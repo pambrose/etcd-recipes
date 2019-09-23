@@ -39,7 +39,7 @@ fun main() {
                                 .use { lock ->
                                     println("Thread $id attempting to lock $keyname")
                                     val lockresp = lock.lock(keyname.asByteSequence, lease.id).get()
-                                    println("Thread $id got lock $keyname")
+                                    println("Thread $id locked $keyname")
 
                                     client.kvClient
                                         .use { kvclient ->
