@@ -22,6 +22,11 @@ fun delayedRepeat(iterations: Int, duration: Duration = 1.seconds, block: (count
     var i = 0
     repeat(iterations) {
         block(i++, startMillis)
-        Thread.sleep(duration.toLongMilliseconds())
+        sleep(duration)
     }
+}
+
+@ExperimentalTime
+fun sleep(duration: Duration) {
+    Thread.sleep(duration.toLongMilliseconds())
 }

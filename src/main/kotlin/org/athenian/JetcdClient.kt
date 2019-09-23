@@ -5,7 +5,11 @@ import io.etcd.jetcd.options.WatchOption
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.random.Random
+import kotlin.time.ExperimentalTime
+import kotlin.time.milliseconds
+import kotlin.time.seconds
 
+@ExperimentalTime
 fun main() {
     val count = 3
     val countdown = CountDownLatch(count)
@@ -38,7 +42,7 @@ fun main() {
                                 println("Watch $id: ${event.eventType} ${event.keyValue.value.asString}")
                             }
 
-                            Thread.sleep(Random.nextLong(3_000))
+                            sleep(Random.nextInt(3_000).milliseconds)
 
                             client.leaseClient
                                 .use { leaseClient ->
@@ -74,10 +78,10 @@ fun main() {
                                             //Thread.sleep(2000)
 
                                             // delete the key
-                                            //kvClient.delete(key).get()
+                                            //kvclient.delete(key).get()
 
                                             println("Thread $id is waiting")
-                                            Thread.sleep(25_000)
+                                            sleep(25.seconds)
                                             println("Thread $id is exiting")
                                         }
                                 }

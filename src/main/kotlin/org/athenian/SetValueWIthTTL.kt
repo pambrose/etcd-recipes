@@ -4,6 +4,7 @@ import io.etcd.jetcd.Client
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.ExperimentalTime
+import kotlin.time.seconds
 
 @ExperimentalTime
 fun main() {
@@ -14,7 +15,7 @@ fun main() {
 
     thread {
         try {
-            Thread.sleep(3_000)
+            sleep(3.seconds)
 
             Client.builder()
                 .run {
@@ -25,7 +26,7 @@ fun main() {
                         .use { leaseClient ->
                             client.kvClient
                                 .use { kvclient ->
-                                    println("Assigning $keyname = keyval")
+                                    println("Assigning $keyname = $keyval")
                                     val lease = leaseClient.grant(5).get()
                                     kvclient.put(keyname.asByteSequence, keyval.asByteSequence, lease.asPutOption).get()
                                 }
@@ -44,10 +45,10 @@ fun main() {
                     endpoints(url)
                     build()
                 }.use { client ->
-                    client.getKVClient()
-                        .use { kvClient ->
+                    client.kvClient
+                        .use { kvclient ->
                             delayedRepeat(12) { i, start ->
-                                val resp = kvClient.get(keyname.asByteSequence).get()
+                                val resp = kvclient.get(keyname.asByteSequence).get()
                                 val keyval = resp.kvs.takeIf { it.size > 0 }?.get(0)?.value?.asString ?: "empty"
                                 println("Key $keyname = $keyval after ${System.currentTimeMillis() - start}ms")
                             }
