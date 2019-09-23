@@ -17,11 +17,12 @@ val LeaseGrantResponse.asPutOption: PutOption
     get() = PutOption.newBuilder().withLeaseId(this.id).build()
 
 @ExperimentalTime
-fun delayedRepeat(iterations: Int, duration: Duration = 1.seconds, block: (count: Int, startMillis: Long) -> Unit) {
+fun repeatWithSleep(iterations: Int,
+                    duration: Duration = 1.seconds,
+                    block: (count: Int, startMillis: Long) -> Unit) {
     val startMillis = System.currentTimeMillis()
-    var i = 0
-    repeat(iterations) {
-        block(i++, startMillis)
+    repeat(iterations) { i ->
+        block(i, startMillis)
         sleep(duration)
     }
 }

@@ -25,7 +25,7 @@ fun main() {
                 }.use { client ->
                     client.kvClient
                         .use { kvclient ->
-                            delayedRepeat(5) { i, start ->
+                            repeatWithSleep(5) { i, start ->
                                 val kv = keyval + i
                                 println("Assigning $keyname = $kv")
                                 kvclient.put(keyname.asByteSequence, kv.asByteSequence).get()
@@ -44,8 +44,6 @@ fun main() {
 
     thread {
         try {
-            sleep(1.seconds)
-
             Client.builder()
                 .run {
                     endpoints(url)

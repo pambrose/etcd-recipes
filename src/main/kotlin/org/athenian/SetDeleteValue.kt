@@ -47,7 +47,7 @@ fun main() {
                 }.use { client ->
                     client.kvClient
                         .use { kvclient ->
-                            delayedRepeat(12) { i, start ->
+                            repeatWithSleep(12) { i, start ->
                                 val resp = kvclient.get(keyname.asByteSequence).get()
                                 val respval = resp.kvs.takeIf { it.size > 0 }?.get(0)?.value?.asString ?: "empty"
                                 println("Key $keyname = $respval after ${System.currentTimeMillis() - start}ms")
