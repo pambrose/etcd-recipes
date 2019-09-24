@@ -1,10 +1,7 @@
 package org.athenian
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.op.Cmp
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.jetcd.op.Op
-import io.etcd.jetcd.options.PutOption
 import io.etcd.jetcd.watch.WatchEvent
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -50,15 +47,11 @@ fun main() {
                                 .use { kvclient ->
                                     kvclient.txn()
                                         .run {
-                                            If(Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, CmpTarget.version(0)))
-                                            Then(Op.put(debug.asByteSequence,
-                                                        "EQUAL".asByteSequence,
-                                                        PutOption.DEFAULT))
-                                            Else(Op.put(debug.asByteSequence,
-                                                        "NOT EQUAL".asByteSequence,
-                                                        PutOption.DEFAULT))
-                                            commit()
-                                        }.get()
+                                            If(equals(keyname, CmpTarget.version(0)))
+                                            Then(put(debug, "EQUAL"))
+                                            Else(put(debug, "NOT EQUAL"))
+                                            commit().get()
+                                        }
 
 
                                     println("Thread $id assigning $keyval")

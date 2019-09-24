@@ -1,6 +1,7 @@
-package org.athenian
+package org.athenian.basics
 
 import io.etcd.jetcd.Client
+import org.athenian.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.ExperimentalTime
@@ -10,7 +11,7 @@ import kotlin.time.seconds
 fun main() {
     val url = "http://localhost:2379"
     val countdown = CountDownLatch(2)
-    val keyname = "foo"
+    val keyname = "/foo"
     val keyval = "foobar"
 
     thread {
@@ -19,14 +20,15 @@ fun main() {
 
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.leaseClient
-                        .use { leaseClient ->
-                            client.kvClient
-                                .use { kvclient ->
-                                    println("Assigning $keyname = $keyval")
-                                    val lease = leaseClient.grant(5).get()
-                                    kvclient.put(keyname, keyval, lease.asPutOption)
-                                }
+                    client.kvClient
+                        .use { kvclient ->
+                            println("Assigning $keyname = $keyval")
+                            kvclient.put(keyname, keyval)
+
+                            sleep(5.seconds)
+
+                            println("Deleting $keyname")
+                            kvclient.delete(keyname)
                         }
                 }
         } finally {
@@ -41,8 +43,8 @@ fun main() {
                     client.kvClient
                         .use { kvclient ->
                             repeatWithSleep(12) { i, start ->
-                                val kval = kvclient.getValue(keyname)
-                                println("Key $keyname = $kval after ${System.currentTimeMillis() - start}ms")
+                                val respval = kvclient.getValue(keyname)
+                                println("Key $keyname = $respval after ${System.currentTimeMillis() - start}ms")
                             }
                         }
                 }

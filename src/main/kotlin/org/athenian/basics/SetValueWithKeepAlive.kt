@@ -1,13 +1,15 @@
-package org.athenian
+package org.athenian.basics
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
+import org.athenian.asPutOption
+import org.athenian.put
 import kotlin.time.ExperimentalTime
 
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
-    val keyname = "/election"
+    val keyname = "/foo"
     val keyval = "foobar"
 
     Client.builder().endpoints(url).build()

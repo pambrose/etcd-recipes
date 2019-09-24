@@ -1,7 +1,8 @@
-package org.athenian
+package org.athenian.basics
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.WatchOption
+import org.athenian.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.ExperimentalTime
@@ -11,7 +12,7 @@ import kotlin.time.seconds
 fun main() {
     val url = "http://localhost:2379"
     val countdown = CountDownLatch(2)
-    val keyname = "foo"
+    val keyname = "/foo"
     val keyval = "foobar"
 
     thread {

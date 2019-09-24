@@ -9,6 +9,9 @@ import io.etcd.jetcd.kv.PutResponse
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lock.LockResponse
 import io.etcd.jetcd.lock.UnlockResponse
+import io.etcd.jetcd.op.Cmp
+import io.etcd.jetcd.op.CmpTarget
+import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.PutOption
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -59,3 +62,12 @@ fun KV.getValue(keyname: String, defaultStr: String = ""): String = getValue(key
 fun Lock.lock(keyname: String, leaseId: Long): LockResponse = lock(keyname.asByteSequence, leaseId).get()
 
 fun Lock.unlock(keyname: String): UnlockResponse = unlock(keyname.asByteSequence).get()
+
+fun put(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): Op.PutOp =
+    Op.put(keyname.asByteSequence, keyval.asByteSequence, option)
+
+fun <T> equals(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, target)
+
+fun <T> less(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.LESS, target)
+
+fun <T> greater(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.GREATER, target)

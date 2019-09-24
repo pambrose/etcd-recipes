@@ -1,27 +1,28 @@
-package org.athenian
+package org.athenian.leader
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
-import io.etcd.jetcd.op.Cmp
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.jetcd.op.Op
-import io.etcd.jetcd.options.PutOption
+import org.athenian.delete
+import org.athenian.equals
+import org.athenian.getValue
+import org.athenian.put
 import kotlin.time.ExperimentalTime
 
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
-    val keyname = "/txntest"
+    val keyname = "/election"
     val debug = "/debug"
 
     fun checkForKey(kvclient: KV) {
         kvclient.txn()
             .run {
-                If(Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, CmpTarget.version(0)))
-                Then(Op.put(debug.asByteSequence, "Key $keyname not found".asByteSequence, PutOption.DEFAULT))
-                Else(Op.put(debug.asByteSequence, "Key $keyname found".asByteSequence, PutOption.DEFAULT))
-                commit()
-            }.get()
+                If(equals(keyname, CmpTarget.version(0)))
+                Then(put(debug, "Key $keyname not found"))
+                Else(put(debug, "Key $keyname found"))
+                commit().get()
+            }
 
         println("Debug value: ${kvclient.getValue(debug)}")
     }
