@@ -17,11 +17,8 @@ fun main() {
         try {
             sleep(3.seconds)
 
-            Client.builder()
-                .run {
-                    endpoints(url)
-                    build()
-                }.use { client ->
+            Client.builder().endpoints(url).build()
+                .use { client ->
                     client.kvClient
                         .use { kvclient ->
                             println("Assigning $keyname = $keyval")
@@ -40,16 +37,12 @@ fun main() {
 
     thread {
         try {
-            Client.builder()
-                .run {
-                    endpoints(url)
-                    build()
-                }.use { client ->
+            Client.builder().endpoints(url).build()
+                .use { client ->
                     client.kvClient
                         .use { kvclient ->
                             repeatWithSleep(12) { i, start ->
-                                val resp = kvclient.get(keyname.asByteSequence).get()
-                                val respval = resp.kvs.takeIf { it.size > 0 }?.get(0)?.value?.asString ?: "empty"
+                                val respval = kvclient.getValue(keyname)
                                 println("Key $keyname = $respval after ${System.currentTimeMillis() - start}ms")
                             }
                         }

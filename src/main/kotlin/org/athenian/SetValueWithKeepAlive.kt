@@ -10,11 +10,8 @@ fun main() {
     val keyname = "/election"
     val keyval = "foobar"
 
-    Client.builder()
-        .run {
-            endpoints(url)
-            build()
-        }.use { client ->
+    Client.builder().endpoints(url).build()
+        .use { client ->
             client.leaseClient
                 .use { leaseClient ->
                     client.kvClient

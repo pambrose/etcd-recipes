@@ -17,11 +17,8 @@ fun main() {
         try {
             sleep(3.seconds)
 
-            Client.builder()
-                .run {
-                    endpoints(url)
-                    build()
-                }.use { client ->
+            Client.builder().endpoints(url).build()
+                .use { client ->
                     client.leaseClient
                         .use { leaseClient ->
                             client.kvClient
@@ -39,16 +36,12 @@ fun main() {
 
     thread {
         try {
-            Client.builder()
-                .run {
-                    endpoints(url)
-                    build()
-                }.use { client ->
+            Client.builder().endpoints(url).build()
+                .use { client ->
                     client.kvClient
                         .use { kvclient ->
                             repeatWithSleep(12) { i, start ->
-                                val resp = kvclient.get(keyname)
-                                val kval = resp.kvs.takeIf { it.size > 0 }?.get(0)?.value?.asString ?: "empty"
+                                val kval = kvclient.getValue(keyname)
                                 println("Key $keyname = $kval after ${System.currentTimeMillis() - start}ms")
                             }
                         }

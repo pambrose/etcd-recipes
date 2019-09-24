@@ -18,11 +18,8 @@ fun main() {
         try {
             sleep(3.seconds)
 
-            Client.builder()
-                .run {
-                    endpoints(url)
-                    build()
-                }.use { client ->
+            Client.builder().endpoints(url).build()
+                .use { client ->
                     client.kvClient
                         .use { kvclient ->
                             repeatWithSleep(5) { i, start ->
@@ -44,11 +41,8 @@ fun main() {
 
     thread {
         try {
-            Client.builder()
-                .run {
-                    endpoints(url)
-                    build()
-                }.use { client ->
+            Client.builder().endpoints(url).build()
+                .use { client ->
                     client.watchClient
                         .use { watch ->
                             val watchOptions =

@@ -14,39 +14,28 @@ fun main() {
     val keyname = "/txntest"
     val debug = "/debug"
 
+    fun checkForKey(kvclient: KV) {
+        kvclient.txn()
+            .run {
+                If(Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, CmpTarget.version(0)))
+                Then(Op.put(debug.asByteSequence, "Key $keyname not found".asByteSequence, PutOption.DEFAULT))
+                Else(Op.put(debug.asByteSequence, "Key $keyname found".asByteSequence, PutOption.DEFAULT))
+                commit()
+            }.get()
 
-    fun runTxn(kvclient: KV) {
-        val txresp =
-            kvclient.txn()
-                .run {
-                    If(Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, CmpTarget.version(0)))
-                    Then(Op.put(debug.asByteSequence, "EQUAL".asByteSequence, PutOption.DEFAULT))
-                    Else(Op.put(debug.asByteSequence, "NOT EQUAL".asByteSequence, PutOption.DEFAULT))
-                    commit()
-                }.get()
-
-        val resp = kvclient.get(debug.asByteSequence).get()
-        val kval = resp.kvs.takeIf { it.size > 0 }?.get(0)?.value?.asString ?: ""
-
-        println("Debug value: $kval")
+        println("Debug value: ${kvclient.getValue(debug)}")
     }
 
-    Client.builder()
-        .run {
-            endpoints(url)
-            build()
-        }
+    Client.builder().endpoints(url).build()
         .use { client ->
-
             client.kvClient
                 .use { kvclient ->
                     println("Deleting keys")
-                    kvclient.delete(keyname)
-                    kvclient.delete(debug)
+                    kvclient.delete(keyname, debug)
 
-                    runTxn(kvclient)
+                    checkForKey(kvclient)
                     kvclient.put(keyname, "Something")
-                    runTxn(kvclient)
+                    checkForKey(kvclient)
                 }
         }
 }

@@ -18,13 +18,9 @@ fun main() {
     repeat(count) { id ->
         thread {
             println("Started Thread $id")
-            Client.builder()
-                .run {
-                    endpoints(url)
-                    build()
-                }
-                .use { client ->
 
+            Client.builder().endpoints(url).build()
+                .use { client ->
                     val keyval = "client$id"
 
                     sleep(Random.nextInt(3_000).milliseconds)
@@ -36,25 +32,21 @@ fun main() {
                             client.lockClient
                                 .use { lock ->
                                     println("Thread $id attempting to lock $keyname")
-                                    val lockresp = lock.lock(keyname.asByteSequence, lease.id).get()
+                                    lock.lock(keyname, lease.id)
                                     println("Thread $id locked $keyname")
 
                                     client.kvClient
                                         .use { kvclient ->
 
                                             println("Thread $id assigning $keyval")
-                                            kvclient
-                                                .put(keyname.asByteSequence, keyval.asByteSequence)
-                                                .get()
+                                            kvclient.put(keyname, keyval)
 
-                                            val response = kvclient.get(keyname)
-
-                                            val respval = response.kvs[0].value.asString
+                                            val respval = kvclient.getValue(keyname)
                                             if (respval == keyval)
                                                 println("Thread $id is the leader")
 
                                             // delete the key
-                                            //kvclient.delete(key).get()
+                                            //kvclient.delete(key)
 
                                             println("Thread $id is waiting")
                                             sleep(25.seconds)
@@ -62,7 +54,7 @@ fun main() {
                                         }
 
                                     println("Thread $id is unlocking")
-                                    lock.unlock(keyname.asByteSequence).get()
+                                    lock.unlock(keyname)
                                     println("Thread $id is done unlocking")
                                 }
                         }
