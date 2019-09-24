@@ -28,12 +28,12 @@ fun main() {
                             repeatWithSleep(5) { i, start ->
                                 val kv = keyval + i
                                 println("Assigning $keyname = $kv")
-                                kvclient.put(keyname.asByteSequence, kv.asByteSequence).get()
+                                kvclient.put(keyname, kv)
 
                                 sleep(1.seconds)
 
                                 println("Deleting $keyname")
-                                kvclient.delete(keyname.asByteSequence).get()
+                                kvclient.delete(keyname)
                             }
                         }
                 }

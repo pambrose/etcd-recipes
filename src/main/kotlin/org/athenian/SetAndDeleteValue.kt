@@ -25,12 +25,12 @@ fun main() {
                     client.kvClient
                         .use { kvclient ->
                             println("Assigning $keyname = $keyval")
-                            kvclient.put(keyname.asByteSequence, keyval.asByteSequence).get()
+                            kvclient.put(keyname, keyval)
 
                             sleep(5.seconds)
 
                             println("Deleting $keyname")
-                            kvclient.delete(keyname.asByteSequence).get()
+                            kvclient.delete(keyname)
                         }
                 }
         } finally {

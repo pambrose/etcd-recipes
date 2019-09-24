@@ -1,8 +1,6 @@
 package org.athenian
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.op.Cmp
-import io.etcd.jetcd.op.CmpTarget
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.random.Random
@@ -44,17 +42,12 @@ fun main() {
                                     client.kvClient
                                         .use { kvclient ->
 
-                                            kvclient.txn()
-                                                .If(Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, CmpTarget.value(keyval.asByteSequence)))
-                                                .Then()
-                                                .Else()
-
                                             println("Thread $id assigning $keyval")
                                             kvclient
                                                 .put(keyname.asByteSequence, keyval.asByteSequence)
                                                 .get()
 
-                                            val response = kvclient.get(keyname.asByteSequence).get()
+                                            val response = kvclient.get(keyname)
 
                                             val respval = response.kvs[0].value.asString
                                             if (respval == keyval)

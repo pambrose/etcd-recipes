@@ -28,10 +28,9 @@ fun main() {
                                 .use { kvclient ->
                                     println("Assigning $keyname = $keyval")
                                     val lease = leaseClient.grant(5).get()
-                                    kvclient.put(keyname.asByteSequence, keyval.asByteSequence, lease.asPutOption).get()
+                                    kvclient.put(keyname, keyval, lease.asPutOption)
                                 }
                         }
-
                 }
         } finally {
             countdown.countDown()
@@ -48,9 +47,9 @@ fun main() {
                     client.kvClient
                         .use { kvclient ->
                             repeatWithSleep(12) { i, start ->
-                                val resp = kvclient.get(keyname.asByteSequence).get()
-                                val keyval = resp.kvs.takeIf { it.size > 0 }?.get(0)?.value?.asString ?: "empty"
-                                println("Key $keyname = $keyval after ${System.currentTimeMillis() - start}ms")
+                                val resp = kvclient.get(keyname)
+                                val kval = resp.kvs.takeIf { it.size > 0 }?.get(0)?.value?.asString ?: "empty"
+                                println("Key $keyname = $kval after ${System.currentTimeMillis() - start}ms")
                             }
                         }
                 }

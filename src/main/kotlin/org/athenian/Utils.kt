@@ -1,6 +1,10 @@
 package org.athenian
 
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.KV
+import io.etcd.jetcd.kv.DeleteResponse
+import io.etcd.jetcd.kv.GetResponse
+import io.etcd.jetcd.kv.PutResponse
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.options.PutOption
 import kotlin.time.Duration
@@ -31,3 +35,14 @@ fun repeatWithSleep(iterations: Int,
 fun sleep(duration: Duration) {
     Thread.sleep(duration.toLongMilliseconds())
 }
+
+infix fun KV.put(kv: Pair<String, String>): PutResponse = put(kv.first, kv.second)
+
+fun KV.put(keyname: String, keyval: String): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
+
+fun KV.put(keyname: String, keyval: String, option: PutOption): PutResponse =
+    put(keyval.asByteSequence, keyval.asByteSequence, option).get()
+
+infix fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).get()
+
+infix fun KV.get(keyname: String): GetResponse = get(keyname.asByteSequence).get()
