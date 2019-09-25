@@ -46,12 +46,7 @@ fun main() {
                 .use { client ->
                     client.watchClient
                         .use { watch ->
-                            val watchOptions =
-                                WatchOption.newBuilder()
-                                    .run {
-                                        withRevision(0)
-                                        build()
-                                    }
+                            val watchOptions = WatchOption.newBuilder().withRevision(0).build()
                             println("Starting watch")
                             val watcher =
                                 watch.watch(keyname.asByteSequence, watchOptions) { resp ->

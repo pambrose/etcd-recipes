@@ -28,7 +28,6 @@ fun main() {
                                                                      { err ->
                                                                          println("KeepAlive err resp: $err")
                                                                      })
-
                             ).use {
                                 println("Starting sleep")
                                 Thread.sleep(20_000)
