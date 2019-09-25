@@ -1,6 +1,7 @@
-package org.athenian
+package org.athenian.basics
 
 import io.etcd.jetcd.Client
+import org.athenian.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.random.Random

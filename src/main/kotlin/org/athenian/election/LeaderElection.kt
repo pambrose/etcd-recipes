@@ -18,12 +18,12 @@ import kotlin.time.seconds
 
 @ExperimentalTime
 class LeaderElection(val url: String,
-                     val electionTopicName: String = defaultElectionKeyName,
+                     val electionKeyName: String = defaultElectionKeyName,
                      val id: String = "Unassigned:${abs(Random.nextInt())}") : Closeable {
+    private val executor = Executors.newFixedThreadPool(2)
     private val startCountdown = CountDownLatch(1)
     private val initCountDown = CountDownLatch(1)
     private val watchCountDown = CountDownLatch(1)
-    private val executor = Executors.newFixedThreadPool(2)
 
     fun start(actions: ElectionActions): LeaderElection {
         executor.submit {
@@ -70,25 +70,43 @@ class LeaderElection(val url: String,
 
     override fun close() {
         watchCountDown.countDown()
+        sleep(1.seconds)
         startCountdown.countDown()
         sleep(1.seconds)
         executor.shutdown()
     }
 
-    // This will not return until election failure or relinquishes leadership
+    private fun watchForLeadershipOpening(watchClient: Watch, action: () -> Unit): Watch.Watcher {
+        val watchOptions = WatchOption.newBuilder().withRevision(0).build()
+        return watchClient.watch(electionKeyName.asByteSequence, watchOptions) { resp ->
+            // Create a watch to act on DELETE events
+            resp.events
+                .forEach { event ->
+                    if (event.eventType == WatchEvent.EventType.DELETE) {
+                        //println("$clientId executing action")
+                        action.invoke()
+                    }
+                }
+        }
+    }
+
+    // This will not return until election failure or leader surrenders leadership
     private fun attemptToBecomeLeader(actions: ElectionActions, leaseClient: Lease, kvclient: KV) {
-
+        // Prime lease with 2 seconds to give keepAlive a chance to get started
+        val lease = leaseClient.grant(2).get()
+        // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$id:${abs(Random.nextInt())}"
-        val lease = leaseClient.grant(1).get()
 
+        // Do a CAS on on the key name. If it is not found, then set it
         kvclient.txn()
             .run {
-                If(equals(electionTopicName, CmpTarget.version(0)))
-                Then(put(electionTopicName, uniqueToken, lease.asPutOption))
+                If(equals(electionKeyName, CmpTarget.version(0)))
+                Then(put(electionKeyName, uniqueToken, lease.asPutOption))
                 commit().get()
             }
 
-        if (kvclient.getValue(electionTopicName) == uniqueToken) {
+        // Check to see if unique value was successfully set in the CAS step
+        if (kvclient.getValue(electionKeyName) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
                                       { next -> /*println("KeepAlive next resp: $next")*/ },
@@ -102,20 +120,8 @@ class LeaderElection(val url: String,
         }
     }
 
-    private fun watchForLeadershipOpening(watchClient: Watch, action: () -> Unit): Watch.Watcher {
-        val watchOptions = WatchOption.newBuilder().withRevision(0).build()
-        return watchClient.watch(electionTopicName.asByteSequence, watchOptions) { resp ->
-            resp.events.forEach { event ->
-                if (event.eventType == WatchEvent.EventType.DELETE) {
-                    //println("$clientId executing action")
-                    action.invoke()
-                }
-            }
-        }
-    }
-
     companion object {
-        private val defaultElectionKeyName = "/election/leader"
+        val defaultElectionKeyName = "/election/leader"
 
         fun resetKeys(url: String, electionKeyName: String = defaultElectionKeyName) {
             Client.builder().endpoints(url).build()
