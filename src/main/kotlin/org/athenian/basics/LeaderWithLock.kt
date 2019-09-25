@@ -9,12 +9,14 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.milliseconds
 import kotlin.time.seconds
 
+// Note: This is *not* the way to do an election
+
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val count = 3
     val countdown = CountDownLatch(count)
-    val keyname = "/election"
+    val keyname = "/lockedElection"
 
     repeat(count) { id ->
         thread {
@@ -42,15 +44,14 @@ fun main() {
                                             println("Thread $id assigning $keyval")
                                             kvclient.put(keyname, keyval)
 
-                                            val respval = kvclient.getValue(keyname)
-                                            if (respval == keyval)
+                                            if (kvclient.getValue(keyname) == keyval)
                                                 println("Thread $id is the leader")
 
                                             // delete the key
                                             //kvclient.delete(key)
 
                                             println("Thread $id is waiting")
-                                            sleep(25.seconds)
+                                            sleep(15.seconds)
                                             println("Thread $id is done waiting")
                                         }
 
