@@ -29,33 +29,32 @@ class LeaderElection(val url: String,
         executor.submit {
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.leaseClient
-                        .use { leaseClient ->
-                            client.watchClient
-                                .use { watchClient ->
-                                    client.kvClient
-                                        .use { kvclient ->
-                                            val countdown = CountDownLatch(1)
+                    client.withLeaseClient { leaseClient ->
+                        client.withWatchClient { watchClient ->
+                            client.withKvClient { kvclient ->
+                                val countdown = CountDownLatch(1)
 
-                                            initCountDown.countDown()
+                                initCountDown.countDown()
 
-                                            executor.submit {
-                                                watchForLeadershipOpening(watchClient) {
-                                                    attemptToBecomeLeader(actions, leaseClient, kvclient)
-                                                }.use {
-                                                    watchCountDown.await()
-                                                }
-                                            }
-
-                                            // Give the watcher a chance to start
-                                            sleep(2.seconds)
-
-                                            attemptToBecomeLeader(actions, leaseClient, kvclient)
-
-                                            countdown.await()
-                                        }
+                                executor.submit {
+                                    watchForLeadershipOpening(watchClient) {
+                                        // Run for leader when leader key is deleted
+                                        attemptToBecomeLeader(actions, leaseClient, kvclient)
+                                    }.use {
+                                        watchCountDown.await()
+                                    }
                                 }
+
+                                // Give the watcher a chance to start
+                                sleep(2.seconds)
+
+                                // Clients should run for leader in case they are the first to run
+                                attemptToBecomeLeader(actions, leaseClient, kvclient)
+
+                                countdown.await()
+                            }
                         }
+                    }
                 }
         }
 
@@ -98,12 +97,10 @@ class LeaderElection(val url: String,
         val uniqueToken = "$id:${abs(Random.nextInt())}"
 
         // Do a CAS on on the key name. If it is not found, then set it
-        kvclient.txn()
-            .run {
-                If(equals(electionKeyName, CmpTarget.version(0)))
-                Then(put(electionKeyName, uniqueToken, lease.asPutOption))
-                commit().get()
-            }
+        kvclient.transaction {
+            If(equals(electionKeyName, CmpTarget.version(0)))
+            Then(put(electionKeyName, uniqueToken, lease.asPutOption))
+        }
 
         // Check to see if unique value was successfully set in the CAS step
         if (kvclient.getValue(electionKeyName) == uniqueToken) {
@@ -126,10 +123,9 @@ class LeaderElection(val url: String,
         fun resetKeys(url: String, electionKeyName: String = defaultElectionKeyName) {
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.kvClient
-                        .use { kvclient ->
-                            kvclient.delete(electionKeyName)
-                        }
+                    client.withKvClient { kvclient ->
+                        kvclient.delete(electionKeyName)
+                    }
                 }
         }
     }

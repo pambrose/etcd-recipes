@@ -5,6 +5,7 @@ import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import org.athenian.asByteSequence
 import org.athenian.asString
+import org.athenian.withWatchClient
 import java.util.concurrent.CountDownLatch
 import kotlin.time.ExperimentalTime
 import kotlin.time.MonoClock
@@ -18,8 +19,7 @@ fun main() {
 
     Client.builder().endpoints(url).build()
         .use { client ->
-            client.watchClient
-                .use { watchClient ->
+            client.withWatchClient { watchClient ->
                     val watchOptions = WatchOption.newBuilder().withRevision(0).build()
                     watchClient.watch(electionKeyName.asByteSequence, watchOptions) { resp ->
                         resp.events

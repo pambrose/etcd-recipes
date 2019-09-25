@@ -21,19 +21,18 @@ fun main() {
 
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.kvClient
-                        .use { kvclient ->
-                            repeatWithSleep(5) { i, start ->
-                                val kv = keyval + i
-                                println("Assigning $keyname = $kv")
-                                kvclient.put(keyname, kv)
+                    client.withKvClient { kvclient ->
+                        repeatWithSleep(5) { i, start ->
+                            val kv = keyval + i
+                            println("Assigning $keyname = $kv")
+                            kvclient.put(keyname, kv)
 
-                                sleep(1.seconds)
+                            sleep(1.seconds)
 
-                                println("Deleting $keyname")
-                                kvclient.delete(keyname)
-                            }
+                            println("Deleting $keyname")
+                            kvclient.delete(keyname)
                         }
+                    }
                 }
         } finally {
             countdown.countDown()
@@ -44,22 +43,21 @@ fun main() {
         try {
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.watchClient
-                        .use { watch ->
-                            val watchOptions = WatchOption.newBuilder().withRevision(0).build()
-                            println("Starting watch")
-                            val watcher =
-                                watch.watch(keyname.asByteSequence, watchOptions) { resp ->
-                                    resp.events.forEach { event ->
-                                        println("Watch event: ${event.eventType} ${event.keyValue.value.asString}")
-                                    }
+                    client.withWatchClient { watchClient ->
+                        val watchOptions = WatchOption.newBuilder().withRevision(0).build()
+                        println("Starting watch")
+                        val watcher =
+                            watchClient.watch(keyname.asByteSequence, watchOptions) { resp ->
+                                resp.events.forEach { event ->
+                                    println("Watch event: ${event.eventType} ${event.keyValue.value.asString}")
                                 }
+                            }
 
-                            sleep(5.seconds)
+                        sleep(5.seconds)
 
-                            println("Closing watch")
-                            watcher.close()
-                        }
+                        println("Closing watch")
+                        watcher.close()
+                    }
                 }
         } finally {
             countdown.countDown()

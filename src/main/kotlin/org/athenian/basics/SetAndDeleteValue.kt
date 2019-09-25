@@ -20,16 +20,15 @@ fun main() {
 
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.kvClient
-                        .use { kvclient ->
-                            println("Assigning $keyname = $keyval")
-                            kvclient.put(keyname, keyval)
+                    client.withKvClient { kvclient ->
+                        println("Assigning $keyname = $keyval")
+                        kvclient.put(keyname, keyval)
 
-                            sleep(5.seconds)
+                        sleep(5.seconds)
 
-                            println("Deleting $keyname")
-                            kvclient.delete(keyname)
-                        }
+                        println("Deleting $keyname")
+                        kvclient.delete(keyname)
+                    }
                 }
         } finally {
             countdown.countDown()
@@ -40,13 +39,12 @@ fun main() {
         try {
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.kvClient
-                        .use { kvclient ->
-                            repeatWithSleep(12) { i, start ->
-                                val respval = kvclient.getValue(keyname)
-                                println("Key $keyname = $respval after ${System.currentTimeMillis() - start}ms")
-                            }
+                    client.withKvClient { kvclient ->
+                        repeatWithSleep(12) { i, start ->
+                            val respval = kvclient.getValue(keyname)
+                            println("Key $keyname = $respval after ${System.currentTimeMillis() - start}ms")
                         }
+                    }
                 }
 
         } finally {

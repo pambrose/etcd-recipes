@@ -28,38 +28,34 @@ fun main() {
 
                     sleep(Random.nextInt(3_000).milliseconds)
 
-                    client.leaseClient
-                        .use { leaseClient ->
-                            val lease = leaseClient.grant(10).get()
+                    client.withLeaseClient { leaseClient ->
+                        val lease = leaseClient.grant(10).get()
 
-                            client.lockClient
-                                .use { lock ->
-                                    println("Thread $id attempting to lock $keyname")
-                                    lock.lock(keyname, lease.id)
-                                    println("Thread $id locked $keyname")
+                        client.withLockClient { lock ->
+                            println("Thread $id attempting to lock $keyname")
+                            lock.lock(keyname, lease.id)
+                            println("Thread $id locked $keyname")
 
-                                    client.kvClient
-                                        .use { kvclient ->
+                            client.withKvClient { kvclient ->
+                                println("Thread $id assigning $keyval")
+                                kvclient.put(keyname, keyval)
 
-                                            println("Thread $id assigning $keyval")
-                                            kvclient.put(keyname, keyval)
+                                if (kvclient.getValue(keyname) == keyval)
+                                    println("Thread $id is the leader")
 
-                                            if (kvclient.getValue(keyname) == keyval)
-                                                println("Thread $id is the leader")
+                                // delete the key
+                                //kvclient.delete(key)
 
-                                            // delete the key
-                                            //kvclient.delete(key)
+                                println("Thread $id is waiting")
+                                sleep(15.seconds)
+                                println("Thread $id is done waiting")
+                            }
 
-                                            println("Thread $id is waiting")
-                                            sleep(15.seconds)
-                                            println("Thread $id is done waiting")
-                                        }
-
-                                    println("Thread $id is unlocking")
-                                    lock.unlock(keyname)
-                                    println("Thread $id is done unlocking")
-                                }
+                            println("Thread $id is unlocking")
+                            lock.unlock(keyname)
+                            println("Thread $id is done unlocking")
                         }
+                    }
                 }
             countdown.countDown()
         }

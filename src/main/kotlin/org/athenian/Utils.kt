@@ -1,8 +1,6 @@
 package org.athenian
 
-import io.etcd.jetcd.ByteSequence
-import io.etcd.jetcd.KV
-import io.etcd.jetcd.Lock
+import io.etcd.jetcd.*
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.kv.PutResponse
@@ -71,3 +69,25 @@ fun <T> equals(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteS
 fun <T> less(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.LESS, target)
 
 fun <T> greater(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.GREATER, target)
+
+fun Client.withWatchClient(block: (watchClient: Watch) -> Unit) = watchClient.use { block(it) }
+
+fun Client.withLeaseClient(block: (leaseClient: Lease) -> Unit) = leaseClient.use { block(it) }
+
+fun Client.withLockClient(block: (lockClient: Lock) -> Unit) = lockClient.use { block(it) }
+
+fun Client.withMaintClient(block: (maintClient: Maintenance) -> Unit) = maintenanceClient.use { block(it) }
+
+fun Client.withClusterClient(block: (clusterClient: Cluster) -> Unit) = clusterClient.use { block(it) }
+
+fun Client.withAuthrClient(block: (authClient: Auth) -> Unit) = authClient.use { block(it) }
+
+fun Client.withKvClient(block: (kvClient: KV) -> Unit) = kvClient.use { block(it) }
+
+fun KV.transaction(block: Txn.() -> Txn) {
+    txn()
+        .run {
+            block()
+            commit().get()
+        }
+}

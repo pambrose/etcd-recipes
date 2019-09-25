@@ -20,15 +20,13 @@ fun main() {
 
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.leaseClient
-                        .use { leaseClient ->
-                            client.kvClient
-                                .use { kvclient ->
-                                    println("Assigning $keyname = $keyval")
-                                    val lease = leaseClient.grant(5).get()
-                                    kvclient.put(keyname, keyval, lease.asPutOption)
-                                }
+                    client.withLeaseClient { leaseClient ->
+                        client.withKvClient { kvclient ->
+                            println("Assigning $keyname = $keyval")
+                            val lease = leaseClient.grant(5).get()
+                            kvclient.put(keyname, keyval, lease.asPutOption)
                         }
+                    }
                 }
         } finally {
             countdown.countDown()
@@ -39,13 +37,12 @@ fun main() {
         try {
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.kvClient
-                        .use { kvclient ->
-                            repeatWithSleep(12) { i, start ->
-                                val kval = kvclient.getValue(keyname)
-                                println("Key $keyname = $kval after ${System.currentTimeMillis() - start}ms")
-                            }
+                    client.withKvClient { kvclient ->
+                        repeatWithSleep(12) { i, start ->
+                            val kval = kvclient.getValue(keyname)
+                            println("Key $keyname = $kval after ${System.currentTimeMillis() - start}ms")
                         }
+                    }
                 }
 
         } finally {
