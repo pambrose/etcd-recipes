@@ -55,7 +55,7 @@ infix fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequ
 
 infix fun KV.get(keyname: String): GetResponse = get(keyname.asByteSequence).get()
 
-infix fun KV.getValue(keyname: String): String? = get(keyname).kvs.takeIf { it.size > 0 }?.get(0)?.value?.asString
+infix fun KV.getValue(keyname: String): String? = get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
 
 fun KV.getValue(keyname: String, defaultStr: String = ""): String = getValue(keyname) ?: defaultStr
 
