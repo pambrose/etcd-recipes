@@ -11,6 +11,7 @@ import io.etcd.jetcd.op.Cmp
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.PutOption
+import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
@@ -90,4 +91,12 @@ fun KV.transaction(block: Txn.() -> Txn) {
             block()
             commit().get()
         }
+}
+
+fun randomId(length: Int = 10): String {
+    val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+    return (1..length)
+        .map { Random.nextInt(0, charPool.size) }
+        .map { i -> charPool.get(i) }
+        .joinToString("");
 }

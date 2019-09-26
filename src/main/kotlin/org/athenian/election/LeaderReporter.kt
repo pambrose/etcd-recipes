@@ -13,7 +13,7 @@ import kotlin.time.MonoClock
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
-    val electionKeyName = LeaderElection.defaultElectionKeyName
+    val electionKeyName = LeaderElection.defaultElectionPath
     val clock = MonoClock
     var unelectedTime = clock.markNow()
 

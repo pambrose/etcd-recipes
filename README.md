@@ -16,3 +16,7 @@ etcd --listen-client-urls=http://localhost:2379 --advertise-client-urls=http://l
 * [Transaction Example](https://banzaicloud.com/blog/jetcd_bug/)
 * [play.etcd.io](http://play.etcd.io/play)
 * [Go etcd3 API](https://godoc.org/github.com/coreos/etcd/clientv3)
+
+
+## Elections
+* [etcd3 leader election using Python](https://www.sandtable.com/etcd3-leader-election-using-python/)

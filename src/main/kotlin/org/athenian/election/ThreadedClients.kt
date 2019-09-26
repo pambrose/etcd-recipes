@@ -9,7 +9,7 @@ import kotlin.time.seconds
 fun main() {
     val url = "http://localhost:2379"
 
-    LeaderElection.resetKeys(url)
+    LeaderElection.resetElectionPath(url)
 
     val participants = List(3) { LeaderElection(url = url, id = "Thread$it") }
 
