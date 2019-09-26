@@ -13,6 +13,7 @@ import io.etcd.jetcd.op.Cmp
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.PutOption
+import java.util.concurrent.Semaphore
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -59,16 +60,19 @@ fun KV.put(keyname: String, keyval: String, option: PutOption): PutResponse =
 
 fun KV.delete(vararg keynames: String) = keynames.forEach { delete(it) }
 
-infix fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).get()
+fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).get()
 
-infix fun KV.get(keyname: String): GetResponse = get(keyname.asByteSequence).get()
+fun KV.get(keyname: String): GetResponse = get(keyname.asByteSequence).get()
 
-infix fun KV.getStringValue(keyname: String): String? =
+fun KV.getStringValue(keyname: String): String? =
     get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
 
 fun KV.getStringValue(keyname: String, defaultStr: String): String = getStringValue(keyname) ?: defaultStr
 
-infix fun KV.getLongValue(keyname: String): Long? =
+fun KV.getLongValue(keyname: String): Long? =
+    get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
+
+fun KV.getLongValue(keyname: String, revision: Long): Long? =
     get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
 
 fun Lock.lock(keyname: String, leaseId: Long): LockResponse = lock(keyname.asByteSequence, leaseId).get()
@@ -118,4 +122,13 @@ fun randomId(length: Int = 10): String {
         .map { Random.nextInt(0, charPool.size) }
         .map { i -> charPool.get(i) }
         .joinToString("");
+}
+
+fun <T> Semaphore.withLock(block: () -> T): T {
+    acquire()
+    try {
+        return block()
+    } finally {
+        release()
+    }
 }
