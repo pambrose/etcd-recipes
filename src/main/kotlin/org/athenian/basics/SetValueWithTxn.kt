@@ -19,7 +19,7 @@ fun main() {
             Else(put(debug, "Key $keyname found"))
         }
 
-        println("Debug value: ${kvclient.getValue(debug)}")
+        println("Debug value: ${kvclient.getStringValue(debug, "unset")}")
     }
 
     Client.builder().endpoints(url).build()

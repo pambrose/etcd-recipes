@@ -40,7 +40,7 @@ fun main() {
                                 println("Thread $id assigning $keyval")
                                 kvclient.put(keyname, keyval)
 
-                                if (kvclient.getValue(keyname) == keyval)
+                                if (kvclient.getStringValue(keyname) == keyval)
                                     println("Thread $id is the leader")
 
                                 // delete the key

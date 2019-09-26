@@ -94,17 +94,18 @@ class LeaderElection(val url: String,
     private fun attemptToBecomeLeader(actions: ElectionActions, leaseClient: Lease, kvclient: KV): Boolean {
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.grant(2).get()
+
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$id:${abs(Random.nextInt())}"
 
-        // Do a CAS on on the key name. If it is not found, then set it
+        // Do a CAS on the key name. If it is not found, then set it
         kvclient.transaction {
             If(equals(electionPath, CmpTarget.version(0)))
             Then(put(electionPath, uniqueToken, lease.asPutOption))
         }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (kvclient.getValue(electionPath) == uniqueToken) {
+        return if (kvclient.getStringValue(electionPath) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
                                       { next -> /*println("KeepAlive next resp: $next")*/ },

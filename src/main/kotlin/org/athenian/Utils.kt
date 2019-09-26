@@ -1,9 +1,11 @@
 package org.athenian
 
+import com.google.common.primitives.Longs
 import io.etcd.jetcd.*
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.kv.PutResponse
+import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lock.LockResponse
 import io.etcd.jetcd.lock.UnlockResponse
@@ -19,8 +21,15 @@ import kotlin.time.seconds
 val String.asByteSequence: ByteSequence
     get() = ByteSequence.from(this.toByteArray())
 
+val Long.asByteSequence: ByteSequence
+    get() = ByteSequence.from(Longs.toByteArray(this))
+
+
 val ByteSequence.asString: String
     get() = toString(Charsets.UTF_8)
+
+val ByteSequence.asLong: Long
+    get() = Longs.fromByteArray(bytes)
 
 val LeaseGrantResponse.asPutOption: PutOption
     get() = PutOption.newBuilder().withLeaseId(this.id).build()
@@ -54,16 +63,26 @@ infix fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequ
 
 infix fun KV.get(keyname: String): GetResponse = get(keyname.asByteSequence).get()
 
-infix fun KV.getValue(keyname: String): String? = get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
+infix fun KV.getStringValue(keyname: String): String? =
+    get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
 
-fun KV.getValue(keyname: String, defaultStr: String = ""): String = getValue(keyname) ?: defaultStr
+fun KV.getStringValue(keyname: String, defaultStr: String): String = getStringValue(keyname) ?: defaultStr
+
+infix fun KV.getLongValue(keyname: String): Long? =
+    get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
 
 fun Lock.lock(keyname: String, leaseId: Long): LockResponse = lock(keyname.asByteSequence, leaseId).get()
 
 fun Lock.unlock(keyname: String): UnlockResponse = unlock(keyname.asByteSequence).get()
 
 fun put(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): Op.PutOp =
-    Op.put(keyname.asByteSequence, keyval.asByteSequence, option)
+    put(keyname, keyval.asByteSequence, option)
+
+fun put(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): Op.PutOp =
+    put(keyname, keyval.asByteSequence, option)
+
+fun put(keyname: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): Op.PutOp =
+    Op.put(keyname.asByteSequence, keyval, option)
 
 fun <T> equals(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, target)
 
@@ -85,12 +104,12 @@ fun Client.withAuthrClient(block: (authClient: Auth) -> Unit) = authClient.use {
 
 fun Client.withKvClient(block: (kvClient: KV) -> Unit) = kvClient.use { block(it) }
 
-fun KV.transaction(block: Txn.() -> Txn) {
-    txn()
+fun KV.transaction(block: Txn.() -> Txn): TxnResponse {
+    return txn()
         .run {
             block()
-            commit().get()
-        }
+            commit()
+        }.get()
 }
 
 fun randomId(length: Int = 10): String {
