@@ -57,6 +57,10 @@ fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).
 
 fun KV.getValue(keyname: String): GetResponse = get(keyname.asByteSequence).get()
 
+fun KV.keyIsPresent(keyname: String): Boolean = getStringValue(keyname) != null
+
+fun KV.keyIsNotPresent(keyname: String): Boolean = !keyIsPresent(keyname)
+
 fun KV.getStringValue(keyname: String): String? =
     getValue(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
 

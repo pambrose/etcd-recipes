@@ -8,8 +8,6 @@ import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlin.math.abs
-import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
@@ -17,10 +15,10 @@ import kotlin.time.seconds
 
 @ExperimentalTime
 class LeaderElection(val url: String,
-                     val electionName: String,
+                     electionName: String,
                      val id: String = "Client:${randomId()}") : Closeable {
 
-
+    private val electionPath = electionPath(electionName)
     private val executor = Executors.newFixedThreadPool(2)
     private val startCountdown = CountDownLatch(1)
     private val initCountDown = CountDownLatch(1)
@@ -82,7 +80,7 @@ class LeaderElection(val url: String,
     }
 
     private fun watchForLeadershipOpening(watchClient: Watch, action: () -> Unit): Watch.Watcher =
-        watchClient.watcher(electionName) { watchResponse ->
+        watchClient.watcher(electionPath) { watchResponse ->
             // Create a watch to act on DELETE events
             watchResponse.events
                 .forEach { event ->
@@ -99,16 +97,16 @@ class LeaderElection(val url: String,
         val lease = leaseClient.grant(2).get()
 
         // Create unique token to avoid collision from clients with same id
-        val uniqueToken = "$id:${abs(Random.nextInt())}"
+        val uniqueToken = "$id:${randomId(9)}"
 
         // Do a CAS on the key name. If it is not found, then set it
         kvclient.transaction {
-            If(equals(electionName, CmpTarget.version(0)))
-            Then(putOp(electionName, uniqueToken, lease.asPutOption))
+            If(equals(electionPath, CmpTarget.version(0)))
+            Then(putOp(electionPath, uniqueToken, lease.asPutOption))
         }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (kvclient.getStringValue(electionName) == uniqueToken) {
+        return if (kvclient.getStringValue(electionPath) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
                                       { next -> /*println("KeepAlive next resp: $next")*/ },
