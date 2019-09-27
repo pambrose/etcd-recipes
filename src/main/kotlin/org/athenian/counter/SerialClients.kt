@@ -6,7 +6,7 @@ import kotlin.time.ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
 
-    DistributedAtomicLong.resetCounter(url, "counter2")
+    DistributedAtomicLong.reset(url, "counter2")
 
     val counters = List(30) { DistributedAtomicLong(url, "counter2") }
 

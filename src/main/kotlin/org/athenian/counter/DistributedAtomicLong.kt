@@ -6,42 +6,28 @@ import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
 import org.athenian.*
 import java.io.Closeable
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.Semaphore
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.random.Random
 
 class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
 
-    val executor = Executors.newSingleThreadExecutor()
-    val counterPath = "$counterPrefix/$counterName"
-    val semaphore = Semaphore(1, true)
-    val latch = CountDownLatch(1)
-    lateinit var kv: KV
+    private val counterPath = counterPath(counterName)
+    private val semaphore = Semaphore(1, true)
+    private val client: Client
+    private val kv: KV
 
     init {
-        // Hold lock until initialization has taken place
-        semaphore.acquire()
-        executor.submit {
-            Client.builder().endpoints(url).build()
-                .use { client ->
-                    client.withKvClient { kvclient ->
+        client = Client.builder().endpoints(url).build()
+        kv = client.kvClient
 
-                        kv = kvclient
-
-                        // Create counter if first time through
-                        createCounterIfNotPresent()
-
-                        semaphore.release()
-
-                        latch.await()
-                    }
-                }
-        }
+        // Create counter if first time through
+        createCounterIfNotPresent()
     }
 
     override fun close() {
-        latch.countDown()
-        executor.shutdown()
+        kv.close()
+        client.close()
     }
 
     fun get(): Long = semaphore.withLock { kv.getLongValue(counterPath) ?: -1 }
@@ -50,28 +36,26 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
 
     fun decrement(): Long = modifyCounterValue(-1)
 
-    fun add(amt: Long): Long = modifyCounterValue(amt)
+    fun add(value: Long): Long = modifyCounterValue(value)
 
-    fun subtract(amt: Long): Long = modifyCounterValue(-amt)
+    fun subtract(value: Long): Long = modifyCounterValue(-value)
 
-    fun reset() {
+    private fun modifyCounterValue(value: Long): Long =
         semaphore.withLock {
-            kv.delete(counterPath)
-            createCounterIfNotPresent()
-        }
-    }
-
-    private fun modifyCounterValue(amt: Long): Long =
-        semaphore.withLock {
+            var count = 1
+            totalCount.incrementAndGet()
             do {
-                val txnResponse = applyCounterTransaction(amt)
-                if (!txnResponse.isSucceeded)
-                    println("Collision")
+                val txnResponse = applyCounterTransaction(value)
+                if (!txnResponse.isSucceeded) {
+                    println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
+                    // Crude backoff for retry
+                    Thread.sleep(Random.nextLong(count * 100L))
+                    count++
+                }
             } while (!txnResponse.isSucceeded)
 
             kv.getLongValue(counterPath) ?: -1
         }
-
 
     private fun createCounterIfNotPresent(): Boolean =
         // Run the transaction if the counter is not present
@@ -97,17 +81,20 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
     }
 
     companion object {
-        val counterPrefix = "/counters"
+        private val counterPrefix = "/counters"
+        val collisionCount = AtomicLong()
+        val totalCount = AtomicLong()
 
-        fun resetCounter(url: String, counterName: String) {
-            val counterPath = "$counterPrefix/$counterName"
+        fun counterPath(counterName: String) =
+            "${counterPrefix}${if (counterName.startsWith("/")) "" else "/"}$counterName"
+
+        fun reset(url: String, counterName: String) {
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvclient ->
-                        kvclient.delete(counterPath)
+                        kvclient.delete(counterPath(counterName))
                     }
                 }
         }
     }
-
 }
