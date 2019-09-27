@@ -1,10 +1,9 @@
 package org.athenian.election
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
-import org.athenian.asByteSequence
 import org.athenian.asString
+import org.athenian.watcher
 import org.athenian.withWatchClient
 import java.util.concurrent.CountDownLatch
 import kotlin.time.ExperimentalTime
@@ -13,15 +12,14 @@ import kotlin.time.MonoClock
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
-    val electionKeyName = LeaderElection.defaultElectionPath
+    val electionKeyName = "/election1"
     val clock = MonoClock
     var unelectedTime = clock.markNow()
 
     Client.builder().endpoints(url).build()
         .use { client ->
             client.withWatchClient { watchClient ->
-                    val watchOptions = WatchOption.newBuilder().withRevision(0).build()
-                    watchClient.watch(electionKeyName.asByteSequence, watchOptions) { resp ->
+                watchClient.watcher(electionKeyName) { resp ->
                         resp.events
                             .forEach { event ->
                                 when (event.eventType) {
@@ -39,10 +37,11 @@ fun main() {
                                     }
                                 }
                             }
-                    }
+                }.use {
                     // Sleep forever
                     val countdown = CountDownLatch(1)
                     countdown.await()
+                }
                 }
         }
 }

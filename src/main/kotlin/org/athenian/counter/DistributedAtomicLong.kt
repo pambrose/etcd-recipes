@@ -14,19 +14,22 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
     private val counterPath = counterPath(counterName)
     private val semaphore = Semaphore(1, true)
     private val client = Client.builder().endpoints(url).build()
-    private val kv = client.kvClient
+    private val kvClient = client.kvClient
 
     init {
+        require(url.isEmpty()) { "URL cannot be empty" }
+        require(counterName.isEmpty()) { "Counter name cannot be empty" }
+
         // Create counter if first time through
         createCounterIfNotPresent()
     }
 
     override fun close() {
-        kv.close()
+        kvClient.close()
         client.close()
     }
 
-    fun get(): Long = semaphore.withLock { kv.getLongValue(counterPath) ?: -1 }
+    fun get(): Long = semaphore.withLock { kvClient.getLongValue(counterPath) ?: -1 }
 
     fun increment(): Long = modifyCounterValue(1)
 
@@ -50,16 +53,16 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
                 }
             } while (!txnResponse.isSucceeded)
 
-            kv.getLongValue(counterPath) ?: -1
+            kvClient.getLongValue(counterPath) ?: -1
         }
 
     private fun createCounterIfNotPresent(): Boolean =
         // Run the transaction if the counter is not present
-        if (kv.get(counterPath).kvs.isEmpty()) {
+        if (kvClient.getValue(counterPath).kvs.isEmpty()) {
             val txn =
-                kv.transaction {
+                kvClient.transaction {
                     If(equals(counterPath, CmpTarget.version(0)))
-                    Then(put(counterPath, 0))
+                    Then(puOp(counterPath, 0))
                 }
             txn.isSucceeded
         } else {
@@ -68,12 +71,12 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
 
     private fun applyCounterTransaction(amount: Long): TxnResponse {
 
-        val kvlist = kv.get(counterPath).kvs
+        val kvlist = kvClient.getValue(counterPath).kvs
         val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw InternalError("KeyValue List was empty")
 
-        return this.kv.transaction {
+        return this.kvClient.transaction {
             If(equals(counterPath, CmpTarget.modRevision(kv.modRevision)))
-            Then(put(counterPath, kv.value.asLong + amount))
+            Then(putOp(counterPath, kv.value.asLong + amount))
         }
     }
 
@@ -82,15 +85,14 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
         val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 
-        fun counterPath(counterName: String) =
+        private fun counterPath(counterName: String) =
             "${counterPrefix}${if (counterName.startsWith("/")) "" else "/"}$counterName"
 
         fun reset(url: String, counterName: String) {
+            require(counterName.isEmpty()) { "Counter name cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { kvclient ->
-                        kvclient.delete(counterPath(counterName))
-                    }
+                    client.withKvClient { kvclient -> kvclient.delete(counterPath(counterName)) }
                 }
         }
     }

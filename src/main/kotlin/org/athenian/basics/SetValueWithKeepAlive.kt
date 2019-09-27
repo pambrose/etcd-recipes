@@ -3,7 +3,7 @@ package org.athenian.basics
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
 import org.athenian.asPutOption
-import org.athenian.put
+import org.athenian.putValue
 import org.athenian.withKvClient
 import org.athenian.withLeaseClient
 import kotlin.time.ExperimentalTime
@@ -20,7 +20,7 @@ fun main() {
                 client.withKvClient { kvclient ->
                     println("Assigning $keyname = $keyval")
                     val lease = leaseClient.grant(1).get()
-                    kvclient.put(keyname, keyval, lease.asPutOption)
+                    kvclient.putValue(keyname, keyval, lease.asPutOption)
                     leaseClient.keepAlive(lease.id,
                                           Observers.observer({ next ->
                                                                  println("KeepAlive next resp: $next")

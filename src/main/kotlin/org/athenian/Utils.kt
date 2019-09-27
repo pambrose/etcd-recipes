@@ -14,73 +14,61 @@ import io.etcd.jetcd.op.Cmp
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.PutOption
+import io.etcd.jetcd.options.WatchOption
+import io.etcd.jetcd.watch.WatchResponse
 import java.util.concurrent.Semaphore
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
-val String.asByteSequence: ByteSequence
-    get() = ByteSequence.from(this.toByteArray())
+val String.asByteSequence: ByteSequence get() = ByteSequence.from(this.toByteArray())
 
-val Long.asByteSequence: ByteSequence
-    get() = ByteSequence.from(Longs.toByteArray(this))
+val Int.asByteSequence: ByteSequence get() = ByteSequence.from(Ints.toByteArray(this))
 
+val Long.asByteSequence: ByteSequence get() = ByteSequence.from(Longs.toByteArray(this))
 
-val ByteSequence.asString: String
-    get() = toString(Charsets.UTF_8)
+val ByteSequence.asString: String get() = toString(Charsets.UTF_8)
 
-val ByteSequence.asInt: Int
-    get() = Ints.fromByteArray(bytes)
+val ByteSequence.asInt: Int get() = Ints.fromByteArray(bytes)
 
-val ByteSequence.asLong: Long
-    get() = Longs.fromByteArray(bytes)
+val ByteSequence.asLong: Long get() = Longs.fromByteArray(bytes)
 
-val LeaseGrantResponse.asPutOption: PutOption
-    get() = PutOption.newBuilder().withLeaseId(this.id).build()
+val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(this.id).build()
 
-@ExperimentalTime
-fun repeatWithSleep(iterations: Int,
-                    duration: Duration = 1.seconds,
-                    block: (count: Int, startMillis: Long) -> Unit) {
-    val startMillis = System.currentTimeMillis()
-    repeat(iterations) { i ->
-        block(i, startMillis)
-        sleep(duration)
-    }
-}
+fun KV.putValue(keyname: String, keyval: String): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
 
-@ExperimentalTime
-fun sleep(duration: Duration) {
-    Thread.sleep(duration.toLongMilliseconds())
-}
+fun KV.putValue(keyname: String, keyval: Int): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
 
-infix fun KV.put(kv: Pair<String, String>): PutResponse = put(kv.first, kv.second)
+fun KV.putValue(keyname: String, keyval: Long): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
 
-fun KV.put(keyname: String, keyval: String): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
+fun KV.putValue(keyname: String, keyval: String, option: PutOption): PutResponse =
+    put(keyval.asByteSequence, keyval.asByteSequence, option).get()
 
-fun KV.put(keyname: String, keyval: String, option: PutOption): PutResponse =
+fun KV.putValue(keyname: String, keyval: Int, option: PutOption): PutResponse =
+    put(keyval.asByteSequence, keyval.asByteSequence, option).get()
+
+fun KV.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
     put(keyval.asByteSequence, keyval.asByteSequence, option).get()
 
 fun KV.delete(vararg keynames: String) = keynames.forEach { delete(it) }
 
 fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).get()
 
-fun KV.get(keyname: String): GetResponse = get(keyname.asByteSequence).get()
+fun KV.getValue(keyname: String): GetResponse = get(keyname.asByteSequence).get()
 
 fun KV.getStringValue(keyname: String): String? =
-    get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
+    getValue(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
 
 fun KV.getStringValue(keyname: String, defaultVal: String): String = getStringValue(keyname) ?: defaultVal
 
 fun KV.getIntValue(keyname: String): Int? =
-    get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asInt
+    getValue(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asInt
 
 fun KV.getIntValue(keyname: String, defaultVal: Int): Int = getIntValue(keyname) ?: defaultVal
 
-
 fun KV.getLongValue(keyname: String): Long? =
-    get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
+    getValue(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
 
 fun KV.getLongValue(keyname: String, defaultVal: Long): Long = getLongValue(keyname) ?: defaultVal
 
@@ -88,13 +76,16 @@ fun Lock.lock(keyname: String, leaseId: Long): LockResponse = lock(keyname.asByt
 
 fun Lock.unlock(keyname: String): UnlockResponse = unlock(keyname.asByteSequence).get()
 
-fun put(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): Op.PutOp =
-    put(keyname, keyval.asByteSequence, option)
+fun putOp(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): Op.PutOp =
+    putOp(keyname, keyval.asByteSequence, option)
 
-fun put(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): Op.PutOp =
-    put(keyname, keyval.asByteSequence, option)
+fun puOp(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): Op.PutOp =
+    putOp(keyname, keyval.asByteSequence, option)
 
-fun put(keyname: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): Op.PutOp =
+fun putOp(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): Op.PutOp =
+    putOp(keyname, keyval.asByteSequence, option)
+
+fun putOp(keyname: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): Op.PutOp =
     Op.put(keyname.asByteSequence, keyval, option)
 
 fun <T> equals(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, target)
@@ -117,20 +108,17 @@ fun Client.withAuthrClient(block: (authClient: Auth) -> Unit) = authClient.use {
 
 fun Client.withKvClient(block: (kvClient: KV) -> Unit) = kvClient.use { block(it) }
 
+fun Watch.watcher(keyname: String, block: (WatchResponse) -> Unit): Watch.Watcher =
+    watch(keyname.asByteSequence, WatchOption.newBuilder().withRevision(0).build()) {
+        block(it)
+    }
+
 fun KV.transaction(block: Txn.() -> Txn): TxnResponse {
     return txn()
         .run {
             block()
             commit()
         }.get()
-}
-
-fun randomId(length: Int = 10): String {
-    val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
-    return (1..length)
-        .map { Random.nextInt(0, charPool.size) }
-        .map { i -> charPool[i] }
-        .joinToString("")
 }
 
 fun <T> Semaphore.withLock(block: () -> T): T {
@@ -140,4 +128,28 @@ fun <T> Semaphore.withLock(block: () -> T): T {
     } finally {
         release()
     }
+}
+
+@ExperimentalTime
+fun repeatWithSleep(iterations: Int,
+                    duration: Duration = 1.seconds,
+                    block: (count: Int, startMillis: Long) -> Unit) {
+    val startMillis = System.currentTimeMillis()
+    repeat(iterations) { i ->
+        block(i, startMillis)
+        sleep(duration)
+    }
+}
+
+@ExperimentalTime
+fun sleep(duration: Duration) {
+    Thread.sleep(duration.toLongMilliseconds())
+}
+
+fun randomId(length: Int = 10): String {
+    val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+    return (1..length)
+        .map { Random.nextInt(0, charPool.size) }
+        .map { i -> charPool[i] }
+        .joinToString("")
 }

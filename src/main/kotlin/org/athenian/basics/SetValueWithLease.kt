@@ -24,7 +24,7 @@ fun main() {
                         client.withKvClient { kvclient ->
                             println("Assigning $keyname = $keyval")
                             val lease = leaseClient.grant(5).get()
-                            kvclient.put(keyname, keyval, lease.asPutOption)
+                            kvclient.putValue(keyname, keyval, lease.asPutOption)
                         }
                     }
                 }

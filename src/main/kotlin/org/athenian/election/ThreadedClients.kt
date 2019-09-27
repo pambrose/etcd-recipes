@@ -8,10 +8,11 @@ import kotlin.time.seconds
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
+    val electionName = "/threadedClient"
 
-    LeaderElection.resetElectionPath(url)
+    LeaderElection.reset(url, electionName)
 
-    val participants = List(3) { LeaderElection(url = url, id = "Thread$it") }
+    val participants = List(3) { LeaderElection(url, electionName, "Thread$it") }
 
     participants
         .onEach {

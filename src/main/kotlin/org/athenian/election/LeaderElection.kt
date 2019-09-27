@@ -2,7 +2,6 @@ package org.athenian.election
 
 import io.etcd.jetcd.*
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import org.athenian.*
 import java.io.Closeable
@@ -18,13 +17,19 @@ import kotlin.time.seconds
 
 @ExperimentalTime
 class LeaderElection(val url: String,
-                     val electionPath: String = defaultElectionPath,
+                     val electionName: String,
                      val id: String = "Client:${randomId()}") : Closeable {
+
 
     private val executor = Executors.newFixedThreadPool(2)
     private val startCountdown = CountDownLatch(1)
     private val initCountDown = CountDownLatch(1)
     private val watchCountDown = CountDownLatch(1)
+
+    init {
+        require(url.isEmpty()) { "URL cannot be empty" }
+        require(electionName.isEmpty()) { "Election name cannot be empty" }
+    }
 
     fun start(actions: ElectionActions): LeaderElection {
         executor.submit {
@@ -76,11 +81,10 @@ class LeaderElection(val url: String,
         executor.shutdown()
     }
 
-    private fun watchForLeadershipOpening(watchClient: Watch, action: () -> Unit): Watch.Watcher {
-        val watchOptions = WatchOption.newBuilder().withRevision(0).build()
-        return watchClient.watch(electionPath.asByteSequence, watchOptions) { resp ->
+    private fun watchForLeadershipOpening(watchClient: Watch, action: () -> Unit): Watch.Watcher =
+        watchClient.watcher(electionName) { watchResponse ->
             // Create a watch to act on DELETE events
-            resp.events
+            watchResponse.events
                 .forEach { event ->
                     if (event.eventType == WatchEvent.EventType.DELETE) {
                         //println("$clientId executing action")
@@ -88,7 +92,6 @@ class LeaderElection(val url: String,
                     }
                 }
         }
-    }
 
     // This will not return until election failure or leader surrenders leadership
     private fun attemptToBecomeLeader(actions: ElectionActions, leaseClient: Lease, kvclient: KV): Boolean {
@@ -100,12 +103,12 @@ class LeaderElection(val url: String,
 
         // Do a CAS on the key name. If it is not found, then set it
         kvclient.transaction {
-            If(equals(electionPath, CmpTarget.version(0)))
-            Then(put(electionPath, uniqueToken, lease.asPutOption))
+            If(equals(electionName, CmpTarget.version(0)))
+            Then(putOp(electionName, uniqueToken, lease.asPutOption))
         }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (kvclient.getStringValue(electionPath) == uniqueToken) {
+        return if (kvclient.getStringValue(electionName) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
                                       { next -> /*println("KeepAlive next resp: $next")*/ },
@@ -122,14 +125,16 @@ class LeaderElection(val url: String,
     }
 
     companion object {
-        const val defaultElectionPath = "/election/leader"
+        private const val electionPrefix = "/elections"
 
-        fun resetElectionPath(url: String, electionPath: String = defaultElectionPath) {
+        private fun electionPath(electionName: String) =
+            "${electionPrefix}${if (electionName.startsWith("/")) "" else "/"}$electionName"
+
+        fun reset(url: String, electionName: String) {
+            require(electionName.isEmpty()) { "Election name cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { kvclient ->
-                        kvclient.delete(electionPath)
-                    }
+                    client.withKvClient { kvclient -> kvclient.delete(electionPath(electionName)) }
                 }
         }
     }

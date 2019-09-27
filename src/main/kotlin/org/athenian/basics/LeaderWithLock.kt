@@ -38,7 +38,7 @@ fun main() {
 
                             client.withKvClient { kvclient ->
                                 println("Thread $id assigning $keyval")
-                                kvclient.put(keyname, keyval)
+                                kvclient.putValue(keyname, keyval)
 
                                 if (kvclient.getStringValue(keyname) == keyval)
                                     println("Thread $id is the leader")

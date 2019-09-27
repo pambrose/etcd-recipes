@@ -15,8 +15,8 @@ fun main() {
     fun checkForKey(kvclient: KV) {
         kvclient.transaction {
             If(equals(keyname, CmpTarget.version(0)))
-            Then(put(debug, "Key $keyname not found"))
-            Else(put(debug, "Key $keyname found"))
+            Then(putOp(debug, "Key $keyname not found"))
+            Else(putOp(debug, "Key $keyname found"))
         }
 
         println("Debug value: ${kvclient.getStringValue(debug, "unset")}")
@@ -29,7 +29,7 @@ fun main() {
                 kvclient.delete(keyname, debug)
 
                 checkForKey(kvclient)
-                kvclient.put(keyname, "Something")
+                kvclient.putValue(keyname, "Something")
                 checkForKey(kvclient)
             }
         }

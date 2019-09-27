@@ -22,7 +22,7 @@ fun main() {
                 .use { client ->
                     client.withKvClient { kvclient ->
                         println("Assigning $keyname = $keyval")
-                        kvclient.put(keyname, keyval)
+                        kvclient.putValue(keyname, keyval)
 
                         sleep(5.seconds)
 

@@ -1,7 +1,6 @@
 package org.athenian.basics
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.options.WatchOption
 import org.athenian.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -22,10 +21,10 @@ fun main() {
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvclient ->
-                        repeatWithSleep(5) { i, start ->
+                        repeatWithSleep(10) { i, start ->
                             val kv = keyval + i
                             println("Assigning $keyname = $kv")
-                            kvclient.put(keyname, kv)
+                            kvclient.putValue(keyname, kv)
 
                             sleep(1.seconds)
 
@@ -44,19 +43,17 @@ fun main() {
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withWatchClient { watchClient ->
-                        val watchOptions = WatchOption.newBuilder().withRevision(0).build()
                         println("Starting watch")
-                        val watcher =
-                            watchClient.watch(keyname.asByteSequence, watchOptions) { resp ->
-                                resp.events.forEach { event ->
+                        watchClient.watcher(keyname) { watchResponse ->
+                            watchResponse.events
+                                .forEach { event ->
                                     println("Watch event: ${event.eventType} ${event.keyValue.value.asString}")
                                 }
-                            }
-
-                        sleep(5.seconds)
-
-                        println("Closing watch")
-                        watcher.close()
+                        }.use {
+                            sleep(5.seconds)
+                            println("Closing watch")
+                        }
+                        println("Closed watch")
                     }
                 }
         } finally {
