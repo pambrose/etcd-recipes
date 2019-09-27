@@ -17,8 +17,8 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
     private val kvClient = client.kvClient
 
     init {
-        require(url.isEmpty()) { "URL cannot be empty" }
-        require(counterName.isEmpty()) { "Counter name cannot be empty" }
+        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(counterName.isNotEmpty()) { "Counter name cannot be empty" }
 
         // Create counter if first time through
         createCounterIfNotPresent()
@@ -89,7 +89,7 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
             "${counterPrefix}${if (counterName.startsWith("/")) "" else "/"}$counterName"
 
         fun reset(url: String, counterName: String) {
-            require(counterName.isEmpty()) { "Counter name cannot be empty" }
+            require(counterName.isNotEmpty()) { "Counter name cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvclient -> kvclient.delete(counterPath(counterName)) }

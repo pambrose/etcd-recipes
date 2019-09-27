@@ -25,8 +25,8 @@ class LeaderElection(val url: String,
     private val watchCountDown = CountDownLatch(1)
 
     init {
-        require(url.isEmpty()) { "URL cannot be empty" }
-        require(electionName.isEmpty()) { "Election name cannot be empty" }
+        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(electionName.isNotEmpty()) { "Election name cannot be empty" }
     }
 
     fun start(actions: ElectionActions): LeaderElection {
@@ -129,7 +129,7 @@ class LeaderElection(val url: String,
             "${electionPrefix}${if (electionName.startsWith("/")) "" else "/"}$electionName"
 
         fun reset(url: String, electionName: String) {
-            require(electionName.isEmpty()) { "Election name cannot be empty" }
+            require(electionName.isNotEmpty()) { "Election name cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvclient -> kvclient.delete(electionPath(electionName)) }

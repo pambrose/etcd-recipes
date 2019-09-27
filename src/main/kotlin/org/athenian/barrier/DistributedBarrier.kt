@@ -28,8 +28,8 @@ class DistributedBarrier(val url: String,
     private val waitLatch = lazy { CountDownLatch(1) }
 
     init {
-        require(url.isEmpty()) { "URL cannot be empty" }
-        require(barrierName.isEmpty()) { "Barrier name cannot be empty" }
+        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(barrierName.isNotEmpty()) { "Barrier name cannot be empty" }
     }
 
     override fun close() {
@@ -115,12 +115,11 @@ class DistributedBarrier(val url: String,
             "${barrierPrefix}${if (barrierName.startsWith("/")) "" else "/"}$barrierName"
 
         fun reset(url: String, barrierName: String) {
-            require(barrierName.isEmpty()) { "Barrier name cannot be empty" }
+            require(barrierName.isNotEmpty()) { "Barrier name cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvclient -> kvclient.delete(barrierPath(barrierName)) }
                 }
         }
     }
-
 }

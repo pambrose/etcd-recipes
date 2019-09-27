@@ -4,16 +4,14 @@ import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
-import kotlin.time.MonoClock
 import kotlin.time.measureTimedValue
 
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
+    val counterName = "counter2"
     val count = 10
     val outerLatch = CountDownLatch(count)
-    val counterName = "counter2"
-    val clock = MonoClock
 
     DistributedAtomicLong.reset(url, counterName)
 
