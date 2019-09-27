@@ -6,10 +6,10 @@ import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import org.athenian.*
 import java.io.Closeable
-import java.lang.Math.abs
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -122,7 +122,7 @@ class LeaderElection(val url: String,
     }
 
     companion object {
-        val defaultElectionPath = "/election/leader"
+        const val defaultElectionPath = "/election/leader"
 
         fun resetElectionPath(url: String, electionPath: String = defaultElectionPath) {
             Client.builder().endpoints(url).build()

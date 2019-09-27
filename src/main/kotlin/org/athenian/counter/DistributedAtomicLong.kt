@@ -1,7 +1,6 @@
 package org.athenian.counter
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.KV
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
 import org.athenian.*
@@ -14,13 +13,10 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
 
     private val counterPath = counterPath(counterName)
     private val semaphore = Semaphore(1, true)
-    private val client: Client
-    private val kv: KV
+    private val client = Client.builder().endpoints(url).build()
+    private val kv = client.kvClient
 
     init {
-        client = Client.builder().endpoints(url).build()
-        kv = client.kvClient
-
         // Create counter if first time through
         createCounterIfNotPresent()
     }
@@ -71,6 +67,7 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
         }
 
     private fun applyCounterTransaction(amount: Long): TxnResponse {
+
         val kvlist = kv.get(counterPath).kvs
         val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw InternalError("KeyValue List was empty")
 
@@ -81,7 +78,7 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
     }
 
     companion object {
-        private val counterPrefix = "/counters"
+        private const val counterPrefix = "/counters"
         val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 

@@ -26,28 +26,29 @@ fun main() {
                         .use { counter ->
                             val innerLatch = CountDownLatch(4)
                             val cnt = 50
+                            val maxPause = 50L
 
                             thread {
                                 repeat(cnt) { counter.increment() }
-                                Thread.sleep(Random.nextLong(50))
+                                Thread.sleep(Random.nextLong(maxPause))
                                 innerLatch.countDown()
                             }
 
                             thread {
                                 repeat(cnt) { counter.decrement() }
-                                Thread.sleep(Random.nextLong(50))
+                                Thread.sleep(Random.nextLong(maxPause))
                                 innerLatch.countDown()
                             }
 
                             thread {
                                 repeat(cnt) { counter.add(5) }
-                                Thread.sleep(Random.nextLong(50))
+                                Thread.sleep(Random.nextLong(maxPause))
                                 innerLatch.countDown()
                             }
 
                             thread {
                                 repeat(cnt) { counter.subtract(5) }
-                                Thread.sleep(Random.nextLong(50))
+                                Thread.sleep(Random.nextLong(maxPause))
                                 innerLatch.countDown()
                             }
 
@@ -63,6 +64,6 @@ fun main() {
 
     DistributedAtomicLong(url, counterName)
         .use { counter ->
-            println("Total: ${counter.get()} in ${dur}")
+            println("Total: ${counter.get()} in $dur")
         }
 }

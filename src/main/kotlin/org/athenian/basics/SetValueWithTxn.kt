@@ -14,7 +14,7 @@ fun main() {
 
     fun checkForKey(kvclient: KV) {
         kvclient.transaction {
-            If(org.athenian.equals(keyname, CmpTarget.version(0)))
+            If(equals(keyname, CmpTarget.version(0)))
             Then(put(debug, "Key $keyname not found"))
             Else(put(debug, "Key $keyname found"))
         }

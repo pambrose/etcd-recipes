@@ -1,5 +1,6 @@
 package org.athenian
 
+import com.google.common.primitives.Ints
 import com.google.common.primitives.Longs
 import io.etcd.jetcd.*
 import io.etcd.jetcd.kv.DeleteResponse
@@ -28,6 +29,9 @@ val Long.asByteSequence: ByteSequence
 
 val ByteSequence.asString: String
     get() = toString(Charsets.UTF_8)
+
+val ByteSequence.asInt: Int
+    get() = Ints.fromByteArray(bytes)
 
 val ByteSequence.asLong: Long
     get() = Longs.fromByteArray(bytes)
@@ -67,13 +71,18 @@ fun KV.get(keyname: String): GetResponse = get(keyname.asByteSequence).get()
 fun KV.getStringValue(keyname: String): String? =
     get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
 
-fun KV.getStringValue(keyname: String, defaultStr: String): String = getStringValue(keyname) ?: defaultStr
+fun KV.getStringValue(keyname: String, defaultVal: String): String = getStringValue(keyname) ?: defaultVal
+
+fun KV.getIntValue(keyname: String): Int? =
+    get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asInt
+
+fun KV.getIntValue(keyname: String, defaultVal: Int): Int = getIntValue(keyname) ?: defaultVal
+
 
 fun KV.getLongValue(keyname: String): Long? =
     get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
 
-fun KV.getLongValue(keyname: String, revision: Long): Long? =
-    get(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
+fun KV.getLongValue(keyname: String, defaultVal: Long): Long = getLongValue(keyname) ?: defaultVal
 
 fun Lock.lock(keyname: String, leaseId: Long): LockResponse = lock(keyname.asByteSequence, leaseId).get()
 
@@ -120,8 +129,8 @@ fun randomId(length: Int = 10): String {
     val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
     return (1..length)
         .map { Random.nextInt(0, charPool.size) }
-        .map { i -> charPool.get(i) }
-        .joinToString("");
+        .map { i -> charPool[i] }
+        .joinToString("")
 }
 
 fun <T> Semaphore.withLock(block: () -> T): T {
