@@ -2,11 +2,9 @@ package org.athenian.basics
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
-import org.athenian.asPutOption
-import org.athenian.putValue
-import org.athenian.withKvClient
-import org.athenian.withLeaseClient
+import org.athenian.*
 import kotlin.time.ExperimentalTime
+import kotlin.time.seconds
 
 @ExperimentalTime
 fun main() {
@@ -30,7 +28,7 @@ fun main() {
                                                              })
                     ).use {
                         println("Starting sleep")
-                        Thread.sleep(20_000)
+                        sleep(20.seconds)
                         println("Finished sleep")
 
                     }

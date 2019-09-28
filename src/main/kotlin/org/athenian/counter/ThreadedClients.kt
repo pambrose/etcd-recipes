@@ -1,10 +1,12 @@
 package org.athenian.counter
 
+import org.athenian.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.measureTimedValue
+import kotlin.time.milliseconds
 
 @ExperimentalTime
 fun main() {
@@ -28,25 +30,25 @@ fun main() {
 
                             thread {
                                 repeat(cnt) { counter.increment() }
-                                Thread.sleep(Random.nextLong(maxPause))
+                                sleep(Random.nextLong(maxPause).milliseconds)
                                 innerLatch.countDown()
                             }
 
                             thread {
                                 repeat(cnt) { counter.decrement() }
-                                Thread.sleep(Random.nextLong(maxPause))
+                                sleep(Random.nextLong(maxPause).milliseconds)
                                 innerLatch.countDown()
                             }
 
                             thread {
                                 repeat(cnt) { counter.add(5) }
-                                Thread.sleep(Random.nextLong(maxPause))
+                                sleep(Random.nextLong(maxPause).milliseconds)
                                 innerLatch.countDown()
                             }
 
                             thread {
                                 repeat(cnt) { counter.subtract(5) }
-                                Thread.sleep(Random.nextLong(maxPause))
+                                sleep(Random.nextLong(maxPause).milliseconds)
                                 innerLatch.countDown()
                             }
 

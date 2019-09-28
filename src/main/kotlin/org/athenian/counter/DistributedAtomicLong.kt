@@ -8,10 +8,13 @@ import java.io.Closeable
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.random.Random
+import kotlin.time.ExperimentalTime
+import kotlin.time.milliseconds
 
+@ExperimentalTime
 class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
 
-    private val counterPath = counterPath(counterName)
+    private val counterPath = keyName(counterName)
     private val semaphore = Semaphore(1, true)
     private val client = Client.builder().endpoints(url).build()
     private val kvClient = client.kvClient
@@ -48,7 +51,7 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
                 if (!txnResponse.isSucceeded) {
                     println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
                     // Crude backoff for retry
-                    Thread.sleep(Random.nextLong(count * 100L))
+                    sleep(Random.nextLong(count * 100L).milliseconds)
                     count++
                 }
             } while (!txnResponse.isSucceeded)
@@ -85,14 +88,14 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
         val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 
-        private fun counterPath(counterName: String) =
+        private fun keyName(counterName: String) =
             "${counterPrefix}${if (counterName.startsWith("/")) "" else "/"}$counterName"
 
         fun reset(url: String, counterName: String) {
             require(counterName.isNotEmpty()) { "Counter name cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { kvclient -> kvclient.delete(counterPath(counterName)) }
+                    client.withKvClient { it.delete(keyName(counterName)) }
                 }
         }
     }

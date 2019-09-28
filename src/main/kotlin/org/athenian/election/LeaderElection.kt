@@ -18,7 +18,7 @@ class LeaderElection(val url: String,
                      electionName: String,
                      val id: String = "Client:${randomId()}") : Closeable {
 
-    private val electionPath = electionPath(electionName)
+    private val electionPath = keyName(electionName)
     private val executor = Executors.newFixedThreadPool(2)
     private val startCountdown = CountDownLatch(1)
     private val initCountDown = CountDownLatch(1)
@@ -93,20 +93,21 @@ class LeaderElection(val url: String,
 
     // This will not return until election failure or leader surrenders leadership
     private fun attemptToBecomeLeader(actions: ElectionActions, leaseClient: Lease, kvclient: KV): Boolean {
-        // Prime lease with 2 seconds to give keepAlive a chance to get started
-        val lease = leaseClient.grant(2).get()
-
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$id:${randomId(9)}"
 
+        // Prime lease with 2 seconds to give keepAlive a chance to get started
+        val lease = leaseClient.grant(2).get()
+
         // Do a CAS on the key name. If it is not found, then set it
-        kvclient.transaction {
-            If(equals(electionPath, CmpTarget.version(0)))
-            Then(putOp(electionPath, uniqueToken, lease.asPutOption))
-        }
+        val txn =
+            kvclient.transaction {
+                If(equals(electionPath, CmpTarget.version(0)))
+                Then(putOp(electionPath, uniqueToken, lease.asPutOption))
+            }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (kvclient.getStringValue(electionPath) == uniqueToken) {
+        return if (txn.isSucceeded && kvclient.getStringValue(electionPath) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
                                       { next -> /*println("KeepAlive next resp: $next")*/ },
@@ -125,14 +126,14 @@ class LeaderElection(val url: String,
     companion object {
         private const val electionPrefix = "/elections"
 
-        private fun electionPath(electionName: String) =
+        private fun keyName(electionName: String) =
             "${electionPrefix}${if (electionName.startsWith("/")) "" else "/"}$electionName"
 
         fun reset(url: String, electionName: String) {
             require(electionName.isNotEmpty()) { "Election name cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { kvclient -> kvclient.delete(electionPath(electionName)) }
+                    client.withKvClient { it.delete(keyName(electionName)) }
                 }
         }
     }

@@ -18,14 +18,13 @@ class DistributedBarrier(val url: String,
                          barrierName: String,
                          val id: String = "Client:${randomId()}") : Closeable {
 
-    private val barrierPath = barrierPath(barrierName)
+    private val barrierPath = keyName(barrierName)
     private val client = Client.builder().endpoints(url).build()
     private val kvClient = client.kvClient
-    private val watchClient = lazy { client.watchClient }
     private val leaseClient = lazy { client.leaseClient }
+    private val watchClient = lazy { client.watchClient }
     private val executor = lazy { Executors.newSingleThreadExecutor() }
     private val barrierLatch = lazy { CountDownLatch(1) }
-    private val waitLatch = lazy { CountDownLatch(1) }
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -33,31 +32,32 @@ class DistributedBarrier(val url: String,
     }
 
     override fun close() {
+        kvClient.close()
+        client.close()
         if (leaseClient.isInitialized())
             leaseClient.value.close()
         if (watchClient.isInitialized())
             watchClient.value.close()
-        kvClient.close()
-        client.close()
         if (executor.isInitialized())
             executor.value.shutdown()
     }
 
     fun setBarrier(): Boolean {
-        // Prime lease with 2 seconds to give keepAlive a chance to get started
-        val lease = leaseClient.value.grant(2).get()
-
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$id:${randomId(9)}"
 
+        // Prime lease with 2 seconds to give keepAlive a chance to get started
+        val lease = leaseClient.value.grant(2).get()
+
         // Do a CAS on the key name. If it is not found, then set it
-        kvClient.transaction {
-            If(equals(barrierPath, CmpTarget.version(0)))
-            Then(putOp(barrierPath, uniqueToken, lease.asPutOption))
-        }
+        val txn =
+            kvClient.transaction {
+                If(equals(barrierPath, CmpTarget.version(0)))
+                Then(putOp(barrierPath, uniqueToken, lease.asPutOption))
+            }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (kvClient.getStringValue(barrierPath) == uniqueToken) {
+        return if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
             executor.value.submit {
                 leaseClient.value.keepAlive(lease.id,
                                             Observers.observer(
@@ -88,37 +88,36 @@ class DistributedBarrier(val url: String,
         if (kvClient.keyIsNotPresent(barrierPath))
             return true
 
+        val waitLatch = CountDownLatch(1)
+
         // Check if barrier is present before using watcher
-        watchClient.value.watcher(barrierPath(barrierPath)) { resp ->
-            resp.events
+        watchClient.value.watcher(barrierPath) { watchResponse ->
+            watchResponse.events
                 .forEach { event ->
-                    if (event.eventType == WatchEvent.EventType.DELETE) {
-                        waitLatch.value.countDown()
-                    }
+                    if (event.eventType == WatchEvent.EventType.DELETE)
+                        waitLatch.countDown()
                 }
 
         }.use {
             // Check one more time
-            return@waitOnBarrier if (kvClient.keyIsNotPresent(barrierPath)) {
-                waitLatch.value.countDown()
-                true
-            } else {
-                waitLatch.value.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
-            }
+            if (kvClient.keyIsNotPresent(barrierPath))
+                waitLatch.countDown()
+
+            return@waitOnBarrier waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
         }
     }
 
     companion object {
         private const val barrierPrefix = "/counters"
 
-        private fun barrierPath(barrierName: String) =
+        private fun keyName(barrierName: String) =
             "${barrierPrefix}${if (barrierName.startsWith("/")) "" else "/"}$barrierName"
 
         fun reset(url: String, barrierName: String) {
             require(barrierName.isNotEmpty()) { "Barrier name cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { kvclient -> kvclient.delete(barrierPath(barrierName)) }
+                    client.withKvClient { it.delete(keyName(barrierName)) }
                 }
         }
     }
