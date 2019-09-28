@@ -15,10 +15,9 @@ import kotlin.time.days
 
 @ExperimentalTime
 class DistributedBarrier(val url: String,
-                         barrierName: String,
+                         val barrierPath: String,
                          val id: String = "Client:${randomId()}") : Closeable {
 
-    private val barrierPath = keyName(barrierName)
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }
     private val leaseClient = lazy { client.value.leaseClient }
@@ -28,18 +27,18 @@ class DistributedBarrier(val url: String,
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
-        require(barrierName.isNotEmpty()) { "Barrier name cannot be empty" }
+        require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
     }
 
     override fun close() {
+        if (watchClient.isInitialized())
+            watchClient.value.close()
+        if (leaseClient.isInitialized())
+            leaseClient.value.close()
         if (kvClient.isInitialized())
             kvClient.value.close()
         if (client.isInitialized())
             client.value.close()
-        if (leaseClient.isInitialized())
-            leaseClient.value.close()
-        if (watchClient.isInitialized())
-            watchClient.value.close()
         if (executor.isInitialized())
             executor.value.shutdown()
     }
@@ -118,14 +117,11 @@ class DistributedBarrier(val url: String,
     companion object {
         private const val barrierPrefix = "/counters"
 
-        private fun keyName(barrierName: String) =
-            "${barrierPrefix}${if (barrierName.startsWith("/")) "" else "/"}$barrierName"
-
-        fun reset(url: String, barrierName: String) {
-            require(barrierName.isNotEmpty()) { "Barrier name cannot be empty" }
+        fun reset(url: String, barrierPath: String) {
+            require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { it.delete(keyName(barrierName)) }
+                    client.withKvClient { it.delete(barrierPath) }
                 }
         }
     }

@@ -15,10 +15,9 @@ import kotlin.time.seconds
 
 @ExperimentalTime
 class LeaderElection(val url: String,
-                     electionName: String,
+                     val electionPath: String,
                      val id: String = "Client:${randomId()}") : Closeable {
 
-    private val electionPath = keyName(electionName)
     private val executor = lazy { Executors.newFixedThreadPool(2) }
     private val startCountdown = CountDownLatch(1)
     private val initCountDown = CountDownLatch(1)
@@ -26,7 +25,7 @@ class LeaderElection(val url: String,
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
-        require(electionName.isNotEmpty()) { "Election name cannot be empty" }
+        require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
 
     fun start(actions: ElectionActions): LeaderElection {
@@ -127,14 +126,11 @@ class LeaderElection(val url: String,
     companion object {
         private const val electionPrefix = "/elections"
 
-        private fun keyName(electionName: String) =
-            "${electionPrefix}${if (electionName.startsWith("/")) "" else "/"}$electionName"
-
-        fun reset(url: String, electionName: String) {
-            require(electionName.isNotEmpty()) { "Election name cannot be empty" }
+        fun reset(url: String, electionPath: String) {
+            require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { it.delete(keyName(electionName)) }
+                    client.withKvClient { it.delete(electionPath) }
                 }
         }
     }

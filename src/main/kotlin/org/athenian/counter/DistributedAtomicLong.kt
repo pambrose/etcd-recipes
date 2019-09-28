@@ -12,16 +12,15 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.milliseconds
 
 @ExperimentalTime
-class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
+class DistributedAtomicLong(val url: String, val counterPath: String) : Closeable {
 
-    private val counterPath = keyName(counterName)
     private val semaphore = Semaphore(1, true)
     private val client = Client.builder().endpoints(url).build()
     private val kvClient = client.kvClient
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
-        require(counterName.isNotEmpty()) { "Counter name cannot be empty" }
+        require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
 
         // Create counter if first time through
         createCounterIfNotPresent()
@@ -88,14 +87,11 @@ class DistributedAtomicLong(val url: String, counterName: String) : Closeable {
         val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 
-        private fun keyName(counterName: String) =
-            "${counterPrefix}${if (counterName.startsWith("/")) "" else "/"}$counterName"
-
-        fun reset(url: String, counterName: String) {
-            require(counterName.isNotEmpty()) { "Counter name cannot be empty" }
+        fun reset(url: String, counterPath: String) {
+            require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { it.delete(keyName(counterName)) }
+                    client.withKvClient { it.delete(counterPath) }
                 }
         }
     }
