@@ -1,7 +1,12 @@
 package org.athenian.basics
 
 import io.etcd.jetcd.Client
-import org.athenian.*
+import org.athenian.delete
+import org.athenian.getStringValue
+import org.athenian.putValue
+import org.athenian.repeatWithSleep
+import org.athenian.sleep
+import org.athenian.withKvClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.ExperimentalTime
@@ -20,14 +25,14 @@ fun main() {
 
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { kvclient ->
+                    client.withKvClient { kvClient ->
                         println("Assigning $keyname = $keyval")
-                        kvclient.putValue(keyname, keyval)
+                        kvClient.putValue(keyname, keyval)
 
                         sleep(5.seconds)
 
                         println("Deleting $keyname")
-                        kvclient.delete(keyname)
+                        kvClient.delete(keyname)
                     }
                 }
         } finally {
@@ -39,9 +44,9 @@ fun main() {
         try {
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { kvclient ->
+                    client.withKvClient { kvClient ->
                         repeatWithSleep(12) { i, start ->
-                            val respval = kvclient.getStringValue(keyname, "unset")
+                            val respval = kvClient.getStringValue(keyname, "unset")
                             println("Key $keyname = $respval after ${System.currentTimeMillis() - start}ms")
                         }
                     }

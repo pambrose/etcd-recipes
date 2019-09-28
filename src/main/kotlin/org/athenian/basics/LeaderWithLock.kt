@@ -1,7 +1,14 @@
 package org.athenian.basics
 
 import io.etcd.jetcd.Client
-import org.athenian.*
+import org.athenian.getStringValue
+import org.athenian.lock
+import org.athenian.putValue
+import org.athenian.sleep
+import org.athenian.unlock
+import org.athenian.withKvClient
+import org.athenian.withLeaseClient
+import org.athenian.withLockClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.random.Random
@@ -36,15 +43,15 @@ fun main() {
                             lock.lock(keyname, lease.id)
                             println("Thread $id locked $keyname")
 
-                            client.withKvClient { kvclient ->
+                            client.withKvClient { kvClient ->
                                 println("Thread $id assigning $keyval")
-                                kvclient.putValue(keyname, keyval)
+                                kvClient.putValue(keyname, keyval)
 
-                                if (kvclient.getStringValue(keyname) == keyval)
+                                if (kvClient.getStringValue(keyname) == keyval)
                                     println("Thread $id is the leader")
 
                                 // delete the key
-                                //kvclient.delete(key)
+                                //kvClient.delete(key)
 
                                 println("Thread $id is waiting")
                                 sleep(15.seconds)

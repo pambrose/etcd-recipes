@@ -49,7 +49,7 @@ class LeaderElection(val url: String,
                 .use { client ->
                     client.withLeaseClient { leaseClient ->
                         client.withWatchClient { watchClient ->
-                            client.withKvClient { kvclient ->
+                            client.withKvClient { kvClient ->
                                 val countdown = CountDownLatch(1)
 
                                 initCountDown.countDown()
@@ -57,7 +57,7 @@ class LeaderElection(val url: String,
                                 executor.value.submit {
                                     watchForLeadershipOpening(watchClient) {
                                         // Run for leader when leader key is deleted
-                                        attemptToBecomeLeader(actions, leaseClient, kvclient)
+                                        attemptToBecomeLeader(actions, leaseClient, kvClient)
                                     }.use {
                                         watchCountDown.await()
                                     }
@@ -67,7 +67,7 @@ class LeaderElection(val url: String,
                                 sleep(2.seconds)
 
                                 // Clients should run for leader in case they are the first to run
-                                attemptToBecomeLeader(actions, leaseClient, kvclient)
+                                attemptToBecomeLeader(actions, leaseClient, kvClient)
 
                                 countdown.await()
                             }
@@ -107,7 +107,7 @@ class LeaderElection(val url: String,
         }
 
     // This will not return until election failure or leader surrenders leadership
-    private fun attemptToBecomeLeader(actions: ElectionActions, leaseClient: Lease, kvclient: KV): Boolean {
+    private fun attemptToBecomeLeader(actions: ElectionActions, leaseClient: Lease, kvClient: KV): Boolean {
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$id:${randomId(9)}"
 
@@ -116,13 +116,13 @@ class LeaderElection(val url: String,
 
         // Do a CAS on the key name. If it is not found, then set it
         val txn =
-            kvclient.transaction {
+            kvClient.transaction {
                 If(equals(electionPath, CmpTarget.version(0)))
                 Then(putOp(electionPath, uniqueToken, lease.asPutOption))
             }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (txn.isSucceeded && kvclient.getStringValue(electionPath) == uniqueToken) {
+        return if (txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
                                       { next -> /*println("KeepAlive next resp: $next")*/ },

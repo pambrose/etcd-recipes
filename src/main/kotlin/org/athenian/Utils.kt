@@ -22,6 +22,7 @@ import io.etcd.jetcd.lock.UnlockResponse
 import io.etcd.jetcd.op.Cmp
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.op.Op
+import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchResponse
@@ -73,7 +74,8 @@ fun KV.delete(vararg keynames: String) = keynames.forEach { delete(it) }
 
 fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).get()
 
-fun KV.getValue(keyname: String): GetResponse = get(keyname.asByteSequence).get()
+fun KV.getResponse(keyname: String, getOption: GetOption = GetOption.DEFAULT): GetResponse =
+    get(keyname.asByteSequence, getOption).get()
 
 fun Lazy<KV>.keyIsPresent(keyname: String): Boolean = value.keyIsPresent(keyname)
 
@@ -85,22 +87,39 @@ fun KV.keyIsNotPresent(keyname: String): Boolean = !keyIsPresent(keyname)
 
 fun Lazy<KV>.getStringValue(keyname: String): String? = value.getStringValue(keyname)
 
+fun KV.getChildrenStringValues(keyname: String): List<String> {
+    val k = "$keyname${if (keyname.endsWith("/")) "" else "/"}"
+    return getStringValues(k, GetOption.newBuilder().withPrefix(k.asByteSequence).build())
+}
+
 fun KV.getStringValue(keyname: String): String? =
-    getValue(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
+    getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
 
 fun Lazy<KV>.getStringValue(keyname: String, defaultVal: String): String = value.getStringValue(keyname, defaultVal)
 
 fun KV.getStringValue(keyname: String, defaultVal: String): String = getStringValue(keyname) ?: defaultVal
 
 fun KV.getIntValue(keyname: String): Int? =
-    getValue(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asInt
+    getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asInt
 
 fun KV.getIntValue(keyname: String, defaultVal: Int): Int = getIntValue(keyname) ?: defaultVal
 
 fun KV.getLongValue(keyname: String): Long? =
-    getValue(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
+    getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
 
 fun KV.getLongValue(keyname: String, defaultVal: Long): Long = getLongValue(keyname) ?: defaultVal
+
+fun KV.getStringValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<String> =
+    getResponse(keyname, getOption).kvs.map { it.value.asString }
+
+fun KV.countChildren(keyname: String): Long {
+    val k = "$keyname${if (keyname.endsWith("/")) "" else "/"}"
+    return getResponse(k,
+                       GetOption.newBuilder()
+                           .withPrefix(k.asByteSequence)
+                           .withCountOnly(true)
+                           .build()).count
+}
 
 fun Lock.lock(keyname: String, leaseId: Long): LockResponse = lock(keyname.asByteSequence, leaseId).get()
 

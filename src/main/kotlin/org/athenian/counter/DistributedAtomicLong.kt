@@ -7,7 +7,7 @@ import org.athenian.asLong
 import org.athenian.delete
 import org.athenian.equals
 import org.athenian.getLongValue
-import org.athenian.getValue
+import org.athenian.getResponse
 import org.athenian.puOp
 import org.athenian.putOp
 import org.athenian.sleep
@@ -70,7 +70,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
 
     private fun createCounterIfNotPresent(): Boolean =
         // Run the transaction if the counter is not present
-        if (kvClient.getValue(counterPath).kvs.isEmpty()) {
+        if (kvClient.getResponse(counterPath).kvs.isEmpty()) {
             val txn =
                 kvClient.transaction {
                     If(equals(counterPath, CmpTarget.version(0)))
@@ -83,7 +83,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
 
     private fun applyCounterTransaction(amount: Long): TxnResponse {
 
-        val kvlist = kvClient.getValue(counterPath).kvs
+        val kvlist = kvClient.getResponse(counterPath).kvs
         val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw InternalError("KeyValue List was empty")
 
         return this.kvClient.transaction {
