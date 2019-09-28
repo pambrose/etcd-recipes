@@ -19,7 +19,7 @@ class LeaderElection(val url: String,
                      val id: String = "Client:${randomId()}") : Closeable {
 
     private val electionPath = keyName(electionName)
-    private val executor = Executors.newFixedThreadPool(2)
+    private val executor = lazy { Executors.newFixedThreadPool(2) }
     private val startCountdown = CountDownLatch(1)
     private val initCountDown = CountDownLatch(1)
     private val watchCountDown = CountDownLatch(1)
@@ -30,7 +30,7 @@ class LeaderElection(val url: String,
     }
 
     fun start(actions: ElectionActions): LeaderElection {
-        executor.submit {
+        executor.value.submit {
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withLeaseClient { leaseClient ->
@@ -40,7 +40,7 @@ class LeaderElection(val url: String,
 
                                 initCountDown.countDown()
 
-                                executor.submit {
+                                executor.value.submit {
                                     watchForLeadershipOpening(watchClient) {
                                         // Run for leader when leader key is deleted
                                         attemptToBecomeLeader(actions, leaseClient, kvclient)
@@ -76,7 +76,8 @@ class LeaderElection(val url: String,
         sleep(1.seconds)
         startCountdown.countDown()
         sleep(1.seconds)
-        executor.shutdown()
+        if (executor.isInitialized())
+            executor.value.shutdown()
     }
 
     private fun watchForLeadershipOpening(watchClient: Watch, action: () -> Unit): Watch.Watcher =

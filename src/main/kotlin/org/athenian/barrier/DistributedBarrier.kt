@@ -19,12 +19,12 @@ class DistributedBarrier(val url: String,
                          val id: String = "Client:${randomId()}") : Closeable {
 
     private val barrierPath = keyName(barrierName)
-    private val client = Client.builder().endpoints(url).build()
-    private val kvClient = client.kvClient
-    private val leaseClient = lazy { client.leaseClient }
-    private val watchClient = lazy { client.watchClient }
+    private val client = lazy { Client.builder().endpoints(url).build() }
+    private val kvClient = lazy { client.value.kvClient }
+    private val leaseClient = lazy { client.value.leaseClient }
+    private val watchClient = lazy { client.value.watchClient }
     private val executor = lazy { Executors.newSingleThreadExecutor() }
-    private val barrierLatch = lazy { CountDownLatch(1) }
+    private val barrierLatch = CountDownLatch(1)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -32,8 +32,10 @@ class DistributedBarrier(val url: String,
     }
 
     override fun close() {
-        kvClient.close()
-        client.close()
+        if (kvClient.isInitialized())
+            kvClient.value.close()
+        if (client.isInitialized())
+            client.value.close()
         if (leaseClient.isInitialized())
             leaseClient.value.close()
         if (watchClient.isInitialized())
@@ -42,7 +44,13 @@ class DistributedBarrier(val url: String,
             executor.value.shutdown()
     }
 
+    val isBarrierSet: Boolean get() = kvClient.value.keyIsPresent(barrierPath)
+
     fun setBarrier(): Boolean {
+
+        if (kvClient.value.keyIsPresent(barrierPath))
+            return false
+
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$id:${randomId(9)}"
 
@@ -51,20 +59,20 @@ class DistributedBarrier(val url: String,
 
         // Do a CAS on the key name. If it is not found, then set it
         val txn =
-            kvClient.transaction {
+            kvClient.value.transaction {
                 If(equals(barrierPath, CmpTarget.version(0)))
                 Then(putOp(barrierPath, uniqueToken, lease.asPutOption))
             }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
+        return if (txn.isSucceeded && kvClient.value.getStringValue(barrierPath) == uniqueToken) {
             executor.value.submit {
                 leaseClient.value.keepAlive(lease.id,
                                             Observers.observer(
                                                 { next -> /*println("KeepAlive next resp: $next")*/ },
                                                 { err -> /*println("KeepAlive err resp: $err")*/ })
                 ).use {
-                    barrierLatch.value.await()
+                    barrierLatch.await()
                 }
             }
             true
@@ -74,18 +82,18 @@ class DistributedBarrier(val url: String,
     }
 
     fun removeBarrier(): Boolean =
-        if (barrierLatch.value.count == 0L)
+        if (barrierLatch.count == 0L) {
             false
-        else {
-            barrierLatch.value.countDown()
+        } else {
+            barrierLatch.countDown()
             true
         }
 
     fun waitOnBarrier() = waitOnBarrier(Long.MAX_VALUE.days)
 
     fun waitOnBarrier(duration: Duration): Boolean {
-
-        if (kvClient.keyIsNotPresent(barrierPath))
+        // Do a quick initial check
+        if (kvClient.value.keyIsNotPresent(barrierPath))
             return true
 
         val waitLatch = CountDownLatch(1)
@@ -99,8 +107,8 @@ class DistributedBarrier(val url: String,
                 }
 
         }.use {
-            // Check one more time
-            if (kvClient.keyIsNotPresent(barrierPath))
+            // Check one more time in case watch missed the delete just after last check
+            if (kvClient.value.keyIsNotPresent(barrierPath))
                 waitLatch.countDown()
 
             return@waitOnBarrier waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
