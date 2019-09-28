@@ -4,12 +4,14 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import org.athenian.asPutOption
 import org.athenian.delete
 import org.athenian.equals
 import org.athenian.getStringValue
 import org.athenian.keyIsPresent
 import org.athenian.putOp
+import org.athenian.putValue
 import org.athenian.randomId
 import org.athenian.transaction
 import org.athenian.watcher
@@ -22,11 +24,12 @@ import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
 
+
 @ExperimentalTime
-class DistributedBarrier(val url: String,
-                         val barrierPath: String,
-                         val waitOnMissingBarriers: Boolean = true,
-                         val id: String = "Client:${randomId()}") : Closeable {
+class DistributedBarrierWithCount(val url: String,
+                                  val barrierPath: String,
+                                  val memberCount: Int,
+                                  val id: String = "Client:${randomId()}") : Closeable {
 
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }
@@ -34,10 +37,14 @@ class DistributedBarrier(val url: String,
     private val watchClient = lazy { client.value.watchClient }
     private val executor = lazy { Executors.newSingleThreadExecutor() }
     private val barrierLatch = CountDownLatch(1)
+    private val uniqueToken = "$id:${randomId(9)}"
+    private val readyPath = "$barrierPath/ready"
+    private val uniquePath = "$barrierPath/waiting/$uniqueToken"
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
+        require(memberCount > 0) { "Member count must be > 0" }
     }
 
     override fun close() {
@@ -53,7 +60,7 @@ class DistributedBarrier(val url: String,
             executor.value.shutdown()
     }
 
-    val isBarrierSet: Boolean get() = kvClient.keyIsPresent(barrierPath)
+    val isReadySet: Boolean get() = kvClient.keyIsPresent(barrierPath)
 
     fun setBarrier(): Boolean {
 
@@ -98,25 +105,45 @@ class DistributedBarrier(val url: String,
             true
         }
 
+    /*
+        First node creates subnode /ready
+        Everyone creates a watch for /ready
+        Each node creates its own subnode with keepalive on it
+        Query the number of children, if too few, wait on DELETE of /ready
+        otherwise delete /ready and trigger other nodes
+    */
+
     fun waitOnBarrier() = waitOnBarrier(Long.MAX_VALUE.days)
 
     fun waitOnBarrier(duration: Duration): Boolean {
-        // Check if barrier is present before using watcher
-        if (!waitOnMissingBarriers && !isBarrierSet)
-            return true
+
+        // Do a CAS on the /ready name. If it is not found, then set it
+        val txn =
+            kvClient.transaction {
+                If(equals(readyPath, CmpTarget.version(0)))
+                Then(putOp(readyPath, uniqueToken))
+            }
+
+        val lease = leaseClient.value.grant(2).get()
+        kvClient.putValue(uniquePath, uniqueToken, lease.asPutOption)
+
 
         val waitLatch = CountDownLatch(1)
 
         watchClient.value.watcher(barrierPath) { watchResponse ->
             watchResponse.events
                 .forEach { event ->
-                    if (event.eventType == DELETE)
-                        waitLatch.countDown()
+                    when (event.eventType) {
+                        PUT -> {
+                            // Do a count
+                        }
+                        DELETE -> waitLatch.countDown()
+                    }
                 }
 
         }.use {
             // Check one more time in case watch missed the delete just after last check
-            if (!waitOnMissingBarriers && !isBarrierSet)
+            if (!isReadySet)
                 waitLatch.countDown()
 
             return@waitOnBarrier waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)

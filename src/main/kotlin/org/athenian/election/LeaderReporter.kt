@@ -1,7 +1,9 @@
 package org.athenian.election
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.watch.WatchEvent
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import org.athenian.asString
 import org.athenian.watcher
 import org.athenian.withWatchClient
@@ -19,29 +21,21 @@ fun main() {
     Client.builder().endpoints(url).build()
         .use { client ->
             client.withWatchClient { watchClient ->
-                watchClient.watcher(electionKeyName) { resp ->
-                        resp.events
-                            .forEach { event ->
-                                when (event.eventType) {
-                                    WatchEvent.EventType.PUT -> {
-                                        println("${event.keyValue.value.asString} is now the leader [${unelectedTime.elapsedNow()}]")
-                                    }
-                                    WatchEvent.EventType.DELETE -> {
-                                        unelectedTime = clock.markNow()
-                                    }
-                                    WatchEvent.EventType.UNRECOGNIZED -> {
-                                        println("Error with watch")
-                                    }
-                                    else -> {
-                                        println("Error with watch")
-                                    }
-                                }
+                watchClient.watcher(electionKeyName) { watchResponse ->
+                    watchResponse.events
+                        .forEach { event ->
+                            when (event.eventType) {
+                                PUT -> println("${event.keyValue.value.asString} is now the leader [${unelectedTime.elapsedNow()}]")
+                                DELETE -> unelectedTime = clock.markNow()
+                                UNRECOGNIZED -> println("Error with watch")
+                                else -> println("Error with watch")
                             }
+                        }
                 }.use {
                     // Sleep forever
                     val countdown = CountDownLatch(1)
                     countdown.await()
                 }
-                }
+            }
         }
 }

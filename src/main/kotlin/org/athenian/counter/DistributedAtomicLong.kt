@@ -3,7 +3,17 @@ package org.athenian.counter
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
-import org.athenian.*
+import org.athenian.asLong
+import org.athenian.delete
+import org.athenian.equals
+import org.athenian.getLongValue
+import org.athenian.getValue
+import org.athenian.puOp
+import org.athenian.putOp
+import org.athenian.sleep
+import org.athenian.transaction
+import org.athenian.withKvClient
+import org.athenian.withLock
 import java.io.Closeable
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicLong
@@ -83,7 +93,6 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
     }
 
     companion object {
-        private const val counterPrefix = "/counters"
         val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 

@@ -1,9 +1,24 @@
 package org.athenian.election
 
-import io.etcd.jetcd.*
+import io.etcd.jetcd.Client
+import io.etcd.jetcd.KV
+import io.etcd.jetcd.Lease
+import io.etcd.jetcd.Observers
+import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.jetcd.watch.WatchEvent
-import org.athenian.*
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import org.athenian.asPutOption
+import org.athenian.delete
+import org.athenian.equals
+import org.athenian.getStringValue
+import org.athenian.putOp
+import org.athenian.randomId
+import org.athenian.sleep
+import org.athenian.transaction
+import org.athenian.watcher
+import org.athenian.withKvClient
+import org.athenian.withLeaseClient
+import org.athenian.withWatchClient
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -84,7 +99,7 @@ class LeaderElection(val url: String,
             // Create a watch to act on DELETE events
             watchResponse.events
                 .forEach { event ->
-                    if (event.eventType == WatchEvent.EventType.DELETE) {
+                    if (event.eventType == DELETE) {
                         //println("$clientId executing action")
                         action.invoke()
                     }
@@ -124,8 +139,6 @@ class LeaderElection(val url: String,
     }
 
     companion object {
-        private const val electionPrefix = "/elections"
-
         fun reset(url: String, electionPath: String) {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
             Client.builder().endpoints(url).build()

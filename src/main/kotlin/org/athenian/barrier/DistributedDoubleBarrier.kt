@@ -5,9 +5,11 @@ import io.etcd.jetcd.Observers
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import org.athenian.asPutOption
+import org.athenian.counter.DistributedAtomicLong
 import org.athenian.delete
 import org.athenian.equals
 import org.athenian.getStringValue
+import org.athenian.keyIsNotPresent
 import org.athenian.keyIsPresent
 import org.athenian.putOp
 import org.athenian.randomId
@@ -22,11 +24,12 @@ import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
 
+
 @ExperimentalTime
-class DistributedBarrier(val url: String,
-                         val barrierPath: String,
-                         val waitOnMissingBarriers: Boolean = true,
-                         val id: String = "Client:${randomId()}") : Closeable {
+class DistributedDoubleBarrier(val url: String,
+                               val barrierPath: String,
+                               val memberCount: Int,
+                               val id: String = "Client:${randomId()}") : Closeable {
 
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }
@@ -38,22 +41,34 @@ class DistributedBarrier(val url: String,
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
+        require(memberCount > 0) { "Member count must be > 0" }
+        val counter = DistributedAtomicLong(url, barrierPath)
+        counter.add(memberCount.toLong())
+    }
+
+    fun enter(): Boolean {
+        if (kvClient.keyIsNotPresent(barrierPath))
+            throw IllegalStateException("No barrier $barrierPath exists")
+
+        return true
+    }
+
+    fun leave() {
+
     }
 
     override fun close() {
-        if (watchClient.isInitialized())
-            watchClient.value.close()
-        if (leaseClient.isInitialized())
-            leaseClient.value.close()
         if (kvClient.isInitialized())
             kvClient.value.close()
         if (client.isInitialized())
             client.value.close()
+        if (leaseClient.isInitialized())
+            leaseClient.value.close()
+        if (watchClient.isInitialized())
+            watchClient.value.close()
         if (executor.isInitialized())
             executor.value.shutdown()
     }
-
-    val isBarrierSet: Boolean get() = kvClient.keyIsPresent(barrierPath)
 
     fun setBarrier(): Boolean {
 
@@ -101,12 +116,13 @@ class DistributedBarrier(val url: String,
     fun waitOnBarrier() = waitOnBarrier(Long.MAX_VALUE.days)
 
     fun waitOnBarrier(duration: Duration): Boolean {
-        // Check if barrier is present before using watcher
-        if (!waitOnMissingBarriers && !isBarrierSet)
+        // Do a quick initial check
+        if (kvClient.keyIsNotPresent(barrierPath))
             return true
 
         val waitLatch = CountDownLatch(1)
 
+        // Check if barrier is present before using watcher
         watchClient.value.watcher(barrierPath) { watchResponse ->
             watchResponse.events
                 .forEach { event ->
@@ -116,7 +132,7 @@ class DistributedBarrier(val url: String,
 
         }.use {
             // Check one more time in case watch missed the delete just after last check
-            if (!waitOnMissingBarriers && !isBarrierSet)
+            if (kvClient.keyIsNotPresent(barrierPath))
                 waitLatch.countDown()
 
             return@waitOnBarrier waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)

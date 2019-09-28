@@ -20,3 +20,7 @@ etcd --listen-client-urls=http://localhost:2379 --advertise-client-urls=http://l
 
 ## Elections
 * [etcd3 leader election using Python](https://www.sandtable.com/etcd3-leader-election-using-python/)
+
+## ZK and Curator
+* [ZooKeeper Tutorial](https://data-flair.training/blogs/zookeeper-tutorial/)
+* [Curator Examples](https://github.com/yiming187/curator-example/tree/master/src/main/java/com/ctrip/zk/curator/example)

@@ -2,7 +2,16 @@ package org.athenian
 
 import com.google.common.primitives.Ints
 import com.google.common.primitives.Longs
-import io.etcd.jetcd.*
+import io.etcd.jetcd.Auth
+import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.Client
+import io.etcd.jetcd.Cluster
+import io.etcd.jetcd.KV
+import io.etcd.jetcd.Lease
+import io.etcd.jetcd.Lock
+import io.etcd.jetcd.Maintenance
+import io.etcd.jetcd.Txn
+import io.etcd.jetcd.Watch
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.kv.PutResponse
@@ -42,11 +51,20 @@ fun KV.putValue(keyname: String, keyval: Int): PutResponse = put(keyname.asByteS
 
 fun KV.putValue(keyname: String, keyval: Long): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
 
+fun Lazy<KV>.putValue(keyname: String, keyval: String, option: PutOption): PutResponse =
+    value.putValue(keyname, keyval, option)
+
 fun KV.putValue(keyname: String, keyval: String, option: PutOption): PutResponse =
     put(keyval.asByteSequence, keyval.asByteSequence, option).get()
 
+fun Lazy<KV>.putValue(keyname: String, keyval: Int, option: PutOption): PutResponse =
+    value.putValue(keyname, keyval, option)
+
 fun KV.putValue(keyname: String, keyval: Int, option: PutOption): PutResponse =
     put(keyval.asByteSequence, keyval.asByteSequence, option).get()
+
+fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
+    value.putValue(keyname, keyval, option)
 
 fun KV.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
     put(keyval.asByteSequence, keyval.asByteSequence, option).get()
@@ -57,12 +75,20 @@ fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).
 
 fun KV.getValue(keyname: String): GetResponse = get(keyname.asByteSequence).get()
 
+fun Lazy<KV>.keyIsPresent(keyname: String): Boolean = value.keyIsPresent(keyname)
+
 fun KV.keyIsPresent(keyname: String): Boolean = getStringValue(keyname) != null
+
+fun Lazy<KV>.keyIsNotPresent(keyname: String): Boolean = value.keyIsNotPresent(keyname)
 
 fun KV.keyIsNotPresent(keyname: String): Boolean = !keyIsPresent(keyname)
 
+fun Lazy<KV>.getStringValue(keyname: String): String? = value.getStringValue(keyname)
+
 fun KV.getStringValue(keyname: String): String? =
     getValue(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
+
+fun Lazy<KV>.getStringValue(keyname: String, defaultVal: String): String = value.getStringValue(keyname, defaultVal)
 
 fun KV.getStringValue(keyname: String, defaultVal: String): String = getStringValue(keyname) ?: defaultVal
 
@@ -117,13 +143,13 @@ fun Watch.watcher(keyname: String, block: (WatchResponse) -> Unit): Watch.Watche
         block(it)
     }
 
-fun KV.transaction(block: Txn.() -> Txn): TxnResponse {
-    return txn()
-        .run {
-            block()
-            commit()
-        }.get()
-}
+fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
+
+fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
+    txn().run {
+        block()
+        commit()
+    }.get()
 
 fun <T> Semaphore.withLock(block: () -> T): T {
     acquire()
@@ -146,14 +172,12 @@ fun repeatWithSleep(iterations: Int,
 }
 
 @ExperimentalTime
-fun sleep(duration: Duration) {
-    Thread.sleep(duration.toLongMilliseconds())
-}
+fun sleep(duration: Duration) = Thread.sleep(duration.toLongMilliseconds())
 
-fun randomId(length: Int = 10): String {
-    val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
-    return (1..length)
+private val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+
+fun randomId(length: Int = 10): String =
+    (1..length)
         .map { Random.nextInt(0, charPool.size) }
         .map { i -> charPool[i] }
         .joinToString("")
-}
