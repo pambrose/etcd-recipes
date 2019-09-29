@@ -8,6 +8,7 @@ import org.athenian.asPutOption
 import org.athenian.delete
 import org.athenian.equals
 import org.athenian.getStringValue
+import org.athenian.isDone
 import org.athenian.keyIsPresent
 import org.athenian.putOp
 import org.athenian.randomId
@@ -78,7 +79,7 @@ class DistributedBarrier(val url: String,
     }
 
     fun removeBarrier(): Boolean =
-        if (barrierLatch.count == 0L) {
+        if (barrierLatch.isDone) {
             false
         } else {
             barrierLatch.countDown()

@@ -11,43 +11,41 @@ import kotlin.time.seconds
 fun main() {
     val url = "http://localhost:2379"
     val barrierName = "/barriers/barrier2"
-    val cnt = 30
-    val waitLatch = CountDownLatch(cnt)
-    val finishLatch = CountDownLatch(cnt - 1)
+    val count = 30
+    val waitLatch = CountDownLatch(count)
+    val retryLatch = CountDownLatch(count - 1)
 
     DistributedBarrierWithCount.reset(url, barrierName)
 
-    fun waiter(id: Int, barrier: DistributedBarrierWithCount, timeout: Boolean = false) {
+    fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
         sleep(Random.nextLong(10).seconds)
-        println("Waiting on Barrier #$id")
+        println("#$id Waiting on barrier")
 
-        repeat(5) {
-            if (timeout) {
-                barrier.waitOnBarrier(2.seconds)
-                println("Timedout Waiting on Barrier #$id")
-                println("Waiting again on Barrier #$id")
-            }
+        repeat(retryCount) {
+            barrier.waitOnBarrier(2.seconds)
+            println("#$id Timed out waiting on barrier. Waiting again")
         }
-        finishLatch.countDown()
-        println("Waiter count = ${barrier.waiterCount}")
+
+        retryLatch.countDown()
+        println("#$id Waiter count = ${barrier.waiterCount}")
         barrier.waitOnBarrier()
-        println("Done Waiting on Barrier #$id")
+        println("#$id Done waiting on barrier")
         waitLatch.countDown()
     }
 
-    repeat(cnt - 1) {
+    repeat(count - 1) {
         thread {
-            DistributedBarrierWithCount(url, barrierName, cnt)
+            DistributedBarrierWithCount(url, barrierName, count)
                 .use { barrier ->
-                    waiter(it, barrier, true)
+                    waiter(it, barrier, 5)
                 }
         }
     }
 
-    finishLatch.await()
+    retryLatch.await()
     sleep(2.seconds)
 
-    DistributedBarrierWithCount(url, barrierName, cnt)
+    DistributedBarrierWithCount(url, barrierName, count)
         .use { barrier ->
             waiter(99, barrier)
         }

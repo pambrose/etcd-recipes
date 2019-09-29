@@ -16,6 +16,7 @@ import org.athenian.ensureTrailing
 import org.athenian.equals
 import org.athenian.getChildrenKeys
 import org.athenian.getStringValue
+import org.athenian.isDone
 import org.athenian.keyIsPresent
 import org.athenian.putOp
 import org.athenian.randomId
@@ -118,7 +119,7 @@ class DistributedBarrierWithCount(val url: String,
         checkWaiterCount()
 
         // Do not bother starting watcher if latch is already done
-        if (waitLatch.count == 0L)
+        if (waitLatch.isDone)
             return true
 
         // Watch for DELETE of /ready and PUTS on /waiters/*

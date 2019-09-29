@@ -27,6 +27,7 @@ import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchResponse
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import kotlin.random.Random
 import kotlin.time.Duration
@@ -223,6 +224,8 @@ fun repeatWithSleep(iterations: Int,
 fun sleep(duration: Duration) = Thread.sleep(duration.toLongMilliseconds())
 
 fun String.ensureTrailing(suffix: String = "/"): String = "$this${if (endsWith(suffix)) "" else suffix}"
+
+val CountDownLatch.isDone: Boolean get() = count == 0L
 
 private val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
 

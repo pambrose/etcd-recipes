@@ -1,0 +1,77 @@
+package org.athenian.barrier
+
+import org.athenian.sleep
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
+import kotlin.random.Random
+import kotlin.time.ExperimentalTime
+import kotlin.time.seconds
+
+@ExperimentalTime
+fun main() {
+    val url = "http://localhost:2379"
+    val barrierName = "/barriers/barrier3"
+    val count = 5
+    val doneLatch = CountDownLatch(count)
+    val enterLatch = CountDownLatch(count - 1)
+    val leaveLatch = CountDownLatch(count - 1)
+
+    DistributedDoubleBarrier.reset(url, barrierName)
+
+    fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
+        sleep(Random.nextLong(10).seconds)
+        println("#$id Waiting to enter barrier")
+
+        repeat(retryCount) {
+            barrier.enter(2.seconds)
+            println("#$id Timed out entering barrier. Waiting again")
+        }
+
+        enterLatch.countDown()
+        barrier.enter()
+        println("#$id ** Entered barrier **")
+    }
+
+    fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
+        sleep(Random.nextLong(10).seconds)
+        println("#$id Waiting to leave barrier")
+
+        repeat(retryCount) {
+            barrier.leave(2.seconds)
+            println("#$id Timed out leaving barrier. Waiting again")
+        }
+
+        leaveLatch.countDown()
+        barrier.leave()
+        println("#$id ** Left barrier **")
+
+        doneLatch.countDown()
+    }
+
+    repeat(count - 1) {
+        thread {
+            DistributedDoubleBarrier(url, barrierName, count)
+                .use { barrier ->
+                    enterBarrier(it, barrier, 0)
+                    sleep(Random.nextLong(5).seconds)
+                    leaveBarrier(it, barrier, 0)
+                }
+        }
+    }
+
+
+    DistributedDoubleBarrier(url, barrierName, count)
+        .use { barrier ->
+            enterLatch.await()
+            sleep(2.seconds)
+            enterBarrier(99, barrier)
+
+            leaveLatch.await()
+            sleep(2.seconds)
+            leaveBarrier(99, barrier)
+        }
+
+    doneLatch.await()
+
+    println("Done")
+}
