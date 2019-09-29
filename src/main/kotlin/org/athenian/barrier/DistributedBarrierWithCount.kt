@@ -154,7 +154,7 @@ class DistributedBarrierWithCount(val url: String,
             val timeout = waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
             if (!timeout) {
                 waitLatch.countDown()
-                kvClient.delete(waitingPath)
+                kvClient.delete(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
             }
 
             return@waitOnBarrier timeout
