@@ -123,10 +123,10 @@ class DistributedDoubleBarrier(val url: String,
         val waitLatch = CountDownLatch(1)
 
         // Check if barrier is present before using watcher
-        watchClient.value.watcher(barrierPath) { watchResponse ->
+        watchClient.watcher(barrierPath) { watchResponse ->
             watchResponse.events
-                .forEach { event ->
-                    if (event.eventType == DELETE)
+                .forEach { watchEvent ->
+                    if (watchEvent.eventType == DELETE)
                         waitLatch.countDown()
                 }
 

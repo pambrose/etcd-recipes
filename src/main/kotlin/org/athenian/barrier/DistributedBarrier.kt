@@ -107,10 +107,10 @@ class DistributedBarrier(val url: String,
 
         val waitLatch = CountDownLatch(1)
 
-        watchClient.value.watcher(barrierPath) { watchResponse ->
+        watchClient.watcher(barrierPath) { watchResponse ->
             watchResponse.events
-                .forEach { event ->
-                    if (event.eventType == DELETE)
+                .forEach { watchEvent ->
+                    if (watchEvent.eventType == DELETE)
                         waitLatch.countDown()
                 }
 

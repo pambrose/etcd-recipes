@@ -53,8 +53,8 @@ fun main() {
                         println("Starting watch")
                         watchClient.watcher(keyname) { watchResponse ->
                             watchResponse.events
-                                .forEach { event ->
-                                    println("Watch event: ${event.eventType} ${event.keyValue.value.asString}")
+                                .forEach { watchEvent ->
+                                    println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.value.asString}")
                                 }
                         }.use {
                             sleep(5.seconds)

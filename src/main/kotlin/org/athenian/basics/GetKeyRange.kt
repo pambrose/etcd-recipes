@@ -3,6 +3,7 @@ package org.athenian.basics
 import io.etcd.jetcd.Client
 import org.athenian.countChildren
 import org.athenian.delete
+import org.athenian.getChildrenKeys
 import org.athenian.getChildrenStringValues
 import org.athenian.putValue
 import org.athenian.withKvClient
@@ -23,6 +24,7 @@ fun main() {
                     putValue(keyname, "root")
 
                     println("After creation:")
+                    println(getChildrenKeys(keyname))
                     println(getChildrenStringValues(keyname))
                     println(countChildren(keyname))
 
@@ -33,17 +35,21 @@ fun main() {
                     putValue("$keyname/d", "dddd")
 
                     println("\nAfter addition:")
+                    println(getChildrenKeys(keyname))
                     println(getChildrenStringValues(keyname))
                     println(countChildren(keyname))
 
-                    // Remove children
-                    delete("$keyname/a")
-                    delete("$keyname/b")
-                    delete("$keyname/c")
-                    delete("$keyname/d")
+                    // Delete root
+                    delete(keyname)
+                    // Delete children
+                    getChildrenKeys(keyname).forEach {
+                        println("Deleting key: $it")
+                        delete(it)
+                    }
 
                     println("\nAfter removal:")
-                    println(getChildrenStringValues("$keyname/"))
+                    println(getChildrenKeys(keyname))
+                    println(getChildrenStringValues(keyname))
                     println(countChildren(keyname))
                 }
             }

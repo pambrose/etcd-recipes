@@ -72,6 +72,8 @@ fun KV.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
 
 fun KV.delete(vararg keynames: String) = keynames.forEach { delete(it) }
 
+fun Lazy<KV>.delete(keyname: String): DeleteResponse = value.delete(keyname)
+
 fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).get()
 
 fun KV.getResponse(keyname: String, getOption: GetOption = GetOption.DEFAULT): GetResponse =
@@ -87,8 +89,13 @@ fun KV.keyIsNotPresent(keyname: String): Boolean = !keyIsPresent(keyname)
 
 fun Lazy<KV>.getStringValue(keyname: String): String? = value.getStringValue(keyname)
 
+fun KV.getChildrenKeys(keyname: String): List<String> {
+    val k = keyname.ensureTrailing("/")
+    return getKeys(k, GetOption.newBuilder().withPrefix(k.asByteSequence).build())
+}
+
 fun KV.getChildrenStringValues(keyname: String): List<String> {
-    val k = "$keyname${if (keyname.endsWith("/")) "" else "/"}"
+    val k = keyname.ensureTrailing("/")
     return getStringValues(k, GetOption.newBuilder().withPrefix(k.asByteSequence).build())
 }
 
@@ -109,11 +116,16 @@ fun KV.getLongValue(keyname: String): Long? =
 
 fun KV.getLongValue(keyname: String, defaultVal: Long): Long = getLongValue(keyname) ?: defaultVal
 
+fun KV.getKeys(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<String> =
+    getResponse(keyname, getOption).kvs.map { it.key.asString }
+
 fun KV.getStringValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<String> =
     getResponse(keyname, getOption).kvs.map { it.value.asString }
 
+fun Lazy<KV>.countChildren(keyname: String): Long = value.countChildren(keyname)
+
 fun KV.countChildren(keyname: String): Long {
-    val k = "$keyname${if (keyname.endsWith("/")) "" else "/"}"
+    val k = keyname.ensureTrailing("/")
     return getResponse(k,
                        GetOption.newBuilder()
                            .withPrefix(k.asByteSequence)
@@ -157,6 +169,8 @@ fun Client.withAuthrClient(block: (authClient: Auth) -> Unit) = authClient.use {
 
 fun Client.withKvClient(block: (kvClient: KV) -> Unit) = kvClient.use { block(it) }
 
+fun Lazy<Watch>.watcher(keyname: String, block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyname, block)
+
 fun Watch.watcher(keyname: String, block: (WatchResponse) -> Unit): Watch.Watcher =
     watch(keyname.asByteSequence, WatchOption.newBuilder().withRevision(0).build()) {
         block(it)
@@ -194,6 +208,8 @@ fun repeatWithSleep(iterations: Int,
 fun sleep(duration: Duration) = Thread.sleep(duration.toLongMilliseconds())
 
 private val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+
+fun String.ensureTrailing(str: String, suffix: String = "/"): String = "$str${if (str.endsWith(suffix)) "" else suffix}"
 
 fun randomId(length: Int = 10): String =
     (1..length)
