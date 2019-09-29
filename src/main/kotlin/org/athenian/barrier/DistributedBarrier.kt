@@ -40,19 +40,6 @@ class DistributedBarrier(val url: String,
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
     }
 
-    override fun close() {
-        if (watchClient.isInitialized())
-            watchClient.value.close()
-        if (leaseClient.isInitialized())
-            leaseClient.value.close()
-        if (kvClient.isInitialized())
-            kvClient.value.close()
-        if (client.isInitialized())
-            client.value.close()
-        if (executor.isInitialized())
-            executor.value.shutdown()
-    }
-
     val isBarrierSet: Boolean get() = kvClient.keyIsPresent(barrierPath)
 
     fun setBarrier(): Boolean {
@@ -121,6 +108,23 @@ class DistributedBarrier(val url: String,
 
             return@waitOnBarrier waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
         }
+    }
+
+    override fun close() {
+        if (watchClient.isInitialized())
+            watchClient.value.close()
+
+        if (leaseClient.isInitialized())
+            leaseClient.value.close()
+
+        if (kvClient.isInitialized())
+            kvClient.value.close()
+
+        if (client.isInitialized())
+            client.value.close()
+
+        if (executor.isInitialized())
+            executor.value.shutdown()
     }
 
     companion object {

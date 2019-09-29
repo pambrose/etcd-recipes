@@ -88,8 +88,10 @@ class LeaderElection(val url: String,
     override fun close() {
         watchCountDown.countDown()
         sleep(1.seconds)
+
         startCountdown.countDown()
         sleep(1.seconds)
+
         if (executor.isInitialized())
             executor.value.shutdown()
     }

@@ -57,19 +57,6 @@ class DistributedBarrierWithCount(val url: String,
         require(memberCount > 0) { "Member count must be > 0" }
     }
 
-    override fun close() {
-        if (watchClient.isInitialized())
-            watchClient.value.close()
-        if (leaseClient.isInitialized())
-            leaseClient.value.close()
-        if (kvClient.isInitialized())
-            kvClient.value.close()
-        if (client.isInitialized())
-            client.value.close()
-        if (executor.isInitialized())
-            executor.value.shutdown()
-    }
-
     private val isReadySet: Boolean get() = kvClient.keyIsPresent(readyPath)
 
     val waiterCount: Long get() = kvClient.countChildren(waitingPrefix)
@@ -160,6 +147,23 @@ class DistributedBarrierWithCount(val url: String,
 
             return@waitOnBarrier success
         }
+    }
+
+    override fun close() {
+        if (watchClient.isInitialized())
+            watchClient.value.close()
+
+        if (leaseClient.isInitialized())
+            leaseClient.value.close()
+
+        if (kvClient.isInitialized())
+            kvClient.value.close()
+
+        if (client.isInitialized())
+            client.value.close()
+
+        if (executor.isInitialized())
+            executor.value.shutdown()
     }
 
     companion object {

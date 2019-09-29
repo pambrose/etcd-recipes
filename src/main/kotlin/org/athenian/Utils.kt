@@ -77,8 +77,11 @@ fun Lazy<KV>.delete(keyname: String): DeleteResponse = value.delete(keyname)
 
 fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).get()
 
-fun KV.getResponse(keyname: String, getOption: GetOption = GetOption.DEFAULT): GetResponse =
-    get(keyname.asByteSequence, getOption).get()
+fun Lazy<KV>.getResponse(keyname: String, option: GetOption = GetOption.DEFAULT): GetResponse =
+    value.getResponse(keyname, option)
+
+fun KV.getResponse(keyname: String, option: GetOption = GetOption.DEFAULT): GetResponse =
+    get(keyname.asByteSequence, option).get()
 
 fun Lazy<KV>.keyIsPresent(keyname: String): Boolean = value.keyIsPresent(keyname)
 
@@ -107,10 +110,14 @@ fun Lazy<KV>.getStringValue(keyname: String, defaultVal: String): String = value
 
 fun KV.getStringValue(keyname: String, defaultVal: String): String = getStringValue(keyname) ?: defaultVal
 
+fun Lazy<KV>.getIntValue(keyname: String): Int? = value.getIntValue(keyname)
+
 fun KV.getIntValue(keyname: String): Int? =
     getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asInt
 
 fun KV.getIntValue(keyname: String, defaultVal: Int): Int = getIntValue(keyname) ?: defaultVal
+
+fun Lazy<KV>.getLongValue(keyname: String): Long? = value.getLongValue(keyname)
 
 fun KV.getLongValue(keyname: String): Long? =
     getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong

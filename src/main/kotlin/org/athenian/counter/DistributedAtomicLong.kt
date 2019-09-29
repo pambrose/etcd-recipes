@@ -25,8 +25,8 @@ import kotlin.time.milliseconds
 class DistributedAtomicLong(val url: String, val counterPath: String) : Closeable {
 
     private val semaphore = Semaphore(1, true)
-    private val client = Client.builder().endpoints(url).build()
-    private val kvClient = client.kvClient
+    private val client = lazy { Client.builder().endpoints(url).build() }
+    private val kvClient = lazy { client.value.kvClient }
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -34,11 +34,6 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
 
         // Create counter if first time through
         createCounterIfNotPresent()
-    }
-
-    override fun close() {
-        kvClient.close()
-        client.close()
     }
 
     fun get(): Long = semaphore.withLock { kvClient.getLongValue(counterPath) ?: -1 }
@@ -89,6 +84,14 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
             If(equals(counterPath, CmpTarget.modRevision(kv.modRevision)))
             Then(putOp(counterPath, kv.value.asLong + amount))
         }
+    }
+
+    override fun close() {
+        if (kvClient.isInitialized())
+            kvClient.value.close()
+
+        if (client.isInitialized())
+            client.value.close()
     }
 
     companion object {
