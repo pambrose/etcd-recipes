@@ -22,6 +22,7 @@ import io.etcd.jetcd.lock.UnlockResponse
 import io.etcd.jetcd.op.Cmp
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.op.Op
+import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 import io.etcd.jetcd.options.WatchOption
@@ -137,6 +138,9 @@ fun Lock.lock(keyname: String, leaseId: Long): LockResponse = lock(keyname.asByt
 
 fun Lock.unlock(keyname: String): UnlockResponse = unlock(keyname.asByteSequence).get()
 
+fun deleteOp(keyname: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
+    Op.delete(keyname.asByteSequence, option)
+
 fun putOp(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): Op.PutOp =
     putOp(keyname, keyval.asByteSequence, option)
 
@@ -169,10 +173,14 @@ fun Client.withAuthrClient(block: (authClient: Auth) -> Unit) = authClient.use {
 
 fun Client.withKvClient(block: (kvClient: KV) -> Unit) = kvClient.use { block(it) }
 
-fun Lazy<Watch>.watcher(keyname: String, block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyname, block)
+fun Lazy<Watch>.watcher(keyname: String,
+                        option: WatchOption = WatchOption.DEFAULT,
+                        block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyname, option, block)
 
-fun Watch.watcher(keyname: String, block: (WatchResponse) -> Unit): Watch.Watcher =
-    watch(keyname.asByteSequence, WatchOption.newBuilder().withRevision(0).build()) {
+fun Watch.watcher(keyname: String,
+                  option: WatchOption = WatchOption.DEFAULT,
+                  block: (WatchResponse) -> Unit): Watch.Watcher =
+    watch(keyname.asByteSequence, option) {
         block(it)
     }
 
@@ -207,9 +215,9 @@ fun repeatWithSleep(iterations: Int,
 @ExperimentalTime
 fun sleep(duration: Duration) = Thread.sleep(duration.toLongMilliseconds())
 
-private val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
+fun String.ensureTrailing(suffix: String = "/"): String = "$this${if (endsWith(suffix)) "" else suffix}"
 
-fun String.ensureTrailing(str: String, suffix: String = "/"): String = "$str${if (str.endsWith(suffix)) "" else suffix}"
+private val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
 
 fun randomId(length: Int = 10): String =
     (1..length)

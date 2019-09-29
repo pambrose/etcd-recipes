@@ -11,29 +11,46 @@ import kotlin.time.seconds
 fun main() {
     val url = "http://localhost:2379"
     val barrierName = "/barriers/barrier2"
-    val cnt = 5
+    val cnt = 10
     val waitLatch = CountDownLatch(cnt)
+    val finishLatch = CountDownLatch(cnt - 1)
 
     DistributedBarrierWithCount.reset(url, barrierName)
 
-    repeat(cnt) {
+    fun waiter(id: Int, barrier: DistributedBarrierWithCount, retry: Boolean) {
+        sleep(Random.nextLong(10).seconds)
+        println("Waiting on Barrier #$id")
+
+        if (retry) {
+            barrier.waitOnBarrier(2.seconds)
+            println("Timedout Waiting on Barrier #$id")
+            println("Waiting again on Barrier #$id")
+        }
+        finishLatch.countDown()
+        println("Waiter count = ${barrier.waiterCount}")
+        barrier.waitOnBarrier()
+        println("Done Waiting on Barrier #$id")
+        waitLatch.countDown()
+    }
+
+    repeat(cnt - 1) {
         thread {
             DistributedBarrierWithCount(url, barrierName, cnt)
                 .use { barrier ->
-                    sleep(Random.nextLong(5).seconds)
-                    println("Waiting on Barrier #$it")
-                    //barrier.waitOnBarrier(1.seconds)
-                    //println("Timedout Waiting on Barrier #$it")
-                    //println("Waiting again on Barrier #$it")
-                    barrier.waitOnBarrier()
-                    println("Done Waiting on Barrier #$it")
-
-                    sleep(20.seconds)
-                    waitLatch.countDown()
+                    waiter(it, barrier, true)
                 }
         }
     }
 
+    finishLatch.await()
+    sleep(2.seconds)
+
+    DistributedBarrierWithCount(url, barrierName, cnt)
+        .use { barrier ->
+            waiter(99, barrier, false)
+        }
+
     waitLatch.await()
+
     println("Done")
 }

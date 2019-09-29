@@ -82,7 +82,6 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
         }
 
     private fun applyCounterTransaction(amount: Long): TxnResponse {
-
         val kvlist = kvClient.getResponse(counterPath).kvs
         val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw InternalError("KeyValue List was empty")
 

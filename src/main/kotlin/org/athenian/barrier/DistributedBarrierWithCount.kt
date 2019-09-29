@@ -3,12 +3,15 @@ package org.athenian.barrier
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
 import io.etcd.jetcd.op.CmpTarget
+import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import org.athenian.asByteSequence
 import org.athenian.asPutOption
 import org.athenian.asString
 import org.athenian.countChildren
 import org.athenian.delete
+import org.athenian.deleteOp
 import org.athenian.ensureTrailing
 import org.athenian.equals
 import org.athenian.getChildrenKeys
@@ -32,7 +35,7 @@ import kotlin.time.days
 class DistributedBarrierWithCount(val url: String,
                                   val barrierPath: String,
                                   val memberCount: Int,
-                                  val id: String = "Client:${randomId(9)}") : Closeable {
+                                  val id: String = "Client:${randomId(6)}") : Closeable {
 
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }
@@ -71,6 +74,8 @@ class DistributedBarrierWithCount(val url: String,
         otherwise delete /ready and trigger other nodes
     */
 
+    val waiterCount: Long get() = kvClient.countChildren(waitingPrefix)
+
     fun waitOnBarrier() = waitOnBarrier(Long.MAX_VALUE.days)
 
     fun waitOnBarrier(duration: Duration): Boolean {
@@ -84,27 +89,18 @@ class DistributedBarrierWithCount(val url: String,
                 Then(putOp(readyPath, uniqueToken))
             }
 
-        if (readyTxn.isSucceeded)
-            println("$id created $readyPath")
-
         val waitLatch = CountDownLatch(1)
 
         val waitingPath = "$waitingPrefix/$uniqueToken"
-        println("Creating $waitingPath")
         val lease = leaseClient.value.grant(2).get()
-        val waitingTxn =
             kvClient.transaction {
                 If(equals(waitingPath, CmpTarget.version(0)))
                 Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
             }
 
-        if (waitingTxn.isSucceeded)
-            println("$id created $waitingPath")
-
         // Keep key alive
-        if (waitingTxn.isSucceeded && kvClient.getStringValue(waitingPath) == uniqueToken) {
+        if (kvClient.getStringValue(waitingPath) == uniqueToken) {
             executor.value.submit {
-                println("Starting keep-alive $id")
                 leaseClient.value.keepAlive(lease.id,
                                             Observers.observer(
                                                 { next -> /*println("KeepAlive next resp: $next")*/ },
@@ -119,28 +115,32 @@ class DistributedBarrierWithCount(val url: String,
             if (!isReadySet) {
                 waitLatch.countDown()
             } else {
-                val cnt = kvClient.countChildren(waitingPrefix)
-                println("$id counted $cnt children")
-                if (cnt >= memberCount) {
+                if (waiterCount >= memberCount) {
+
                     waitLatch.countDown()
 
-                    println("$id deleting $readyPath")
-                    kvClient.delete(readyPath)
+                    val deleteTxn =
+                        kvClient.transaction {
+                            If(equals(readyPath, CmpTarget.version(0)))
+                            Then()
+                            Else(deleteOp(readyPath))
+                        }
                 }
             }
         }
 
         checkOnWaiterCount()
 
-        if (waitLatch.count == 0L || !isReadySet)
+        if (waitLatch.count == 0L || !isReadySet) {
             return true
+        }
 
-        println("$id starting watcher")
-        watchClient.watcher(barrierPath.ensureTrailing("/")) { watchResponse ->
+        // Watch /ready value
+        val k = barrierPath.ensureTrailing("/")
+        watchClient.watcher(k, WatchOption.newBuilder().withPrefix(k.asByteSequence).build()) { watchResponse ->
             watchResponse.events
                 .forEach { watchEvent ->
                     val key = watchEvent.keyValue.key.asString
-                    println("$id got event ${watchEvent.eventType} for $key")
                     when {
                         key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> checkOnWaiterCount()
                         key.startsWith(readyPath) && watchEvent.eventType == DELETE -> waitLatch.countDown()
@@ -151,8 +151,13 @@ class DistributedBarrierWithCount(val url: String,
             // Check one more time in case watch missed the delete just after last check
             checkOnWaiterCount()
 
-            println("$id is waiting on waitLatch")
-            return@waitOnBarrier waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+            val timeout = waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+            if (!timeout) {
+                waitLatch.countDown()
+                kvClient.delete(waitingPath)
+            }
+
+            return@waitOnBarrier timeout
         }
     }
 
