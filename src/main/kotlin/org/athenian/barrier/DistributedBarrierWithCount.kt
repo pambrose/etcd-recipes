@@ -30,7 +30,13 @@ import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
 
-
+/*
+    First node creates subnode /ready
+    Each node creates its own subnode with keepalive on it
+    Each node creates a watch for DELETE on /ready and PUT on any waiter
+    Query the number of children after each PUT on waiter and DELETE /ready if memberCount seen
+    Leave if DELETE of /ready is seen
+*/
 @ExperimentalTime
 class DistributedBarrierWithCount(val url: String,
                                   val barrierPath: String,
@@ -64,15 +70,7 @@ class DistributedBarrierWithCount(val url: String,
             executor.value.shutdown()
     }
 
-    val isReadySet: Boolean get() = kvClient.keyIsPresent(readyPath)
-
-    /*
-        First node creates subnode /ready
-        Each node creates its own subnode with keepalive on it
-        Everyone creates a watch for /ready
-        Query the number of children, if too few, wait on DELETE of /ready
-        otherwise delete /ready and trigger other nodes
-    */
+    private val isReadySet: Boolean get() = kvClient.keyIsPresent(readyPath)
 
     val waiterCount: Long get() = kvClient.countChildren(waitingPrefix)
 
@@ -93,10 +91,10 @@ class DistributedBarrierWithCount(val url: String,
 
         val waitingPath = "$waitingPrefix/$uniqueToken"
         val lease = leaseClient.value.grant(2).get()
-            kvClient.transaction {
-                If(equals(waitingPath, CmpTarget.version(0)))
-                Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
-            }
+        kvClient.transaction {
+            If(equals(waitingPath, CmpTarget.version(0)))
+            Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
+        }
 
         // Keep key alive
         if (kvClient.getStringValue(waitingPath) == uniqueToken) {
@@ -111,7 +109,8 @@ class DistributedBarrierWithCount(val url: String,
             }
         }
 
-        fun checkOnWaiterCount() {
+        fun checkWaiterCount() {
+            // First see if /ready is missing
             if (!isReadySet) {
                 waitLatch.countDown()
             } else {
@@ -119,45 +118,47 @@ class DistributedBarrierWithCount(val url: String,
 
                     waitLatch.countDown()
 
-                    val deleteTxn =
-                        kvClient.transaction {
-                            If(equals(readyPath, CmpTarget.version(0)))
-                            Then()
-                            Else(deleteOp(readyPath))
-                        }
+                    // Delete /ready key
+                    kvClient.transaction {
+                        If(equals(readyPath, CmpTarget.version(0)))
+                        Then()
+                        Else(deleteOp(readyPath))
+                    }
                 }
             }
         }
 
-        checkOnWaiterCount()
+        checkWaiterCount()
 
-        if (waitLatch.count == 0L || !isReadySet) {
+        // Do not bother starting watcher if latch is already done
+        if (waitLatch.count == 0L)
             return true
-        }
 
-        // Watch /ready value
-        val k = barrierPath.ensureTrailing("/")
-        watchClient.watcher(k, WatchOption.newBuilder().withPrefix(k.asByteSequence).build()) { watchResponse ->
+        // Watch for DELETE of /ready and PUTS on /waiters/*
+        val adjustedKey = barrierPath.ensureTrailing("/")
+        val watchOption = WatchOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build()
+        watchClient.watcher(adjustedKey, watchOption) { watchResponse ->
             watchResponse.events
                 .forEach { watchEvent ->
                     val key = watchEvent.keyValue.key.asString
                     when {
-                        key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> checkOnWaiterCount()
+                        key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> checkWaiterCount()
                         key.startsWith(readyPath) && watchEvent.eventType == DELETE -> waitLatch.countDown()
                     }
                 }
 
         }.use {
             // Check one more time in case watch missed the delete just after last check
-            checkOnWaiterCount()
+            checkWaiterCount()
 
-            val timeout = waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
-            if (!timeout) {
-                waitLatch.countDown()
+            val success = waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+            // Cleanup if a time-out occurred
+            if (!success) {
+                waitLatch.countDown() // Release keep-alive waiting on latch.
                 kvClient.delete(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
             }
 
-            return@waitOnBarrier timeout
+            return@waitOnBarrier success
         }
     }
 

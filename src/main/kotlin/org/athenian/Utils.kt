@@ -91,13 +91,13 @@ fun KV.keyIsNotPresent(keyname: String): Boolean = !keyIsPresent(keyname)
 fun Lazy<KV>.getStringValue(keyname: String): String? = value.getStringValue(keyname)
 
 fun KV.getChildrenKeys(keyname: String): List<String> {
-    val k = keyname.ensureTrailing("/")
-    return getKeys(k, GetOption.newBuilder().withPrefix(k.asByteSequence).build())
+    val adjustedKey = keyname.ensureTrailing("/")
+    return getKeys(adjustedKey, GetOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build())
 }
 
 fun KV.getChildrenStringValues(keyname: String): List<String> {
-    val k = keyname.ensureTrailing("/")
-    return getStringValues(k, GetOption.newBuilder().withPrefix(k.asByteSequence).build())
+    val adjustedKey = keyname.ensureTrailing("/")
+    return getStringValues(adjustedKey, GetOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build())
 }
 
 fun KV.getStringValue(keyname: String): String? =
@@ -126,10 +126,10 @@ fun KV.getStringValues(keyname: String, getOption: GetOption = GetOption.DEFAULT
 fun Lazy<KV>.countChildren(keyname: String): Long = value.countChildren(keyname)
 
 fun KV.countChildren(keyname: String): Long {
-    val k = keyname.ensureTrailing("/")
-    return getResponse(k,
+    val adjustedKey = keyname.ensureTrailing("/")
+    return getResponse(adjustedKey,
                        GetOption.newBuilder()
-                           .withPrefix(k.asByteSequence)
+                           .withPrefix(adjustedKey.asByteSequence)
                            .withCountOnly(true)
                            .build()).count
 }
