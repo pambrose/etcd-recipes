@@ -10,7 +10,7 @@ import kotlin.time.seconds
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
-    val barrierName = "/barriers/barrier2"
+    val barrierName = "/barriers/barrierwithcountertest"
     val count = 30
     val waitLatch = CountDownLatch(count)
     val retryLatch = CountDownLatch(count - 1)
@@ -33,11 +33,11 @@ fun main() {
         waitLatch.countDown()
     }
 
-    repeat(count - 1) {
+    repeat(count - 1) { id ->
         thread {
             DistributedBarrierWithCount(url, barrierName, count)
                 .use { barrier ->
-                    waiter(it, barrier, 5)
+                    waiter(id, barrier, 5)
                 }
         }
     }

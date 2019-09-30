@@ -9,23 +9,23 @@ import kotlin.time.seconds
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
-    val barrierName = "barrier2"
+    val barrierName = "/barriers/earlythreadedclients"
     val cnt = 5
     val waitLatch = CountDownLatch(cnt)
     val goLatch = CountDownLatch(1)
 
     DistributedBarrier.reset(url, barrierName)
 
-    repeat(cnt) {
+    repeat(cnt) { id ->
         thread {
             DistributedBarrier(url, barrierName)
                 .use { barrier ->
-                    println("Waiting on Barrier #$it")
+                    println("$id Waiting on Barrier")
                     barrier.waitOnBarrier(1.seconds)
-                    println("Timedout Waiting on Barrier #$it")
-                    println("Waiting again on Barrier #$it")
+                    println("$id Timedout Waiting on Barrier")
+                    println("$id Waiting again on Barrier")
                     barrier.waitOnBarrier()
-                    println("Done Waiting on Barrier #$it")
+                    println("$id Done Waiting on Barrier")
                     waitLatch.countDown()
                 }
         }
