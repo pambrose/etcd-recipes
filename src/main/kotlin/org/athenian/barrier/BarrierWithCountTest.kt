@@ -23,12 +23,13 @@ fun main() {
 
         repeat(retryCount) {
             barrier.waitOnBarrier(2.seconds)
-            println("#$id Timed out waiting on barrier. Waiting again")
+            println("#$id Timed out waiting on barrier, waiting again")
         }
 
         retryLatch.countDown()
         println("#$id Waiter count = ${barrier.waiterCount}")
         barrier.waitOnBarrier()
+
         println("#$id Done waiting on barrier")
         waitLatch.countDown()
     }

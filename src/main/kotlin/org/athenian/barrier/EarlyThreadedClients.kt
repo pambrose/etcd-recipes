@@ -22,9 +22,10 @@ fun main() {
                 .use { barrier ->
                     println("$id Waiting on Barrier")
                     barrier.waitOnBarrier(1.seconds)
-                    println("$id Timedout Waiting on Barrier")
-                    println("$id Waiting again on Barrier")
+
+                    println("$id Timedout waiting on barrier, waiting again")
                     barrier.waitOnBarrier()
+
                     println("$id Done Waiting on Barrier")
                     waitLatch.countDown()
                 }

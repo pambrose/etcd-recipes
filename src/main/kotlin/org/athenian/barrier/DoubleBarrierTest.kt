@@ -20,28 +20,30 @@ fun main() {
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
         sleep(10.random.seconds)
-        println("#$id Waiting to enter barrier")
 
         repeat(retryCount) {
+            println("#$id Waiting to enter barrier")
             barrier.enter(2.seconds)
-            println("#$id Timed out entering barrier. Waiting again")
+            println("#$id Timed out entering barrier")
         }
 
         enterLatch.countDown()
+        println("#$id Waiting to enter barrier")
         barrier.enter()
         println("#$id Entered barrier")
     }
 
     fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
         sleep(10.random.seconds)
-        println("#$id Waiting to leave barrier")
 
         repeat(retryCount) {
+            println("#$id Waiting to leave barrier")
             barrier.leave(2.seconds)
-            println("#$id Timed out leaving barrier. Waiting again")
+            println("#$id Timed out leaving barrier")
         }
 
         leaveLatch.countDown()
+        println("#$id Waiting to leave barrier")
         barrier.leave()
         println("#$id Left barrier")
 
