@@ -1,9 +1,9 @@
 package org.athenian.barrier
 
+import org.athenian.random
 import org.athenian.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
@@ -18,7 +18,7 @@ fun main() {
     DistributedBarrierWithCount.reset(url, barrierName)
 
     fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
-        sleep(Random.nextLong(10).seconds)
+        sleep(10.random.seconds)
         println("#$id Waiting on barrier")
 
         repeat(retryCount) {

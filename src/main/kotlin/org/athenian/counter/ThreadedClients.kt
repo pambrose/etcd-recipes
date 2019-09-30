@@ -1,9 +1,9 @@
 package org.athenian.counter
 
+import org.athenian.random
 import org.athenian.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.measureTimedValue
 import kotlin.time.milliseconds
@@ -26,29 +26,29 @@ fun main() {
                         .use { counter ->
                             val innerLatch = CountDownLatch(4)
                             val cnt = 50
-                            val maxPause = 50L
+                            val maxPause = 50
 
                             thread {
                                 repeat(cnt) { counter.increment() }
-                                sleep(Random.nextLong(maxPause).milliseconds)
+                                sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
                             }
 
                             thread {
                                 repeat(cnt) { counter.decrement() }
-                                sleep(Random.nextLong(maxPause).milliseconds)
+                                sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
                             }
 
                             thread {
                                 repeat(cnt) { counter.add(5) }
-                                sleep(Random.nextLong(maxPause).milliseconds)
+                                sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
                             }
 
                             thread {
                                 repeat(cnt) { counter.subtract(5) }
-                                sleep(Random.nextLong(maxPause).milliseconds)
+                                sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
                             }
 

@@ -10,6 +10,7 @@ import org.athenian.getLongValue
 import org.athenian.getResponse
 import org.athenian.puOp
 import org.athenian.putOp
+import org.athenian.random
 import org.athenian.sleep
 import org.athenian.transaction
 import org.athenian.withKvClient
@@ -17,7 +18,6 @@ import org.athenian.withLock
 import java.io.Closeable
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.milliseconds
 
@@ -55,7 +55,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
                 if (!txnResponse.isSucceeded) {
                     println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
                     // Crude backoff for retry
-                    sleep(Random.nextLong(count * 100L).milliseconds)
+                    sleep((count * 100).random.milliseconds)
                     count++
                 }
             } while (!txnResponse.isSucceeded)

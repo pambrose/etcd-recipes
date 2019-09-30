@@ -1,9 +1,9 @@
 package org.athenian.barrier
 
+import org.athenian.random
 import org.athenian.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
@@ -19,7 +19,7 @@ fun main() {
     DistributedDoubleBarrier.reset(url, barrierName)
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-        sleep(Random.nextLong(10).seconds)
+        sleep(10.random.seconds)
         println("#$id Waiting to enter barrier")
 
         repeat(retryCount) {
@@ -29,11 +29,11 @@ fun main() {
 
         enterLatch.countDown()
         barrier.enter()
-        println("#$id ** Entered barrier **")
+        println("#$id Entered barrier")
     }
 
     fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-        sleep(Random.nextLong(10).seconds)
+        sleep(10.random.seconds)
         println("#$id Waiting to leave barrier")
 
         repeat(retryCount) {
@@ -43,7 +43,7 @@ fun main() {
 
         leaveLatch.countDown()
         barrier.leave()
-        println("#$id ** Left barrier **")
+        println("#$id Left barrier")
 
         doneLatch.countDown()
     }
@@ -52,9 +52,9 @@ fun main() {
         thread {
             DistributedDoubleBarrier(url, barrierName, count)
                 .use { barrier ->
-                    enterBarrier(it, barrier, 0)
-                    sleep(Random.nextLong(5).seconds)
-                    leaveBarrier(it, barrier, 0)
+                    enterBarrier(it, barrier, 2)
+                    sleep(5.random.seconds)
+                    leaveBarrier(it, barrier, 2)
                 }
         }
     }

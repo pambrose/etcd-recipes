@@ -4,6 +4,7 @@ import io.etcd.jetcd.Client
 import org.athenian.getStringValue
 import org.athenian.lock
 import org.athenian.putValue
+import org.athenian.random
 import org.athenian.sleep
 import org.athenian.unlock
 import org.athenian.withKvClient
@@ -11,7 +12,6 @@ import org.athenian.withLeaseClient
 import org.athenian.withLockClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.milliseconds
 import kotlin.time.seconds
@@ -33,7 +33,7 @@ fun main() {
                 .use { client ->
                     val keyval = "client$id"
 
-                    sleep(Random.nextInt(3_000).milliseconds)
+                    sleep(3_000.random.milliseconds)
 
                     client.withLeaseClient { leaseClient ->
                         val lease = leaseClient.grant(10).get()

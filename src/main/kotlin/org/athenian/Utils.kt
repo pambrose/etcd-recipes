@@ -34,6 +34,10 @@ import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
+val Int.random: Int get() = Random.nextInt(this)
+
+val Long.random: Long get() = Random.nextLong(this)
+
 val String.asByteSequence: ByteSequence get() = ByteSequence.from(this.toByteArray())
 
 val Int.asByteSequence: ByteSequence get() = ByteSequence.from(Ints.toByteArray(this))
@@ -223,7 +227,9 @@ fun repeatWithSleep(iterations: Int,
 @ExperimentalTime
 fun sleep(duration: Duration) = Thread.sleep(duration.toLongMilliseconds())
 
-fun String.ensureTrailing(suffix: String = "/"): String = "$this${if (endsWith(suffix)) "" else suffix}"
+fun String.ensureTrailing(extChar: String = "/"): String = "$this${if (endsWith(extChar)) "" else extChar}"
+
+fun String.append(suffix: String, extChar: String = "/"): String = "${ensureTrailing(extChar)}$suffix"
 
 val CountDownLatch.isDone: Boolean get() = count == 0L
 
