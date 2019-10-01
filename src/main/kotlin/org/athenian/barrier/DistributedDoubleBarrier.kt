@@ -5,8 +5,10 @@ import org.athenian.append
 import org.athenian.delete
 import org.athenian.getChildrenKeys
 import org.athenian.randomId
+import org.athenian.timeUnitToDuration
 import org.athenian.withKvClient
 import java.io.Closeable
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
@@ -30,13 +32,17 @@ class DistributedDoubleBarrier(val url: String,
 
     val leaveWaiterCount: Long get() = leaveBarrier.waiterCount
 
-    fun enter() = enter(Long.MAX_VALUE.days)
+    fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 
-    fun enter(duration: Duration): Boolean = enterBarrier.waitOnBarrier(duration)
+    fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
 
-    fun leave() = leave(Long.MAX_VALUE.days)
+    fun enter(timeout: Duration): Boolean = enterBarrier.waitOnBarrier(timeout)
 
-    fun leave(duration: Duration): Boolean = leaveBarrier.waitOnBarrier(duration)
+    fun leave(): Boolean = leave(Long.MAX_VALUE.days)
+
+    fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))
+
+    fun leave(timeout: Duration): Boolean = leaveBarrier.waitOnBarrier(timeout)
 
     override fun close() {
         enterBarrier.close()

@@ -12,6 +12,7 @@ import org.athenian.isDone
 import org.athenian.keyIsPresent
 import org.athenian.putOp
 import org.athenian.randomId
+import org.athenian.timeUnitToDuration
 import org.athenian.transaction
 import org.athenian.watcher
 import org.athenian.withKvClient
@@ -22,7 +23,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
-import kotlin.time.milliseconds
 
 @ExperimentalTime
 class DistributedBarrier(val url: String,
@@ -87,11 +87,11 @@ class DistributedBarrier(val url: String,
             true
         }
 
-    fun waitOnBarrier() = waitOnBarrier(Long.MAX_VALUE.days)
+    fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
-    fun waitOnBarrier(amount: Long) = waitOnBarrier(amount.milliseconds)
+    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
-    fun waitOnBarrier(duration: Duration): Boolean {
+    fun waitOnBarrier(timeout: Duration): Boolean {
         // Check if barrier is present before using watcher
         if (!waitOnMissingBarriers && !isBarrierSet)
             return true
@@ -110,7 +110,7 @@ class DistributedBarrier(val url: String,
             if (!waitOnMissingBarriers && !isBarrierSet)
                 waitLatch.countDown()
 
-            return@waitOnBarrier waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+            return@waitOnBarrier waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
         }
     }
 

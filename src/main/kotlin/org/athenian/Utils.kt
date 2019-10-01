@@ -29,9 +29,16 @@ import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchResponse
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
+import kotlin.time.days
+import kotlin.time.hours
+import kotlin.time.microseconds
+import kotlin.time.milliseconds
+import kotlin.time.minutes
+import kotlin.time.nanoseconds
 import kotlin.time.seconds
 
 val Int.random: Int get() = Random.nextInt(this)
@@ -215,23 +222,36 @@ fun <T> Semaphore.withLock(block: () -> T): T {
 
 @ExperimentalTime
 fun repeatWithSleep(iterations: Int,
-                    duration: Duration = 1.seconds,
+                    sleepTime: Duration = 1.seconds,
                     block: (count: Int, startMillis: Long) -> Unit) {
     val startMillis = System.currentTimeMillis()
     repeat(iterations) { i ->
         block(i, startMillis)
-        sleep(duration)
+        sleep(sleepTime)
     }
 }
 
 @ExperimentalTime
-fun sleep(duration: Duration) = Thread.sleep(duration.toLongMilliseconds())
+fun sleep(sleepTime: Duration) = Thread.sleep(sleepTime.toLongMilliseconds())
 
 fun String.ensureTrailing(extChar: String = "/"): String = "$this${if (endsWith(extChar)) "" else extChar}"
 
 fun String.append(suffix: String, extChar: String = "/"): String = "${ensureTrailing(extChar)}$suffix"
 
 val CountDownLatch.isDone: Boolean get() = count == 0L
+
+
+@ExperimentalTime
+fun timeUnitToDuration(value: Long, timeUnit: TimeUnit): Duration =
+    when (timeUnit) {
+        TimeUnit.MICROSECONDS -> value.microseconds
+        TimeUnit.NANOSECONDS -> value.nanoseconds
+        TimeUnit.MILLISECONDS -> value.milliseconds
+        TimeUnit.SECONDS -> value.seconds
+        TimeUnit.MINUTES -> value.minutes
+        TimeUnit.HOURS -> value.hours
+        TimeUnit.DAYS -> value.days
+    }
 
 private val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
 

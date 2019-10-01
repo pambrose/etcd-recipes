@@ -14,6 +14,7 @@ import org.athenian.getStringValue
 import org.athenian.putOp
 import org.athenian.randomId
 import org.athenian.sleep
+import org.athenian.timeUnitToDuration
 import org.athenian.transaction
 import org.athenian.watcher
 import org.athenian.withKvClient
@@ -82,8 +83,12 @@ class LeaderElection(val url: String,
         return this
     }
 
-    fun await(duration: Duration = Long.MAX_VALUE.days): Boolean =
-        startCountdown.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+    fun await(): Boolean = await(Long.MAX_VALUE.days)
+
+    fun await(timeout: Long, timeUnit: TimeUnit): Boolean = await(timeUnitToDuration(timeout, timeUnit))
+
+    fun await(timeout: Duration): Boolean =
+        startCountdown.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
 
     override fun close() {
         watchCountDown.countDown()

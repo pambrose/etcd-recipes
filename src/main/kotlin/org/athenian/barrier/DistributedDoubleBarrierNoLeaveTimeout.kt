@@ -22,6 +22,7 @@ import org.athenian.isDone
 import org.athenian.keyIsPresent
 import org.athenian.putOp
 import org.athenian.randomId
+import org.athenian.timeUnitToDuration
 import org.athenian.transaction
 import org.athenian.watcher
 import org.athenian.withKvClient
@@ -66,9 +67,11 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     val waiterCount: Long get() = kvClient.countChildren(waitingPrefix)
 
-    fun enter() = enter(Long.MAX_VALUE.days)
+    fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 
-    fun enter(duration: Duration): Boolean {
+    fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
+
+    fun enter(timeout: Duration): Boolean {
 
         val uniqueToken = "$id:${randomId(9)}"
 
@@ -147,7 +150,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
         // Check one more time in case watch missed the delete just after last check
         checkWaiterCountInEnter()
 
-        val success = enterWaitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+        val success = enterWaitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
         // Cleanup if a time-out occurred
         if (!success)
             enterWaitLatch.countDown() // Release keep-alive waiting on latch.
@@ -162,9 +165,11 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
         }
     }
 
-    fun leave() = leave(Long.MAX_VALUE.days)
+    fun leave(): Boolean = leave(Long.MAX_VALUE.days)
 
-    fun leave(duration: Duration): Boolean {
+    fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))
+
+    fun leave(timeout: Duration): Boolean {
 
         check(enterCalled.get()) { "enter() must be called before leave()" }
 
@@ -175,7 +180,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
         checkWaiterCountInLeave()
 
-        return leaveLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+        return leaveLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
     }
 
     override fun close() {

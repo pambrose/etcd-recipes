@@ -21,6 +21,7 @@ import org.athenian.isDone
 import org.athenian.keyIsPresent
 import org.athenian.putOp
 import org.athenian.randomId
+import org.athenian.timeUnitToDuration
 import org.athenian.transaction
 import org.athenian.watcher
 import org.athenian.withKvClient
@@ -63,9 +64,11 @@ class DistributedBarrierWithCount(val url: String,
 
     val waiterCount: Long get() = kvClient.countChildren(waitingPrefix)
 
-    fun waitOnBarrier() = waitOnBarrier(Long.MAX_VALUE.days)
+    fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
-    fun waitOnBarrier(duration: Duration): Boolean {
+    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
+
+    fun waitOnBarrier(timeout: Duration): Boolean {
 
         val uniqueToken = "$id:${randomId(9)}"
 
@@ -139,7 +142,7 @@ class DistributedBarrierWithCount(val url: String,
             // Check one more time in case watch missed the delete just after last check
             checkWaiterCount()
 
-            val success = waitLatch.await(duration.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+            val success = waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
             // Cleanup if a time-out occurred
             if (!success) {
                 waitLatch.countDown() // Release keep-alive waiting on latch.
