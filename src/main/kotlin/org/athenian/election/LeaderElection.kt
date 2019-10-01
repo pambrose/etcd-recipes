@@ -31,9 +31,15 @@ import kotlin.time.milliseconds
 import kotlin.time.seconds
 
 @ExperimentalTime
-class LeaderElection(val url: String, val electionPath: String, val id: String) : Closeable {
+class LeaderElection(val url: String,
+                     val electionPath: String,
+                     val actions: ElectionActions,
+                     val id: String) : Closeable {
 
-    constructor(url: String, electionPath: String) : this(url, electionPath, "Client:${randomId(9)}")
+    constructor(url: String, electionPath: String, actions: ElectionActions) : this(url,
+                                                                                    electionPath,
+                                                                                    actions,
+                                                                                    "Client:${randomId(9)}")
 
     private val executor = lazy { Executors.newFixedThreadPool(2) }
     private val startCountdown = CountDownLatch(1)
@@ -45,7 +51,7 @@ class LeaderElection(val url: String, val electionPath: String, val id: String) 
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
 
-    fun start(actions: ElectionActions): LeaderElection {
+    fun start(): LeaderElection {
         executor.value.submit {
             Client.builder().endpoints(url).build()
                 .use { client ->
@@ -56,14 +62,15 @@ class LeaderElection(val url: String, val electionPath: String, val id: String) 
 
                                 initCountDown.countDown()
 
-                                executor.value.submit {
-                                    watchForLeadershipOpening(watchClient) {
-                                        // Run for leader when leader key is deleted
-                                        attemptToBecomeLeader(actions, leaseClient, kvClient)
-                                    }.use {
-                                        watchCountDown.await()
+                                executor.value
+                                    .submit {
+                                        watchForLeadershipOpening(watchClient) {
+                                            // Run for leader when leader key is deleted
+                                            attemptToBecomeLeader(actions, leaseClient, kvClient)
+                                        }.use {
+                                            watchCountDown.await()
+                                        }
                                     }
-                                }
 
                                 // Give the watcher a chance to start
                                 sleep(2.seconds)
@@ -79,7 +86,7 @@ class LeaderElection(val url: String, val electionPath: String, val id: String) 
         }
 
         initCountDown.await()
-        actions.onInitComplete.invoke()
+        actions.onInitComplete.invoke(this)
 
         return this
     }
@@ -136,12 +143,12 @@ class LeaderElection(val url: String, val electionPath: String, val id: String) 
                                       { /*println("KeepAlive next resp: $next")*/ },
                                       { /*println("KeepAlive err resp: $err")*/ })
             ).use {
-                actions.onElected.invoke()
+                actions.onElected.invoke(this)
             }
-            actions.onTermComplete.invoke()
+            actions.onTermComplete.invoke(this)
             true
         } else {
-            actions.onFailedElection.invoke()
+            actions.onFailedElection.invoke(this)
             false
         }
     }
@@ -157,8 +164,10 @@ class LeaderElection(val url: String, val electionPath: String, val id: String) 
     }
 }
 
-typealias ElectionAction = () -> Unit
+@ExperimentalTime
+typealias ElectionAction = (election: LeaderElection) -> Unit
 
+@ExperimentalTime
 class ElectionActions(val onElected: ElectionAction = {},
                       val onTermComplete: ElectionAction = {},
                       val onFailedElection: ElectionAction = {},

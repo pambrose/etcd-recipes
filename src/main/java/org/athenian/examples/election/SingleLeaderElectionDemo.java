@@ -13,31 +13,29 @@ public class SingleLeaderElectionDemo {
         String url = "http://localhost:2379";
         String electionName = "/election/leaderElectionDemo";
 
+        ElectionActions actions =
+                new ElectionActions(
+                        (election) -> {
+                            System.out.println(election.getId() + " initialized");
+                            return null;
+                        },
+                        (election) -> {
+                            System.out.println(election.getId() + " elected leader");
+                            long pause = random(5);
+                            sleep(pause);
+                            System.out.println(election.getId() + " surrendering after " + pause + " seconds");
+                            return null;
+                        },
+                        (election) -> {
+                            return null;
+                        },
+                        (election) -> {
+                            return null;
+                        });
 
-        try (LeaderElection election = new LeaderElection(url, electionName)) {
-
-            election.start(new ElectionActions(
-                    () -> {
-                        System.out.println(election.getId() + " initialized");
-                        return null;
-                    },
-                    () -> {
-                        System.out.println(election.getId() + " elected leader");
-                        long pause = random(5);
-                        sleep(pause);
-                        System.out.println(election.getId() + " surrendering after " + pause + " seconds");
-
-                        return null;
-                    },
-                    () -> {
-                        return null;
-                    },
-                    () -> {
-                        return null;
-                    }));
-
+        try (LeaderElection election = new LeaderElection(url, electionName, actions)) {
+            election.start();
             election.await();
-
         }
     }
 }

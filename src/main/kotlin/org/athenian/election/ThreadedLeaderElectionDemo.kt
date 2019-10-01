@@ -12,28 +12,27 @@ fun main() {
 
     LeaderElection.reset(url, electionName)
 
-    val participants = List(3) { LeaderElection(url, electionName, "Thread$it") }
+    val actions =
+        ElectionActions(
+            onInitComplete = { println("${it.id} initialized") },
+            onElected = {
+                println("${it.id} elected leader")
+                val pause = Random.nextInt(5).seconds
+                sleep(pause)
+                println("${it.id} surrendering after $pause")
+            },
+            onFailedElection = {
+                //println("$id failed to get elected")
+            },
+            onTermComplete = {
+                println("${it.id} completed")
+                sleep(2.seconds)
+            }
+        )
+
+    val participants = List(3) { LeaderElection(url, electionName, actions, "Thread$it") }
 
     participants
-        .onEach {
-            val actions =
-                ElectionActions(
-                    onInitComplete = { println("${it.id} initialized") },
-                    onElected = {
-                        println("${it.id} elected leader")
-                        val pause = Random.nextInt(5).seconds
-                        sleep(pause)
-                        println("${it.id} surrendering after $pause")
-                    },
-                    onFailedElection = {
-                        //println("$id failed to get elected")
-                    },
-                    onTermComplete = {
-                        println("${it.id} completed")
-                        sleep(2.seconds)
-                    }
-                )
-            it.start(actions)
-        }
+        .onEach { it.start() }
         .forEach { it.await() }
 }
