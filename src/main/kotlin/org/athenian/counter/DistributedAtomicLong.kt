@@ -52,7 +52,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
             do {
                 val txnResponse = applyCounterTransaction(value)
                 if (!txnResponse.isSucceeded) {
-                    println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
+                    //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
                     // Crude backoff for retry
                     sleep((count * 100).random.milliseconds)
                     count++

@@ -19,8 +19,9 @@ fun main() {
 
     val (_, dur) =
         measureTimedValue {
-            repeat(threadCount) {
+            repeat(threadCount) { id ->
                 thread {
+                    println("Creating counter #$id");
                     DistributedAtomicLong(url, counterName)
                         .use { counter ->
                             val innerLatch = CountDownLatch(4)
@@ -28,27 +29,35 @@ fun main() {
                             val maxPause = 50
 
                             thread {
+                                println("Begin increments for counter #$id")
                                 repeat(count) { counter.increment() }
                                 sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
+                                println("Completed increments for counter #$id")
                             }
 
                             thread {
+                                println("Begin decrements for counter #$id")
                                 repeat(count) { counter.decrement() }
                                 sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
+                                println("Completed decrements for counter #$id")
                             }
 
                             thread {
+                                println("Begin adds for counter #$id")
                                 repeat(count) { counter.add(5) }
                                 sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
+                                println("Completed adds for counter #$id")
                             }
 
                             thread {
+                                println("Begin subtracts for counter #$id")
                                 repeat(count) { counter.subtract(5) }
                                 sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
+                                println("Completed subtracts for counter #$id")
                             }
 
                             innerLatch.await()
@@ -63,6 +72,6 @@ fun main() {
 
     DistributedAtomicLong(url, counterName)
         .use { counter ->
-            println("Total: ${counter.get()} in $dur")
+            println("Counter value = ${counter.get()} in $dur")
         }
 }
