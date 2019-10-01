@@ -40,7 +40,11 @@ import kotlin.time.days
 class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
                                              val barrierPath: String,
                                              val memberCount: Int,
-                                             val id: String = "Client:${randomId(6)}") : Closeable {
+                                             val id: String) : Closeable {
+
+    constructor(url: String,
+                barrierPath: String,
+                memberCount: Int) : this(url, barrierPath, memberCount, "Client:${randomId(9)}")
 
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }

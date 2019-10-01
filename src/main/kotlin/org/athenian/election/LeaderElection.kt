@@ -30,9 +30,9 @@ import kotlin.time.days
 import kotlin.time.seconds
 
 @ExperimentalTime
-class LeaderElection(val url: String,
-                     val electionPath: String,
-                     val id: String = "Client:${randomId()}") : Closeable {
+class LeaderElection(val url: String, val electionPath: String, val id: String) : Closeable {
+
+    constructor(url: String, electionPath: String) : this(url, electionPath, "Client:${randomId(9)}")
 
     private val executor = lazy { Executors.newFixedThreadPool(2) }
     private val startCountdown = CountDownLatch(1)

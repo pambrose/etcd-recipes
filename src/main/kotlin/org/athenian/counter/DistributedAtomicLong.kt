@@ -8,7 +8,6 @@ import org.athenian.delete
 import org.athenian.equals
 import org.athenian.getLongValue
 import org.athenian.getResponse
-import org.athenian.puOp
 import org.athenian.putOp
 import org.athenian.random
 import org.athenian.sleep
@@ -36,7 +35,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
         createCounterIfNotPresent()
     }
 
-    fun get(): Long = semaphore.withLock { kvClient.getLongValue(counterPath) ?: -1 }
+    fun get(): Long = semaphore.withLock { kvClient.getLongValue(counterPath) ?: -1L }
 
     fun increment(): Long = modifyCounterValue(1)
 
@@ -69,7 +68,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
             val txn =
                 kvClient.transaction {
                     If(equals(counterPath, CmpTarget.version(0)))
-                    Then(puOp(counterPath, 0))
+                    Then(putOp(counterPath, 0L))
                 }
             txn.isSucceeded
         } else {
@@ -78,8 +77,9 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
 
     private fun applyCounterTransaction(amount: Long): TxnResponse {
         val kvlist = kvClient.getResponse(counterPath).kvs
-        val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw InternalError("KeyValue List was empty")
+        val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
 
+        val l = kv.value.asLong
         return this.kvClient.transaction {
             If(equals(counterPath, CmpTarget.modRevision(kv.modRevision)))
             Then(putOp(counterPath, kv.value.asLong + amount))
@@ -94,7 +94,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
             client.value.close()
     }
 
-    companion object {
+    companion object Static {
         val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 

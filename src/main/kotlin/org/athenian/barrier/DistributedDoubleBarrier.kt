@@ -17,10 +17,14 @@ import kotlin.time.days
 class DistributedDoubleBarrier(val url: String,
                                barrierPath: String,
                                memberCount: Int,
-                               val id: String = "Client:${randomId(6)}") : Closeable {
+                               val id: String) : Closeable {
 
-    private val enterBarrier = DistributedBarrierWithCount(url, barrierPath.append("enter"), memberCount, id)
-    private val leaveBarrier = DistributedBarrierWithCount(url, barrierPath.append("leave"), memberCount, id)
+    constructor(url: String,
+                barrierPath: String,
+                memberCount: Int) : this(url, barrierPath, memberCount, "Client:${randomId(9)}")
+
+    private val enterBarrier = DistributedBarrierWithCount(url, barrierPath.append("enter"), memberCount)
+    private val leaveBarrier = DistributedBarrierWithCount(url, barrierPath.append("leave"), memberCount)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }

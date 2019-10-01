@@ -6,10 +6,11 @@ import kotlin.time.measureTimedValue
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
+    val counterName = "counter2"
 
-    DistributedAtomicLong.reset(url, "counter2")
+    DistributedAtomicLong.reset(url, counterName)
 
-    val counters = List(30) { DistributedAtomicLong(url, "counter2") }
+    val counters = List(30) { DistributedAtomicLong(url, counterName) }
 
     val (total, dur) =
         measureTimedValue {
@@ -24,6 +25,7 @@ fun main() {
                 .first()
                 .get()
         }
+
     println("Total: $total in $dur")
 
     counters.forEach { it.close() }

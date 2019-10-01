@@ -27,9 +27,16 @@ import kotlin.time.days
 @ExperimentalTime
 class DistributedBarrier(val url: String,
                          val barrierPath: String,
-                         val waitOnMissingBarriers: Boolean = true) : Closeable {
+                         val waitOnMissingBarriers: Boolean,
+                         val id: String) : Closeable {
 
-    private val id: String = "Client:${randomId()}"
+    constructor(url: String,
+                barrierPath: String,
+                waitOnMissingBarrier: Boolean = true) : this(url,
+                                                             barrierPath,
+                                                             waitOnMissingBarrier,
+                                                             "Client:${randomId(9)}")
+
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }
     private val leaseClient = lazy { client.value.leaseClient }

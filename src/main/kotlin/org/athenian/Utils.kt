@@ -163,7 +163,7 @@ fun deleteOp(keyname: String, option: DeleteOption = DeleteOption.DEFAULT): Op.D
 fun putOp(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): Op.PutOp =
     putOp(keyname, keyval.asByteSequence, option)
 
-fun puOp(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): Op.PutOp =
+fun putOp(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): Op.PutOp =
     putOp(keyname, keyval.asByteSequence, option)
 
 fun putOp(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): Op.PutOp =
@@ -213,8 +213,8 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
 
 fun <T> Semaphore.withLock(block: () -> T): T {
     acquire()
-    try {
-        return block()
+    return try {
+        block()
     } finally {
         release()
     }
