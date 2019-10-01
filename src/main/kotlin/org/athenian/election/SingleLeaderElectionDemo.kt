@@ -8,7 +8,7 @@ import kotlin.time.seconds
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
-    val electionName = "/election/singleClient"
+    val electionName = "/election/leaderElectionDemo"
 
     LeaderElection(url, electionName)
         .also { election ->
