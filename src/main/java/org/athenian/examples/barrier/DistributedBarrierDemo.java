@@ -1,4 +1,6 @@
-package org.athenian.barrier;
+package org.athenian.examples.barrier;
+
+import org.athenian.barrier.DistributedBarrier;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;

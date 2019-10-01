@@ -1,4 +1,7 @@
-package org.athenian.election;
+package org.athenian.examples.election;
+
+import org.athenian.election.ElectionActions;
+import org.athenian.election.LeaderElection;
 
 import static org.athenian.utils.Utils.random;
 import static org.athenian.utils.Utils.sleep;

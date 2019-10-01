@@ -1,5 +1,6 @@
-package org.athenian.counter;
+package org.athenian.examples.counter;
 
+import org.athenian.counter.DistributedAtomicLong;
 import org.athenian.utils.Utils;
 
 import java.util.concurrent.CountDownLatch;
