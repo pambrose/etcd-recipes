@@ -22,13 +22,14 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
+import kotlin.time.milliseconds
 
 @ExperimentalTime
 class DistributedBarrier(val url: String,
                          val barrierPath: String,
-                         val waitOnMissingBarriers: Boolean = true,
-                         val id: String = "Client:${randomId()}") : Closeable {
+                         val waitOnMissingBarriers: Boolean = true) : Closeable {
 
+    private val id: String = "Client:${randomId()}"
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }
     private val leaseClient = lazy { client.value.leaseClient }
@@ -66,8 +67,8 @@ class DistributedBarrier(val url: String,
             executor.value.submit {
                 leaseClient.value.keepAlive(lease.id,
                                             Observers.observer(
-                                                { next -> /*println("KeepAlive next resp: $next")*/ },
-                                                { err -> /*println("KeepAlive err resp: $err")*/ })
+                                                { /*println("KeepAlive next resp: $next")*/ },
+                                                { /*println("KeepAlive err resp: $err")*/ })
                 ).use {
                     barrierLatch.await()
                 }
@@ -87,6 +88,8 @@ class DistributedBarrier(val url: String,
         }
 
     fun waitOnBarrier() = waitOnBarrier(Long.MAX_VALUE.days)
+
+    fun waitOnBarrier(amount: Long) = waitOnBarrier(amount.milliseconds)
 
     fun waitOnBarrier(duration: Duration): Boolean {
         // Check if barrier is present before using watcher

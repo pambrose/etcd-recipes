@@ -29,7 +29,6 @@ fun main() {
                     kvClient.apply {
 
                         val option = WatchOption.newBuilder().withPrefix("/".asByteSequence).build()
-                        val watch =
                             watchClient.watcher(keyname, option) { watchResponse ->
                                 watchResponse.events
                                     .forEach { watchEvent ->

@@ -28,7 +28,7 @@ fun main() {
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
-                        repeatWithSleep(10) { i, start ->
+                        repeatWithSleep(10) { i, _ ->
                             val kv = keyval + i
                             println("Assigning $keyname = $kv")
                             kvClient.putValue(keyname, kv)

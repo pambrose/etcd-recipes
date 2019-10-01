@@ -13,8 +13,8 @@ import kotlin.time.days
 
 @ExperimentalTime
 class DistributedDoubleBarrier(val url: String,
-                               val barrierPath: String,
-                               val memberCount: Int,
+                               barrierPath: String,
+                               memberCount: Int,
                                val id: String = "Client:${randomId(6)}") : Closeable {
 
     private val enterBarrier = DistributedBarrierWithCount(url, barrierPath.append("enter"), memberCount, id)

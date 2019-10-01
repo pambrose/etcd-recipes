@@ -127,8 +127,8 @@ class LeaderElection(val url: String,
         return if (txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
-                                      { next -> /*println("KeepAlive next resp: $next")*/ },
-                                      { err -> /*println("KeepAlive err resp: $err")*/ })
+                                      { /*println("KeepAlive next resp: $next")*/ },
+                                      { /*println("KeepAlive err resp: $err")*/ })
             ).use {
                 actions.onElected.invoke()
             }

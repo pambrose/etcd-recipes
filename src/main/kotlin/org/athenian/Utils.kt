@@ -62,19 +62,19 @@ fun Lazy<KV>.putValue(keyname: String, keyval: String, option: PutOption): PutRe
     value.putValue(keyname, keyval, option)
 
 fun KV.putValue(keyname: String, keyval: String, option: PutOption): PutResponse =
-    put(keyval.asByteSequence, keyval.asByteSequence, option).get()
+    put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
 fun Lazy<KV>.putValue(keyname: String, keyval: Int, option: PutOption): PutResponse =
     value.putValue(keyname, keyval, option)
 
 fun KV.putValue(keyname: String, keyval: Int, option: PutOption): PutResponse =
-    put(keyval.asByteSequence, keyval.asByteSequence, option).get()
+    put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
 fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
     value.putValue(keyname, keyval, option)
 
 fun KV.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
-    put(keyval.asByteSequence, keyval.asByteSequence, option).get()
+    put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
 fun KV.delete(vararg keynames: String) = keynames.forEach { delete(it) }
 

@@ -45,7 +45,7 @@ fun main() {
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
-                        repeatWithSleep(12) { i, start ->
+                        repeatWithSleep(12) { _, start ->
                             val respval = kvClient.getStringValue(keyname, "unset")
                             println("Key $keyname = $respval after ${System.currentTimeMillis() - start}ms")
                         }

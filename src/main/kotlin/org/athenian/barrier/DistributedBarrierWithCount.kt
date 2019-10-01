@@ -70,11 +70,10 @@ class DistributedBarrierWithCount(val url: String,
         val uniqueToken = "$id:${randomId(9)}"
 
         // Do a CAS on the /ready name. If it is not found, then set it
-        val readyTxn =
-            kvClient.transaction {
-                If(equals(readyPath, CmpTarget.version(0)))
-                Then(putOp(readyPath, uniqueToken))
-            }
+        kvClient.transaction {
+            If(equals(readyPath, CmpTarget.version(0)))
+            Then(putOp(readyPath, uniqueToken))
+        }
 
         val waitLatch = CountDownLatch(1)
 
@@ -90,8 +89,8 @@ class DistributedBarrierWithCount(val url: String,
             executor.value.submit {
                 leaseClient.value.keepAlive(lease.id,
                                             Observers.observer(
-                                                { next -> /*println("KeepAlive next resp: $next")*/ },
-                                                { err -> /*println("KeepAlive err resp: $err")*/ })
+                                                { /*println("KeepAlive next resp: $next")*/ },
+                                                { /*println("KeepAlive err resp: $err")*/ })
                 ).use {
                     waitLatch.await()
                 }

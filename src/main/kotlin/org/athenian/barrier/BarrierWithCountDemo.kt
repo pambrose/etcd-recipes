@@ -10,7 +10,7 @@ import kotlin.time.seconds
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
-    val barrierName = "/barriers/barrierwithcountertest"
+    val barrierName = "/barriers/barrierwithcountdemo"
     val count = 30
     val waitLatch = CountDownLatch(count)
     val retryLatch = CountDownLatch(count - 1)

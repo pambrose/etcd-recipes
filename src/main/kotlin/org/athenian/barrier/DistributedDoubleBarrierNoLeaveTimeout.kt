@@ -75,11 +75,10 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
         enterCalled.set(true)
 
         // Do a CAS on the /ready name. If it is not found, then set it
-        val readyTxn =
-            kvClient.transaction {
-                If(equals(readyPath, CmpTarget.version(0)))
-                Then(putOp(readyPath, uniqueToken))
-            }
+        kvClient.transaction {
+            If(equals(readyPath, CmpTarget.version(0)))
+            Then(putOp(readyPath, uniqueToken))
+        }
 
         waitingPath.set("$waitingPrefix/$uniqueToken")
         val lease = leaseClient.value.grant(2).get()
@@ -93,8 +92,8 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
             executor.value.submit {
                 leaseClient.value.keepAlive(lease.id,
                                             Observers.observer(
-                                                { next -> /*println("KeepAlive next resp: $next")*/ },
-                                                { err -> /*println("KeepAlive err resp: $err")*/ })
+                                                { /*println("KeepAlive next resp: $next")*/ },
+                                                { /*println("KeepAlive err resp: $err")*/ })
                 ).use {
                     keepAliveLatch.await()
                 }
@@ -153,7 +152,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
         if (!success)
             enterWaitLatch.countDown() // Release keep-alive waiting on latch.
 
-        return@enter success
+        return success
     }
 
     private fun checkWaiterCountInLeave() {
@@ -167,8 +166,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     fun leave(duration: Duration): Boolean {
 
-        if (!enterCalled.get())
-            throw IllegalStateException("enter() must be called before leave()")
+        check(enterCalled.get()) { "enter() must be called before leave()" }
 
         leaveCalled.set(true)
 
