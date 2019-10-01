@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
+import kotlin.time.milliseconds
 import kotlin.time.seconds
 
 @ExperimentalTime
@@ -92,10 +93,10 @@ class LeaderElection(val url: String, val electionPath: String, val id: String) 
 
     override fun close() {
         watchCountDown.countDown()
-        sleep(1.seconds)
+        sleep(100.milliseconds)
 
         startCountdown.countDown()
-        sleep(1.seconds)
+        sleep(100.milliseconds)
 
         if (executor.isInitialized())
             executor.value.shutdown()

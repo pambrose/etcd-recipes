@@ -20,8 +20,8 @@ fun main() {
         .use { client ->
             client.withLeaseClient { leaseClient ->
                 client.withKvClient { kvClient ->
-                    println("Assigning $keyname = $keyval")
                     val lease = leaseClient.grant(1).get()
+                    println("Assigning $keyname = $keyval")
                     kvClient.putValue(keyname, keyval, lease.asPutOption)
                     leaseClient.keepAlive(lease.id,
                                           Observers.observer({ next ->
@@ -31,11 +31,14 @@ fun main() {
                                                                  println("KeepAlive err resp: $err")
                                                              })
                     ).use {
+
                         println("Starting sleep")
-                        sleep(20.seconds)
+                        sleep(10.seconds)
                         println("Finished sleep")
 
                     }
+                    println("Keep-alive is now terminated")
+                    sleep(5.seconds)
                 }
             }
         }

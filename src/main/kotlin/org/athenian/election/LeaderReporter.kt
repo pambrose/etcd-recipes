@@ -5,11 +5,12 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import org.athenian.asString
+import org.athenian.sleep
 import org.athenian.watcher
 import org.athenian.withWatchClient
-import java.util.concurrent.CountDownLatch
 import kotlin.time.ExperimentalTime
 import kotlin.time.MonoClock
+import kotlin.time.days
 
 @ExperimentalTime
 fun main() {
@@ -33,8 +34,7 @@ fun main() {
                         }
                 }.use {
                     // Sleep forever
-                    val countdown = CountDownLatch(1)
-                    countdown.await()
+                    sleep(Long.MAX_VALUE.days)
                 }
             }
         }

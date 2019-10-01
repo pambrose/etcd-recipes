@@ -1,6 +1,6 @@
 package org.athenian.counter;
 
-import org.athenian.Utils;
+import org.athenian.utils.Utils;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;

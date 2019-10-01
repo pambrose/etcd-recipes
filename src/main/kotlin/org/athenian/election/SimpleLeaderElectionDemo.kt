@@ -8,28 +8,28 @@ import kotlin.time.seconds
 @ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
-    val electionName = "/singleClient"
+    val electionName = "/election/singleClient"
 
     LeaderElection(url, electionName)
-        .also {
+        .also { election ->
             val actions =
                 ElectionActions(
-                    onInitComplete = { println("${it.id} initialized") },
+                    onInitComplete = { println("${election.id} initialized") },
                     onElected = {
-                        println("${it.id} elected leader")
+                        println("${election.id} elected leader")
                         val pause = Random.nextInt(5).seconds
                         sleep(pause)
-                        println("${it.id} surrendering after $pause")
+                        println("${election.id} surrendering after $pause")
                     },
                     onFailedElection = {
                         //println("$id failed to get elected")
                     },
                     onTermComplete = {
-                        println("${it.id} completed")
+                        println("${election.id} completed")
                         sleep(2.seconds)
                     }
                 )
-            it.start(actions)
-            it.await()
+            election.start(actions)
+            election.await()
         }
 }

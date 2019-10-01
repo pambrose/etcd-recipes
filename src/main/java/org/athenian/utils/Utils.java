@@ -1,4 +1,4 @@
-package org.athenian;
+package org.athenian.utils;
 
 import java.util.Random;
 
