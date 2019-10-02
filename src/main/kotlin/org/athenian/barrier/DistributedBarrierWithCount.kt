@@ -17,7 +17,7 @@ import org.athenian.utils.equals
 import org.athenian.utils.getChildrenKeys
 import org.athenian.utils.getStringValue
 import org.athenian.utils.isFinished
-import org.athenian.utils.keepAlive
+import org.athenian.utils.keepAliveUntil
 import org.athenian.utils.keyIsPresent
 import org.athenian.utils.putOp
 import org.athenian.utils.randomId
@@ -100,7 +100,7 @@ class DistributedBarrierWithCount(val url: String,
         check(kvClient.getStringValue(waitingPath) == uniqueToken) { "Failed to assign waitingPath unique value" }
 
         // Keep key alive
-        executor.value.submit { leaseClient.value.keepAlive(lease) { waitLatch.await() } }
+        executor.value.submit { leaseClient.value.keepAliveUntil(lease) { waitLatch.await() } }
 
         fun checkWaiterCount() {
             // First see if /ready is missing

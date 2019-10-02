@@ -14,7 +14,7 @@ import org.athenian.utils.getChildrenKeys
 import org.athenian.utils.getChildrenStringValues
 import org.athenian.utils.getStringValue
 import org.athenian.utils.isFinished
-import org.athenian.utils.keepAlive
+import org.athenian.utils.keepAliveUntil
 import org.athenian.utils.putOp
 import org.athenian.utils.randomId
 import org.athenian.utils.sleep
@@ -140,8 +140,8 @@ class LeaderSelector(val url: String,
                                 clientInitLatch.countDown()
 
                                 executor.submit {
+                                    // Run for leader when leader key is deleted
                                     watchForDeleteEvents(watchClient) {
-                                        // Run for leader when leader key is deleted
                                         attemptToBecomeLeader(leaseClient, kvClient)
                                     }.use {
                                         context.watchForDeleteLatch.await()
@@ -204,11 +204,9 @@ class LeaderSelector(val url: String,
 
     private fun watchForDeleteEvents(watchClient: Watch, action: () -> Unit): Watch.Watcher =
         watchClient.watcher(electionPath) { watchResponse ->
-            // Create a watch to act on DELETE events
-            watchResponse.events
-                .forEach { event ->
-                    if (event.eventType == DELETE) action.invoke()
-                }
+            watchResponse.events.forEach { event ->
+                if (event.eventType == DELETE) action.invoke()
+            }
         }
 
     private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
@@ -225,7 +223,7 @@ class LeaderSelector(val url: String,
         check(txn.isSucceeded) { "Participation registration failed" }
 
         // Run keep-alive until closed
-        leaseClient.keepAlive(lease) { context.leadershipCompleteLatch.await() }
+        leaseClient.keepAliveUntil(lease) { context.leadershipCompleteLatch.await() }
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
@@ -249,8 +247,8 @@ class LeaderSelector(val url: String,
         // Check to see if unique value was successfully set in the CAS step
         return if (!isLeader && txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
             // This will exit when leadership is relinquished
-            leaseClient.keepAlive(lease) {
-                // Was selected as leader
+            leaseClient.keepAliveUntil(lease) {
+                // Selected as leader
                 context.electedLeader.set(true)
                 listener.takeLeadership(this)
             }

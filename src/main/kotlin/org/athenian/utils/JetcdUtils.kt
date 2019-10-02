@@ -239,7 +239,7 @@ fun String.ensureTrailing(extChar: String = "/"): String = "$this${if (endsWith(
 
 fun String.append(suffix: String, extChar: String = "/"): String = "${ensureTrailing(extChar)}$suffix"
 
-fun Lease.keepAlive(lease: LeaseGrantResponse, block: () -> Unit) =
+fun Lease.keepAliveUntil(lease: LeaseGrantResponse, block: () -> Unit) =
     keepAlive(lease.id, Observers.observer(
         { /*println("KeepAlive next resp: $next")*/ },
         { /*println("KeepAlive err resp: $err")*/ }))

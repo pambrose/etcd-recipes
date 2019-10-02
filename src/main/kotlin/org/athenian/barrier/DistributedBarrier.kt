@@ -8,7 +8,7 @@ import org.athenian.utils.delete
 import org.athenian.utils.equals
 import org.athenian.utils.getStringValue
 import org.athenian.utils.isFinished
-import org.athenian.utils.keepAlive
+import org.athenian.utils.keepAliveUntil
 import org.athenian.utils.keyIsPresent
 import org.athenian.utils.putOp
 import org.athenian.utils.randomId
@@ -71,7 +71,7 @@ class DistributedBarrier(val url: String,
 
         // Check to see if unique value was successfully set in the CAS step
         return if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
-            executor.value.submit { leaseClient.value.keepAlive(lease) { barrierLatch.await() } }
+            executor.value.submit { leaseClient.value.keepAliveUntil(lease) { barrierLatch.await() } }
             true
         } else {
             false
