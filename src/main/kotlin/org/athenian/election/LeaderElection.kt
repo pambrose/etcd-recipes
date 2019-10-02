@@ -34,10 +34,7 @@ import kotlin.time.seconds
 typealias ElectionAction = (election: LeaderElection) -> Unit
 
 @ExperimentalTime
-class ElectionActions(val onElected: ElectionAction = {},
-                      val onTermComplete: ElectionAction = {},
-                      val onFailedElection: ElectionAction = {},
-                      val onInitComplete: ElectionAction = {})
+class ElectionActions(val onElected: ElectionAction = {})
 
 
 @ExperimentalTime
@@ -204,8 +201,7 @@ class LeaderElection(val url: String,
             }
 
             // Leadership was relinquished
-
-            actions.onTermComplete.invoke(this)
+            //actions.onTermComplete.invoke(this)
 
             // Do this after leadership is complete so the thread does not terminate
             context.watchForDeleteLatch.countDown()
@@ -214,7 +210,7 @@ class LeaderElection(val url: String,
             true
         } else {
             // Failed to become leader
-            actions.onFailedElection.invoke(this)
+            //actions.onFailedElection.invoke(this)
             false
         }
     }

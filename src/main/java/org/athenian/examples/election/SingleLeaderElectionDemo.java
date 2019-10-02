@@ -16,26 +16,25 @@ public class SingleLeaderElectionDemo {
         ElectionActions actions =
                 new ElectionActions(
                         (election) -> {
-                            System.out.println(election.getId() + " initialized");
-                            return null;
-                        },
-                        (election) -> {
                             System.out.println(election.getId() + " elected leader");
                             long pause = random(5);
                             sleep(pause);
                             System.out.println(election.getId() + " surrendering after " + pause + " seconds");
                             return null;
-                        },
-                        (election) -> {
-                            return null;
-                        },
-                        (election) -> {
-                            return null;
                         });
 
         try (LeaderElection election = new LeaderElection(url, electionName, actions)) {
-            election.start();
-            election.await();
+            for (int i = 0; i < 5; i++) {
+                election.start();
+                election.await();
+            }
+        }
+
+        for (int i = 0; i < 5; i++) {
+            try (LeaderElection election = new LeaderElection(url, electionName, actions)) {
+                election.start();
+                election.await();
+            }
         }
     }
 }

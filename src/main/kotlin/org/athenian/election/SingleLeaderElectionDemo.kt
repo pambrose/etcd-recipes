@@ -12,19 +12,11 @@ fun main() {
 
     val actions =
         ElectionActions(
-            onInitComplete = { election -> println("${election.id} initialized") },
             onElected = { election ->
                 println("${election.id} elected leader")
                 val pause = Random.nextInt(5).seconds
                 sleep(pause)
                 println("${election.id} surrendering after $pause")
-            },
-            onFailedElection = { _ ->
-                //println("$id failed to get elected")
-            },
-            onTermComplete = { election ->
-                println("${election.id} completed")
-                sleep(2.seconds)
             }
         )
 
