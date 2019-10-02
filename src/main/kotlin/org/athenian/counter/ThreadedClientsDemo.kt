@@ -19,9 +19,9 @@ fun main() {
 
     val (_, dur) =
         measureTimedValue {
-            repeat(threadCount) { id ->
+            repeat(threadCount) { i ->
                 thread {
-                    println("Creating counter #$id")
+                    println("Creating counter #$i")
                     DistributedAtomicLong(url, counterName)
                         .use { counter ->
                             val innerLatch = CountDownLatch(4)
@@ -29,35 +29,35 @@ fun main() {
                             val maxPause = 50
 
                             thread {
-                                println("Begin increments for counter #$id")
+                                println("Begin increments for counter #$i")
                                 repeat(count) { counter.increment() }
                                 sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
-                                println("Completed increments for counter #$id")
+                                println("Completed increments for counter #$i")
                             }
 
                             thread {
-                                println("Begin decrements for counter #$id")
+                                println("Begin decrements for counter #$i")
                                 repeat(count) { counter.decrement() }
                                 sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
-                                println("Completed decrements for counter #$id")
+                                println("Completed decrements for counter #$i")
                             }
 
                             thread {
-                                println("Begin adds for counter #$id")
+                                println("Begin adds for counter #$i")
                                 repeat(count) { counter.add(5) }
                                 sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
-                                println("Completed adds for counter #$id")
+                                println("Completed adds for counter #$i")
                             }
 
                             thread {
-                                println("Begin subtracts for counter #$id")
+                                println("Begin subtracts for counter #$i")
                                 repeat(count) { counter.subtract(5) }
                                 sleep(maxPause.random.milliseconds)
                                 innerLatch.countDown()
-                                println("Completed subtracts for counter #$id")
+                                println("Completed subtracts for counter #$i")
                             }
 
                             innerLatch.await()

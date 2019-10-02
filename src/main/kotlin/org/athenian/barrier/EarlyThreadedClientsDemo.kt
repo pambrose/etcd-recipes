@@ -16,17 +16,17 @@ fun main() {
 
     DistributedBarrier.reset(url, barrierName)
 
-    repeat(count) { id ->
+    repeat(count) { i ->
         thread {
             DistributedBarrier(url, barrierName)
                 .use { barrier ->
-                    println("$id Waiting on Barrier")
+                    println("$i Waiting on Barrier")
                     barrier.waitOnBarrier(1.seconds)
 
-                    println("$id Timedout waiting on barrier, waiting again")
+                    println("$i Timedout waiting on barrier, waiting again")
                     barrier.waitOnBarrier()
 
-                    println("$id Done Waiting on Barrier")
+                    println("$i Done Waiting on Barrier")
                     waitLatch.countDown()
                 }
         }

@@ -31,11 +31,9 @@ fun main() {
                                                                  println("KeepAlive err resp: $err")
                                                              })
                     ).use {
-
                         println("Starting sleep")
                         sleep(10.seconds)
                         println("Finished sleep")
-
                     }
                     println("Keep-alive is now terminated")
                     sleep(5.seconds)

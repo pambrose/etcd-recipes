@@ -17,7 +17,7 @@ import kotlin.time.days
 class DistributedDoubleBarrier(val url: String,
                                barrierPath: String,
                                memberCount: Int,
-                               val id: String) : Closeable {
+                               val clientId: String) : Closeable {
 
     constructor(url: String,
                 barrierPath: String,

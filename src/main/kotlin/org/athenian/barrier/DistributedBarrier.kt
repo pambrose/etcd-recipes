@@ -28,7 +28,7 @@ import kotlin.time.days
 class DistributedBarrier(val url: String,
                          val barrierPath: String,
                          private val waitOnMissingBarriers: Boolean,
-                         val id: String) : Closeable {
+                         val clientId: String) : Closeable {
 
     constructor(url: String,
                 barrierPath: String,
@@ -57,7 +57,7 @@ class DistributedBarrier(val url: String,
             return false
 
         // Create unique token to avoid collision from clients with same id
-        val uniqueToken = "$id:${randomId(9)}"
+        val uniqueToken = "$clientId:${randomId(9)}"
 
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.value.grant(2).get()

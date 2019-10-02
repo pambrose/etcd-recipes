@@ -44,7 +44,7 @@ import kotlin.time.days
 class DistributedBarrierWithCount(val url: String,
                                   val barrierPath: String,
                                   val memberCount: Int,
-                                  val id: String) : Closeable {
+                                  val clientId: String) : Closeable {
 
     constructor(url: String,
                 barrierPath: String,
@@ -78,7 +78,7 @@ class DistributedBarrierWithCount(val url: String,
     @Throws(InterruptedException::class)
     fun waitOnBarrier(timeout: Duration): Boolean {
 
-        val uniqueToken = "$id:${randomId(9)}"
+        val uniqueToken = "$clientId:${randomId(9)}"
 
         // Do a CAS on the /ready name. If it is not found, then set it
         kvClient.transaction {

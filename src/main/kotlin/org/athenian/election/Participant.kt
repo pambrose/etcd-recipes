@@ -1,3 +1,3 @@
 package org.athenian.election
 
-data class Participant(val id: String, val isLeader: Boolean)
+data class Participant(val clientId: String, val isLeader: Boolean)

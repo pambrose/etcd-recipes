@@ -13,10 +13,10 @@ fun main() {
     LeaderSelector.reset(url, electionName)
 
     val leadershipAction = { selector: LeaderSelector ->
-        println("${selector.id} elected leader")
+        println("${selector.clientId} elected leader")
         val pause = Random.nextInt(5).seconds
         sleep(pause)
-        println("${selector.id} surrendering after $pause")
+        println("${selector.clientId} surrendering after $pause")
     }
 
     LeaderSelector(url, electionName, leadershipAction)

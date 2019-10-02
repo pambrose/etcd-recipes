@@ -25,13 +25,13 @@ fun main() {
     val countdown = CountDownLatch(count)
     val keyname = "/lockedElection"
 
-    repeat(count) { id ->
+    repeat(count) { i ->
         thread {
-            println("Started Thread $id")
+            println("Started Thread $i")
 
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    val keyval = "client$id"
+                    val keyval = "client$i"
 
                     sleep(3_000.random.milliseconds)
 
@@ -39,28 +39,28 @@ fun main() {
                         val lease = leaseClient.grant(10).get()
 
                         client.withLockClient { lock ->
-                            println("Thread $id attempting to lock $keyname")
+                            println("Thread $i attempting to lock $keyname")
                             lock.lock(keyname, lease.id)
-                            println("Thread $id locked $keyname")
+                            println("Thread $i locked $keyname")
 
                             client.withKvClient { kvClient ->
-                                println("Thread $id assigning $keyval")
+                                println("Thread $i assigning $keyval")
                                 kvClient.putValue(keyname, keyval)
 
                                 if (kvClient.getStringValue(keyname) == keyval)
-                                    println("Thread $id is the leader")
+                                    println("Thread $i is the leader")
 
                                 // delete the key
                                 //kvClient.delete(key)
 
-                                println("Thread $id is waiting")
+                                println("Thread $i is waiting")
                                 sleep(15.seconds)
-                                println("Thread $id is done waiting")
+                                println("Thread $i is done waiting")
                             }
 
-                            println("Thread $id is unlocking")
+                            println("Thread $i is unlocking")
                             lock.unlock(keyname)
-                            println("Thread $id is done unlocking")
+                            println("Thread $i is done unlocking")
                         }
                     }
                 }

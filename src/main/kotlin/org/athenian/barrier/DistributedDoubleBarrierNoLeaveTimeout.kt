@@ -40,7 +40,7 @@ import kotlin.time.days
 class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
                                              val barrierPath: String,
                                              val memberCount: Int,
-                                             val id: String) : Closeable {
+                                             val clientId: String) : Closeable {
 
     constructor(url: String,
                 barrierPath: String,
@@ -78,7 +78,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     fun enter(timeout: Duration): Boolean {
 
-        val uniqueToken = "$id:${randomId(9)}"
+        val uniqueToken = "$clientId:${randomId(9)}"
 
         enterCalled.set(true)
 

@@ -41,8 +41,8 @@ import kotlin.time.seconds
 class LeaderSelector(val url: String,
                      val electionPath: String,
                      private val listener: LeaderSelectorListener,
-                     executorService: ExecutorService?,
-                     val id: String) : Closeable {
+                     val clientId: String,
+                     private val userExecutor: ExecutorService?) : Closeable {
 
     // For Java clients
     constructor(url: String,
@@ -50,8 +50,18 @@ class LeaderSelector(val url: String,
                 listener: LeaderSelectorListener) : this(url,
                                                          electionPath,
                                                          listener,
-                                                         null,
-                                                         "Client:${randomId(9)}")
+                                                         "Client:${randomId(9)}",
+                                                         null)
+
+    // For Java clients
+    constructor(url: String,
+                electionPath: String,
+                listener: LeaderSelectorListener,
+                clientId: String) : this(url,
+                                         electionPath,
+                                         listener,
+                                         clientId,
+                                         null)
 
     // For Java clients
     constructor(url: String,
@@ -60,23 +70,23 @@ class LeaderSelector(val url: String,
                 executorService: ExecutorService) : this(url,
                                                          electionPath,
                                                          listener,
-                                                         executorService,
-                                                         "Client:${randomId(9)}")
+                                                         "Client:${randomId(9)}",
+                                                         executorService)
 
     // For Kotlin clients
     constructor(url: String,
                 electionPath: String,
                 lambda: (selector: LeaderSelector) -> Unit,
-                executorService: ExecutorService? = null,
-                id: String = "Client:${randomId(9)}") : this(url,
-                                                             electionPath,
-                                                             object : LeaderSelectorListener {
-                                                                 override fun takeLeadership(selector: LeaderSelector) {
-                                                                     lambda.invoke(selector)
-                                                                 }
-                                                             },
-                                                             executorService,
-                                                             id)
+                clientId: String = "Client:${randomId(9)}",
+                executorService: ExecutorService? = null) : this(url,
+                                                                 electionPath,
+                                                                 object : LeaderSelectorListener {
+                                                                     override fun takeLeadership(selector: LeaderSelector) {
+                                                                         lambda.invoke(selector)
+                                                                     }
+                                                                 },
+                                                                 clientId,
+                                                                 executorService)
 
     private class LeaderSelectorContext {
         val startCalled = AtomicBoolean(false)
@@ -89,8 +99,7 @@ class LeaderSelector(val url: String,
 
     private var selectorContext = AtomicReference(LeaderSelectorContext())
     private val context get() = selectorContext.get()
-    private val executor = executorService ?: Executors.newFixedThreadPool(3)
-    private val closeExecutor = AtomicBoolean(executorService == null)
+    private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -185,7 +194,7 @@ class LeaderSelector(val url: String,
             leadershipCompleteLatch.countDown()
         }
 
-        if (closeExecutor.get())
+        if (userExecutor == null)
             executor.shutdown()
     }
 
@@ -206,12 +215,15 @@ class LeaderSelector(val url: String,
     private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.grant(2).get()
-        val participantPath = participationPath(electionPath).append(id)
+        val participantPath = participationPath(electionPath).append(clientId)
 
-        kvClient.transaction {
-            If(equals(participantPath, CmpTarget.version(0)))
-            Then(putOp(participantPath, id, lease.asPutOption))
-        }
+        val txn =
+            kvClient.transaction {
+                If(equals(participantPath, CmpTarget.version(0)))
+                Then(putOp(participantPath, clientId, lease.asPutOption))
+            }
+
+        check(txn.isSucceeded) { "Participation registration failed" }
 
         leaseClient.keepAlive(lease.id,
                               Observers.observer(
@@ -229,7 +241,7 @@ class LeaderSelector(val url: String,
             return false
 
         // Create unique token to avoid collision from clients with same id
-        val uniqueToken = "$id:${randomId(uniqueSuffixLength)}"
+        val uniqueToken = "$clientId:${randomId(uniqueSuffixLength)}"
 
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.grant(2).get()

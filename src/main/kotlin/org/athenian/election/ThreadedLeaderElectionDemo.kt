@@ -19,10 +19,10 @@ fun main() {
 
     val leadershipAction =
         { selector: LeaderSelector ->
-            println("${selector.id} elected leader")
+            println("${selector.clientId} elected leader")
             val pause = Random.nextInt(5).seconds
             sleep(pause)
-            println("${selector.id} surrendering after $pause")
+            println("${selector.clientId} surrendering after $pause")
         }
 
     repeat(count) {
@@ -30,7 +30,7 @@ fun main() {
             LeaderSelector(url, electionName, leadershipAction, "Thread$it")
                 .use { election ->
                     election.start()
-                    election.await()
+                    election.waitOnLeadershipComplete()
                 }
             latch.countDown()
         }

@@ -50,13 +50,13 @@ fun main() {
         doneLatch.countDown()
     }
 
-    repeat(count - 1) { id ->
+    repeat(count - 1) { i ->
         thread {
             DistributedDoubleBarrier(url, barrierName, count)
                 .use { barrier ->
-                    enterBarrier(id, barrier, 2)
+                    enterBarrier(i, barrier, 2)
                     sleep(5.random.seconds)
-                    leaveBarrier(id, barrier, 2)
+                    leaveBarrier(i, barrier, 2)
                 }
         }
     }

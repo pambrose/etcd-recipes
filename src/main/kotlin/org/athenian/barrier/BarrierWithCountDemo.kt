@@ -34,11 +34,11 @@ fun main() {
         waitLatch.countDown()
     }
 
-    repeat(count - 1) { id ->
+    repeat(count - 1) { i ->
         thread {
             DistributedBarrierWithCount(url, barrierName, count)
                 .use { barrier ->
-                    waiter(id, barrier, 5)
+                    waiter(i, barrier, 5)
                 }
         }
     }

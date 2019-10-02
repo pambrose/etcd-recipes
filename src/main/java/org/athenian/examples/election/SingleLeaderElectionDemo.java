@@ -17,10 +17,10 @@ public class SingleLeaderElectionDemo {
 
         LeaderSelectorListener listener =
                 selector -> {
-                    System.out.println(selector.getId() + " elected leader");
+                    System.out.println(selector.getClientId() + " elected leader");
                     long pause = random(5);
                     sleepSecs(pause);
-                    System.out.println(selector.getId() + " surrendering after " + pause + " seconds");
+                    System.out.println(selector.getClientId() + " surrendering after " + pause + " seconds");
 
                 };
 
