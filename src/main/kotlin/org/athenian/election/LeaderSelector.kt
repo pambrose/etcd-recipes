@@ -162,13 +162,14 @@ class LeaderSelector(val url: String,
     }
 
     @Throws(InterruptedException::class)
-    fun await(): Boolean = await(Long.MAX_VALUE.days)
+    fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Long.MAX_VALUE.days)
 
     @Throws(InterruptedException::class)
-    fun await(timeout: Long, timeUnit: TimeUnit): Boolean = await(timeUnitToDuration(timeout, timeUnit))
+    fun waitOnLeadershipComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
+        waitOnLeadershipComplete(timeUnitToDuration(timeout, timeUnit))
 
     @Throws(InterruptedException::class)
-    fun await(timeout: Duration): Boolean {
+    fun waitOnLeadershipComplete(timeout: Duration): Boolean {
         checkStartCalled()
         checkCloseNotCalled()
         return context.leadershipCompleteLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)

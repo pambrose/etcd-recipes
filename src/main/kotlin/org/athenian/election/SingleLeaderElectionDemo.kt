@@ -23,7 +23,7 @@ fun main() {
         .use { election ->
             repeat(5) {
                 election.start()
-                election.await()
+                election.waitOnLeadershipComplete()
             }
         }
 
@@ -31,7 +31,7 @@ fun main() {
         LeaderSelector(url, electionName, leadershipAction)
             .use { election ->
                 election.start()
-                election.await()
+                election.waitOnLeadershipComplete()
             }
     }
 }

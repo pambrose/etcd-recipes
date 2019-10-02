@@ -33,7 +33,7 @@ public class SingleLeaderElectionDemo {
                     sleepSecs(1);
                 }
 
-                selector.await();
+                selector.waitOnLeadershipComplete();
             }
         }
 
@@ -46,7 +46,7 @@ public class SingleLeaderElectionDemo {
                     sleepSecs(1);
                 }
 
-                selector.await();
+                selector.waitOnLeadershipComplete();
             }
         }
     }
