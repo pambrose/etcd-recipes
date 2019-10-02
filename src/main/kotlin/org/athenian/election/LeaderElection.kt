@@ -31,18 +31,14 @@ import kotlin.time.days
 import kotlin.time.seconds
 
 @ExperimentalTime
-interface LeaderSelectorListener {
-    @Throws(Exception::class)
-    fun takeLeadership(election: LeaderElection)
-}
+typealias ElectionAction = (election: LeaderElection) -> Unit
 
-class LeaderElectionContext {
-    val watchForDeleteLatch = CountDownLatch(1)
-    val leadershipCompleteLatch = CountDownLatch(1)
-    val electedLeader = AtomicBoolean(false)
-    val startCallStarted = AtomicBoolean(false)
-    val startCallCompleted = AtomicBoolean(false)
-}
+@ExperimentalTime
+class ElectionActions(val onElected: ElectionAction = {},
+                      val onTermComplete: ElectionAction = {},
+                      val onFailedElection: ElectionAction = {},
+                      val onInitComplete: ElectionAction = {})
+
 
 @ExperimentalTime
 class LeaderElection(val url: String,
@@ -53,8 +49,17 @@ class LeaderElection(val url: String,
     constructor(url: String, electionPath: String, actions: ElectionActions) : this(url,
                                                                                     electionPath,
                                                                                     actions,
-                                                                                    "Client:${randomId(
-                                                                                        9)}")
+                                                                                    "Client:${randomId(9)}")
+
+
+    class LeaderElectionContext {
+        val startCalled = AtomicBoolean(false)
+        val closeCalled = AtomicBoolean(false)
+        val watchForDeleteLatch = CountDownLatch(1)
+        val leadershipCompleteLatch = CountDownLatch(1)
+        val electedLeader = AtomicBoolean(false)
+        val startCallAllowed = AtomicBoolean(true)
+    }
 
     private val executor = Executors.newFixedThreadPool(2)
     private var context = LeaderElectionContext()
@@ -65,11 +70,15 @@ class LeaderElection(val url: String,
     }
 
     fun start(): LeaderElection {
-        if (context.startCallStarted.get() && !context.startCallCompleted.get())
-            throw IllegalStateException("Previous call to start() not complete")
+        verifyStartCallAllowed()
+        verifyCloseNotCalled()
 
+        // Reinitialize the context each time through
         context = LeaderElectionContext()
-        context.startCallStarted.set(true)
+            .apply {
+                startCalled.set(true)
+                startCallAllowed.set(false)
+            }
 
         val clientInitLatch = CountDownLatch(1)
 
@@ -92,7 +101,7 @@ class LeaderElection(val url: String,
                                 }
 
                                 // Give the watcher a chance to start
-                                sleep(2.seconds)
+                                sleep(1.seconds)
 
                                 // Clients should run for leader in case they are the first to run
                                 attemptToBecomeLeader(leaseClient, kvClient)
@@ -104,11 +113,10 @@ class LeaderElection(val url: String,
                 }
         }
 
+        // Wait for connection to etcd
         clientInitLatch.await()
 
-        actions.onInitComplete.invoke(this)
-
-        context.startCallCompleted.set(true)
+        //actions.onInitComplete.invoke(this)
 
         return this
     }
@@ -118,14 +126,38 @@ class LeaderElection(val url: String,
     fun await(timeout: Long, timeUnit: TimeUnit): Boolean = await(timeUnitToDuration(timeout,
                                                                                      timeUnit))
 
-    fun await(timeout: Duration): Boolean =
-        context.leadershipCompleteLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+    fun await(timeout: Duration): Boolean {
+        verifyStartCalled()
+        verifyCloseNotCalled()
+        return context.leadershipCompleteLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+    }
 
     override fun close() {
-        context.watchForDeleteLatch.countDown()
-        context.leadershipCompleteLatch.countDown()
+        verifyStartCalled()
+        verifyCloseNotCalled()
+
+        context.apply {
+            closeCalled.set(true)
+            watchForDeleteLatch.countDown()
+            leadershipCompleteLatch.countDown()
+        }
 
         executor.shutdown()
+    }
+
+    private fun verifyStartCallAllowed() {
+        if (!context.startCallAllowed.get())
+            throw IllegalStateException("Previous call to start() not complete")
+    }
+
+    private fun verifyStartCalled() {
+        if (!context.startCalled.get())
+            throw IllegalStateException("start() not called")
+    }
+
+    private fun verifyCloseNotCalled() {
+        if (context.closeCalled.get())
+            throw IllegalStateException("close() already closed")
     }
 
     private fun watchForDeleteEvents(watchClient: Watch, action: () -> Unit): Watch.Watcher =
@@ -140,8 +172,9 @@ class LeaderElection(val url: String,
                 }
         }
 
-    // This will not return until election failure or leader surrenders leadership
+    // This will not return until election failure or leader surrenders leadership after being elected
     private fun attemptToBecomeLeader(leaseClient: Lease, kvClient: KV): Boolean {
+
         if (context.electedLeader.get())
             return false
 
@@ -177,6 +210,7 @@ class LeaderElection(val url: String,
             // Do this after leadership is complete so the thread does not terminate
             context.watchForDeleteLatch.countDown()
             context.leadershipCompleteLatch.countDown()
+            context.startCallAllowed.set(true)
             true
         } else {
             // Failed to become leader
@@ -195,13 +229,3 @@ class LeaderElection(val url: String,
         }
     }
 }
-
-@ExperimentalTime
-typealias ElectionAction = (election: LeaderElection) -> Unit
-
-@ExperimentalTime
-class ElectionActions(val onElected: ElectionAction = {},
-                      val onTermComplete: ElectionAction = {},
-                      val onFailedElection: ElectionAction = {},
-                      val onInitComplete: ElectionAction = {})
-

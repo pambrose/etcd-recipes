@@ -27,6 +27,7 @@ fun main() {
                 sleep(2.seconds)
             }
         )
+
     LeaderElection(url, electionName, actions)
         .use { election ->
             repeat(3) {
