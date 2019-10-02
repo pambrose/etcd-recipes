@@ -7,9 +7,12 @@ import io.etcd.jetcd.Observers
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import org.athenian.utils.append
 import org.athenian.utils.asPutOption
 import org.athenian.utils.delete
 import org.athenian.utils.equals
+import org.athenian.utils.getChildrenKeys
+import org.athenian.utils.getChildrenStringValues
 import org.athenian.utils.getStringValue
 import org.athenian.utils.putOp
 import org.athenian.utils.randomId
@@ -68,13 +71,15 @@ class LeaderSelector(val url: String,
         val startCallAllowed = AtomicBoolean(true)
     }
 
-    private val executor = Executors.newFixedThreadPool(2)
+    private val executor = Executors.newFixedThreadPool(3)
     private var context = LeaderElectionContext()
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
+
+    val isLeader get() = context.electedLeader.get()
 
     fun start(): LeaderSelector {
 
@@ -106,6 +111,10 @@ class LeaderSelector(val url: String,
                                     }.use {
                                         context.watchForDeleteLatch.await()
                                     }
+                                }
+
+                                executor.submit {
+                                    advertiseParticipation(leaseClient, kvClient)
                                 }
 
                                 // Give the watcher a chance to start
@@ -153,7 +162,6 @@ class LeaderSelector(val url: String,
         executor.shutdown()
     }
 
-    val isLeader get() = context.electedLeader.get()
 
     private fun checkStartCalled() = check(context.startCalled.get()) { "start() not called" }
 
@@ -164,21 +172,37 @@ class LeaderSelector(val url: String,
             // Create a watch to act on DELETE events
             watchResponse.events
                 .forEach { event ->
-                    if (event.eventType == DELETE) {
-                        //println("$clientId executing action")
-                        action.invoke()
-                    }
+                    if (event.eventType == DELETE) action.invoke()
                 }
         }
 
+    private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
+        // Prime lease with 2 seconds to give keepAlive a chance to get started
+        val lease = leaseClient.grant(2).get()
+        val participantPath = participationPath(electionPath).append(id)
+
+        kvClient.transaction {
+            If(equals(participantPath, CmpTarget.version(0)))
+            Then(putOp(participantPath, id, lease.asPutOption))
+        }
+
+        leaseClient.keepAlive(lease.id,
+                              Observers.observer(
+                                  { /*println("KeepAlive next resp: $next")*/ },
+                                  { /*println("KeepAlive err resp: $err")*/ })
+        ).use {
+            // Run keep-alive until closed
+            context.leadershipCompleteLatch.await()
+        }
+    }
+
     // This will not return until election failure or leader surrenders leadership after being elected
     private fun attemptToBecomeLeader(leaseClient: Lease, kvClient: KV): Boolean {
-
         if (isLeader)
             return false
 
         // Create unique token to avoid collision from clients with same id
-        val uniqueToken = "$id:${randomId(9)}"
+        val uniqueToken = "$id:${randomId(uniqueSuffixLength)}"
 
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.grant(2).get()
@@ -218,12 +242,36 @@ class LeaderSelector(val url: String,
     }
 
     companion object Static {
+
+        private val uniqueSuffixLength = 9
+
+        private fun participationPath(path: String) = path.append("participants")
+
         fun reset(url: String, electionPath: String) {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { it.delete(electionPath) }
+                    client.withKvClient { kvClient ->
+                        kvClient.getChildrenKeys(electionPath).forEach {
+                            kvClient.delete(it)
+                        }
+                    }
                 }
+        }
+
+        fun getParticipants(url: String, electionPath: String): List<Participant> {
+            require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
+            val retval = mutableListOf<Participant>()
+            Client.builder().endpoints(url).build()
+                .use { client ->
+                    client.withKvClient { kvClient ->
+                        val leader = kvClient.getStringValue(electionPath)?.dropLast(uniqueSuffixLength + 1)
+                        kvClient.getChildrenStringValues(participationPath(electionPath)).forEach {
+                            retval += Participant(it, leader == it)
+                        }
+                    }
+                }
+            return retval
         }
     }
 }

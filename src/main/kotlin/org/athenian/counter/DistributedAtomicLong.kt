@@ -102,7 +102,9 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { it.delete(counterPath) }
+                    client.withKvClient { kvClient ->
+                        kvClient.delete(counterPath)
+                    }
                 }
         }
     }

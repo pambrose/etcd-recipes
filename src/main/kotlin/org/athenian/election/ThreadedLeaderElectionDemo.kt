@@ -1,5 +1,6 @@
 package org.athenian.election
 
+import org.athenian.election.LeaderSelector.Static.getParticipants
 import org.athenian.utils.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -33,6 +34,11 @@ fun main() {
                 }
             latch.countDown()
         }
+    }
+
+    while (latch.count > 0) {
+        println("Participants: ${getParticipants(url, electionName)}")
+        sleep(1.seconds)
     }
 
     latch.await()

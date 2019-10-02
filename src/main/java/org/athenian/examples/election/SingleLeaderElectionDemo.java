@@ -4,7 +4,7 @@ import org.athenian.election.LeaderSelector;
 import org.athenian.election.LeaderSelectorListener;
 
 import static org.athenian.utils.Utils.random;
-import static org.athenian.utils.Utils.sleep;
+import static org.athenian.utils.Utils.sleepSecs;
 
 public class SingleLeaderElectionDemo {
 
@@ -19,7 +19,7 @@ public class SingleLeaderElectionDemo {
                 election -> {
                     System.out.println(election.getId() + " elected leader");
                     long pause = random(5);
-                    sleep(pause);
+                    sleepSecs(pause);
                     System.out.println(election.getId() + " surrendering after " + pause + " seconds");
 
                 };

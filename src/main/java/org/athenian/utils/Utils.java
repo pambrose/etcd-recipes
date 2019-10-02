@@ -10,11 +10,15 @@ public class Utils {
         return Math.abs(random.nextLong() % upper);
     }
 
-    public static void sleep(long time) {
+    public static void sleepMillis(long time) {
         try {
             Thread.sleep(time);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    public static void sleepSecs(long time) {
+        sleepMillis(time * 1000);
     }
 }

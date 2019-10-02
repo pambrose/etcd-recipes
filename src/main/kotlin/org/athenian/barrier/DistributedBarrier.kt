@@ -147,7 +147,9 @@ class DistributedBarrier(val url: String,
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { it.delete(barrierPath) }
+                    client.withKvClient { kvClient ->
+                        kvClient.delete(barrierPath)
+                    }
                 }
         }
     }
