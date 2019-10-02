@@ -10,6 +10,8 @@ fun main() {
     val url = "http://localhost:2379"
     val electionName = "/election/leaderElectionDemo"
 
+    LeaderSelector.reset(url, electionName)
+
     val leadershipAction = { selector: LeaderSelector ->
         println("${selector.id} elected leader")
         val pause = Random.nextInt(5).seconds

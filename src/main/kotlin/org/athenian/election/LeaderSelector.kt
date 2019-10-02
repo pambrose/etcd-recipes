@@ -156,7 +156,7 @@ class LeaderSelector(val url: String,
         executor.shutdown()
     }
 
-    val isElectedLeader get() = context.electedLeader.get()
+    val isLeader get() = context.electedLeader.get()
 
     private fun checkStartCalled() = check(context.startCalled.get()) { "start() not called" }
 
@@ -177,7 +177,7 @@ class LeaderSelector(val url: String,
     // This will not return until election failure or leader surrenders leadership after being elected
     private fun attemptToBecomeLeader(leaseClient: Lease, kvClient: KV): Boolean {
 
-        if (isElectedLeader)
+        if (isLeader)
             return false
 
         // Create unique token to avoid collision from clients with same id
@@ -194,7 +194,7 @@ class LeaderSelector(val url: String,
             }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (!isElectedLeader && txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
+        return if (!isLeader && txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
                                       { /*println("KeepAlive next resp: $next")*/ },
@@ -206,23 +206,21 @@ class LeaderSelector(val url: String,
             }
 
             // Leadership was relinquished
-            //actions.onTermComplete.invoke(this)
-
-            // Do this after leadership is complete so the thread does not terminate
             context.apply {
+                // Do this after leadership is complete so the thread does not terminate
                 watchForDeleteLatch.countDown()
                 leadershipCompleteLatch.countDown()
                 startCallAllowed.set(true)
+                electedLeader.set(false)
             }
             true
         } else {
             // Failed to become leader
-            //actions.onFailedElection.invoke(this)
             false
         }
     }
 
-    companion object {
+    companion object Static {
         fun reset(url: String, electionPath: String) {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
             Client.builder().endpoints(url).build()

@@ -13,6 +13,8 @@ public class SingleLeaderElectionDemo {
         String url = "http://localhost:2379";
         String electionName = "/election/leaderElectionDemo";
 
+        LeaderSelector.Static.reset(url, electionName);
+
         LeaderSelectorListener listener =
                 election -> {
                     System.out.println(election.getId() + " elected leader");
