@@ -21,7 +21,7 @@ fun main() {
         measureTimedValue {
             repeat(threadCount) { id ->
                 thread {
-                    println("Creating counter #$id");
+                    println("Creating counter #$id")
                     DistributedAtomicLong(url, counterName)
                         .use { counter ->
                             val innerLatch = CountDownLatch(4)

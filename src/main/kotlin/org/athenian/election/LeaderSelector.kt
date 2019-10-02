@@ -35,7 +35,7 @@ import kotlin.time.seconds
 // For Java clients
 class LeaderSelector(val url: String,
                      val electionPath: String,
-                     val listener: LeaderSelectorListener,
+                     private val listener: LeaderSelectorListener,
                      val id: String) : Closeable {
 
     // For Java clients
@@ -59,8 +59,7 @@ class LeaderSelector(val url: String,
                                                              },
                                                              id)
 
-
-    class LeaderElectionContext {
+    private class LeaderElectionContext {
         val startCalled = AtomicBoolean(false)
         val closeCalled = AtomicBoolean(false)
         val watchForDeleteLatch = CountDownLatch(1)
@@ -124,8 +123,6 @@ class LeaderSelector(val url: String,
 
         // Wait for connection to etcd
         clientInitLatch.await()
-
-        //actions.onInitComplete.invoke(this)
 
         return this
     }

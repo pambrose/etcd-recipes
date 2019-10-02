@@ -68,12 +68,14 @@ class DistributedBarrierWithCount(val url: String,
 
     val waiterCount: Long get() = kvClient.countChildren(waitingPrefix)
 
+    @Throws(InterruptedException::class)
     fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
-    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean = waitOnBarrier(timeUnitToDuration(
-        timeout,
-        timeUnit))
+    @Throws(InterruptedException::class)
+    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
+        waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
+    @Throws(InterruptedException::class)
     fun waitOnBarrier(timeout: Duration): Boolean {
 
         val uniqueToken = "$id:${randomId(9)}"

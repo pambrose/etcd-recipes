@@ -27,7 +27,7 @@ import kotlin.time.days
 @ExperimentalTime
 class DistributedBarrier(val url: String,
                          val barrierPath: String,
-                         val waitOnMissingBarriers: Boolean,
+                         private val waitOnMissingBarriers: Boolean,
                          val id: String) : Closeable {
 
     constructor(url: String,
@@ -94,12 +94,14 @@ class DistributedBarrier(val url: String,
             true
         }
 
+    @Throws(InterruptedException::class)
     fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
-    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean = waitOnBarrier(timeUnitToDuration(
-        timeout,
-        timeUnit))
+    @Throws(InterruptedException::class)
+    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
+        waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
+    @Throws(InterruptedException::class)
     fun waitOnBarrier(timeout: Duration): Boolean {
         // Check if barrier is present before using watcher
         if (!waitOnMissingBarriers && !isBarrierSet)
