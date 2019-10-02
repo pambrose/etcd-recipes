@@ -240,7 +240,6 @@ fun String.append(suffix: String, extChar: String = "/"): String = "${ensureTrai
 
 val CountDownLatch.isDone: Boolean get() = count == 0L
 
-
 @ExperimentalTime
 fun timeUnitToDuration(value: Long, timeUnit: TimeUnit): Duration =
     when (timeUnit) {

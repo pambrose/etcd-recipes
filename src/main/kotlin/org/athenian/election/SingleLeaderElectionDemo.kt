@@ -10,21 +10,26 @@ fun main() {
     val url = "http://localhost:2379"
     val electionName = "/election/leaderElectionDemo"
 
-    val actions =
-        ElectionActions(
-            onElected = { election ->
-                println("${election.id} elected leader")
-                val pause = Random.nextInt(5).seconds
-                sleep(pause)
-                println("${election.id} surrendering after $pause")
-            }
-        )
+    val leadershipAction = { selector: LeaderSelector ->
+        println("${selector.id} elected leader")
+        val pause = Random.nextInt(5).seconds
+        sleep(pause)
+        println("${selector.id} surrendering after $pause")
+    }
 
-    LeaderElection(url, electionName, actions)
+    LeaderSelector(url, electionName, leadershipAction)
         .use { election ->
-            repeat(3) {
+            repeat(5) {
                 election.start()
                 election.await()
             }
         }
+
+    repeat(5) {
+        LeaderSelector(url, electionName, leadershipAction)
+            .use { election ->
+                election.start()
+                election.await()
+            }
+    }
 }

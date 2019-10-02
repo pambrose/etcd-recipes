@@ -30,23 +30,34 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.days
 import kotlin.time.seconds
 
-@ExperimentalTime
-typealias ElectionAction = (election: LeaderElection) -> Unit
 
 @ExperimentalTime
-class ElectionActions(val onElected: ElectionAction = {})
-
-
-@ExperimentalTime
-class LeaderElection(val url: String,
+// For Java clients
+class LeaderSelector(val url: String,
                      val electionPath: String,
-                     val actions: ElectionActions,
+                     val listener: LeaderSelectorListener,
                      val id: String) : Closeable {
 
-    constructor(url: String, electionPath: String, actions: ElectionActions) : this(url,
-                                                                                    electionPath,
-                                                                                    actions,
-                                                                                    "Client:${randomId(9)}")
+    // For Java clients
+    constructor(url: String,
+                electionPath: String,
+                listener: LeaderSelectorListener) : this(url,
+                                                         electionPath,
+                                                         listener,
+                                                         "Client:${randomId(9)}")
+
+    // For Kotlin clients
+    constructor(url: String,
+                electionPath: String,
+                lambda: (selector: LeaderSelector) -> Unit,
+                id: String = "Client:${randomId(9)}") : this(url,
+                                                             electionPath,
+                                                             object : LeaderSelectorListener {
+                                                                 override fun takeLeadership(selector: LeaderSelector) {
+                                                                     lambda.invoke(selector)
+                                                                 }
+                                                             },
+                                                             id)
 
 
     class LeaderElectionContext {
@@ -66,7 +77,7 @@ class LeaderElection(val url: String,
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
 
-    fun start(): LeaderElection {
+    fun start(): LeaderSelector {
         verifyStartCallAllowed()
         verifyCloseNotCalled()
 
@@ -118,11 +129,13 @@ class LeaderElection(val url: String,
         return this
     }
 
+    @Throws(InterruptedException::class)
     fun await(): Boolean = await(Long.MAX_VALUE.days)
 
-    fun await(timeout: Long, timeUnit: TimeUnit): Boolean = await(timeUnitToDuration(timeout,
-                                                                                     timeUnit))
+    @Throws(InterruptedException::class)
+    fun await(timeout: Long, timeUnit: TimeUnit): Boolean = await(timeUnitToDuration(timeout, timeUnit))
 
+    @Throws(InterruptedException::class)
     fun await(timeout: Duration): Boolean {
         verifyStartCalled()
         verifyCloseNotCalled()
@@ -142,20 +155,14 @@ class LeaderElection(val url: String,
         executor.shutdown()
     }
 
-    private fun verifyStartCallAllowed() {
-        if (!context.startCallAllowed.get())
-            throw IllegalStateException("Previous call to start() not complete")
-    }
+    val isElectedLeader get() = context.electedLeader.get()
 
-    private fun verifyStartCalled() {
-        if (!context.startCalled.get())
-            throw IllegalStateException("start() not called")
-    }
+    private fun verifyStartCallAllowed() =
+        check(context.startCallAllowed.get()) { "Previous call to start() not complete" }
 
-    private fun verifyCloseNotCalled() {
-        if (context.closeCalled.get())
-            throw IllegalStateException("close() already closed")
-    }
+    private fun verifyStartCalled() = check(context.startCalled.get()) { "start() not called" }
+
+    private fun verifyCloseNotCalled() = check(!context.closeCalled.get()) { "close() already closed" }
 
     private fun watchForDeleteEvents(watchClient: Watch, action: () -> Unit): Watch.Watcher =
         watchClient.watcher(electionPath) { watchResponse ->
@@ -172,7 +179,7 @@ class LeaderElection(val url: String,
     // This will not return until election failure or leader surrenders leadership after being elected
     private fun attemptToBecomeLeader(leaseClient: Lease, kvClient: KV): Boolean {
 
-        if (context.electedLeader.get())
+        if (isElectedLeader)
             return false
 
         // Create unique token to avoid collision from clients with same id
@@ -189,7 +196,7 @@ class LeaderElection(val url: String,
             }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (!context.electedLeader.get() && txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
+        return if (!isElectedLeader && txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
                                       { /*println("KeepAlive next resp: $next")*/ },
@@ -197,16 +204,18 @@ class LeaderElection(val url: String,
             ).use {
                 // Was selected as leader
                 context.electedLeader.set(true)
-                actions.onElected.invoke(this)
+                listener.takeLeadership(this)
             }
 
             // Leadership was relinquished
             //actions.onTermComplete.invoke(this)
 
             // Do this after leadership is complete so the thread does not terminate
-            context.watchForDeleteLatch.countDown()
-            context.leadershipCompleteLatch.countDown()
-            context.startCallAllowed.set(true)
+            context.apply {
+                watchForDeleteLatch.countDown()
+                leadershipCompleteLatch.countDown()
+                startCallAllowed.set(true)
+            }
             true
         } else {
             // Failed to become leader
