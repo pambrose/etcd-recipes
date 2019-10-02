@@ -81,6 +81,8 @@ class LeaderSelector(val url: String,
 
     val isLeader get() = context.electedLeader.get()
 
+    val isFinished get() = context.leadershipCompleteLatch.count == 0L
+
     fun start(): LeaderSelector {
 
         check(context.startCallAllowed.get()) { "Previous call to start() not complete" }

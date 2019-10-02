@@ -16,25 +16,37 @@ public class SingleLeaderElectionDemo {
         LeaderSelector.Static.reset(url, electionName);
 
         LeaderSelectorListener listener =
-                election -> {
-                    System.out.println(election.getId() + " elected leader");
+                selector -> {
+                    System.out.println(selector.getId() + " elected leader");
                     long pause = random(5);
                     sleepSecs(pause);
-                    System.out.println(election.getId() + " surrendering after " + pause + " seconds");
+                    System.out.println(selector.getId() + " surrendering after " + pause + " seconds");
 
                 };
 
-        try (LeaderSelector election = new LeaderSelector(url, electionName, listener)) {
+        try (LeaderSelector selector = new LeaderSelector(url, electionName, listener)) {
             for (int i = 0; i < 5; i++) {
-                election.start();
-                election.await();
+                selector.start();
+
+                while (!selector.isFinished()) {
+                    System.out.println(LeaderSelector.Static.getParticipants(url, electionName));
+                    sleepSecs(1);
+                }
+
+                selector.await();
             }
         }
 
         for (int i = 0; i < 5; i++) {
-            try (LeaderSelector election = new LeaderSelector(url, electionName, listener)) {
-                election.start();
-                election.await();
+            try (LeaderSelector selector = new LeaderSelector(url, electionName, listener)) {
+                selector.start();
+
+                while (!selector.isFinished()) {
+                    System.out.println(LeaderSelector.Static.getParticipants(url, electionName));
+                    sleepSecs(1);
+                }
+
+                selector.await();
             }
         }
     }
