@@ -8,7 +8,7 @@ import static org.athenian.utils.Utils.sleep;
 
 public class SingleLeaderElectionDemo {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
 
         String url = "http://localhost:2379";
         String electionName = "/election/leaderElectionDemo";

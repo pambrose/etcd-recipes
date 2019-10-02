@@ -78,8 +78,9 @@ class LeaderSelector(val url: String,
     }
 
     fun start(): LeaderSelector {
-        verifyStartCallAllowed()
-        verifyCloseNotCalled()
+
+        check(context.startCallAllowed.get()) { "Previous call to start() not complete" }
+        checkCloseNotCalled()
 
         // Reinitialize the context each time through
         context = LeaderElectionContext()
@@ -137,14 +138,14 @@ class LeaderSelector(val url: String,
 
     @Throws(InterruptedException::class)
     fun await(timeout: Duration): Boolean {
-        verifyStartCalled()
-        verifyCloseNotCalled()
+        checkStartCalled()
+        checkCloseNotCalled()
         return context.leadershipCompleteLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
     }
 
     override fun close() {
-        verifyStartCalled()
-        verifyCloseNotCalled()
+        checkStartCalled()
+        checkCloseNotCalled()
 
         context.apply {
             closeCalled.set(true)
@@ -157,12 +158,9 @@ class LeaderSelector(val url: String,
 
     val isElectedLeader get() = context.electedLeader.get()
 
-    private fun verifyStartCallAllowed() =
-        check(context.startCallAllowed.get()) { "Previous call to start() not complete" }
+    private fun checkStartCalled() = check(context.startCalled.get()) { "start() not called" }
 
-    private fun verifyStartCalled() = check(context.startCalled.get()) { "start() not called" }
-
-    private fun verifyCloseNotCalled() = check(!context.closeCalled.get()) { "close() already closed" }
+    private fun checkCloseNotCalled() = check(!context.closeCalled.get()) { "close() already closed" }
 
     private fun watchForDeleteEvents(watchClient: Watch, action: () -> Unit): Watch.Watcher =
         watchClient.watcher(electionPath) { watchResponse ->
