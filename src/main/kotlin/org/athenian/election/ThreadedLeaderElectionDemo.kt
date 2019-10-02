@@ -1,6 +1,6 @@
 package org.athenian.election
 
-import org.athenian.sleep
+import org.athenian.utils.sleep
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds

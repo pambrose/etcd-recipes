@@ -1,6 +1,6 @@
 package org.athenian.election
 
-import org.athenian.sleep
+import org.athenian.utils.sleep
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
@@ -19,7 +19,7 @@ fun main() {
                 sleep(pause)
                 println("${election.id} surrendering after $pause")
             },
-            onFailedElection = { election ->
+            onFailedElection = { _ ->
                 //println("$id failed to get elected")
             },
             onTermComplete = { election ->
@@ -28,8 +28,8 @@ fun main() {
             }
         )
     LeaderElection(url, electionName, actions)
-        .also { election ->
-            repeat(10) {
+        .use { election ->
+            repeat(3) {
                 election.start()
                 election.await()
             }

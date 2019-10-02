@@ -7,28 +7,42 @@ import io.etcd.jetcd.Observers
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import org.athenian.asPutOption
-import org.athenian.delete
-import org.athenian.equals
-import org.athenian.getStringValue
-import org.athenian.putOp
-import org.athenian.randomId
-import org.athenian.sleep
-import org.athenian.timeUnitToDuration
-import org.athenian.transaction
-import org.athenian.watcher
-import org.athenian.withKvClient
-import org.athenian.withLeaseClient
-import org.athenian.withWatchClient
+import org.athenian.utils.asPutOption
+import org.athenian.utils.delete
+import org.athenian.utils.equals
+import org.athenian.utils.getStringValue
+import org.athenian.utils.putOp
+import org.athenian.utils.randomId
+import org.athenian.utils.sleep
+import org.athenian.utils.timeUnitToDuration
+import org.athenian.utils.transaction
+import org.athenian.utils.watcher
+import org.athenian.utils.withKvClient
+import org.athenian.utils.withLeaseClient
+import org.athenian.utils.withWatchClient
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
-import kotlin.time.milliseconds
 import kotlin.time.seconds
+
+@ExperimentalTime
+interface LeaderSelectorListener {
+    @Throws(Exception::class)
+    fun takeLeadership(election: LeaderElection)
+}
+
+class LeaderElectionContext {
+    val watchForDeleteLatch = CountDownLatch(1)
+    val leadershipCompleteLatch = CountDownLatch(1)
+    val electedLeader = AtomicBoolean(false)
+    val startCallStarted = AtomicBoolean(false)
+    val startCallCompleted = AtomicBoolean(false)
+}
 
 @ExperimentalTime
 class LeaderElection(val url: String,
@@ -39,12 +53,11 @@ class LeaderElection(val url: String,
     constructor(url: String, electionPath: String, actions: ElectionActions) : this(url,
                                                                                     electionPath,
                                                                                     actions,
-                                                                                    "Client:${randomId(9)}")
+                                                                                    "Client:${randomId(
+                                                                                        9)}")
 
-    private val executor = lazy { Executors.newFixedThreadPool(2) }
-    private val startCountdown = CountDownLatch(1)
-    private val initCountDown = CountDownLatch(1)
-    private val watchCountDown = CountDownLatch(1)
+    private val executor = Executors.newFixedThreadPool(2)
+    private var context = LeaderElectionContext()
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -52,64 +65,70 @@ class LeaderElection(val url: String,
     }
 
     fun start(): LeaderElection {
-        executor.value.submit {
+        if (context.startCallStarted.get() && !context.startCallCompleted.get())
+            throw IllegalStateException("Previous call to start() not complete")
+
+        context = LeaderElectionContext()
+        context.startCallStarted.set(true)
+
+        val clientInitLatch = CountDownLatch(1)
+
+        executor.submit {
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withLeaseClient { leaseClient ->
                         client.withWatchClient { watchClient ->
                             client.withKvClient { kvClient ->
-                                val countdown = CountDownLatch(1)
 
-                                initCountDown.countDown()
+                                clientInitLatch.countDown()
 
-                                executor.value
-                                    .submit {
-                                        watchForLeadershipOpening(watchClient) {
-                                            // Run for leader when leader key is deleted
-                                            attemptToBecomeLeader(actions, leaseClient, kvClient)
-                                        }.use {
-                                            watchCountDown.await()
-                                        }
+                                executor.submit {
+                                    watchForDeleteEvents(watchClient) {
+                                        // Run for leader when leader key is deleted
+                                        attemptToBecomeLeader(leaseClient, kvClient)
+                                    }.use {
+                                        context.watchForDeleteLatch.await()
                                     }
+                                }
 
                                 // Give the watcher a chance to start
                                 sleep(2.seconds)
 
                                 // Clients should run for leader in case they are the first to run
-                                attemptToBecomeLeader(actions, leaseClient, kvClient)
+                                attemptToBecomeLeader(leaseClient, kvClient)
 
-                                countdown.await()
+                                context.leadershipCompleteLatch.await()
                             }
                         }
                     }
                 }
         }
 
-        initCountDown.await()
+        clientInitLatch.await()
+
         actions.onInitComplete.invoke(this)
+
+        context.startCallCompleted.set(true)
 
         return this
     }
 
     fun await(): Boolean = await(Long.MAX_VALUE.days)
 
-    fun await(timeout: Long, timeUnit: TimeUnit): Boolean = await(timeUnitToDuration(timeout, timeUnit))
+    fun await(timeout: Long, timeUnit: TimeUnit): Boolean = await(timeUnitToDuration(timeout,
+                                                                                     timeUnit))
 
     fun await(timeout: Duration): Boolean =
-        startCountdown.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+        context.leadershipCompleteLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
 
     override fun close() {
-        watchCountDown.countDown()
-        sleep(100.milliseconds)
+        context.watchForDeleteLatch.countDown()
+        context.leadershipCompleteLatch.countDown()
 
-        startCountdown.countDown()
-        sleep(100.milliseconds)
-
-        if (executor.isInitialized())
-            executor.value.shutdown()
+        executor.shutdown()
     }
 
-    private fun watchForLeadershipOpening(watchClient: Watch, action: () -> Unit): Watch.Watcher =
+    private fun watchForDeleteEvents(watchClient: Watch, action: () -> Unit): Watch.Watcher =
         watchClient.watcher(electionPath) { watchResponse ->
             // Create a watch to act on DELETE events
             watchResponse.events
@@ -122,7 +141,10 @@ class LeaderElection(val url: String,
         }
 
     // This will not return until election failure or leader surrenders leadership
-    private fun attemptToBecomeLeader(actions: ElectionActions, leaseClient: Lease, kvClient: KV): Boolean {
+    private fun attemptToBecomeLeader(leaseClient: Lease, kvClient: KV): Boolean {
+        if (context.electedLeader.get())
+            return false
+
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$id:${randomId(9)}"
 
@@ -137,17 +159,27 @@ class LeaderElection(val url: String,
             }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
+        return if (!context.electedLeader.get() && txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
             leaseClient.keepAlive(lease.id,
                                   Observers.observer(
                                       { /*println("KeepAlive next resp: $next")*/ },
                                       { /*println("KeepAlive err resp: $err")*/ })
             ).use {
+                // Was selected as leader
+                context.electedLeader.set(true)
                 actions.onElected.invoke(this)
             }
+
+            // Leadership was relinquished
+
             actions.onTermComplete.invoke(this)
+
+            // Do this after leadership is complete so the thread does not terminate
+            context.watchForDeleteLatch.countDown()
+            context.leadershipCompleteLatch.countDown()
             true
         } else {
+            // Failed to become leader
             actions.onFailedElection.invoke(this)
             false
         }

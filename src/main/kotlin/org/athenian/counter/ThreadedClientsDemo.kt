@@ -1,7 +1,7 @@
 package org.athenian.counter
 
-import org.athenian.random
-import org.athenian.sleep
+import org.athenian.utils.random
+import org.athenian.utils.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.ExperimentalTime

@@ -2,17 +2,17 @@ package org.athenian.basics
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.WatchOption
-import org.athenian.asByteSequence
-import org.athenian.asString
-import org.athenian.countChildren
-import org.athenian.delete
-import org.athenian.getChildrenKeys
-import org.athenian.getChildrenStringValues
-import org.athenian.putValue
-import org.athenian.sleep
-import org.athenian.watcher
-import org.athenian.withKvClient
-import org.athenian.withWatchClient
+import org.athenian.utils.asByteSequence
+import org.athenian.utils.asString
+import org.athenian.utils.countChildren
+import org.athenian.utils.delete
+import org.athenian.utils.getChildrenKeys
+import org.athenian.utils.getChildrenStringValues
+import org.athenian.utils.putValue
+import org.athenian.utils.sleep
+import org.athenian.utils.watcher
+import org.athenian.utils.withKvClient
+import org.athenian.utils.withWatchClient
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 

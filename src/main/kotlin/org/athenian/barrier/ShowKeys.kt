@@ -1,10 +1,10 @@
 package org.athenian.barrier
 
 import io.etcd.jetcd.Client
-import org.athenian.countChildren
-import org.athenian.getChildrenKeys
-import org.athenian.getChildrenStringValues
-import org.athenian.withKvClient
+import org.athenian.utils.countChildren
+import org.athenian.utils.getChildrenKeys
+import org.athenian.utils.getChildrenStringValues
+import org.athenian.utils.withKvClient
 import kotlin.time.ExperimentalTime
 
 @ExperimentalTime

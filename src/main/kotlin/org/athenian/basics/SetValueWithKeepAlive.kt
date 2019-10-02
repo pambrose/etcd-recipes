@@ -2,11 +2,11 @@ package org.athenian.basics
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
-import org.athenian.asPutOption
-import org.athenian.putValue
-import org.athenian.sleep
-import org.athenian.withKvClient
-import org.athenian.withLeaseClient
+import org.athenian.utils.asPutOption
+import org.athenian.utils.putValue
+import org.athenian.utils.sleep
+import org.athenian.utils.withKvClient
+import org.athenian.utils.withLeaseClient
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 

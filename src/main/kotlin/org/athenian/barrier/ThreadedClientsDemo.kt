@@ -1,6 +1,6 @@
 package org.athenian.barrier
 
-import org.athenian.sleep
+import org.athenian.utils.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.ExperimentalTime

@@ -1,12 +1,12 @@
 package org.athenian.barrier
 
 import io.etcd.jetcd.Client
-import org.athenian.append
-import org.athenian.delete
-import org.athenian.getChildrenKeys
-import org.athenian.randomId
-import org.athenian.timeUnitToDuration
-import org.athenian.withKvClient
+import org.athenian.utils.append
+import org.athenian.utils.delete
+import org.athenian.utils.getChildrenKeys
+import org.athenian.utils.randomId
+import org.athenian.utils.timeUnitToDuration
+import org.athenian.utils.withKvClient
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -38,13 +38,15 @@ class DistributedDoubleBarrier(val url: String,
 
     fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 
-    fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
+    fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout,
+                                                                                     timeUnit))
 
     fun enter(timeout: Duration): Boolean = enterBarrier.waitOnBarrier(timeout)
 
     fun leave(): Boolean = leave(Long.MAX_VALUE.days)
 
-    fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))
+    fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout,
+                                                                                     timeUnit))
 
     fun leave(timeout: Duration): Boolean = leaveBarrier.waitOnBarrier(timeout)
 

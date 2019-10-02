@@ -1,13 +1,13 @@
 package org.athenian.basics
 
 import io.etcd.jetcd.Client
-import org.athenian.asPutOption
-import org.athenian.getStringValue
-import org.athenian.putValue
-import org.athenian.repeatWithSleep
-import org.athenian.sleep
-import org.athenian.withKvClient
-import org.athenian.withLeaseClient
+import org.athenian.utils.asPutOption
+import org.athenian.utils.getStringValue
+import org.athenian.utils.putValue
+import org.athenian.utils.repeatWithSleep
+import org.athenian.utils.sleep
+import org.athenian.utils.withKvClient
+import org.athenian.utils.withLeaseClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.ExperimentalTime

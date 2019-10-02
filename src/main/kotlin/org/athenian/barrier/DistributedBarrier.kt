@@ -4,18 +4,18 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import org.athenian.asPutOption
-import org.athenian.delete
-import org.athenian.equals
-import org.athenian.getStringValue
-import org.athenian.isDone
-import org.athenian.keyIsPresent
-import org.athenian.putOp
-import org.athenian.randomId
-import org.athenian.timeUnitToDuration
-import org.athenian.transaction
-import org.athenian.watcher
-import org.athenian.withKvClient
+import org.athenian.utils.asPutOption
+import org.athenian.utils.delete
+import org.athenian.utils.equals
+import org.athenian.utils.getStringValue
+import org.athenian.utils.isDone
+import org.athenian.utils.keyIsPresent
+import org.athenian.utils.putOp
+import org.athenian.utils.randomId
+import org.athenian.utils.timeUnitToDuration
+import org.athenian.utils.transaction
+import org.athenian.utils.watcher
+import org.athenian.utils.withKvClient
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -96,7 +96,9 @@ class DistributedBarrier(val url: String,
 
     fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
-    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
+    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean = waitOnBarrier(timeUnitToDuration(
+        timeout,
+        timeUnit))
 
     fun waitOnBarrier(timeout: Duration): Boolean {
         // Check if barrier is present before using watcher

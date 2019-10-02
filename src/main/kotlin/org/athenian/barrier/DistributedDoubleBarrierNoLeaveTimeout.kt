@@ -7,25 +7,25 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import org.athenian.append
-import org.athenian.asByteSequence
-import org.athenian.asPutOption
-import org.athenian.asString
-import org.athenian.countChildren
-import org.athenian.delete
-import org.athenian.deleteOp
-import org.athenian.ensureTrailing
-import org.athenian.equals
-import org.athenian.getChildrenKeys
-import org.athenian.getStringValue
-import org.athenian.isDone
-import org.athenian.keyIsPresent
-import org.athenian.putOp
-import org.athenian.randomId
-import org.athenian.timeUnitToDuration
-import org.athenian.transaction
-import org.athenian.watcher
-import org.athenian.withKvClient
+import org.athenian.utils.append
+import org.athenian.utils.asByteSequence
+import org.athenian.utils.asPutOption
+import org.athenian.utils.asString
+import org.athenian.utils.countChildren
+import org.athenian.utils.delete
+import org.athenian.utils.deleteOp
+import org.athenian.utils.ensureTrailing
+import org.athenian.utils.equals
+import org.athenian.utils.getChildrenKeys
+import org.athenian.utils.getStringValue
+import org.athenian.utils.isDone
+import org.athenian.utils.keyIsPresent
+import org.athenian.utils.putOp
+import org.athenian.utils.randomId
+import org.athenian.utils.timeUnitToDuration
+import org.athenian.utils.transaction
+import org.athenian.utils.watcher
+import org.athenian.utils.withKvClient
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -73,7 +73,8 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 
-    fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
+    fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout,
+                                                                                     timeUnit))
 
     fun enter(timeout: Duration): Boolean {
 
@@ -171,7 +172,8 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     fun leave(): Boolean = leave(Long.MAX_VALUE.days)
 
-    fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))
+    fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout,
+                                                                                     timeUnit))
 
     fun leave(timeout: Duration): Boolean {
 

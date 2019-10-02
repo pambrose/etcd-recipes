@@ -1,4 +1,4 @@
-package org.athenian
+package org.athenian.utils
 
 import com.google.common.primitives.Ints
 import com.google.common.primitives.Longs

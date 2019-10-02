@@ -1,15 +1,15 @@
 package org.athenian.basics
 
 import io.etcd.jetcd.Client
-import org.athenian.getStringValue
-import org.athenian.lock
-import org.athenian.putValue
-import org.athenian.random
-import org.athenian.sleep
-import org.athenian.unlock
-import org.athenian.withKvClient
-import org.athenian.withLeaseClient
-import org.athenian.withLockClient
+import org.athenian.utils.getStringValue
+import org.athenian.utils.lock
+import org.athenian.utils.putValue
+import org.athenian.utils.random
+import org.athenian.utils.sleep
+import org.athenian.utils.unlock
+import org.athenian.utils.withKvClient
+import org.athenian.utils.withLeaseClient
+import org.athenian.utils.withLockClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.ExperimentalTime

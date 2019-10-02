@@ -3,13 +3,13 @@ package org.athenian.basics
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.op.CmpTarget
-import org.athenian.delete
-import org.athenian.equals
-import org.athenian.getStringValue
-import org.athenian.putOp
-import org.athenian.putValue
-import org.athenian.transaction
-import org.athenian.withKvClient
+import org.athenian.utils.delete
+import org.athenian.utils.equals
+import org.athenian.utils.getStringValue
+import org.athenian.utils.putOp
+import org.athenian.utils.putValue
+import org.athenian.utils.transaction
+import org.athenian.utils.withKvClient
 import kotlin.time.ExperimentalTime
 
 @ExperimentalTime
