@@ -1,7 +1,6 @@
 package org.athenian.barrier
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.Observers
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
@@ -18,7 +17,8 @@ import org.athenian.utils.ensureTrailing
 import org.athenian.utils.equals
 import org.athenian.utils.getChildrenKeys
 import org.athenian.utils.getStringValue
-import org.athenian.utils.isDone
+import org.athenian.utils.isFinished
+import org.athenian.utils.keepAlive
 import org.athenian.utils.keyIsPresent
 import org.athenian.utils.putOp
 import org.athenian.utils.randomId
@@ -90,23 +90,18 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
         waitingPath.set("$waitingPrefix/$uniqueToken")
         val lease = leaseClient.value.grant(2).get()
-        kvClient.transaction {
-            If(equals(waitingPath.get(), CmpTarget.version(0)))
-            Then(putOp(waitingPath.get(), uniqueToken, lease.asPutOption))
-        }
+
+        val txn =
+            kvClient.transaction {
+                If(equals(waitingPath.get(), CmpTarget.version(0)))
+                Then(putOp(waitingPath.get(), uniqueToken, lease.asPutOption))
+            }
+
+        check(txn.isSucceeded) { "Failed to set waitingPath" }
+        check(kvClient.getStringValue(waitingPath.get()) == uniqueToken) { "Failed to assign waitingPath unique value" }
 
         // Keep key alive
-        if (kvClient.getStringValue(waitingPath.get()) == uniqueToken) {
-            executor.value.submit {
-                leaseClient.value.keepAlive(lease.id,
-                                            Observers.observer(
-                                                { /*println("KeepAlive next resp: $next")*/ },
-                                                { /*println("KeepAlive err resp: $err")*/ })
-                ).use {
-                    keepAliveLatch.await()
-                }
-            }
-        }
+        executor.value.submit { leaseClient.value.keepAlive(lease) { keepAliveLatch.await() } }
 
         fun checkWaiterCountInEnter() {
             // First see if /ready is missing
@@ -130,7 +125,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
         checkWaiterCountInEnter()
 
         // Do not bother starting watcher if latch is already done
-        if (enterWaitLatch.isDone)
+        if (enterWaitLatch.isFinished)
             return true
 
         // Watch for DELETE of /ready and PUTS on /waiters/*

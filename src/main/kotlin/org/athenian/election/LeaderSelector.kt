@@ -3,7 +3,6 @@ package org.athenian.election
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
-import io.etcd.jetcd.Observers
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
@@ -14,6 +13,8 @@ import org.athenian.utils.equals
 import org.athenian.utils.getChildrenKeys
 import org.athenian.utils.getChildrenStringValues
 import org.athenian.utils.getStringValue
+import org.athenian.utils.isFinished
+import org.athenian.utils.keepAlive
 import org.athenian.utils.putOp
 import org.athenian.utils.randomId
 import org.athenian.utils.sleep
@@ -112,7 +113,7 @@ class LeaderSelector(val url: String,
 
     val isLeader get() = context.electedLeader.get()
 
-    val isFinished get() = context.leadershipCompleteLatch.count == 0L
+    val isFinished get() = context.leadershipCompleteLatch.isFinished
 
     fun start(): LeaderSelector {
 
@@ -147,9 +148,7 @@ class LeaderSelector(val url: String,
                                     }
                                 }
 
-                                executor.submit {
-                                    advertiseParticipation(leaseClient, kvClient)
-                                }
+                                executor.submit { advertiseParticipation(leaseClient, kvClient) }
 
                                 // Give the watcher a chance to start
                                 sleep(1.seconds)
@@ -225,14 +224,8 @@ class LeaderSelector(val url: String,
 
         check(txn.isSucceeded) { "Participation registration failed" }
 
-        leaseClient.keepAlive(lease.id,
-                              Observers.observer(
-                                  { /*println("KeepAlive next resp: $next")*/ },
-                                  { /*println("KeepAlive err resp: $err")*/ })
-        ).use {
-            // Run keep-alive until closed
-            context.leadershipCompleteLatch.await()
-        }
+        // Run keep-alive until closed
+        leaseClient.keepAlive(lease) { context.leadershipCompleteLatch.await() }
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
@@ -255,11 +248,8 @@ class LeaderSelector(val url: String,
 
         // Check to see if unique value was successfully set in the CAS step
         return if (!isLeader && txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
-            leaseClient.keepAlive(lease.id,
-                                  Observers.observer(
-                                      { /*println("KeepAlive next resp: $next")*/ },
-                                      { /*println("KeepAlive err resp: $err")*/ })
-            ).use {
+            // This will exit when leadership is relinquished
+            leaseClient.keepAlive(lease) {
                 // Was selected as leader
                 context.electedLeader.set(true)
                 listener.takeLeadership(this)

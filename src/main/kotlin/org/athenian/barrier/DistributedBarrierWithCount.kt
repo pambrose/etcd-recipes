@@ -1,7 +1,6 @@
 package org.athenian.barrier
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.Observers
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
@@ -17,7 +16,8 @@ import org.athenian.utils.ensureTrailing
 import org.athenian.utils.equals
 import org.athenian.utils.getChildrenKeys
 import org.athenian.utils.getStringValue
-import org.athenian.utils.isDone
+import org.athenian.utils.isFinished
+import org.athenian.utils.keepAlive
 import org.athenian.utils.keyIsPresent
 import org.athenian.utils.putOp
 import org.athenian.utils.randomId
@@ -87,26 +87,20 @@ class DistributedBarrierWithCount(val url: String,
         }
 
         val waitLatch = CountDownLatch(1)
-
         val waitingPath = waitingPrefix.append(uniqueToken)
         val lease = leaseClient.value.grant(2).get()
-        kvClient.transaction {
-            If(equals(waitingPath, CmpTarget.version(0)))
-            Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
-        }
+
+        val txn =
+            kvClient.transaction {
+                If(equals(waitingPath, CmpTarget.version(0)))
+                Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
+            }
+
+        check(txn.isSucceeded) { "Failed to set waitingPath" }
+        check(kvClient.getStringValue(waitingPath) == uniqueToken) { "Failed to assign waitingPath unique value" }
 
         // Keep key alive
-        if (kvClient.getStringValue(waitingPath) == uniqueToken) {
-            executor.value.submit {
-                leaseClient.value.keepAlive(lease.id,
-                                            Observers.observer(
-                                                { /*println("KeepAlive next resp: $next")*/ },
-                                                { /*println("KeepAlive err resp: $err")*/ })
-                ).use {
-                    waitLatch.await()
-                }
-            }
-        }
+        executor.value.submit { leaseClient.value.keepAlive(lease) { waitLatch.await() } }
 
         fun checkWaiterCount() {
             // First see if /ready is missing
@@ -130,7 +124,7 @@ class DistributedBarrierWithCount(val url: String,
         checkWaiterCount()
 
         // Do not bother starting watcher if latch is already done
-        if (waitLatch.isDone)
+        if (waitLatch.isFinished)
             return true
 
         // Watch for DELETE of /ready and PUTS on /waiters/*

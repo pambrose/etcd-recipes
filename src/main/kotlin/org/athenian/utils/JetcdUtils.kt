@@ -10,6 +10,7 @@ import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Lock
 import io.etcd.jetcd.Maintenance
+import io.etcd.jetcd.Observers
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.kv.DeleteResponse
@@ -238,7 +239,15 @@ fun String.ensureTrailing(extChar: String = "/"): String = "$this${if (endsWith(
 
 fun String.append(suffix: String, extChar: String = "/"): String = "${ensureTrailing(extChar)}$suffix"
 
-val CountDownLatch.isDone: Boolean get() = count == 0L
+fun Lease.keepAlive(lease: LeaseGrantResponse, block: () -> Unit) =
+    keepAlive(lease.id, Observers.observer(
+        { /*println("KeepAlive next resp: $next")*/ },
+        { /*println("KeepAlive err resp: $err")*/ }))
+        .use {
+            block.invoke()
+        }
+
+val CountDownLatch.isFinished: Boolean get() = count == 0L
 
 @ExperimentalTime
 fun timeUnitToDuration(value: Long, timeUnit: TimeUnit): Duration =

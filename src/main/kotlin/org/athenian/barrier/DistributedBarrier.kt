@@ -1,14 +1,14 @@
 package org.athenian.barrier
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.Observers
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import org.athenian.utils.asPutOption
 import org.athenian.utils.delete
 import org.athenian.utils.equals
 import org.athenian.utils.getStringValue
-import org.athenian.utils.isDone
+import org.athenian.utils.isFinished
+import org.athenian.utils.keepAlive
 import org.athenian.utils.keyIsPresent
 import org.athenian.utils.putOp
 import org.athenian.utils.randomId
@@ -71,15 +71,7 @@ class DistributedBarrier(val url: String,
 
         // Check to see if unique value was successfully set in the CAS step
         return if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
-            executor.value.submit {
-                leaseClient.value.keepAlive(lease.id,
-                                            Observers.observer(
-                                                { /*println("KeepAlive next resp: $next")*/ },
-                                                { /*println("KeepAlive err resp: $err")*/ })
-                ).use {
-                    barrierLatch.await()
-                }
-            }
+            executor.value.submit { leaseClient.value.keepAlive(lease) { barrierLatch.await() } }
             true
         } else {
             false
@@ -87,7 +79,7 @@ class DistributedBarrier(val url: String,
     }
 
     fun removeBarrier(): Boolean =
-        if (barrierLatch.isDone) {
+        if (barrierLatch.isFinished) {
             false
         } else {
             barrierLatch.countDown()
