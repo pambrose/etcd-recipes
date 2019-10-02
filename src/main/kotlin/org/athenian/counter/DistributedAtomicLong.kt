@@ -75,16 +75,13 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
             false
         }
 
-    private fun applyCounterTransaction(amount: Long): TxnResponse {
-        val kvlist = kvClient.getResponse(counterPath).kvs
-        val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
-
-        val l = kv.value.asLong
-        return this.kvClient.transaction {
+    private fun applyCounterTransaction(amount: Long): TxnResponse =
+        kvClient.transaction {
+            val kvlist = kvClient.getResponse(counterPath).kvs
+            val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
             If(equals(counterPath, CmpTarget.modRevision(kv.modRevision)))
             Then(putOp(counterPath, kv.value.asLong + amount))
         }
-    }
 
     override fun close() {
         if (kvClient.isInitialized())

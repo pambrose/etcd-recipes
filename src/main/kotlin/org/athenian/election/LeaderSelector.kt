@@ -28,6 +28,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
@@ -62,7 +63,7 @@ class LeaderSelector(val url: String,
                                                              },
                                                              id)
 
-    private class LeaderElectionContext {
+    private class LeaderSelectorContext {
         val startCalled = AtomicBoolean(false)
         val closeCalled = AtomicBoolean(false)
         val watchForDeleteLatch = CountDownLatch(1)
@@ -72,12 +73,17 @@ class LeaderSelector(val url: String,
     }
 
     private val executor = Executors.newFixedThreadPool(3)
-    private var context = LeaderElectionContext()
+    private var selectorContext = AtomicReference(LeaderSelectorContext())
+    private val context get() = selectorContext.get()
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
+
+    val isStartCalled get() = context.startCalled.get()
+
+    val isCloseCalled get() = context.closeCalled.get()
 
     val isLeader get() = context.electedLeader.get()
 
@@ -89,11 +95,12 @@ class LeaderSelector(val url: String,
         checkCloseNotCalled()
 
         // Reinitialize the context each time through
-        context = LeaderElectionContext()
-            .apply {
+        selectorContext.set(
+            LeaderSelectorContext().apply {
                 startCalled.set(true)
                 startCallAllowed.set(false)
             }
+        )
 
         val clientInitLatch = CountDownLatch(1)
 
@@ -165,9 +172,9 @@ class LeaderSelector(val url: String,
     }
 
 
-    private fun checkStartCalled() = check(context.startCalled.get()) { "start() not called" }
+    private fun checkStartCalled() = check(isStartCalled) { "start() not called" }
 
-    private fun checkCloseNotCalled() = check(!context.closeCalled.get()) { "close() already closed" }
+    private fun checkCloseNotCalled() = check(!isCloseCalled) { "close() already closed" }
 
     private fun watchForDeleteEvents(watchClient: Watch, action: () -> Unit): Watch.Watcher =
         watchClient.watcher(electionPath) { watchResponse ->

@@ -45,7 +45,7 @@ val Int.random: Int get() = Random.nextInt(this)
 
 val Long.random: Long get() = Random.nextLong(this)
 
-val String.asByteSequence: ByteSequence get() = ByteSequence.from(this.toByteArray())
+val String.asByteSequence: ByteSequence get() = ByteSequence.from(toByteArray())
 
 val Int.asByteSequence: ByteSequence get() = ByteSequence.from(Ints.toByteArray(this))
 
@@ -57,7 +57,7 @@ val ByteSequence.asInt: Int get() = Ints.fromByteArray(bytes)
 
 val ByteSequence.asLong: Long get() = Longs.fromByteArray(bytes)
 
-val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(this.id).build()
+val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(id).build()
 
 fun KV.putValue(keyname: String, keyval: String): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
 
