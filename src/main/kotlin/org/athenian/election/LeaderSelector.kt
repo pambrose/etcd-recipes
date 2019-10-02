@@ -25,6 +25,7 @@ import org.athenian.utils.withLeaseClient
 import org.athenian.utils.withWatchClient
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -40,6 +41,7 @@ import kotlin.time.seconds
 class LeaderSelector(val url: String,
                      val electionPath: String,
                      private val listener: LeaderSelectorListener,
+                     executorService: ExecutorService?,
                      val id: String) : Closeable {
 
     // For Java clients
@@ -48,12 +50,24 @@ class LeaderSelector(val url: String,
                 listener: LeaderSelectorListener) : this(url,
                                                          electionPath,
                                                          listener,
+                                                         null,
+                                                         "Client:${randomId(9)}")
+
+    // For Java clients
+    constructor(url: String,
+                electionPath: String,
+                listener: LeaderSelectorListener,
+                executorService: ExecutorService) : this(url,
+                                                         electionPath,
+                                                         listener,
+                                                         executorService,
                                                          "Client:${randomId(9)}")
 
     // For Kotlin clients
     constructor(url: String,
                 electionPath: String,
                 lambda: (selector: LeaderSelector) -> Unit,
+                executorService: ExecutorService? = null,
                 id: String = "Client:${randomId(9)}") : this(url,
                                                              electionPath,
                                                              object : LeaderSelectorListener {
@@ -61,6 +75,7 @@ class LeaderSelector(val url: String,
                                                                      lambda.invoke(selector)
                                                                  }
                                                              },
+                                                             executorService,
                                                              id)
 
     private class LeaderSelectorContext {
@@ -72,9 +87,10 @@ class LeaderSelector(val url: String,
         val startCallAllowed = AtomicBoolean(true)
     }
 
-    private val executor = Executors.newFixedThreadPool(3)
     private var selectorContext = AtomicReference(LeaderSelectorContext())
     private val context get() = selectorContext.get()
+    private val executor = executorService ?: Executors.newFixedThreadPool(3)
+    private val closeExecutor = AtomicBoolean(executorService == null)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -168,7 +184,8 @@ class LeaderSelector(val url: String,
             leadershipCompleteLatch.countDown()
         }
 
-        executor.shutdown()
+        if (closeExecutor.get())
+            executor.shutdown()
     }
 
 
