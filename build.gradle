@@ -10,7 +10,7 @@ version '1.0-SNAPSHOT'
 sourceCompatibility = 1.8
 
 def jetcdVersion = '0.3.0'
-def utilsVersion = '917d879804'
+def utilsVersion = '399b1317fb'
 
 repositories {
     mavenCentral()

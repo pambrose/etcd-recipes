@@ -3,8 +3,8 @@ package org.athenian.examples.election;
 import org.athenian.election.LeaderSelector;
 import org.athenian.election.LeaderSelectorListener;
 
-import static org.athenian.utils.Utils.random;
-import static org.athenian.utils.Utils.sleepSecs;
+import static com.sudothought.util.Utils.random;
+import static com.sudothought.util.Utils.sleepSecs;
 
 public class SingleLeaderElectionDemo {
 

@@ -3,10 +3,10 @@ package org.athenian.basics
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
-import org.athenian.utils.asPutOption
-import org.athenian.utils.putValue
-import org.athenian.utils.withKvClient
-import org.athenian.utils.withLeaseClient
+import org.athenian.jetcd.asPutOption
+import org.athenian.jetcd.putValue
+import org.athenian.jetcd.withKvClient
+import org.athenian.jetcd.withLeaseClient
 import kotlin.time.seconds
 
 fun main() {

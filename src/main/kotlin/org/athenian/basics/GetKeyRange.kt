@@ -3,16 +3,16 @@ package org.athenian.basics
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.WatchOption
-import org.athenian.utils.asByteSequence
-import org.athenian.utils.asString
-import org.athenian.utils.countChildren
-import org.athenian.utils.delete
-import org.athenian.utils.getChildrenKeys
-import org.athenian.utils.getChildrenStringValues
-import org.athenian.utils.putValue
-import org.athenian.utils.watcher
-import org.athenian.utils.withKvClient
-import org.athenian.utils.withWatchClient
+import org.athenian.jetcd.asByteSequence
+import org.athenian.jetcd.asString
+import org.athenian.jetcd.countChildren
+import org.athenian.jetcd.delete
+import org.athenian.jetcd.getChildrenKeys
+import org.athenian.jetcd.getChildrenStringValues
+import org.athenian.jetcd.putValue
+import org.athenian.jetcd.watcher
+import org.athenian.jetcd.withKvClient
+import org.athenian.jetcd.withWatchClient
 import kotlin.time.seconds
 
 fun main() {

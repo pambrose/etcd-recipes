@@ -1,13 +1,12 @@
 package org.athenian.examples.counter;
 
 import org.athenian.counter.DistributedAtomicLong;
-import org.athenian.utils.Utils;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static org.athenian.utils.Utils.sleepMillis;
+import static org.athenian.examples.election.Utils.sleepMillis;
 
 public class DistributedAtomicLongDemo {
 

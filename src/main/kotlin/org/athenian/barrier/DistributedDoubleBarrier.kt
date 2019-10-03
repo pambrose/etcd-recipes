@@ -3,10 +3,10 @@ package org.athenian.barrier
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
-import org.athenian.utils.append
-import org.athenian.utils.delete
-import org.athenian.utils.getChildrenKeys
-import org.athenian.utils.withKvClient
+import org.athenian.jetcd.append
+import org.athenian.jetcd.delete
+import org.athenian.jetcd.getChildrenKeys
+import org.athenian.jetcd.withKvClient
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration

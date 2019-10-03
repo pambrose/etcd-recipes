@@ -5,9 +5,9 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
-import org.athenian.utils.asString
-import org.athenian.utils.watcher
-import org.athenian.utils.withWatchClient
+import org.athenian.jetcd.asString
+import org.athenian.jetcd.watcher
+import org.athenian.jetcd.withWatchClient
 import kotlin.time.MonoClock
 import kotlin.time.days
 

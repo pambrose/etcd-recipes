@@ -1,8 +1,7 @@
-package org.athenian.utils
+package org.athenian.jetcd
 
 import com.google.common.primitives.Ints
 import com.google.common.primitives.Longs
-import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Auth
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
@@ -29,8 +28,6 @@ import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchResponse
-import kotlin.time.Duration
-import kotlin.time.seconds
 
 val String.asByteSequence: ByteSequence get() = ByteSequence.from(toByteArray())
 
@@ -198,20 +195,6 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
         commit()
     }.get()
 
-fun repeatWithSleep(iterations: Int,
-                    sleepTime: Duration = 1.seconds,
-                    block: (count: Int, startMillis: Long) -> Unit) {
-    val startMillis = System.currentTimeMillis()
-    repeat(iterations) { i ->
-        block(i, startMillis)
-        sleep(sleepTime)
-    }
-}
-
-fun String.ensureTrailing(extChar: String = "/"): String = "$this${if (endsWith(extChar)) "" else extChar}"
-
-fun String.append(suffix: String, extChar: String = "/"): String = "${ensureTrailing(extChar)}$suffix"
-
 fun Lease.keepAliveUntil(lease: LeaseGrantResponse, block: () -> Unit) =
     keepAlive(lease.id, Observers.observer(
         { /*println("KeepAlive next resp: $next")*/ },
@@ -219,3 +202,7 @@ fun Lease.keepAliveUntil(lease: LeaseGrantResponse, block: () -> Unit) =
         .use {
             block.invoke()
         }
+
+fun String.ensureTrailing(extChar: String = "/"): String = "$this${if (endsWith(extChar)) "" else extChar}"
+
+fun String.append(suffix: String, extChar: String = "/"): String = "${ensureTrailing(extChar)}$suffix"

@@ -1,14 +1,14 @@
 package org.athenian.basics
 
+import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
-import org.athenian.utils.asString
-import org.athenian.utils.delete
-import org.athenian.utils.putValue
-import org.athenian.utils.repeatWithSleep
-import org.athenian.utils.watcher
-import org.athenian.utils.withKvClient
-import org.athenian.utils.withWatchClient
+import org.athenian.jetcd.asString
+import org.athenian.jetcd.delete
+import org.athenian.jetcd.putValue
+import org.athenian.jetcd.watcher
+import org.athenian.jetcd.withKvClient
+import org.athenian.jetcd.withWatchClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
