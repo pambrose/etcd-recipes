@@ -1,14 +1,12 @@
 package org.athenian.counter
 
-import org.athenian.utils.random
-import org.athenian.utils.sleep
+import com.sudothought.common.util.random
+import com.sudothought.common.util.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.ExperimentalTime
 import kotlin.time.measureTimedValue
 import kotlin.time.milliseconds
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val counterName = "counter2"

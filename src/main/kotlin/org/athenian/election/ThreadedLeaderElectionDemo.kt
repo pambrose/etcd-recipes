@@ -1,14 +1,12 @@
 package org.athenian.election
 
+import com.sudothought.common.util.sleep
 import org.athenian.election.LeaderSelector.Static.getParticipants
-import org.athenian.utils.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.random.Random
-import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val electionName = "/threadedClient"

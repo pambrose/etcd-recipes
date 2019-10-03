@@ -10,9 +10,7 @@ import org.athenian.utils.putOp
 import org.athenian.utils.putValue
 import org.athenian.utils.transaction
 import org.athenian.utils.withKvClient
-import kotlin.time.ExperimentalTime
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val keyname = "/txntest"

@@ -1,19 +1,17 @@
 package org.athenian.basics
 
+import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import org.athenian.utils.asPutOption
 import org.athenian.utils.getStringValue
 import org.athenian.utils.putValue
 import org.athenian.utils.repeatWithSleep
-import org.athenian.utils.sleep
 import org.athenian.utils.withKvClient
 import org.athenian.utils.withLeaseClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val countdown = CountDownLatch(2)

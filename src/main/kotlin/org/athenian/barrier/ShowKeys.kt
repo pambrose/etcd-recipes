@@ -5,9 +5,7 @@ import org.athenian.utils.countChildren
 import org.athenian.utils.getChildrenKeys
 import org.athenian.utils.getChildrenStringValues
 import org.athenian.utils.withKvClient
-import kotlin.time.ExperimentalTime
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val keyname = "/barriers/barrier2"

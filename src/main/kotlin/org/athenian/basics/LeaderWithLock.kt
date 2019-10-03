@@ -1,24 +1,22 @@
 package org.athenian.basics
 
+import com.sudothought.common.util.random
+import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import org.athenian.utils.getStringValue
 import org.athenian.utils.lock
 import org.athenian.utils.putValue
-import org.athenian.utils.random
-import org.athenian.utils.sleep
 import org.athenian.utils.unlock
 import org.athenian.utils.withKvClient
 import org.athenian.utils.withLeaseClient
 import org.athenian.utils.withLockClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.ExperimentalTime
 import kotlin.time.milliseconds
 import kotlin.time.seconds
 
 // Note: This is *not* the way to do an election
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val count = 3

@@ -1,11 +1,9 @@
 package org.athenian.election
 
-import org.athenian.utils.sleep
+import com.sudothought.common.util.sleep
 import kotlin.random.Random
-import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val electionName = "/election/leaderElectionDemo"

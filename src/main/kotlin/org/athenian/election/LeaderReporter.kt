@@ -1,18 +1,16 @@
 package org.athenian.election
 
+import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import org.athenian.utils.asString
-import org.athenian.utils.sleep
 import org.athenian.utils.watcher
 import org.athenian.utils.withWatchClient
-import kotlin.time.ExperimentalTime
 import kotlin.time.MonoClock
 import kotlin.time.days
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val electionKeyName = "/election1"

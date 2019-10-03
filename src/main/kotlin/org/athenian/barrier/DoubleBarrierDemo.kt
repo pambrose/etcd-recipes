@@ -1,13 +1,11 @@
 package org.athenian.barrier
 
-import org.athenian.utils.random
-import org.athenian.utils.sleep
+import com.sudothought.common.util.random
+import com.sudothought.common.util.sleep
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val barrierName = "/barriers/doublebarriertest"

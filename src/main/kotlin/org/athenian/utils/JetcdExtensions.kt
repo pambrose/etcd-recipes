@@ -2,6 +2,7 @@ package org.athenian.utils
 
 import com.google.common.primitives.Ints
 import com.google.common.primitives.Longs
+import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Auth
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
@@ -28,23 +29,8 @@ import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchResponse
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Semaphore
-import java.util.concurrent.TimeUnit
-import kotlin.random.Random
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
-import kotlin.time.days
-import kotlin.time.hours
-import kotlin.time.microseconds
-import kotlin.time.milliseconds
-import kotlin.time.minutes
-import kotlin.time.nanoseconds
 import kotlin.time.seconds
-
-val Int.random: Int get() = Random.nextInt(this)
-
-val Long.random: Long get() = Random.nextLong(this)
 
 val String.asByteSequence: ByteSequence get() = ByteSequence.from(toByteArray())
 
@@ -212,16 +198,6 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
         commit()
     }.get()
 
-fun <T> Semaphore.withLock(block: () -> T): T {
-    acquire()
-    return try {
-        block()
-    } finally {
-        release()
-    }
-}
-
-@ExperimentalTime
 fun repeatWithSleep(iterations: Int,
                     sleepTime: Duration = 1.seconds,
                     block: (count: Int, startMillis: Long) -> Unit) {
@@ -231,9 +207,6 @@ fun repeatWithSleep(iterations: Int,
         sleep(sleepTime)
     }
 }
-
-@ExperimentalTime
-fun sleep(sleepTime: Duration) = Thread.sleep(sleepTime.toLongMilliseconds())
 
 fun String.ensureTrailing(extChar: String = "/"): String = "$this${if (endsWith(extChar)) "" else extChar}"
 
@@ -246,25 +219,3 @@ fun Lease.keepAliveUntil(lease: LeaseGrantResponse, block: () -> Unit) =
         .use {
             block.invoke()
         }
-
-val CountDownLatch.isFinished: Boolean get() = count == 0L
-
-@ExperimentalTime
-fun timeUnitToDuration(value: Long, timeUnit: TimeUnit): Duration =
-    when (timeUnit) {
-        TimeUnit.MICROSECONDS -> value.microseconds
-        TimeUnit.NANOSECONDS -> value.nanoseconds
-        TimeUnit.MILLISECONDS -> value.milliseconds
-        TimeUnit.SECONDS -> value.seconds
-        TimeUnit.MINUTES -> value.minutes
-        TimeUnit.HOURS -> value.hours
-        TimeUnit.DAYS -> value.days
-    }
-
-private val charPool = ('a'..'z') + ('A'..'Z') + ('0'..'9')
-
-fun randomId(length: Int = 10): String =
-    (1..length)
-        .map { Random.nextInt(0, charPool.size) }
-        .map { i -> charPool[i] }
-        .joinToString("")

@@ -1,9 +1,7 @@
 package org.athenian.counter
 
-import kotlin.time.ExperimentalTime
 import kotlin.time.measureTimedValue
 
-@ExperimentalTime
 fun main() {
     val url = "http://localhost:2379"
     val counterName = "counter2"
