@@ -10,7 +10,7 @@ version '1.0-SNAPSHOT'
 sourceCompatibility = 1.8
 
 def jetcdVersion = '0.3.0'
-def utilsVersion = '98117b74fa'
+def utilsVersion = 'dev-SNAPSHOT'
 
 repositories {
     mavenCentral()
@@ -34,4 +34,3 @@ compileTestKotlin {
     kotlinOptions.jvmTarget = "1.8"
     kotlinOptions.freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime']
 }
-
