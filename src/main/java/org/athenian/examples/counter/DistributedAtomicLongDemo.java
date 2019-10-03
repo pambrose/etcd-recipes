@@ -6,7 +6,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static org.athenian.examples.election.Utils.sleepMillis;
+import static com.sudothought.util.Utils.random;
+import static com.sudothought.util.Utils.sleepMillis;
+
 
 public class DistributedAtomicLongDemo {
 
@@ -31,7 +33,7 @@ public class DistributedAtomicLongDemo {
                     executor.submit(() -> {
                         System.out.println("Begin increments for counter #" + id);
                         for (int j = 0; j < count; j++) counter.increment();
-                        sleepMillis(Utils.random(pause));
+                        sleepMillis(random(pause));
                         innerLatch.countDown();
                         System.out.println("Completed increments for counter #" + id);
                     });
@@ -39,7 +41,7 @@ public class DistributedAtomicLongDemo {
                     executor.submit(() -> {
                         System.out.println("Begin decrements for counter #" + id);
                         for (int j = 0; j < count; j++) counter.decrement();
-                        sleepMillis(Utils.random(pause));
+                        sleepMillis(random(pause));
                         innerLatch.countDown();
                         System.out.println("Completed decrements for counter #" + id);
                     });
@@ -47,7 +49,7 @@ public class DistributedAtomicLongDemo {
                     executor.submit(() -> {
                         System.out.println("Begin adds for counter #" + id);
                         for (int j = 0; j < count; j++) counter.add(5);
-                        sleepMillis(Utils.random(pause));
+                        sleepMillis(random(pause));
                         innerLatch.countDown();
                         System.out.println("Completed adds for counter #" + id);
                     });
@@ -55,7 +57,7 @@ public class DistributedAtomicLongDemo {
                     executor.submit(() -> {
                         System.out.println("Begin subtracts for counter #" + id);
                         for (int j = 0; j < count; j++) counter.subtract(5);
-                        sleepMillis(Utils.random(pause));
+                        sleepMillis(random(pause));
                         innerLatch.countDown();
                         System.out.println("Completed subtracts for counter #" + id);
                     });
