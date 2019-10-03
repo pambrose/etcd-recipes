@@ -1,5 +1,7 @@
 package org.athenian.election
 
+import com.sudothought.common.delegate.AtomicDelegates
+import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
@@ -29,8 +31,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
@@ -90,16 +90,16 @@ class LeaderSelector(val url: String,
                                                                  executorService)
 
     private class LeaderSelectorContext {
-        val startCalled = AtomicBoolean(false)
-        val closeCalled = AtomicBoolean(false)
         val watchForDeleteLatch = CountDownLatch(1)
         val leadershipCompleteLatch = CountDownLatch(1)
-        val electedLeader = AtomicBoolean(false)
-        val startCallAllowed = AtomicBoolean(true)
+        var startCalled by atomicBoolean(false)
+        var closeCalled by atomicBoolean(false)
+        var electedLeader by atomicBoolean(false)
+        var startCallAllowed by atomicBoolean(true)
     }
 
-    private var selectorContext = AtomicReference(LeaderSelectorContext())
-    private val context get() = selectorContext.get()
+    private var selectorContext by AtomicDelegates.nonNullableReference(LeaderSelectorContext())
+    private val context get() = selectorContext
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
 
     init {
@@ -107,26 +107,25 @@ class LeaderSelector(val url: String,
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
 
-    val isStartCalled get() = context.startCalled.get()
+    val isStartCalled get() = context.startCalled
 
-    val isCloseCalled get() = context.closeCalled.get()
+    val isCloseCalled get() = context.closeCalled
 
-    val isLeader get() = context.electedLeader.get()
+    val isLeader get() = context.electedLeader
 
     val isFinished get() = context.leadershipCompleteLatch.isFinished
 
     fun start(): LeaderSelector {
 
-        check(context.startCallAllowed.get()) { "Previous call to start() not complete" }
+        check(context.startCallAllowed) { "Previous call to start() not complete" }
         checkCloseNotCalled()
 
         // Reinitialize the context each time through
-        selectorContext.set(
+        selectorContext =
             LeaderSelectorContext().apply {
-                startCalled.set(true)
-                startCallAllowed.set(false)
+                startCalled = true
+                startCallAllowed = false
             }
-        )
 
         val clientInitLatch = CountDownLatch(1)
 
@@ -188,7 +187,7 @@ class LeaderSelector(val url: String,
         checkCloseNotCalled()
 
         context.apply {
-            closeCalled.set(true)
+            closeCalled = true
             watchForDeleteLatch.countDown()
             leadershipCompleteLatch.countDown()
         }
@@ -249,7 +248,7 @@ class LeaderSelector(val url: String,
             // This will exit when leadership is relinquished
             leaseClient.keepAliveUntil(lease) {
                 // Selected as leader
-                context.electedLeader.set(true)
+                context.electedLeader = true
                 listener.takeLeadership(this)
             }
 
@@ -258,8 +257,8 @@ class LeaderSelector(val url: String,
                 // Do this after leadership is complete so the thread does not terminate
                 watchForDeleteLatch.countDown()
                 leadershipCompleteLatch.countDown()
-                startCallAllowed.set(true)
-                electedLeader.set(false)
+                startCallAllowed = true
+                electedLeader = false
             }
             true
         } else {

@@ -1,5 +1,8 @@
 package org.athenian.barrier
 
+import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
+import com.sudothought.common.delegate.AtomicDelegates.nullableReference
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
@@ -30,8 +33,6 @@ import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.days
@@ -51,10 +52,10 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
     private val leaseClient = lazy { client.value.leaseClient }
     private val watchClient = lazy { client.value.watchClient }
     private val executor = lazy { Executors.newSingleThreadExecutor() }
-    private val enterCalled = AtomicBoolean(false)
-    private val leaveCalled = AtomicBoolean(false)
-    private val watcher = AtomicReference<Watch.Watcher>()
-    private val waitingPath = AtomicReference<String>()
+    private var enterCalled by atomicBoolean(false)
+    private var leaveCalled by atomicBoolean(false)
+    private var watcher by nullableReference<Watch.Watcher?>()
+    private var waitingPath by nonNullableReference<String>()
     private val enterWaitLatch = CountDownLatch(1)
     private val keepAliveLatch = CountDownLatch(1)
     private val leaveLatch = CountDownLatch(1)
@@ -73,14 +74,13 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 
-    fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout,
-                                                                                     timeUnit))
+    fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
 
     fun enter(timeout: Duration): Boolean {
 
         val uniqueToken = "$clientId:${randomId(9)}"
 
-        enterCalled.set(true)
+        enterCalled = true
 
         // Do a CAS on the /ready name. If it is not found, then set it
         kvClient.transaction {
@@ -88,17 +88,17 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
             Then(putOp(readyPath, uniqueToken))
         }
 
-        waitingPath.set("$waitingPrefix/$uniqueToken")
+        waitingPath = "$waitingPrefix/$uniqueToken"
         val lease = leaseClient.value.grant(2).get()
 
         val txn =
             kvClient.transaction {
-                If(equals(waitingPath.get(), CmpTarget.version(0)))
-                Then(putOp(waitingPath.get(), uniqueToken, lease.asPutOption))
+                If(equals(waitingPath, CmpTarget.version(0)))
+                Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
             }
 
         check(txn.isSucceeded) { "Failed to set waitingPath" }
-        check(kvClient.getStringValue(waitingPath.get()) == uniqueToken) { "Failed to assign waitingPath unique value" }
+        check(kvClient.getStringValue(waitingPath) == uniqueToken) { "Failed to assign waitingPath unique value" }
 
         // Keep key alive
         executor.value.submit { leaseClient.value.keepAliveUntil(lease) { keepAliveLatch.await() } }
@@ -131,7 +131,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
         // Watch for DELETE of /ready and PUTS on /waiters/*
         val adjustedKey = barrierPath.ensureTrailing("/")
         val watchOption = WatchOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build()
-        watcher.set(
+        watcher =
             watchClient.watcher(adjustedKey, watchOption) { watchResponse ->
                 watchResponse.events
                     .forEach { watchEvent ->
@@ -145,7 +145,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
                         }
                     }
 
-            })
+            }
 
         // Check one more time in case watch missed the delete just after last check
         checkWaiterCountInEnter()
@@ -172,12 +172,12 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     fun leave(timeout: Duration): Boolean {
 
-        check(enterCalled.get()) { "enter() must be called before leave()" }
+        check(enterCalled) { "enter() must be called before leave()" }
 
-        leaveCalled.set(true)
+        leaveCalled = true
 
         // println("Deleting ${waitingPath.get()}")
-        kvClient.delete(waitingPath.get())
+        kvClient.delete(waitingPath)
 
         checkWaiterCountInLeave()
 
@@ -185,8 +185,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
     }
 
     override fun close() {
-        if (watcher.get() != null)
-            watcher.get().close()
+        watcher?.close()
 
         if (watchClient.isInitialized())
             watchClient.value.close()
