@@ -42,9 +42,18 @@ fun main() {
 
         println(si.toJson())
 
-        ///sd.registerService(si)
+        println("Registering")
+        sd.registerService(si)
+        sleep(2.seconds)
+        println("Updating")
+        sd.updateService(si)
+        sleep(2.seconds)
+        println("Unregistering")
+        sd.unregisterService(si)
+        sleep(2.seconds)
 
-        sleep(30.seconds)
+        println("Final sleep")
+        sleep(5.seconds)
 
     }
 }

@@ -24,18 +24,19 @@ import java.time.Instant
 
 @Serializable
 data class ServiceInstance(val name: String,
-                           val payload: String,
-                           val id: String = randomId(9),
-                           val address: String = "",
-                           val port: Int = -1,
-                           val sslPort: Int = -1,
-                           val registrationTimeUTC: Long = Instant.now().toEpochMilli(),
-                           val serviceType: ServiceType = ServiceType.DYNAMIC,
-                           val uri: String = "",
-                           val enabled: Boolean = true) {
+                           var payload: String,
+                           var address: String = "",
+                           var port: Int = -1,
+                           var sslPort: Int = -1,
+                           var registrationTimeUTC: Long = Instant.now().toEpochMilli(),
+                           var serviceType: ServiceType = ServiceType.DYNAMIC,
+                           var uri: String = "",
+                           var enabled: Boolean = true) {
+
+    val id: String = randomId(9)
+
     init {
         require(name.isNotEmpty()) { "Name cannot be empty" }
-        require(id.isNotEmpty()) { "Id cannot be empty" }
     }
 
     fun toJson() = Json.stringify(serializer(), this)
