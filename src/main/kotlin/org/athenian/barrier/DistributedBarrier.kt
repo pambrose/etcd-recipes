@@ -29,7 +29,7 @@ import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.equals
 import org.athenian.jetcd.getStringValue
-import org.athenian.jetcd.keepAliveUntil
+import org.athenian.jetcd.keepAliveWith
 import org.athenian.jetcd.keyIsPresent
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
@@ -88,7 +88,7 @@ class DistributedBarrier(val url: String,
 
         // Check to see if unique value was successfully set in the CAS step
         return if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
-            executor.value.submit { leaseClient.value.keepAliveUntil(lease) { barrierLatch.await() } }
+            executor.value.submit { leaseClient.value.keepAliveWith(lease) { barrierLatch.await() } }
             true
         } else {
             false

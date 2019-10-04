@@ -37,7 +37,7 @@ import org.athenian.jetcd.equals
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getChildrenStringValues
 import org.athenian.jetcd.getStringValue
-import org.athenian.jetcd.keepAliveUntil
+import org.athenian.jetcd.keepAliveWith
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
 import org.athenian.jetcd.watcher
@@ -231,7 +231,7 @@ class LeaderSelector(val url: String,
         check(txn.isSucceeded) { "Participation registration failed" }
 
         // Run keep-alive until closed
-        leaseClient.keepAliveUntil(lease) { leadershipComplete.waitUntilTrue() }
+        leaseClient.keepAliveWith(lease) { leadershipComplete.waitUntilTrue() }
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
@@ -255,7 +255,7 @@ class LeaderSelector(val url: String,
         // Check to see if unique value was successfully set in the CAS step
         return if (!isLeader && txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
             // This will exit when leadership is relinquished
-            leaseClient.keepAliveUntil(lease) {
+            leaseClient.keepAliveWith(lease) {
                 // Selected as leader
                 electedLeader = true
                 listener.takeLeadership(this)

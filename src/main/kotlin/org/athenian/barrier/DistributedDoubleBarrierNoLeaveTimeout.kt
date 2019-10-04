@@ -42,7 +42,7 @@ import org.athenian.jetcd.ensureTrailing
 import org.athenian.jetcd.equals
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getStringValue
-import org.athenian.jetcd.keepAliveUntil
+import org.athenian.jetcd.keepAliveWith
 import org.athenian.jetcd.keyIsPresent
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
@@ -118,7 +118,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
         check(kvClient.getStringValue(waitingPath) == uniqueToken) { "Failed to assign waitingPath unique value" }
 
         // Keep key alive
-        executor.value.submit { leaseClient.value.keepAliveUntil(lease) { keepAliveLatch.await() } }
+        executor.value.submit { leaseClient.value.keepAliveWith(lease) { keepAliveLatch.await() } }
 
         fun checkWaiterCountInEnter() {
             // First see if /ready is missing

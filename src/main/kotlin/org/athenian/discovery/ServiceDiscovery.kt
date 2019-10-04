@@ -18,25 +18,27 @@
 package org.athenian.discovery
 
 import com.google.common.collect.Maps
-import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.op.CmpTarget
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asPutOption
-import org.athenian.jetcd.keepAliveUntil
+import org.athenian.jetcd.getChildrenStringValues
+import org.athenian.jetcd.getStringValue
+import org.athenian.jetcd.keepAlive
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
 import java.io.Closeable
 import java.util.concurrent.Executors
 
 class ServiceDiscovery<T>(val url: String,
-                          val basePath: String,
+                          basePath: String,
                           val clientId: String = "Client:${randomId(9)}") : Closeable {
 
     private val executor = lazy { Executors.newCachedThreadPool() }
@@ -44,12 +46,16 @@ class ServiceDiscovery<T>(val url: String,
     private var leaseClient by nonNullableReference<Lease>()
     private var kvClient by nonNullableReference<KV>()
     private var startCalled by atomicBoolean(false)
-    private val servicePath = basePath.appendToPath(clientId)
+    private val servicePath = basePath.appendToPath("/names")
     private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()
 
-    class ServiceInstanceContext(val service: ServiceInstance) {
+    class ServiceInstanceContext(val service: ServiceInstance) : Closeable {
         var lease by nonNullableReference<LeaseGrantResponse>()
-        val closeKeepAlive = BooleanMonitor(true)
+        var keepAlive by nonNullableReference<CloseableClient>()
+
+        override fun close() {
+            keepAlive.close()
+        }
     }
 
     init {
@@ -65,13 +71,13 @@ class ServiceDiscovery<T>(val url: String,
     }
 
     private fun checkStartCalled() {
-        check(startCalled) { "start() must be called first" }
+        if (!startCalled) throw ServiceDiscoveryException("start() must be called first")
     }
 
     fun registerService(service: ServiceInstance) {
-
         checkStartCalled()
 
+        val instancePath = getInstancePath(service)
         val context = ServiceInstanceContext(service)
 
         serviceContextMap[service.id] = context
@@ -81,41 +87,33 @@ class ServiceDiscovery<T>(val url: String,
 
         val txn =
             kvClient.transaction {
-                If(org.athenian.jetcd.equals(servicePath, CmpTarget.version(0)))
-                Then(putOp(servicePath, service.toJson(), context.lease.asPutOption))
+                If(org.athenian.jetcd.equals(instancePath, CmpTarget.version(0)))
+                Then(putOp(instancePath, service.toJson(), context.lease.asPutOption))
             }
 
-        if (!txn.isSucceeded) throw ServiceDiscoveryException("Service registration failed for $servicePath")
+        if (!txn.isSucceeded) throw ServiceDiscoveryException("Service registration failed for $instancePath")
 
         // Run keep-alive until closed
-        executor.value.submit {
-            leaseClient.keepAliveUntil(context.lease) { context.closeKeepAlive.waitUntilFalse() }
-            println("Ending keep-alive")
-        }
+        context.keepAlive = leaseClient.keepAlive(context.lease)
     }
 
     fun updateService(service: ServiceInstance) {
         checkStartCalled()
-
+        val instancePath = getInstancePath(service)
         val context = serviceContextMap[service.id]
-        if (context == null)
-            throw ServiceDiscoveryException("ServiceInstance not already registered with registerService()")
-
+            ?: throw ServiceDiscoveryException("ServiceInstance not already registered with registerService()")
         val txn =
             kvClient.transaction {
-                If(org.athenian.jetcd.equals(servicePath, CmpTarget.version(0)))
-                Else(putOp(servicePath, service.toJson(), context.lease.asPutOption))
+                If(org.athenian.jetcd.equals(instancePath, CmpTarget.version(0)))
+                Else(putOp(instancePath, service.toJson(), context.lease.asPutOption))
             }
-
-        if (txn.isSucceeded) throw ServiceDiscoveryException("Service update failed for $servicePath")
+        if (txn.isSucceeded) throw ServiceDiscoveryException("Service update failed for $instancePath")
     }
 
     fun unregisterService(service: ServiceInstance) {
         checkStartCalled()
-
-        serviceContextMap[service.id]?.closeKeepAlive?.set(false)
-            ?: throw ServiceDiscoveryException("ServiceInstance not already registered with registerService()")
-
+        serviceContextMap[service.id]?.close()
+            ?: throw ServiceDiscoveryException("ServiceInstance not published with registerService()")
         serviceContextMap.remove(service.id)
     }
 
@@ -124,27 +122,35 @@ class ServiceDiscovery<T>(val url: String,
         return null
     }
 
-    fun queryForNames(): Collection<String?>? {
+    fun queryForNames(): Collection<String>? {
         checkStartCalled()
         return null
     }
 
-    fun queryForInstances(name: String): Collection<ServiceInstance?>? {
+    fun queryForInstances(name: String): Collection<ServiceInstance> {
         checkStartCalled()
-        return null
+        val instancePath = getInstancePath(name)
+        val jsons = kvClient.getChildrenStringValues(instancePath)
+            ?: throw ServiceDiscoveryException("ServiceInstance $instancePath not present")
+        return jsons.map { ServiceInstance.toObject(it) }
     }
 
     fun queryForInstance(name: String, id: String): ServiceInstance? {
-        return null
+        checkStartCalled()
+        val instancePath = getInstancePath(name, id)
+        val json = kvClient.getStringValue(instancePath)
+            ?: throw ServiceDiscoveryException("ServiceInstance $instancePath not present")
+        return ServiceInstance.toObject(json)
     }
 
     //fun serviceProviderBuilder(): ServiceProviderBuilder<T?>? {return null}
 
-    override fun close() {
+    private fun getInstancePath(service: ServiceInstance) = getInstancePath(service.name, service.id)
 
-        serviceContextMap.forEach { k, v ->
-            v.closeKeepAlive.set(false)
-        }
+    private fun getInstancePath(vararg elems: String) = servicePath.appendToPath(elems.joinToString("/"))
+
+    override fun close() {
+        serviceContextMap.forEach { k, v -> unregisterService(v.service) }
 
         if (startCalled) {
             kvClient.close()

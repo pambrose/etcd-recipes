@@ -26,7 +26,7 @@ import kotlin.time.seconds
 fun main() {
 
     @Serializable
-    data class Test(val intval: Int) {
+    data class Test(var intval: Int) {
         fun toJson() = Json.stringify(serializer(), this)
     }
 
@@ -37,23 +37,40 @@ fun main() {
 
         sd.start()
 
-        val payload = Test(-999)
-        val si = ServiceInstance("A Name", payload.toJson())
+        val test = Test(-999)
+        val si = ServiceInstance("A Name", test.toJson())
 
         println(si.toJson())
 
         println("Registering")
         sd.registerService(si)
+        println("Retrieved value: ${sd.queryForInstance(si.name, si.id)}")
+        println("Retrieved value: ${sd.queryForInstances(si.name)}")
+
+
         sleep(2.seconds)
         println("Updating")
+        test.intval = -888
+        si.payload = test.toJson()
         sd.updateService(si)
+        println("Retrieved value: ${sd.queryForInstance(si.name, si.id)}")
+        println("Retrieved value: ${sd.queryForInstances(si.name)}")
+
         sleep(2.seconds)
         println("Unregistering")
         sd.unregisterService(si)
+
+        sleep(3.seconds)
+
+        try {
+            println("Retrieved value: ${sd.queryForInstance(si.name, si.id)}")
+        } catch (e: Exception) {
+            println("Had exception $e")
+        }
+
         sleep(2.seconds)
 
         println("Final sleep")
-        sleep(5.seconds)
-
+        sleep(2.seconds)
     }
 }

@@ -214,7 +214,12 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
         commit()
     }.get()
 
-fun Lease.keepAliveUntil(lease: LeaseGrantResponse, block: () -> Unit) =
+fun Lease.keepAlive(lease: LeaseGrantResponse) =
+    keepAlive(lease.id, Observers.observer(
+        { /*println("KeepAlive next resp: $next")*/ },
+        { /*println("KeepAlive err resp: $err")*/ }))
+
+fun Lease.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) =
     keepAlive(lease.id, Observers.observer(
         { /*println("KeepAlive next resp: $next")*/ },
         { /*println("KeepAlive err resp: $err")*/ }))
@@ -222,6 +227,12 @@ fun Lease.keepAliveUntil(lease: LeaseGrantResponse, block: () -> Unit) =
             block.invoke()
         }
 
-fun String.ensureTrailing(extChar: String = "/"): String = "$this${if (endsWith(extChar)) "" else extChar}"
 
-fun String.appendToPath(suffix: String, extChar: String = "/"): String = "${ensureTrailing(extChar)}$suffix"
+fun String.ensureTrailing(delim: String = "/"): String = "$this${if (endsWith(delim)) "" else delim}"
+
+fun String.stripLeading(delim: String = "/"): String = if (startsWith(delim)) drop(1) else this
+fun String.stripTrailing(delim: String = "/"): String = if (endsWith(delim)) dropLast(1) else this
+
+fun String.appendToPath(suffix: String, delim: String = "/"): String {
+    return "${stripTrailing(delim)}$delim${suffix.stripLeading(delim)}"
+}
