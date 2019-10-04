@@ -224,4 +224,4 @@ fun Lease.keepAliveUntil(lease: LeaseGrantResponse, block: () -> Unit) =
 
 fun String.ensureTrailing(extChar: String = "/"): String = "$this${if (endsWith(extChar)) "" else extChar}"
 
-fun String.append(suffix: String, extChar: String = "/"): String = "${ensureTrailing(extChar)}$suffix"
+fun String.appendToPath(suffix: String, extChar: String = "/"): String = "${ensureTrailing(extChar)}$suffix"

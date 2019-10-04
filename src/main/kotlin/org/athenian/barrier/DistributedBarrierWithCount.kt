@@ -27,7 +27,7 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import org.athenian.jetcd.append
+import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asByteSequence
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.asString
@@ -72,8 +72,8 @@ class DistributedBarrierWithCount(val url: String,
     private val leaseClient = lazy { client.value.leaseClient }
     private val watchClient = lazy { client.value.watchClient }
     private val executor = lazy { Executors.newSingleThreadExecutor() }
-    private val readyPath = barrierPath.append("ready")
-    private val waitingPrefix = barrierPath.append("waiting")
+    private val readyPath = barrierPath.appendToPath("ready")
+    private val waitingPrefix = barrierPath.appendToPath("waiting")
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -104,7 +104,7 @@ class DistributedBarrierWithCount(val url: String,
         }
 
         val waitLatch = CountDownLatch(1)
-        val waitingPath = waitingPrefix.append(uniqueToken)
+        val waitingPath = waitingPrefix.appendToPath(uniqueToken)
         val lease = leaseClient.value.grant(2).get()
 
         val txn =

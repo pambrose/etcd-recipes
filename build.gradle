@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'org.jetbrains.kotlin.jvm' version '1.3.50'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.3.50'
     id "com.github.ben-manes.versions" version "0.25.0"
 }
 
@@ -9,28 +10,37 @@ version '1.0-SNAPSHOT'
 
 sourceCompatibility = 1.8
 
+def kotlinVersion = '1.3.50'
+def serializationVersion = '0.13.0'
 def jetcdVersion = '0.3.0'
 def utilsVersion = 'dev-SNAPSHOT'
+def loggingVersion = '1.7.6'
 
 repositories {
+    maven { url "https://kotlin.bintray.com/kotlinx" }
     mavenCentral()
+    jcenter()
     maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinVersion}"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-runtime:$serializationVersion"
     implementation "io.etcd:jetcd-all:${jetcdVersion}"
     implementation "com.github.pambrose:common-utils:${utilsVersion}"
+    implementation "io.github.microutils:kotlin-logging:$loggingVersion"
 
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
 
 compileKotlin {
     kotlinOptions.jvmTarget = "1.8"
-    kotlinOptions.freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime']
+    kotlinOptions.freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
+                                       '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
 }
 
 compileTestKotlin {
     kotlinOptions.jvmTarget = "1.8"
-    kotlinOptions.freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime']
+    kotlinOptions.freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
+                                       '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
 }

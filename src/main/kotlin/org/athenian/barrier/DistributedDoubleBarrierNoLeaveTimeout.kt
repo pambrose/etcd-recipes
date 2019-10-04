@@ -31,7 +31,7 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import org.athenian.jetcd.append
+import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asByteSequence
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.asString
@@ -76,8 +76,8 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
     private val enterWaitLatch = CountDownLatch(1)
     private val keepAliveLatch = CountDownLatch(1)
     private val leaveLatch = CountDownLatch(1)
-    private val readyPath = barrierPath.append("ready")
-    private val waitingPrefix = barrierPath.append("waiting")
+    private val readyPath = barrierPath.appendToPath("ready")
+    private val waitingPrefix = barrierPath.appendToPath("waiting")
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -161,7 +161,6 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
                             key.startsWith(waitingPrefix) && watchEvent.eventType == DELETE -> checkWaiterCountInLeave()
                         }
                     }
-
             }
 
         // Check one more time in case watch missed the delete just after last check
@@ -184,8 +183,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     fun leave(): Boolean = leave(Long.MAX_VALUE.days)
 
-    fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout,
-                                                                                     timeUnit))
+    fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))
 
     fun leave(timeout: Duration): Boolean {
 

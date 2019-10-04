@@ -22,7 +22,7 @@ package org.athenian.barrier
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
-import org.athenian.jetcd.append
+import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.withKvClient
@@ -40,8 +40,8 @@ class DistributedDoubleBarrier(val url: String,
                 barrierPath: String,
                 memberCount: Int) : this(url, barrierPath, memberCount, "Client:${randomId(9)}")
 
-    private val enterBarrier = DistributedBarrierWithCount(url, barrierPath.append("enter"), memberCount)
-    private val leaveBarrier = DistributedBarrierWithCount(url, barrierPath.append("leave"), memberCount)
+    private val enterBarrier = DistributedBarrierWithCount(url, barrierPath.appendToPath("enter"), memberCount)
+    private val leaveBarrier = DistributedBarrierWithCount(url, barrierPath.appendToPath("leave"), memberCount)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }

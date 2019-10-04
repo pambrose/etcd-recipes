@@ -19,8 +19,7 @@
 
 package org.athenian.election
 
-import com.sudothought.common.concurrent.isFinished
-import com.sudothought.common.delegate.AtomicDelegates
+import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
@@ -31,7 +30,7 @@ import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import org.athenian.jetcd.append
+import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.equals
@@ -106,45 +105,39 @@ class LeaderSelector(val url: String,
                                                                  clientId,
                                                                  executorService)
 
-    private class LeaderSelectorContext {
-        val watchForDeleteLatch = CountDownLatch(1)
-        val leadershipCompleteLatch = CountDownLatch(1)
-        var startCalled by atomicBoolean(false)
-        var closeCalled by atomicBoolean(false)
-        var electedLeader by atomicBoolean(false)
-        var startCallAllowed by atomicBoolean(true)
-    }
-
-    private var selectorContext by AtomicDelegates.nonNullableReference(LeaderSelectorContext())
-    private val context get() = selectorContext
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
+    private val terminateWatchForDelete = BooleanMonitor(false)
+    private val leadershipComplete = BooleanMonitor(false)
+    private var startCalled by atomicBoolean(false)
+    private var closeCalled by atomicBoolean(false)
+    private var electedLeader by atomicBoolean(false)
+    private var startCallAllowed by atomicBoolean(true)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
 
-    val isStartCalled get() = context.startCalled
+    val isStartCalled get() = startCalled
 
-    val isCloseCalled get() = context.closeCalled
+    val isCloseCalled get() = closeCalled
 
-    val isLeader get() = context.electedLeader
+    val isLeader get() = electedLeader
 
-    val isFinished get() = context.leadershipCompleteLatch.isFinished
+    val isFinished get() = leadershipComplete.get()
 
     fun start(): LeaderSelector {
 
-        check(context.startCallAllowed) { "Previous call to start() not complete" }
+        check(startCallAllowed) { "Previous call to start() not complete" }
         checkCloseNotCalled()
 
-        // Reinitialize the context each time through
-        selectorContext =
-            LeaderSelectorContext().apply {
-                startCalled = true
-                startCallAllowed = false
-            }
+        terminateWatchForDelete.set(false)
+        leadershipComplete.set(false)
+        electedLeader = false
+        startCalled = true
+        startCallAllowed = false
 
-        val clientInitLatch = CountDownLatch(1)
+        val connectedToEtcd = CountDownLatch(1)
 
         executor.submit {
             Client.builder().endpoints(url).build()
@@ -153,14 +146,14 @@ class LeaderSelector(val url: String,
                         client.withWatchClient { watchClient ->
                             client.withKvClient { kvClient ->
 
-                                clientInitLatch.countDown()
+                                connectedToEtcd.countDown()
 
                                 executor.submit {
                                     // Run for leader when leader key is deleted
                                     watchForDeleteEvents(watchClient) {
                                         attemptToBecomeLeader(leaseClient, kvClient)
                                     }.use {
-                                        context.watchForDeleteLatch.await()
+                                        terminateWatchForDelete.waitUntilTrue()
                                     }
                                 }
 
@@ -172,16 +165,14 @@ class LeaderSelector(val url: String,
                                 // Clients should run for leader in case they are the first to run
                                 attemptToBecomeLeader(leaseClient, kvClient)
 
-                                context.leadershipCompleteLatch.await()
+                                leadershipComplete.waitUntilTrue()
                             }
                         }
                     }
                 }
         }
 
-        // Wait for connection to etcd
-        clientInitLatch.await()
-
+        connectedToEtcd.await()
         return this
     }
 
@@ -196,23 +187,24 @@ class LeaderSelector(val url: String,
     fun waitOnLeadershipComplete(timeout: Duration): Boolean {
         checkStartCalled()
         checkCloseNotCalled()
-        return context.leadershipCompleteLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+        return leadershipComplete.waitUntilTrue(timeout)
+    }
+
+    private fun closeLatches() {
+        terminateWatchForDelete.set(true)
+        leadershipComplete.set(true)
     }
 
     override fun close() {
         checkStartCalled()
         checkCloseNotCalled()
 
-        context.apply {
-            closeCalled = true
-            watchForDeleteLatch.countDown()
-            leadershipCompleteLatch.countDown()
-        }
+        closeLatches()
+        closeCalled = true
 
         if (userExecutor == null)
             executor.shutdown()
     }
-
 
     private fun checkStartCalled() = check(isStartCalled) { "start() not called" }
 
@@ -228,7 +220,7 @@ class LeaderSelector(val url: String,
     private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.grant(2).get()
-        val participantPath = participationPath(electionPath).append(clientId)
+        val participantPath = participationPath(electionPath).appendToPath(clientId)
 
         val txn =
             kvClient.transaction {
@@ -239,7 +231,7 @@ class LeaderSelector(val url: String,
         check(txn.isSucceeded) { "Participation registration failed" }
 
         // Run keep-alive until closed
-        leaseClient.keepAliveUntil(lease) { context.leadershipCompleteLatch.await() }
+        leaseClient.keepAliveUntil(lease) { leadershipComplete.waitUntilTrue() }
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
@@ -265,18 +257,15 @@ class LeaderSelector(val url: String,
             // This will exit when leadership is relinquished
             leaseClient.keepAliveUntil(lease) {
                 // Selected as leader
-                context.electedLeader = true
+                electedLeader = true
                 listener.takeLeadership(this)
             }
 
             // Leadership was relinquished
-            context.apply {
-                // Do this after leadership is complete so the thread does not terminate
-                watchForDeleteLatch.countDown()
-                leadershipCompleteLatch.countDown()
-                startCallAllowed = true
-                electedLeader = false
-            }
+            // Do this after leadership is complete so the thread does not terminate
+            closeLatches()
+            startCallAllowed = true
+            electedLeader = false
             true
         } else {
             // Failed to become leader
@@ -288,7 +277,7 @@ class LeaderSelector(val url: String,
 
         private val uniqueSuffixLength = 9
 
-        private fun participationPath(path: String) = path.append("participants")
+        private fun participationPath(path: String) = path.appendToPath("participants")
 
         fun reset(url: String, electionPath: String) {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
@@ -309,9 +298,8 @@ class LeaderSelector(val url: String,
                 .use { client ->
                     client.withKvClient { kvClient ->
                         val leader = kvClient.getStringValue(electionPath)?.dropLast(uniqueSuffixLength + 1)
-                        kvClient.getChildrenStringValues(participationPath(electionPath)).forEach {
-                            retval += Participant(it, leader == it)
-                        }
+                        kvClient.getChildrenStringValues(participationPath(electionPath))
+                            .forEach { retval += Participant(it, leader == it) }
                     }
                 }
             return retval
