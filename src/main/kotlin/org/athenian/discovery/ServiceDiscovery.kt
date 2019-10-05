@@ -18,6 +18,7 @@
 package org.athenian.discovery
 
 import com.google.common.collect.Maps
+import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
 import com.sudothought.common.util.randomId
@@ -29,24 +30,26 @@ import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.op.CmpTarget
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asPutOption
+import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getChildrenStringValues
 import org.athenian.jetcd.getStringValue
 import org.athenian.jetcd.keepAlive
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
 import java.io.Closeable
-import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
 
 class ServiceDiscovery<T>(val url: String,
                           basePath: String,
                           val clientId: String = "Client:${randomId(9)}") : Closeable {
 
-    private val executor = lazy { Executors.newCachedThreadPool() }
+    private val semaphore = Semaphore(1, true)
     private var client by nonNullableReference<Client>()
     private var leaseClient by nonNullableReference<Lease>()
     private var kvClient by nonNullableReference<KV>()
     private var startCalled by atomicBoolean(false)
-    private val servicePath = basePath.appendToPath("/names")
+    private var closeCalled by atomicBoolean(false)
+    private val namesPath = basePath.appendToPath("/names")
     private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()
 
     class ServiceInstanceContext(val service: ServiceInstance) : Closeable {
@@ -64,101 +67,115 @@ class ServiceDiscovery<T>(val url: String,
     }
 
     fun start() {
-        client = Client.builder().endpoints(url).build()
-        leaseClient = client.leaseClient
-        kvClient = client.kvClient
-        startCalled = true
-    }
-
-    private fun checkStartCalled() {
-        if (!startCalled) throw ServiceDiscoveryException("start() must be called first")
+        semaphore.withLock {
+            if (startCalled)
+                throw ServiceDiscoveryException("start() already called")
+            if (closeCalled)
+                throw ServiceDiscoveryException("close() already called")
+            client = Client.builder().endpoints(url).build()
+            leaseClient = client.leaseClient
+            kvClient = client.kvClient
+            startCalled = true
+        }
     }
 
     fun registerService(service: ServiceInstance) {
-        checkStartCalled()
+        semaphore.withLock {
+            checkStatus()
 
-        val instancePath = getInstancePath(service)
-        val context = ServiceInstanceContext(service)
+            val instancePath = getNamesPath(service)
+            val context = ServiceInstanceContext(service)
 
-        serviceContextMap[service.id] = context
+            serviceContextMap[service.id] = context
 
-        // Prime lease with 2 seconds to give keepAlive a chance to get started
-        context.lease = leaseClient.grant(2).get()
+            // Prime lease with 2 seconds to give keepAlive a chance to get started
+            context.lease = leaseClient.grant(2).get()
 
-        val txn =
-            kvClient.transaction {
-                If(org.athenian.jetcd.equals(instancePath, CmpTarget.version(0)))
-                Then(putOp(instancePath, service.toJson(), context.lease.asPutOption))
-            }
+            val txn =
+                kvClient.transaction {
+                    If(org.athenian.jetcd.equals(instancePath, CmpTarget.version(0)))
+                    Then(putOp(instancePath, service.toJson(), context.lease.asPutOption))
+                }
 
-        if (!txn.isSucceeded) throw ServiceDiscoveryException("Service registration failed for $instancePath")
+            if (!txn.isSucceeded) throw ServiceDiscoveryException("Service registration failed for $instancePath")
 
-        // Run keep-alive until closed
-        context.keepAlive = leaseClient.keepAlive(context.lease)
+            // Run keep-alive until closed
+            context.keepAlive = leaseClient.keepAlive(context.lease)
+        }
     }
 
     fun updateService(service: ServiceInstance) {
-        checkStartCalled()
-        val instancePath = getInstancePath(service)
-        val context = serviceContextMap[service.id]
-            ?: throw ServiceDiscoveryException("ServiceInstance not already registered with registerService()")
-        val txn =
-            kvClient.transaction {
-                If(org.athenian.jetcd.equals(instancePath, CmpTarget.version(0)))
-                Else(putOp(instancePath, service.toJson(), context.lease.asPutOption))
-            }
-        if (txn.isSucceeded) throw ServiceDiscoveryException("Service update failed for $instancePath")
+        semaphore.withLock {
+            checkStatus()
+            val instancePath = getNamesPath(service)
+            val context = serviceContextMap[service.id]
+                ?: throw ServiceDiscoveryException("ServiceInstance not already registered with registerService()")
+            val txn =
+                kvClient.transaction {
+                    If(org.athenian.jetcd.equals(instancePath, CmpTarget.version(0)))
+                    Else(putOp(instancePath, service.toJson(), context.lease.asPutOption))
+                }
+            if (txn.isSucceeded) throw ServiceDiscoveryException("Service update failed for $instancePath")
+        }
     }
 
     fun unregisterService(service: ServiceInstance) {
-        checkStartCalled()
-        serviceContextMap[service.id]?.close()
-            ?: throw ServiceDiscoveryException("ServiceInstance not published with registerService()")
-        serviceContextMap.remove(service.id)
+        semaphore.withLock {
+            checkStatus()
+            serviceContextMap[service.id]?.close()
+                ?: throw ServiceDiscoveryException("ServiceInstance not published with registerService()")
+            serviceContextMap.remove(service.id)
+        }
     }
 
     fun serviceCacheBuilder(): ServiceCacheBuilder<T>? {
-        checkStartCalled()
+        checkStatus()
         return null
     }
 
-    fun queryForNames(): Collection<String>? {
-        checkStartCalled()
-        return null
-    }
+    fun queryForNames(): List<String> =
+        semaphore.withLock {
+            checkStatus()
+            kvClient.getChildrenKeys(namesPath)
+        }
 
-    fun queryForInstances(name: String): Collection<ServiceInstance> {
-        checkStartCalled()
-        val instancePath = getInstancePath(name)
-        val jsons = kvClient.getChildrenStringValues(instancePath)
-            ?: throw ServiceDiscoveryException("ServiceInstance $instancePath not present")
-        return jsons.map { ServiceInstance.toObject(it) }
-    }
+    fun queryForInstances(name: String): List<ServiceInstance> =
+        semaphore.withLock {
+            checkStatus()
+            kvClient.getChildrenStringValues(getNamesPath(name)).map { ServiceInstance.toObject(it) }
+        }
 
-    fun queryForInstance(name: String, id: String): ServiceInstance? {
-        checkStartCalled()
-        val instancePath = getInstancePath(name, id)
-        val json = kvClient.getStringValue(instancePath)
-            ?: throw ServiceDiscoveryException("ServiceInstance $instancePath not present")
-        return ServiceInstance.toObject(json)
-    }
+    fun queryForInstance(name: String, id: String): ServiceInstance =
+        semaphore.withLock {
+            checkStatus()
+            val path = getNamesPath(name, id)
+            val json = kvClient.getStringValue(path)
+                ?: throw ServiceDiscoveryException("ServiceInstance $path not present")
+            ServiceInstance.toObject(json)
+        }
 
     //fun serviceProviderBuilder(): ServiceProviderBuilder<T?>? {return null}
 
-    private fun getInstancePath(service: ServiceInstance) = getInstancePath(service.name, service.id)
-
-    private fun getInstancePath(vararg elems: String) = servicePath.appendToPath(elems.joinToString("/"))
-
     override fun close() {
-        serviceContextMap.forEach { k, v -> unregisterService(v.service) }
-
-        if (startCalled) {
-            kvClient.close()
-            leaseClient.close()
-            client.close()
+        semaphore.withLock {
+            if (startCalled && !closeCalled) {
+                serviceContextMap.forEach { k, v -> unregisterService(v.service) }
+                kvClient.close()
+                leaseClient.close()
+                client.close()
+            }
+            closeCalled = true
         }
-
-        if (executor.isInitialized())
-            executor.value.shutdown()
     }
+
+    private fun checkStatus() {
+        if (!startCalled)
+            throw ServiceDiscoveryException("start() must be called first")
+        if (closeCalled)
+            throw ServiceDiscoveryException("close() already called")
+    }
+
+    private fun getNamesPath(service: ServiceInstance) = getNamesPath(service.name, service.id)
+
+    private fun getNamesPath(vararg elems: String) = namesPath.appendToPath(elems.joinToString("/"))
 }

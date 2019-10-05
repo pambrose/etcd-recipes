@@ -20,8 +20,8 @@ package org.athenian.examples.election;
 import org.athenian.election.LeaderSelector;
 import org.athenian.election.LeaderSelectorListener;
 
-import static com.sudothought.util.Utils.random;
-import static com.sudothought.util.Utils.sleepSecs;
+import static com.sudothought.common.util.Misc.random;
+import static com.sudothought.common.util.Misc.sleepSecs;
 
 public class SingleLeaderElectionDemo {
 

@@ -23,9 +23,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.sudothought.util.Utils.random;
-import static com.sudothought.util.Utils.sleepMillis;
-
+import static com.sudothought.common.util.Misc.random;
+import static com.sudothought.common.util.Misc.sleepMillis;
 
 public class DistributedAtomicLongDemo {
 

@@ -13,7 +13,8 @@ sourceCompatibility = 1.8
 def kotlinVersion = '1.3.50'
 def serializationVersion = '0.13.0'
 def jetcdVersion = '0.3.0'
-def utilsVersion = 'dev-SNAPSHOT'
+def utilsVersion = '6cae17c784'
+def utilsVersion2 = 'dev-SNAPSHOT'
 def loggingVersion = '1.7.6'
 
 repositories {

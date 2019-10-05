@@ -45,7 +45,8 @@ fun main() {
         println("Registering")
         sd.registerService(si)
         println("Retrieved value: ${sd.queryForInstance(si.name, si.id)}")
-        println("Retrieved value: ${sd.queryForInstances(si.name)}")
+        println("Retrieved values: ${sd.queryForInstances(si.name)}")
+        println("Retrieved names: ${sd.queryForNames()}")
 
 
         sleep(2.seconds)
@@ -54,7 +55,8 @@ fun main() {
         si.payload = test.toJson()
         sd.updateService(si)
         println("Retrieved value: ${sd.queryForInstance(si.name, si.id)}")
-        println("Retrieved value: ${sd.queryForInstances(si.name)}")
+        println("Retrieved values: ${sd.queryForInstances(si.name)}")
+        println("Retrieved names: ${sd.queryForNames()}")
 
         sleep(2.seconds)
         println("Unregistering")
