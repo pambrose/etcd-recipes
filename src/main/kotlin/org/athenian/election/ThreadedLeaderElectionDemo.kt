@@ -37,7 +37,7 @@ fun main() {
     val leadershipAction =
         { selector: LeaderSelector ->
             println("${selector.clientId} elected leader")
-            val pause = Random.nextInt(5).seconds
+            val pause = Random.nextInt(1, 3).seconds
             sleep(pause)
             println("${selector.clientId} surrendering after $pause")
         }

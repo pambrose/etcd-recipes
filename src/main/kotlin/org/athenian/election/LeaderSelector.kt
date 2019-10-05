@@ -40,6 +40,7 @@ import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getChildrenStringValues
 import org.athenian.jetcd.getStringValue
 import org.athenian.jetcd.keepAliveWith
+import org.athenian.jetcd.keyExists
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
 import org.athenian.jetcd.watcher
@@ -113,6 +114,7 @@ class LeaderSelector(val url: String,
     private val terminateWatch = BooleanMonitor(false)
     private val terminateKeepAlive = BooleanMonitor(false)
     private val leadershipComplete = BooleanMonitor(false)
+    private val startThreadComplete = BooleanMonitor(false)
     private var startCalled by atomicBoolean(false)
     private var closeCalled by atomicBoolean(false)
     private var electedLeader by atomicBoolean(false)
@@ -139,6 +141,7 @@ class LeaderSelector(val url: String,
         terminateWatch.set(false)
         terminateKeepAlive.set(false)
         leadershipComplete.set(false)
+        startThreadComplete.set(false)
         startCalled = true
         closeCalled = false
         electedLeader = false
@@ -147,36 +150,62 @@ class LeaderSelector(val url: String,
         val connectedToEtcd = CountDownLatch(1)
 
         executor.submit {
-            Client.builder().endpoints(url).build()
-                .use { client ->
-                    client.withLeaseClient { leaseClient ->
-                        client.withKvClient { kvClient ->
+            try {
+                Client.builder().endpoints(url).build()
+                    .use { client ->
+                        client.withLeaseClient { leaseClient ->
+                            client.withKvClient { kvClient ->
 
-                            connectedToEtcd.countDown()
+                                connectedToEtcd.countDown()
+                                val watchStarted = CountDownLatch(1)
+                                val watchStopped = CountDownLatch(1)
+                                val advertiseComplete = CountDownLatch(1)
 
-                            executor.submit {
-                                client.withWatchClient { watchClient ->
-                                    // Run for leader when leader key is deleted
-                                    watchForDeleteEvents(watchClient) {
-                                        semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
-                                    }.use {
-                                        terminateWatch.waitUntilTrue()
+                                executor.submit {
+                                    try {
+                                        client.withWatchClient { watchClient ->
+                                            // Run for leader when leader key is deleted
+                                            watchForDeleteEvents(watchClient, watchStarted) {
+                                                semaphore.withLock {
+                                                    attemptToBecomeLeader(leaseClient, kvClient)
+                                                }
+                                            }.use {
+                                                terminateWatch.waitUntilTrue()
+                                            }
+                                            watchStopped.countDown()
+                                        }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
                                     }
                                 }
+
+                                executor.submit {
+                                    try {
+                                        advertiseParticipation(leaseClient, kvClient)
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    } finally {
+                                        advertiseComplete.countDown()
+                                    }
+                                }
+
+                                // Wait for the watcher to start
+                                watchStarted.await()
+
+                                // Clients should run for leader in case they are the first to run
+                                semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
+
+                                leadershipComplete.waitUntilTrue()
+                                watchStopped.await()
+                                advertiseComplete.await()
                             }
-
-                            executor.submit { advertiseParticipation(leaseClient, kvClient) }
-
-                            // Give the watcher a chance to start
-                            sleep(1.seconds)
-
-                            // Clients should run for leader in case they are the first to run
-                            semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
-
-                            leadershipComplete.waitUntilTrue()
                         }
                     }
-                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                startThreadComplete.set(true)
+            }
         }
 
         connectedToEtcd.await()
@@ -207,8 +236,11 @@ class LeaderSelector(val url: String,
         checkStartCalled()
         checkCloseNotCalled()
 
-        markLeadershipComplete()
         closeCalled = true
+
+        markLeadershipComplete()
+
+        startThreadComplete.waitUntilTrue()
 
         if (userExecutor == null)
             executor.shutdown()
@@ -218,28 +250,46 @@ class LeaderSelector(val url: String,
 
     private fun checkCloseNotCalled() = check(!isCloseCalled) { "close() already closed" }
 
-    private fun watchForDeleteEvents(watchClient: Watch, action: () -> Unit): Watch.Watcher =
-        watchClient.watcher(electionPath) { watchResponse ->
+    private fun watchForDeleteEvents(watchClient: Watch,
+                                     watchStarted: CountDownLatch,
+                                     block: () -> Unit): Watch.Watcher {
+        watchStarted.countDown()
+        return watchClient.watcher(electionPath) { watchResponse ->
             watchResponse.events.forEach { event ->
-                if (event.eventType == DELETE) action.invoke()
+                if (event.eventType == DELETE) block.invoke()
             }
         }
+    }
 
     private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
+
+        val path = participationPath(electionPath).appendToPath(clientId)
+
+        // Wait until key goes away when previous keep alive finishes
+        for (i in (0..10)) {
+            if (!kvClient.keyExists(path))
+                break
+            //println("Waiting for key to go away")
+            sleep(1.seconds)
+        }
+
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.grant(2).get()
-
         val txn =
             kvClient.transaction {
-                val participantPath = participationPath(electionPath).appendToPath(clientId)
-                If(equals(participantPath, CmpTarget.version(0)))
-                Then(putOp(participantPath, clientId, lease.asPutOption))
+                If(equals(path, CmpTarget.version(0)))
+                Then(putOp(path, clientId, lease.asPutOption))
             }
 
-        if (!txn.isSucceeded) throw ServiceDiscoveryException("Participation registration failed")
+        if (!txn.isSucceeded) throw ServiceDiscoveryException("Participation registration failed [$path]")
 
         // Run keep-alive until closed
-        leaseClient.keepAliveWith(lease) { terminateKeepAlive.waitUntilTrue() }
+        leaseClient.keepAliveWith(lease) {
+            terminateKeepAlive.waitUntilTrue()
+        }
+
+        // Keep-alive can be slow to get rid of the key, so delete it
+        //kvClient.delete(path)
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
@@ -268,6 +318,9 @@ class LeaderSelector(val url: String,
                 electedLeader = true
                 listener.takeLeadership(this)
             }
+
+            // Keep-alive can be slow to get rid of the key, so delete it
+            //kvClient.delete(electionPath)
 
             // Leadership was relinquished
             // Do this after leadership is complete so the thread does not terminate

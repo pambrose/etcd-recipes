@@ -208,6 +208,8 @@ fun Watch.watcher(keyname: String,
         block(it)
     }
 
+fun KV.keyExists(keyname: String): Boolean = !(transaction { If(equals(keyname, CmpTarget.version(0))) }.isSucceeded)
+
 fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
 
 fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
