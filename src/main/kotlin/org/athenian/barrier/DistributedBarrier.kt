@@ -21,7 +21,7 @@ package org.athenian.barrier
 
 import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
-import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
+import com.sudothought.common.delegate.AtomicDelegates.nullableReference
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
@@ -62,8 +62,7 @@ class DistributedBarrier(val url: String,
     private val kvClient = lazy { client.value.kvClient }
     private val leaseClient = lazy { client.value.leaseClient }
     private val watchClient = lazy { client.value.watchClient }
-    private var keepAliveLease by nonNullableReference<CloseableClient>()
-    private var keepAliveAssigned by atomicBoolean(false)
+    private var keepAliveLease by nullableReference<CloseableClient?>(null)
     private var barrierRemoved by atomicBoolean(false)
 
     init {
@@ -94,7 +93,6 @@ class DistributedBarrier(val url: String,
                 // Check to see if unique value was successfully set in the CAS step
                 if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
                     keepAliveLease = leaseClient.value.keepAlive(lease)
-                    keepAliveAssigned = true
                     true
                 } else {
                     false
@@ -107,7 +105,8 @@ class DistributedBarrier(val url: String,
             if (barrierRemoved) {
                 false
             } else {
-                keepAliveLease.close()
+                keepAliveLease?.close()
+                keepAliveLease = null
                 barrierRemoved = true
                 true
             }
@@ -146,8 +145,9 @@ class DistributedBarrier(val url: String,
 
     override fun close() {
         semaphore.withLock {
-            if (keepAliveAssigned && !barrierRemoved)
-                keepAliveLease.close()
+
+            keepAliveLease?.close()
+            keepAliveLease = null
 
             if (watchClient.isInitialized())
                 watchClient.value.close()

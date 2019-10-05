@@ -19,10 +19,11 @@
 
 package org.athenian.barrier
 
-import com.sudothought.common.concurrent.isFinished
+import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
@@ -38,15 +39,13 @@ import org.athenian.jetcd.ensureTrailing
 import org.athenian.jetcd.equals
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getStringValue
-import org.athenian.jetcd.keepAliveWith
+import org.athenian.jetcd.keepAlive
 import org.athenian.jetcd.keyIsPresent
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
 import org.athenian.jetcd.watcher
 import org.athenian.jetcd.withKvClient
 import java.io.Closeable
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
@@ -71,9 +70,8 @@ class DistributedBarrierWithCount(val url: String,
     private val kvClient = lazy { client.value.kvClient }
     private val leaseClient = lazy { client.value.leaseClient }
     private val watchClient = lazy { client.value.watchClient }
-    private val executor = lazy { Executors.newSingleThreadExecutor() }
     private val readyPath = barrierPath.appendToPath("ready")
-    private val waitingPrefix = barrierPath.appendToPath("waiting")
+    private val waitingPath = barrierPath.appendToPath("waiting")
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -83,7 +81,7 @@ class DistributedBarrierWithCount(val url: String,
 
     private val isReadySet: Boolean get() = kvClient.keyIsPresent(readyPath)
 
-    val waiterCount: Long get() = kvClient.countChildren(waitingPrefix)
+    val waiterCount: Long get() = kvClient.countChildren(waitingPath)
 
     @Throws(InterruptedException::class)
     fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
@@ -95,7 +93,35 @@ class DistributedBarrierWithCount(val url: String,
     @Throws(InterruptedException::class)
     fun waitOnBarrier(timeout: Duration): Boolean {
 
+        var keepAliveLease: CloseableClient? = null
+        val keepAliveClosed = BooleanMonitor(false)
         val uniqueToken = "$clientId:${randomId(9)}"
+
+        fun closeKeepAlive() {
+            if (!keepAliveClosed.get()) {
+                keepAliveLease?.close()
+                keepAliveClosed.set(true)
+            }
+        }
+
+        fun checkWaiterCount() {
+            // First see if /ready is missing
+            if (!isReadySet) {
+                closeKeepAlive()
+            } else {
+                if (waiterCount >= memberCount) {
+
+                    closeKeepAlive()
+
+                    // Delete /ready key
+                    kvClient.transaction {
+                        If(equals(readyPath, CmpTarget.version(0)))
+                        Then()
+                        Else(deleteOp(readyPath))
+                    }
+                }
+            }
+        }
 
         // Do a CAS on the /ready name. If it is not found, then set it
         kvClient.transaction {
@@ -103,8 +129,7 @@ class DistributedBarrierWithCount(val url: String,
             Then(putOp(readyPath, uniqueToken))
         }
 
-        val waitLatch = CountDownLatch(1)
-        val waitingPath = waitingPrefix.appendToPath(uniqueToken)
+        val waitingPath = waitingPath.appendToPath(uniqueToken)
         val lease = leaseClient.value.grant(2).get()
 
         val txn =
@@ -117,31 +142,12 @@ class DistributedBarrierWithCount(val url: String,
         check(kvClient.getStringValue(waitingPath) == uniqueToken) { "Failed to assign waitingPath unique value" }
 
         // Keep key alive
-        executor.value.submit { leaseClient.value.keepAliveWith(lease) { waitLatch.await() } }
-
-        fun checkWaiterCount() {
-            // First see if /ready is missing
-            if (!isReadySet) {
-                waitLatch.countDown()
-            } else {
-                if (waiterCount >= memberCount) {
-
-                    waitLatch.countDown()
-
-                    // Delete /ready key
-                    kvClient.transaction {
-                        If(equals(readyPath, CmpTarget.version(0)))
-                        Then()
-                        Else(deleteOp(readyPath))
-                    }
-                }
-            }
-        }
+        keepAliveLease = leaseClient.value.keepAlive(lease)
 
         checkWaiterCount()
 
         // Do not bother starting watcher if latch is already done
-        if (waitLatch.isFinished)
+        if (keepAliveClosed.get())
             return true
 
         // Watch for DELETE of /ready and PUTS on /waiters/*
@@ -152,8 +158,8 @@ class DistributedBarrierWithCount(val url: String,
                 .forEach { watchEvent ->
                     val key = watchEvent.keyValue.key.asString
                     when {
-                        key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> checkWaiterCount()
-                        key.startsWith(readyPath) && watchEvent.eventType == DELETE -> waitLatch.countDown()
+                        key.startsWith(this.waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
+                        key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
                     }
                 }
 
@@ -161,10 +167,10 @@ class DistributedBarrierWithCount(val url: String,
             // Check one more time in case watch missed the delete just after last check
             checkWaiterCount()
 
-            val success = waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+            val success = keepAliveClosed.waitUntilTrue(timeout)
             // Cleanup if a time-out occurred
             if (!success) {
-                waitLatch.countDown() // Release keep-alive waiting on latch.
+                closeKeepAlive()
                 kvClient.delete(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
             }
 
@@ -184,9 +190,6 @@ class DistributedBarrierWithCount(val url: String,
 
         if (client.isInitialized())
             client.value.close()
-
-        if (executor.isInitialized())
-            executor.value.shutdown()
     }
 
     companion object {
