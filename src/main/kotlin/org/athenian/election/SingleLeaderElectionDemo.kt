@@ -31,24 +31,28 @@ fun main() {
 
     val leadershipAction = { selector: LeaderSelector ->
         println("${selector.clientId} elected leader")
-        val pause = Random.nextInt(5).seconds
+        val pause = Random.nextInt(1, 3).seconds
         sleep(pause)
         println("${selector.clientId} surrendering after $pause")
     }
 
     LeaderSelector(url, electionName, leadershipAction)
-        .use { election ->
+        .use { selector ->
             repeat(5) {
-                election.start()
-                election.waitOnLeadershipComplete()
+                try {
+                    selector.start()
+                    selector.waitOnLeadershipComplete()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
 
     repeat(5) {
         LeaderSelector(url, electionName, leadershipAction)
-            .use { election ->
-                election.start()
-                election.waitOnLeadershipComplete()
+            .use { selector ->
+                selector.start()
+                selector.waitOnLeadershipComplete()
             }
     }
 }

@@ -19,15 +19,17 @@
 
 package org.athenian.util
 
+import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import org.athenian.jetcd.countChildren
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getChildrenStringValues
 import org.athenian.jetcd.withKvClient
+import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val keyname = "/barriers/barrier2"
+    val keyname = "/"
 
     // DistributedBarrierWithCount.reset(url, keyname)
 
@@ -35,9 +37,12 @@ fun main() {
         .use { client ->
             client.withKvClient { kvClient ->
                 kvClient.apply {
-                    println(getChildrenKeys(keyname))
-                    println(getChildrenStringValues(keyname))
-                    println(countChildren(keyname))
+                    repeat(600) {
+                        println(getChildrenKeys(keyname))
+                        println(getChildrenStringValues(keyname))
+                        println(countChildren(keyname))
+                        sleep(1.seconds)
+                    }
                 }
             }
         }

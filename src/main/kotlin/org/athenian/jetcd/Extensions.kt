@@ -62,6 +62,8 @@ val ByteSequence.asLong: Long get() = Longs.fromByteArray(bytes)
 
 val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(id).build()
 
+val String.asPrefixGetOption get() = GetOption.newBuilder().withPrefix(asByteSequence).build()
+
 fun KV.putValue(keyname: String, keyval: String): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
 
 fun KV.putValue(keyname: String, keyval: Int): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
@@ -110,12 +112,12 @@ fun Lazy<KV>.getStringValue(keyname: String): String? = value.getStringValue(key
 
 fun KV.getChildrenKeys(keyname: String): List<String> {
     val adjustedKey = keyname.ensureTrailing("/")
-    return getKeys(adjustedKey, GetOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build())
+    return getKeys(adjustedKey, adjustedKey.asPrefixGetOption)
 }
 
 fun KV.getChildrenStringValues(keyname: String): List<String> {
     val adjustedKey = keyname.ensureTrailing("/")
-    return getStringValues(adjustedKey, GetOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build())
+    return getStringValues(adjustedKey, adjustedKey.asPrefixGetOption)
 }
 
 fun KV.getStringValue(keyname: String): String? =
@@ -221,8 +223,8 @@ fun Lease.keepAlive(lease: LeaseGrantResponse) =
 
 fun Lease.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) =
     keepAlive(lease.id, Observers.observer(
-        { /*println("KeepAlive next resp: $next")*/ },
-        { /*println("KeepAlive err resp: $err")*/ }))
+        { /*next -> println("KeepAlive next resp: $next")*/ },
+        { /*err -> println("KeepAlive err resp: $err")*/ }))
         .use {
             block.invoke()
         }
@@ -233,6 +235,5 @@ fun String.ensureTrailing(delim: String = "/"): String = "$this${if (endsWith(de
 fun String.stripLeading(delim: String = "/"): String = if (startsWith(delim)) drop(1) else this
 fun String.stripTrailing(delim: String = "/"): String = if (endsWith(delim)) dropLast(1) else this
 
-fun String.appendToPath(suffix: String, delim: String = "/"): String {
-    return "${stripTrailing(delim)}$delim${suffix.stripLeading(delim)}"
-}
+fun String.appendToPath(suffix: String, delim: String = "/"): String =
+    "${stripTrailing(delim)}$delim${suffix.stripLeading(delim)}"

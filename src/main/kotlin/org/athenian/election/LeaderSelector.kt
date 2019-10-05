@@ -20,12 +20,12 @@
 package org.athenian.election
 
 import com.sudothought.common.concurrent.BooleanMonitor
+import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
@@ -39,7 +39,6 @@ import org.athenian.jetcd.equals
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getChildrenStringValues
 import org.athenian.jetcd.getStringValue
-import org.athenian.jetcd.keepAlive
 import org.athenian.jetcd.keepAliveWith
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
@@ -51,6 +50,7 @@ import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
@@ -108,7 +108,8 @@ class LeaderSelector(val url: String,
                                                                  clientId,
                                                                  executorService)
 
-    private val executor = userExecutor ?: Executors.newFixedThreadPool(2)
+    private val semaphore = Semaphore(1, true)
+    private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
     private val terminateWatchForDelete = BooleanMonitor(false)
     private val leadershipComplete = BooleanMonitor(false)
     private var startCalled by atomicBoolean(false)
@@ -136,8 +137,9 @@ class LeaderSelector(val url: String,
 
         terminateWatchForDelete.set(false)
         leadershipComplete.set(false)
-        electedLeader = false
         startCalled = true
+        closeCalled = false
+        electedLeader = false
         startCallAllowed = false
 
         val connectedToEtcd = CountDownLatch(1)
@@ -146,32 +148,30 @@ class LeaderSelector(val url: String,
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withLeaseClient { leaseClient ->
-                        client.withWatchClient { watchClient ->
-                            client.withKvClient { kvClient ->
+                        client.withKvClient { kvClient ->
 
-                                connectedToEtcd.countDown()
+                            connectedToEtcd.countDown()
 
-                                executor.submit {
+                            executor.submit {
+                                client.withWatchClient { watchClient ->
                                     // Run for leader when leader key is deleted
                                     watchForDeleteEvents(watchClient) {
-                                        attemptToBecomeLeader(leaseClient, kvClient)
+                                        semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
                                     }.use {
                                         terminateWatchForDelete.waitUntilTrue()
                                     }
                                 }
-
-
-                                val keepAliveLease = advertiseParticipation(leaseClient, kvClient)
-
-                                // Give the watcher a chance to start
-                                sleep(1.seconds)
-
-                                // Clients should run for leader in case they are the first to run
-                                attemptToBecomeLeader(leaseClient, kvClient)
-
-                                leadershipComplete.waitUntilTrue()
-                                keepAliveLease.close()
                             }
+
+                            executor.submit { advertiseParticipation(leaseClient, kvClient) }
+
+                            // Give the watcher a chance to start
+                            sleep(1.seconds)
+
+                            // Clients should run for leader in case they are the first to run
+                            semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
+
+                            leadershipComplete.waitUntilTrue()
                         }
                     }
                 }
@@ -195,7 +195,7 @@ class LeaderSelector(val url: String,
         return leadershipComplete.waitUntilTrue(timeout)
     }
 
-    private fun closeLatches() {
+    private fun markLeadershipComplete() {
         terminateWatchForDelete.set(true)
         leadershipComplete.set(true)
     }
@@ -204,7 +204,7 @@ class LeaderSelector(val url: String,
         checkStartCalled()
         checkCloseNotCalled()
 
-        closeLatches()
+        markLeadershipComplete()
         closeCalled = true
 
         if (userExecutor == null)
@@ -222,9 +222,10 @@ class LeaderSelector(val url: String,
             }
         }
 
-    private fun advertiseParticipation(leaseClient: Lease, kvClient: KV): CloseableClient {
+    private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.grant(2).get()
+
         val txn =
             kvClient.transaction {
                 val participantPath = participationPath(electionPath).appendToPath(clientId)
@@ -235,7 +236,7 @@ class LeaderSelector(val url: String,
         if (!txn.isSucceeded) throw ServiceDiscoveryException("Participation registration failed")
 
         // Run keep-alive until closed
-        return leaseClient.keepAlive(lease)
+        leaseClient.keepAliveWith(lease) { leadershipComplete.waitUntilTrue() }
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
@@ -267,7 +268,7 @@ class LeaderSelector(val url: String,
 
             // Leadership was relinquished
             // Do this after leadership is complete so the thread does not terminate
-            closeLatches()
+            markLeadershipComplete()
             startCallAllowed = true
             electedLeader = false
             true
@@ -278,6 +279,7 @@ class LeaderSelector(val url: String,
     }
 
     companion object Static {
+
         private val uniqueSuffixLength = 9
 
         private fun participationPath(path: String) = path.appendToPath("participants")
