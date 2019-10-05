@@ -17,7 +17,7 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package org.athenian.barrier
+package org.athenian.barrier.old
 
 import com.sudothought.common.concurrent.isFinished
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean

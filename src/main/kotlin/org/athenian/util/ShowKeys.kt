@@ -17,7 +17,7 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package org.athenian.barrier
+package org.athenian.util
 
 import io.etcd.jetcd.Client
 import org.athenian.jetcd.countChildren

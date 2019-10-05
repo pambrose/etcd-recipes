@@ -25,11 +25,13 @@ import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import org.athenian.discovery.ServiceDiscoveryException
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
@@ -37,6 +39,7 @@ import org.athenian.jetcd.equals
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getChildrenStringValues
 import org.athenian.jetcd.getStringValue
+import org.athenian.jetcd.keepAlive
 import org.athenian.jetcd.keepAliveWith
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
@@ -105,7 +108,7 @@ class LeaderSelector(val url: String,
                                                                  clientId,
                                                                  executorService)
 
-    private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
+    private val executor = userExecutor ?: Executors.newFixedThreadPool(2)
     private val terminateWatchForDelete = BooleanMonitor(false)
     private val leadershipComplete = BooleanMonitor(false)
     private var startCalled by atomicBoolean(false)
@@ -157,7 +160,8 @@ class LeaderSelector(val url: String,
                                     }
                                 }
 
-                                executor.submit { advertiseParticipation(leaseClient, kvClient) }
+
+                                val keepAliveLease = advertiseParticipation(leaseClient, kvClient)
 
                                 // Give the watcher a chance to start
                                 sleep(1.seconds)
@@ -166,6 +170,7 @@ class LeaderSelector(val url: String,
                                 attemptToBecomeLeader(leaseClient, kvClient)
 
                                 leadershipComplete.waitUntilTrue()
+                                keepAliveLease.close()
                             }
                         }
                     }
@@ -217,21 +222,20 @@ class LeaderSelector(val url: String,
             }
         }
 
-    private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
+    private fun advertiseParticipation(leaseClient: Lease, kvClient: KV): CloseableClient {
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.grant(2).get()
-        val participantPath = participationPath(electionPath).appendToPath(clientId)
-
         val txn =
             kvClient.transaction {
+                val participantPath = participationPath(electionPath).appendToPath(clientId)
                 If(equals(participantPath, CmpTarget.version(0)))
                 Then(putOp(participantPath, clientId, lease.asPutOption))
             }
 
-        check(txn.isSucceeded) { "Participation registration failed" }
+        if (!txn.isSucceeded) throw ServiceDiscoveryException("Participation registration failed")
 
         // Run keep-alive until closed
-        leaseClient.keepAliveWith(lease) { leadershipComplete.waitUntilTrue() }
+        return leaseClient.keepAlive(lease)
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
@@ -274,7 +278,6 @@ class LeaderSelector(val url: String,
     }
 
     companion object Static {
-
         private val uniqueSuffixLength = 9
 
         private fun participationPath(path: String) = path.appendToPath("participants")
@@ -284,9 +287,7 @@ class LeaderSelector(val url: String,
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
-                        kvClient.getChildrenKeys(electionPath).forEach {
-                            kvClient.delete(it)
-                        }
+                        kvClient.getChildrenKeys(electionPath).forEach { kvClient.delete(it) }
                     }
                 }
         }
