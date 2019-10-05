@@ -328,9 +328,11 @@ class LeaderSelector(val url: String,
 
     companion object Static {
 
-        val uniqueSuffixLength = 9
+        private val uniqueSuffixLength = 9
 
         private fun participationPath(path: String) = path.appendToPath("participants")
+
+        fun translateLeaderId(id: String) = id.dropLast(uniqueSuffixLength + 1)
 
         fun leaderPath(electionPath: String) = electionPath.appendToPath("LEADER")
 

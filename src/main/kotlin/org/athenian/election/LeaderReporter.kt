@@ -25,7 +25,7 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import org.athenian.election.LeaderSelector.Static.leaderPath
-import org.athenian.election.LeaderSelector.Static.uniqueSuffixLength
+import org.athenian.election.LeaderSelector.Static.translateLeaderId
 import org.athenian.jetcd.asString
 import org.athenian.jetcd.watcher
 import org.athenian.jetcd.withWatchClient
@@ -45,7 +45,7 @@ fun main() {
                     watchResponse.events
                         .forEach { event ->
                             when (event.eventType) {
-                                PUT -> println("${event.keyValue.value.asString.dropLast(uniqueSuffixLength + 1)} is now the leader [${unelectedTime.elapsedNow()}]")
+                                PUT -> println("${translateLeaderId(event.keyValue.value.asString)} is now the leader [${unelectedTime.elapsedNow()}]")
                                 DELETE -> unelectedTime = clock.markNow()
                                 UNRECOGNIZED -> println("Error with watch")
                                 else -> println("Error with watch")
