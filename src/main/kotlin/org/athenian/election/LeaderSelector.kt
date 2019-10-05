@@ -110,7 +110,8 @@ class LeaderSelector(val url: String,
 
     private val semaphore = Semaphore(1, true)
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
-    private val terminateWatchForDelete = BooleanMonitor(false)
+    private val terminateWatch = BooleanMonitor(false)
+    private val terminateKeepAlive = BooleanMonitor(false)
     private val leadershipComplete = BooleanMonitor(false)
     private var startCalled by atomicBoolean(false)
     private var closeCalled by atomicBoolean(false)
@@ -135,7 +136,8 @@ class LeaderSelector(val url: String,
         check(startCallAllowed) { "Previous call to start() not complete" }
         checkCloseNotCalled()
 
-        terminateWatchForDelete.set(false)
+        terminateWatch.set(false)
+        terminateKeepAlive.set(false)
         leadershipComplete.set(false)
         startCalled = true
         closeCalled = false
@@ -158,7 +160,7 @@ class LeaderSelector(val url: String,
                                     watchForDeleteEvents(watchClient) {
                                         semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
                                     }.use {
-                                        terminateWatchForDelete.waitUntilTrue()
+                                        terminateWatch.waitUntilTrue()
                                     }
                                 }
                             }
@@ -196,7 +198,8 @@ class LeaderSelector(val url: String,
     }
 
     private fun markLeadershipComplete() {
-        terminateWatchForDelete.set(true)
+        terminateWatch.set(true)
+        terminateKeepAlive.set(true)
         leadershipComplete.set(true)
     }
 
@@ -236,7 +239,7 @@ class LeaderSelector(val url: String,
         if (!txn.isSucceeded) throw ServiceDiscoveryException("Participation registration failed")
 
         // Run keep-alive until closed
-        leaseClient.keepAliveWith(lease) { leadershipComplete.waitUntilTrue() }
+        leaseClient.keepAliveWith(lease) { terminateKeepAlive.waitUntilTrue() }
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
