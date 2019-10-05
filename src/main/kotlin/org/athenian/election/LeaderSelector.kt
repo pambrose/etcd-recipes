@@ -166,9 +166,7 @@ class LeaderSelector(val url: String,
                                         client.withWatchClient { watchClient ->
                                             // Run for leader when leader key is deleted
                                             watchForDeleteEvents(watchClient, watchStarted) {
-                                                semaphore.withLock {
-                                                    attemptToBecomeLeader(leaseClient, kvClient)
-                                                }
+                                                semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
                                             }.use {
                                                 terminateWatch.waitUntilTrue()
                                             }
@@ -253,12 +251,13 @@ class LeaderSelector(val url: String,
     private fun watchForDeleteEvents(watchClient: Watch,
                                      watchStarted: CountDownLatch,
                                      block: () -> Unit): Watch.Watcher {
-        watchStarted.countDown()
-        return watchClient.watcher(electionPath) { watchResponse ->
+        val watcher = watchClient.watcher(electionPath) { watchResponse ->
             watchResponse.events.forEach { event ->
                 if (event.eventType == DELETE) block.invoke()
             }
         }
+        watchStarted.countDown()
+        return watcher
     }
 
     private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
@@ -266,10 +265,9 @@ class LeaderSelector(val url: String,
         val path = participationPath(electionPath).appendToPath(clientId)
 
         // Wait until key goes away when previous keep alive finishes
-        for (i in (0..10)) {
+        repeat(10) {
             if (!kvClient.keyExists(path))
-                break
-            //println("Waiting for key to go away")
+                return@repeat
             sleep(1.seconds)
         }
 

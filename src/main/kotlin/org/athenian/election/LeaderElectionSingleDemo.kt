@@ -20,7 +20,6 @@
 package org.athenian.election
 
 import com.sudothought.common.util.sleep
-import kotlin.random.Random
 import kotlin.time.seconds
 
 fun main() {
@@ -31,15 +30,16 @@ fun main() {
 
     val leadershipAction = { selector: LeaderSelector ->
         println("${selector.clientId} elected leader")
-        val pause = Random.nextInt(1, 3).seconds
+        val pause = 0.seconds //Random.nextInt(1, 3).seconds
         sleep(pause)
         println("${selector.clientId} surrendering after $pause")
     }
 
     LeaderSelector(url, electionName, leadershipAction)
         .use { selector ->
-            repeat(5) {
+            repeat(100) {
                 try {
+                    println("Iteration $it")
                     selector.start()
                     selector.waitOnLeadershipComplete()
                 } catch (e: Exception) {
