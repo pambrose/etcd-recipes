@@ -38,19 +38,16 @@ fun main() {
     LeaderSelector(url, electionName, leadershipAction)
         .use { selector ->
             repeat(100) {
-                try {
-                    println("Iteration $it")
-                    selector.start()
-                    selector.waitOnLeadershipComplete()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                println("Iteration $it")
+                selector.start()
+                selector.waitOnLeadershipComplete()
             }
         }
 
     repeat(5) {
         LeaderSelector(url, electionName, leadershipAction)
             .use { selector ->
+                println("Iteration $it")
                 selector.start()
                 selector.waitOnLeadershipComplete()
             }
