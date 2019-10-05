@@ -19,17 +19,20 @@
 
 package org.athenian.barrier
 
-import com.sudothought.common.concurrent.isFinished
+import com.sudothought.common.concurrent.withLock
+import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.equals
 import org.athenian.jetcd.getStringValue
-import org.athenian.jetcd.keepAliveWith
+import org.athenian.jetcd.keepAlive
 import org.athenian.jetcd.keyIsPresent
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
@@ -37,7 +40,7 @@ import org.athenian.jetcd.watcher
 import org.athenian.jetcd.withKvClient
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
@@ -54,53 +57,60 @@ class DistributedBarrier(val url: String,
                                                              waitOnMissingBarrier,
                                                              "Client:${randomId(9)}")
 
+    private val semaphore = Semaphore(1, true)
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }
     private val leaseClient = lazy { client.value.leaseClient }
     private val watchClient = lazy { client.value.watchClient }
-    private val executor = lazy { Executors.newSingleThreadExecutor() }
-    private val barrierLatch = CountDownLatch(1)
+    private var keepAliveLease by nonNullableReference<CloseableClient>()
+    private var keepAliveAssigned by atomicBoolean(false)
+    private var barrierRemoved by atomicBoolean(false)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
     }
 
-    val isBarrierSet: Boolean get() = kvClient.keyIsPresent(barrierPath)
+    val isBarrierSet: Boolean get() = semaphore.withLock { kvClient.keyIsPresent(barrierPath) }
 
-    fun setBarrier(): Boolean {
+    fun setBarrier(): Boolean =
+        semaphore.withLock {
+            if (kvClient.keyIsPresent(barrierPath))
+                false
+            else {
+                // Create unique token to avoid collision from clients with same id
+                val uniqueToken = "$clientId:${randomId(9)}"
 
-        if (kvClient.keyIsPresent(barrierPath))
-            return false
+                // Prime lease with 2 seconds to give keepAlive a chance to get started
+                val lease = leaseClient.value.grant(2).get()
 
-        // Create unique token to avoid collision from clients with same id
-        val uniqueToken = "$clientId:${randomId(9)}"
+                // Do a CAS on the key name. If it is not found, then set it
+                val txn =
+                    kvClient.transaction {
+                        If(equals(barrierPath, CmpTarget.version(0)))
+                        Then(putOp(barrierPath, uniqueToken, lease.asPutOption))
+                    }
 
-        // Prime lease with 2 seconds to give keepAlive a chance to get started
-        val lease = leaseClient.value.grant(2).get()
-
-        // Do a CAS on the key name. If it is not found, then set it
-        val txn =
-            kvClient.transaction {
-                If(equals(barrierPath, CmpTarget.version(0)))
-                Then(putOp(barrierPath, uniqueToken, lease.asPutOption))
+                // Check to see if unique value was successfully set in the CAS step
+                if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
+                    keepAliveLease = leaseClient.value.keepAlive(lease)
+                    keepAliveAssigned = true
+                    true
+                } else {
+                    false
+                }
             }
-
-        // Check to see if unique value was successfully set in the CAS step
-        return if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
-            executor.value.submit { leaseClient.value.keepAliveWith(lease) { barrierLatch.await() } }
-            true
-        } else {
-            false
         }
-    }
 
     fun removeBarrier(): Boolean =
-        if (barrierLatch.isFinished) {
-            false
-        } else {
-            barrierLatch.countDown()
-            true
+        semaphore.withLock {
+            if (barrierRemoved) {
+                false
+            } else {
+                keepAliveLease.close()
+                barrierRemoved = true
+                true
+            }
         }
 
     @Throws(InterruptedException::class)
@@ -135,20 +145,22 @@ class DistributedBarrier(val url: String,
     }
 
     override fun close() {
-        if (watchClient.isInitialized())
-            watchClient.value.close()
+        semaphore.withLock {
+            if (keepAliveAssigned && !barrierRemoved)
+                keepAliveLease.close()
 
-        if (leaseClient.isInitialized())
-            leaseClient.value.close()
+            if (watchClient.isInitialized())
+                watchClient.value.close()
 
-        if (kvClient.isInitialized())
-            kvClient.value.close()
+            if (leaseClient.isInitialized())
+                leaseClient.value.close()
 
-        if (client.isInitialized())
-            client.value.close()
+            if (kvClient.isInitialized())
+                kvClient.value.close()
 
-        if (executor.isInitialized())
-            executor.value.shutdown()
+            if (client.isInitialized())
+                client.value.close()
+        }
     }
 
     companion object {
