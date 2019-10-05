@@ -118,7 +118,7 @@ class LeaderSelector(val url: String,
     private var closeCalled by atomicBoolean(false)
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
-    private val leaderPath = electionPath.appendToPath("LEADER")
+    private val leaderPath = leaderPath(electionPath)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -328,9 +328,11 @@ class LeaderSelector(val url: String,
 
     companion object Static {
 
-        private val uniqueSuffixLength = 9
+        val uniqueSuffixLength = 9
 
         private fun participationPath(path: String) = path.appendToPath("participants")
+
+        fun leaderPath(electionPath: String) = electionPath.appendToPath("LEADER")
 
         fun reset(url: String, electionPath: String) {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }

@@ -28,8 +28,8 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val electionName = "/threadedClient"
-    val count = 5
+    val electionName = "/election/threaded"
+    val count = 50
     val latch = CountDownLatch(count)
 
     LeaderSelector.reset(url, electionName)

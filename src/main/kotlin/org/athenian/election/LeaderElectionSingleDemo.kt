@@ -24,7 +24,7 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val electionName = "/election/leaderElectionDemo"
+    val electionName = "/election/single"
 
     LeaderSelector.reset(url, electionName)
 

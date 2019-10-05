@@ -24,6 +24,8 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import org.athenian.election.LeaderSelector.Static.leaderPath
+import org.athenian.election.LeaderSelector.Static.uniqueSuffixLength
 import org.athenian.jetcd.asString
 import org.athenian.jetcd.watcher
 import org.athenian.jetcd.withWatchClient
@@ -32,18 +34,18 @@ import kotlin.time.days
 
 fun main() {
     val url = "http://localhost:2379"
-    val electionKeyName = "/election1"
+    val electionName = "/election/threaded"
     val clock = MonoClock
     var unelectedTime = clock.markNow()
 
     Client.builder().endpoints(url).build()
         .use { client ->
             client.withWatchClient { watchClient ->
-                watchClient.watcher(electionKeyName) { watchResponse ->
+                watchClient.watcher(leaderPath(electionName)) { watchResponse ->
                     watchResponse.events
                         .forEach { event ->
                             when (event.eventType) {
-                                PUT -> println("${event.keyValue.value.asString} is now the leader [${unelectedTime.elapsedNow()}]")
+                                PUT -> println("${event.keyValue.value.asString.dropLast(uniqueSuffixLength + 1)} is now the leader [${unelectedTime.elapsedNow()}]")
                                 DELETE -> unelectedTime = clock.markNow()
                                 UNRECOGNIZED -> println("Error with watch")
                                 else -> println("Error with watch")
