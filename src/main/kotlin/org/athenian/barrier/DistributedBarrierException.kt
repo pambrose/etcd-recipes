@@ -15,17 +15,6 @@
  *  limitations under the License.
  */
 
-package org.athenian.discovery
+package org.athenian.barrier
 
-import java.io.Closeable
-
-class ServiceCache : Closeable {
-
-    val instances: List<ServiceInstance>? = null
-
-    fun start() {}
-
-    fun addListenerForChanges() {}
-
-    override fun close() {}
-}
+class DistributedBarrierException(msg: String) : Exception(msg)

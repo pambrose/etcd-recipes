@@ -15,17 +15,6 @@
  *  limitations under the License.
  */
 
-package org.athenian.discovery
+package org.athenian.election
 
-import java.io.Closeable
-
-class ServiceCache : Closeable {
-
-    val instances: List<ServiceInstance>? = null
-
-    fun start() {}
-
-    fun addListenerForChanges() {}
-
-    override fun close() {}
-}
+class LeaderSelectorException(msg: String) : Exception(msg)

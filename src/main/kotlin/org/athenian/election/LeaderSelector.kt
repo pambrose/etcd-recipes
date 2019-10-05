@@ -31,7 +31,6 @@ import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import org.athenian.discovery.ServiceDiscoveryException
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
@@ -135,7 +134,7 @@ class LeaderSelector(val url: String,
 
     fun start(): LeaderSelector {
 
-        check(startCallAllowed) { "Previous call to start() not complete" }
+        if (!startCallAllowed) throw LeaderSelectorException("Previous call to start() not complete")
         checkCloseNotCalled()
 
         terminateWatch.set(false)
@@ -244,9 +243,13 @@ class LeaderSelector(val url: String,
             executor.shutdown()
     }
 
-    private fun checkStartCalled() = check(isStartCalled) { "start() not called" }
+    private fun checkStartCalled() {
+        if (!isStartCalled) throw LeaderSelectorException("start() not called")
+    }
 
-    private fun checkCloseNotCalled() = check(!isCloseCalled) { "close() already closed" }
+    private fun checkCloseNotCalled() {
+        if (isCloseCalled) throw LeaderSelectorException("close() already closed")
+    }
 
     private fun watchForDeleteEvents(watchClient: Watch,
                                      watchStarted: BooleanMonitor,
@@ -279,7 +282,7 @@ class LeaderSelector(val url: String,
                 Then(putOp(path, clientId, lease.asPutOption))
             }
 
-        if (!txn.isSucceeded) throw ServiceDiscoveryException("Participation registration failed [$path]")
+        if (!txn.isSucceeded) throw LeaderSelectorException("Participation registration failed [$path]")
 
         // Run keep-alive until closed
         leaseClient.keepAliveWith(lease) {

@@ -31,6 +31,7 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import org.athenian.barrier.DistributedBarrierException
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asByteSequence
 import org.athenian.jetcd.asPutOption
@@ -114,8 +115,10 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
                 Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
             }
 
-        check(txn.isSucceeded) { "Failed to set waitingPath" }
-        check(kvClient.getStringValue(waitingPath) == uniqueToken) { "Failed to assign waitingPath unique value" }
+        if (!txn.isSucceeded)
+            throw DistributedBarrierException("Failed to set waitingPath")
+        if (kvClient.getStringValue(waitingPath) != uniqueToken)
+            throw DistributedBarrierException("Failed to assign waitingPath unique value")
 
         // Keep key alive
         executor.value.submit { leaseClient.value.keepAliveWith(lease) { keepAliveLatch.await() } }
@@ -187,7 +190,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     fun leave(timeout: Duration): Boolean {
 
-        check(enterCalled) { "enter() must be called before leave()" }
+        if (!enterCalled) throw DistributedBarrierException("enter() must be called before leave()")
 
         leaveCalled = true
 

@@ -138,8 +138,10 @@ class DistributedBarrierWithCount(val url: String,
                 Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
             }
 
-        check(txn.isSucceeded) { "Failed to set waitingPath" }
-        check(kvClient.getStringValue(waitingPath) == uniqueToken) { "Failed to assign waitingPath unique value" }
+        if (!txn.isSucceeded)
+            throw DistributedBarrierException("Failed to set waitingPath")
+        if (kvClient.getStringValue(waitingPath) != uniqueToken)
+            throw DistributedBarrierException("Failed to assign waitingPath unique value")
 
         // Keep key alive
         keepAliveLease = leaseClient.value.keepAlive(lease)
