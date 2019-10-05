@@ -17,7 +17,7 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package org.athenian.election
+package org.athenian.util
 
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
