@@ -48,7 +48,6 @@ import org.athenian.jetcd.withKvClient
 import org.athenian.jetcd.withLeaseClient
 import org.athenian.jetcd.withWatchClient
 import java.io.Closeable
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Semaphore
@@ -119,6 +118,7 @@ class LeaderSelector(val url: String,
     private var closeCalled by atomicBoolean(false)
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
+    private val leaderPath = electionPath.appendToPath("LEADER")
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -147,7 +147,7 @@ class LeaderSelector(val url: String,
         electedLeader = false
         startCallAllowed = false
 
-        val connectedToEtcd = CountDownLatch(1)
+        val connectedToEtcd = BooleanMonitor(false)
 
         executor.submit {
             try {
@@ -156,10 +156,10 @@ class LeaderSelector(val url: String,
                         client.withLeaseClient { leaseClient ->
                             client.withKvClient { kvClient ->
 
-                                connectedToEtcd.countDown()
-                                val watchStarted = CountDownLatch(1)
-                                val watchStopped = CountDownLatch(1)
-                                val advertiseComplete = CountDownLatch(1)
+                                connectedToEtcd.set(true)
+                                val watchStarted = BooleanMonitor(false)
+                                val watchStopped = BooleanMonitor(false)
+                                val advertiseComplete = BooleanMonitor(false)
 
                                 executor.submit {
                                     try {
@@ -170,7 +170,7 @@ class LeaderSelector(val url: String,
                                             }.use {
                                                 terminateWatch.waitUntilTrue()
                                             }
-                                            watchStopped.countDown()
+                                            watchStopped.set(true)
                                         }
                                     } catch (e: Exception) {
                                         e.printStackTrace()
@@ -183,19 +183,19 @@ class LeaderSelector(val url: String,
                                     } catch (e: Exception) {
                                         e.printStackTrace()
                                     } finally {
-                                        advertiseComplete.countDown()
+                                        advertiseComplete.set(true)
                                     }
                                 }
 
                                 // Wait for the watcher to start
-                                watchStarted.await()
+                                watchStarted.waitUntilTrue()
 
                                 // Clients should run for leader in case they are the first to run
                                 semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
 
                                 leadershipComplete.waitUntilTrue()
-                                watchStopped.await()
-                                advertiseComplete.await()
+                                watchStopped.waitUntilTrue()
+                                advertiseComplete.waitUntilTrue()
                             }
                         }
                     }
@@ -206,7 +206,7 @@ class LeaderSelector(val url: String,
             }
         }
 
-        connectedToEtcd.await()
+        connectedToEtcd.waitUntilTrue()
         return this
     }
 
@@ -249,14 +249,14 @@ class LeaderSelector(val url: String,
     private fun checkCloseNotCalled() = check(!isCloseCalled) { "close() already closed" }
 
     private fun watchForDeleteEvents(watchClient: Watch,
-                                     watchStarted: CountDownLatch,
+                                     watchStarted: BooleanMonitor,
                                      block: () -> Unit): Watch.Watcher {
-        val watcher = watchClient.watcher(electionPath) { watchResponse ->
+        val watcher = watchClient.watcher(leaderPath) { watchResponse ->
             watchResponse.events.forEach { event ->
                 if (event.eventType == DELETE) block.invoke()
             }
         }
-        watchStarted.countDown()
+        watchStarted.set(true)
         return watcher
     }
 
@@ -285,9 +285,6 @@ class LeaderSelector(val url: String,
         leaseClient.keepAliveWith(lease) {
             terminateKeepAlive.waitUntilTrue()
         }
-
-        // Keep-alive can be slow to get rid of the key, so delete it
-        //kvClient.delete(path)
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
@@ -304,21 +301,18 @@ class LeaderSelector(val url: String,
         // Do a CAS on the key name. If it is not found, then set it
         val txn =
             kvClient.transaction {
-                If(equals(electionPath, CmpTarget.version(0)))
-                Then(putOp(electionPath, uniqueToken, lease.asPutOption))
+                If(equals(leaderPath, CmpTarget.version(0)))
+                Then(putOp(leaderPath, uniqueToken, lease.asPutOption))
             }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (!isLeader && txn.isSucceeded && kvClient.getStringValue(electionPath) == uniqueToken) {
+        return if (!isLeader && txn.isSucceeded && kvClient.getStringValue(leaderPath) == uniqueToken) {
             // This will exit when leadership is relinquished
             leaseClient.keepAliveWith(lease) {
                 // Selected as leader
                 electedLeader = true
                 listener.takeLeadership(this)
             }
-
-            // Keep-alive can be slow to get rid of the key, so delete it
-            //kvClient.delete(electionPath)
 
             // Leadership was relinquished
             // Do this after leadership is complete so the thread does not terminate
