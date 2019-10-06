@@ -17,31 +17,15 @@
 
 package org.athenian.discovery
 
-import com.sudothought.common.util.randomId
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.time.Instant
 
 @Serializable
-data class ServiceInstance(val name: String,
-                           var jsonPayload: String,
-                           var address: String = "",
-                           var port: Int = -1,
-                           var sslPort: Int = -1,
-                           var registrationTimeUTC: Long = Instant.now().toEpochMilli(),
-                           var serviceType: ServiceType = ServiceType.DYNAMIC,
-                           var uri: String = "",
-                           var enabled: Boolean = true) {
-
-    val id: String = randomId(9)
-
-    init {
-        require(name.isNotEmpty()) { "Name cannot be empty" }
-    }
-
+data class ServicePayload(var intval: Int) {
     fun toJson() = Json.stringify(serializer(), this)
 
     companion object {
         fun toObject(json: String) = Json.parse(serializer(), json)
     }
 }
+

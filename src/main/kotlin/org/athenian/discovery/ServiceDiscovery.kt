@@ -128,9 +128,9 @@ class ServiceDiscovery<T>(val url: String,
         }
     }
 
-    fun serviceCacheBuilder(): ServiceCacheBuilder<T>? {
+    fun serviceCache(name: String): ServiceCache {
         checkStatus()
-        return null
+        return ServiceCache(url, namesPath, name)
     }
 
     fun queryForNames(): List<String> =

@@ -21,9 +21,9 @@ package org.athenian.util
 
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
-import org.athenian.jetcd.countChildren
-import org.athenian.jetcd.getChildrenKeys
-import org.athenian.jetcd.getChildrenStringValues
+import org.athenian.jetcd.asString
+import org.athenian.jetcd.count
+import org.athenian.jetcd.getChildrenKVs
 import org.athenian.jetcd.withKvClient
 import kotlin.time.seconds
 
@@ -38,9 +38,8 @@ fun main() {
             client.withKvClient { kvClient ->
                 kvClient.apply {
                     repeat(600) {
-                        println(getChildrenKeys(keyname))
-                        println(getChildrenStringValues(keyname))
-                        println(countChildren(keyname))
+                        println(getChildrenKVs(keyname).asString)
+                        println(count(keyname))
                         sleep(1.seconds)
                     }
                 }

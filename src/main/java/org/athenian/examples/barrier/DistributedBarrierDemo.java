@@ -32,7 +32,7 @@ public class DistributedBarrierDemo {
         int threadCount = 5;
         CountDownLatch waitLatch = new CountDownLatch(threadCount);
         CountDownLatch goLatch = new CountDownLatch(1);
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount + 1);
+        ExecutorService executor = Executors.newCachedThreadPool();
 
         DistributedBarrier.Companion.reset(url, barrierName);
 

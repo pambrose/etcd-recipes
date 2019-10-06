@@ -38,7 +38,7 @@ fun main() {
         sd.start()
 
         val test = Test(-999)
-        val si = ServiceInstance("A Name", test.toJson())
+        val si = ServiceInstance("TestName", test.toJson())
 
         println(si.toJson())
 
@@ -52,7 +52,7 @@ fun main() {
         sleep(2.seconds)
         println("Updating")
         test.intval = -888
-        si.payload = test.toJson()
+        si.jsonPayload = test.toJson()
         sd.updateService(si)
         println("Retrieved value: ${sd.queryForInstance(si.name, si.id)}")
         println("Retrieved values: ${sd.queryForInstances(si.name)}")

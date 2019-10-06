@@ -23,11 +23,12 @@ import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.WatchOption
 import org.athenian.jetcd.asByteSequence
+import org.athenian.jetcd.asPair
 import org.athenian.jetcd.asString
-import org.athenian.jetcd.countChildren
+import org.athenian.jetcd.count
 import org.athenian.jetcd.delete
+import org.athenian.jetcd.getChildrenKVs
 import org.athenian.jetcd.getChildrenKeys
-import org.athenian.jetcd.getChildrenStringValues
 import org.athenian.jetcd.putValue
 import org.athenian.jetcd.watcher
 import org.athenian.jetcd.withKvClient
@@ -49,19 +50,16 @@ fun main() {
                         watchClient.watcher(keyname, option) { watchResponse ->
                             watchResponse.events
                                 .forEach { watchEvent ->
-                                    val key = watchEvent.keyValue.key.asString
-                                    println("Got event ${watchEvent.eventType} for $key")
+                                    println("${watchEvent.eventType} for ${watchEvent.keyValue.asPair.asString}")
                                 }
-
                         }.use {
 
                             // Create empty root
                             putValue(keyname, "root")
 
                             println("After creation:")
-                            println(getChildrenKeys(keyname))
-                            println(getChildrenStringValues(keyname))
-                            println(countChildren(keyname))
+                            println(getChildrenKVs(keyname).asString)
+                            println(count(keyname))
 
                             sleep(5.seconds)
 
@@ -72,19 +70,16 @@ fun main() {
                             putValue("$keyname/waiting/d", "dddd")
 
                             println("\nAfter addition:")
-                            println(getChildrenKeys(keyname))
-                            println(getChildrenStringValues(keyname))
-                            println(countChildren(keyname))
+                            println(getChildrenKVs(keyname).asString)
+                            println(count(keyname))
 
                             println("\nElections only:")
-                            println(getChildrenKeys("$keyname/election"))
-                            println(getChildrenStringValues("$keyname/election"))
-                            println(countChildren("$keyname/election"))
+                            println(getChildrenKVs("$keyname/election").asString)
+                            println(count("$keyname/election"))
 
                             println("\nWaitings only:")
-                            println(getChildrenKeys("$keyname/waiting"))
-                            println(getChildrenStringValues("$keyname/waiting"))
-                            println(countChildren("$keyname/waiting"))
+                            println(getChildrenKVs("$keyname/waiting").asString)
+                            println(count("$keyname/waiting"))
 
                             sleep(5.seconds)
 
@@ -99,9 +94,8 @@ fun main() {
 
 
                             println("\nAfter removal:")
-                            println(getChildrenKeys(keyname))
-                            println(getChildrenStringValues(keyname))
-                            println(countChildren(keyname))
+                            println(getChildrenKVs(keyname).asString)
+                            println(count(keyname))
 
                             sleep(5.seconds)
 

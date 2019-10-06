@@ -36,7 +36,7 @@ import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asByteSequence
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.asString
-import org.athenian.jetcd.countChildren
+import org.athenian.jetcd.count
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.deleteOp
 import org.athenian.jetcd.ensureTrailing
@@ -88,7 +88,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     private val isReadySet: Boolean get() = kvClient.keyIsPresent(readyPath)
 
-    val waiterCount: Long get() = kvClient.countChildren(waitingPrefix)
+    val waiterCount: Long get() = kvClient.count(waitingPrefix)
 
     fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 

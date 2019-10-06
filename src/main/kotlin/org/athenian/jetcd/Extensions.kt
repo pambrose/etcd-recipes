@@ -26,6 +26,7 @@ import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Cluster
 import io.etcd.jetcd.KV
+import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Lock
 import io.etcd.jetcd.Maintenance
@@ -63,6 +64,14 @@ val ByteSequence.asLong: Long get() = Longs.fromByteArray(bytes)
 val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(id).build()
 
 val String.asPrefixGetOption get() = GetOption.newBuilder().withPrefix(asByteSequence).build()
+
+val KeyValue.asPair: Pair<String, ByteSequence> get() = Pair(key.asString, value)
+
+val Pair<String, ByteSequence>.asString get() = Pair(first, second.asString)
+
+val Pair<String, ByteSequence>.asInt get() = Pair(first, second.asInt)
+
+val Pair<String, ByteSequence>.asLong get() = Pair(first, second.asLong)
 
 fun KV.putValue(keyname: String, keyval: String): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
 
@@ -120,6 +129,27 @@ fun KV.getChildrenStringValues(keyname: String): List<String> {
     return getStringValues(adjustedKey, adjustedKey.asPrefixGetOption)
 }
 
+fun KV.getChildrenIntValues(keyname: String): List<Int> {
+    val adjustedKey = keyname.ensureTrailing("/")
+    return getIntValues(adjustedKey, adjustedKey.asPrefixGetOption)
+}
+
+fun KV.getChildrenLongValues(keyname: String): List<Long> {
+    val adjustedKey = keyname.ensureTrailing("/")
+    return getLongValues(adjustedKey, adjustedKey.asPrefixGetOption)
+}
+
+fun KV.getChildrenKVs(keyname: String): List<Pair<String, ByteSequence>> {
+    val adjustedKey = keyname.ensureTrailing("/")
+    return getKVs(adjustedKey, adjustedKey.asPrefixGetOption)
+}
+
+val List<Pair<String, ByteSequence>>.asString get() = map { Pair(it.first, it.second.asString) }
+
+val List<Pair<String, ByteSequence>>.asInt get() = map { Pair(it.first, it.second.asInt) }
+
+val List<Pair<String, ByteSequence>>.asLong get() = map { Pair(it.first, it.second.asLong) }
+
 fun KV.getStringValue(keyname: String): String? =
     getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
 
@@ -147,9 +177,18 @@ fun KV.getKeys(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<
 fun KV.getStringValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<String> =
     getResponse(keyname, getOption).kvs.map { it.value.asString }
 
-fun Lazy<KV>.countChildren(keyname: String): Long = value.countChildren(keyname)
+fun KV.getIntValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<Int> =
+    getResponse(keyname, getOption).kvs.map { it.value.asInt }
 
-fun KV.countChildren(keyname: String): Long {
+fun KV.getLongValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<Long> =
+    getResponse(keyname, getOption).kvs.map { it.value.asLong }
+
+fun KV.getKVs(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<Pair<String, ByteSequence>> =
+    getResponse(keyname, getOption).kvs.map { Pair(it.key.asString, it.value) }
+
+fun Lazy<KV>.count(keyname: String): Long = value.count(keyname)
+
+fun KV.count(keyname: String): Long {
     val adjustedKey = keyname.ensureTrailing("/")
     return getResponse(adjustedKey,
                        GetOption.newBuilder()
@@ -200,6 +239,8 @@ fun Client.withKvClient(block: (kvClient: KV) -> Unit) = kvClient.use { block(it
 fun Lazy<Watch>.watcher(keyname: String,
                         option: WatchOption = WatchOption.DEFAULT,
                         block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyname, option, block)
+
+val nullWatchOption = WatchOption.newBuilder().withRange(ByteSequence.from(ByteArray(1))).build()
 
 fun Watch.watcher(keyname: String,
                   option: WatchOption = WatchOption.DEFAULT,

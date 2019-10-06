@@ -22,6 +22,7 @@ package org.athenian.basics
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
+import org.athenian.jetcd.asPair
 import org.athenian.jetcd.asString
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.putValue
@@ -71,7 +72,7 @@ fun main() {
                         watchClient.watcher(keyname) { watchResponse ->
                             watchResponse.events
                                 .forEach { watchEvent ->
-                                    println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.value.asString}")
+                                    println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asPair.asString}")
                                 }
                         }.use {
                             sleep(5.seconds)
