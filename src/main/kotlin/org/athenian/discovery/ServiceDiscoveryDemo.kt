@@ -18,17 +18,10 @@
 package org.athenian.discovery
 
 import com.sudothought.common.util.sleep
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlin.time.seconds
 
 
 fun main() {
-
-    @Serializable
-    data class Test(var intval: Int) {
-        fun toJson() = Json.stringify(serializer(), this)
-    }
 
     val url = "http://localhost:2379"
     val serviceName = "/services/test"
@@ -37,7 +30,7 @@ fun main() {
 
         sd.start()
 
-        val test = Test(-999)
+        val test = ServicePayload(-999)
         val si = ServiceInstance("TestName", test.toJson())
 
         println(si.toJson())

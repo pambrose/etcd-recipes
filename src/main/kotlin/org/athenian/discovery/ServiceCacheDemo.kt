@@ -20,9 +20,7 @@ package org.athenian.discovery
 import com.sudothought.common.util.sleep
 import kotlin.time.days
 
-
 fun main() {
-
     val url = "http://localhost:2379"
     val serviceName = "/services/test"
 
@@ -34,12 +32,13 @@ fun main() {
 
             cache.addListenerForChanges { eventType, serviceName, serviceInstance ->
                 println("Change $eventType $serviceName $serviceInstance")
+                serviceInstance?.let { println("Payload: ${ServicePayload.toObject(it.jsonPayload)}") }
                 println("Instances: ${cache.instances}")
             }
+
             cache.start()
 
-            println("Waiting")
-            sleep(2.days)
+            sleep(10.days)
         }
     }
 }

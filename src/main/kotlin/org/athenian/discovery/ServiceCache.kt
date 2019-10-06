@@ -75,8 +75,8 @@ class ServiceCache(val url: String,
                             }
                             DELETE -> {
                                 val k = event.keyValue.key.asString
-                                val oldServiceInstance = serviceMap.remove(k)?.let { ServiceInstance.toObject(it) }
-                                listeners.forEach { it.cacheChanged(DELETE, k, oldServiceInstance) }
+                                val prevValue = serviceMap.remove(k)?.let { ServiceInstance.toObject(it) }
+                                listeners.forEach { it.cacheChanged(DELETE, k, prevValue) }
                                 //println("$k deleted")
                             }
                             UNRECOGNIZED -> logger.error { "Error with $watchPath watch" }

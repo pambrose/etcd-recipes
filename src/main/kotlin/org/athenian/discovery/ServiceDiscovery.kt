@@ -41,7 +41,10 @@ import java.util.concurrent.Semaphore
 
 class ServiceDiscovery<T>(val url: String,
                           basePath: String,
-                          val clientId: String = "Client:${randomId(9)}") : Closeable {
+                          val clientId: String) : Closeable {
+
+    // Java constructor
+    constructor(url: String, basePath: String) : this(url, basePath, "Client:${randomId(9)}")
 
     private val semaphore = Semaphore(1, true)
     private var client by nonNullableReference<Client>()
