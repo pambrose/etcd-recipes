@@ -26,46 +26,37 @@ fun main() {
     val url = "http://localhost:2379"
     val serviceName = "/services/test"
 
-    ServiceDiscovery<Int>(url, serviceName).use { sd ->
+    ServiceDiscovery(url, serviceName).use { sd ->
 
         sd.start()
 
-        val test = ServicePayload(-999)
-        val si = ServiceInstance("TestName", test.toJson())
+        val payload = IntPayload(-999)
+        val service = ServiceInstance("TestName", payload.toJson())
 
-        println(si.toJson())
+        println(service.toJson())
 
         println("Registering")
-        sd.registerService(si)
-        println("Retrieved value: ${sd.queryForInstance(si.name, si.id)}")
-        println("Retrieved values: ${sd.queryForInstances(si.name)}")
+        sd.registerService(service)
+        println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+        println("Retrieved values: ${sd.queryForInstances(service.name)}")
         println("Retrieved names: ${sd.queryForNames()}")
 
 
         sleep(2.seconds)
         println("Updating")
-        test.intval = -888
-        si.jsonPayload = test.toJson()
-        sd.updateService(si)
-        println("Retrieved value: ${sd.queryForInstance(si.name, si.id)}")
-        println("Retrieved values: ${sd.queryForInstances(si.name)}")
+        payload.intval = -888
+        service.jsonPayload = payload.toJson()
+        sd.updateService(service)
+        println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+        println("Retrieved values: ${sd.queryForInstances(service.name)}")
         println("Retrieved names: ${sd.queryForNames()}")
 
         sleep(2.seconds)
         println("Unregistering")
-        sd.unregisterService(si)
-
+        sd.unregisterService(service)
         sleep(3.seconds)
 
-        try {
-            println("Retrieved value: ${sd.queryForInstance(si.name, si.id)}")
-        } catch (e: Exception) {
-            println("Had exception $e")
-        }
-
-        sleep(2.seconds)
-
-        println("Final sleep")
+        println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
         sleep(2.seconds)
     }
 }

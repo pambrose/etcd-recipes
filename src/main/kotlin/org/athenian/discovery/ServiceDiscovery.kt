@@ -39,9 +39,9 @@ import org.athenian.jetcd.transaction
 import java.io.Closeable
 import java.util.concurrent.Semaphore
 
-class ServiceDiscovery<T>(val url: String,
-                          basePath: String,
-                          val clientId: String) : Closeable {
+class ServiceDiscovery(val url: String,
+                       basePath: String,
+                       val clientId: String) : Closeable {
 
     // Java constructor
     constructor(url: String, basePath: String) : this(url, basePath, "Client:${randomId(9)}")

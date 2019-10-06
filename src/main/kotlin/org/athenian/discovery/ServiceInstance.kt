@@ -43,5 +43,28 @@ data class ServiceInstance(val name: String,
 
     companion object {
         fun toObject(json: String) = Json.parse(serializer(), json)
+
+        class ServiceInstanceBuilder(val name: String, val jsonPayload: String) {
+            var address: String = ""
+            var port: Int = -1
+            var sslPort: Int = -1
+            var registrationTimeUTC: Long = Instant.now().toEpochMilli()
+            var serviceType: ServiceType = ServiceType.DYNAMIC
+            var uri: String = ""
+            var enabled: Boolean = true
+
+            fun build(): ServiceInstance =
+                ServiceInstance(name,
+                                jsonPayload,
+                                address,
+                                port,
+                                sslPort,
+                                registrationTimeUTC,
+                                serviceType,
+                                uri,
+                                enabled)
+        }
+
+        fun newBuilder(name: String, jsonPayload: String) = ServiceInstanceBuilder(name, jsonPayload)
     }
 }

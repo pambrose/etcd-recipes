@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
-data class ServicePayload(var intval: Int) {
+data class IntPayload(var intval: Int) {
     fun toJson() = Json.stringify(serializer(), this)
 
     companion object {

@@ -17,9 +17,9 @@
 
 package org.athenian.examples.discovery;
 
+import org.athenian.discovery.IntPayload;
 import org.athenian.discovery.ServiceCache;
 import org.athenian.discovery.ServiceDiscovery;
-import org.athenian.discovery.ServicePayload;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 
@@ -29,7 +29,7 @@ public class ServiceCacheDemo {
         String url = "http://localhost:2379";
         String serviceName = "/services/test";
 
-        try (ServiceDiscovery<Integer> sd = new ServiceDiscovery<Integer>(url, serviceName)) {
+        try (ServiceDiscovery sd = new ServiceDiscovery(url, serviceName)) {
 
             sd.start();
 
@@ -38,7 +38,7 @@ public class ServiceCacheDemo {
                         (eventType, name, serviceInstance) -> {
                             System.out.println(String.format("Change %s %s %s", eventType, name, serviceInstance));
                             if (serviceInstance != null)
-                                System.out.println("Payload: " + ServicePayload.Companion.toObject(serviceInstance.getJsonPayload()));
+                                System.out.println("Payload: " + IntPayload.Companion.toObject(serviceInstance.getJsonPayload()));
                             System.out.println(cache.getInstances());
                         }
                 );

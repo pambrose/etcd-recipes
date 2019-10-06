@@ -24,7 +24,7 @@ fun main() {
     val url = "http://localhost:2379"
     val serviceName = "/services/test"
 
-    ServiceDiscovery<Int>(url, serviceName).use { sd ->
+    ServiceDiscovery(url, serviceName).use { sd ->
 
         sd.start()
 
@@ -32,7 +32,7 @@ fun main() {
 
             cache.addListenerForChanges { eventType, serviceName, serviceInstance ->
                 println("Change $eventType $serviceName $serviceInstance")
-                serviceInstance?.let { println("Payload: ${ServicePayload.toObject(it.jsonPayload)}") }
+                serviceInstance?.let { println("Payload: ${IntPayload.toObject(it.jsonPayload)}") }
                 println("Instances: ${cache.instances}")
             }
 
