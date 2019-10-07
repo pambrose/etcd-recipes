@@ -29,7 +29,7 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val keyname = "/foo"
+    val path = "/foo"
     val keyval = "foobar"
 
     Client.builder().endpoints(url).build()
@@ -37,8 +37,8 @@ fun main() {
             client.withLeaseClient { leaseClient ->
                 client.withKvClient { kvClient ->
                     val lease = leaseClient.grant(1).get()
-                    println("Assigning $keyname = $keyval")
-                    kvClient.putValue(keyname, keyval, lease.asPutOption)
+                    println("Assigning $path = $keyval")
+                    kvClient.putValue(path, keyval, lease.asPutOption)
                     leaseClient.keepAlive(lease.id,
                                           Observers.observer({ next ->
                                                                  println("KeepAlive next resp: $next")

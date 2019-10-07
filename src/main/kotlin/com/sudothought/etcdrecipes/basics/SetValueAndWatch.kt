@@ -20,13 +20,7 @@ package com.sudothought.etcdrecipes.basics
 
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
-import com.sudothought.etcdrecipes.jetcd.asPair
-import com.sudothought.etcdrecipes.jetcd.asString
-import com.sudothought.etcdrecipes.jetcd.delete
-import com.sudothought.etcdrecipes.jetcd.putValue
-import com.sudothought.etcdrecipes.jetcd.watcher
-import com.sudothought.etcdrecipes.jetcd.withKvClient
-import com.sudothought.etcdrecipes.jetcd.withWatchClient
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.Client
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -34,9 +28,9 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val countdown = CountDownLatch(2)
-    val keyname = "/foo"
+    val path = "/foo"
     val keyval = "foobar"
+    val countdown = CountDownLatch(2)
 
     thread {
         try {
@@ -47,13 +41,13 @@ fun main() {
                     client.withKvClient { kvClient ->
                         repeatWithSleep(10) { i, _ ->
                             val kv = keyval + i
-                            println("Assigning $keyname = $kv")
-                            kvClient.putValue(keyname, kv)
+                            println("Assigning $path = $kv")
+                            kvClient.putValue(path, kv)
 
                             sleep(1.seconds)
 
-                            println("Deleting $keyname")
-                            kvClient.delete(keyname)
+                            println("Deleting $path")
+                            kvClient.delete(path)
                         }
                     }
                 }
@@ -68,7 +62,7 @@ fun main() {
                 .use { client ->
                     client.withWatchClient { watchClient ->
                         println("Starting watch")
-                        watchClient.watcher(keyname) { watchResponse ->
+                        watchClient.watcher(path) { watchResponse ->
                             watchResponse.events
                                 .forEach { watchEvent ->
                                     println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asPair.asString}")

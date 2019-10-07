@@ -27,25 +27,28 @@ import kotlin.time.days
 
 fun main() {
     val url = "http://localhost:2379"
-    val electionName = "/election/threaded"
+    val electionPath = "/election/threaded"
     val executor = Executors.newSingleThreadExecutor()
+
     val latch =
         LeaderSelector.reportLeader(url,
-                                    electionName,
+                                    electionPath,
                                     object : LeaderListener {
-                                        //val electedClock = MonoClock
+                                        val electedClock = MonoClock
                                         val unelectedClock = MonoClock
-                                        //var electedTime = electedClock.markNow()
+                                        var electedTime = electedClock.markNow()
                                         var unelectedTime = unelectedClock.markNow()
+                                        var currentLeader = ""
 
                                         override fun takeLeadership(leaderName: String) {
-                                            println("$leaderName is now the leader [${unelectedTime.elapsedNow()}]")
-                                            //electedClock.markNow()
+                                            println("$leaderName is now the leader [Break time: ${unelectedTime.elapsedNow()}]")
+                                            currentLeader = leaderName
+                                            electedTime = electedClock.markNow()
                                         }
 
                                         override fun relinquishLeadership() {
-                                            //println("No longer the leader [${electedTime.elapsedNow()}]")
-                                            unelectedClock.markNow()
+                                            println("$currentLeader is no longer the leader, after being leader for: ${electedTime.elapsedNow()}")
+                                            unelectedTime = unelectedClock.markNow()
                                         }
                                     },
                                     executor)

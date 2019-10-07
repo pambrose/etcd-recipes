@@ -18,27 +18,21 @@
 
 package com.sudothought.etcdrecipes.basics
 
-import com.sudothought.etcdrecipes.jetcd.delete
-import com.sudothought.etcdrecipes.jetcd.equalTo
-import com.sudothought.etcdrecipes.jetcd.getStringValue
-import com.sudothought.etcdrecipes.jetcd.putOp
-import com.sudothought.etcdrecipes.jetcd.putValue
-import com.sudothought.etcdrecipes.jetcd.transaction
-import com.sudothought.etcdrecipes.jetcd.withKvClient
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.op.CmpTarget
 
 fun main() {
     val url = "http://localhost:2379"
-    val keyname = "/txntest"
+    val path = "/txntest"
     val debug = "/debug"
 
     fun checkForKey(kvClient: KV) {
         kvClient.transaction {
-            If(equalTo(keyname, CmpTarget.version(0)))
-            Then(putOp(debug, "Key $keyname not found"))
-            Else(putOp(debug, "Key $keyname found"))
+            If(equalTo(path, CmpTarget.version(0)))
+            Then(putOp(debug, "Key $path not found"))
+            Else(putOp(debug, "Key $path found"))
         }
 
         println("Debug value: ${kvClient.getStringValue(debug, "unset")}")
@@ -48,10 +42,10 @@ fun main() {
         .use { client ->
             client.withKvClient { kvClient ->
                 println("Deleting keys")
-                kvClient.delete(keyname, debug)
+                kvClient.delete(path, debug)
 
                 checkForKey(kvClient)
-                kvClient.putValue(keyname, "Something")
+                kvClient.putValue(path, "Something")
                 checkForKey(kvClient)
             }
         }

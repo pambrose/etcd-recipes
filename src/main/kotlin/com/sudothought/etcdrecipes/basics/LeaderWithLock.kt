@@ -20,13 +20,7 @@ package com.sudothought.etcdrecipes.basics
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
-import com.sudothought.etcdrecipes.jetcd.getStringValue
-import com.sudothought.etcdrecipes.jetcd.lock
-import com.sudothought.etcdrecipes.jetcd.putValue
-import com.sudothought.etcdrecipes.jetcd.unlock
-import com.sudothought.etcdrecipes.jetcd.withKvClient
-import com.sudothought.etcdrecipes.jetcd.withLeaseClient
-import com.sudothought.etcdrecipes.jetcd.withLockClient
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.Client
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -37,9 +31,9 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
+    val path = "/lockedElection"
     val count = 3
     val countdown = CountDownLatch(count)
-    val keyname = "/lockedElection"
 
     repeat(count) { i ->
         thread {
@@ -55,15 +49,15 @@ fun main() {
                         val lease = leaseClient.grant(10).get()
 
                         client.withLockClient { lock ->
-                            println("Thread $i attempting to lock $keyname")
-                            lock.lock(keyname, lease.id)
-                            println("Thread $i locked $keyname")
+                            println("Thread $i attempting to lock $path")
+                            lock.lock(path, lease.id)
+                            println("Thread $i locked $path")
 
                             client.withKvClient { kvClient ->
                                 println("Thread $i assigning $keyval")
-                                kvClient.putValue(keyname, keyval)
+                                kvClient.putValue(path, keyval)
 
-                                if (kvClient.getStringValue(keyname) == keyval)
+                                if (kvClient.getStringValue(path) == keyval)
                                     println("Thread $i is the leader")
 
                                 // delete the key
@@ -75,7 +69,7 @@ fun main() {
                             }
 
                             println("Thread $i is unlocking")
-                            lock.unlock(keyname)
+                            lock.unlock(path)
                             println("Thread $i is done unlocking")
                         }
                     }

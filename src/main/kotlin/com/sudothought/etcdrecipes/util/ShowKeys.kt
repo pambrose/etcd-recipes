@@ -28,15 +28,15 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val keyname = "/"
+    val path = "/"
 
     Client.builder().endpoints(url).build()
         .use { client ->
             client.withKvClient { kvClient ->
                 kvClient.apply {
                     repeat(600) {
-                        println(getChildrenKVs(keyname).asString)
-                        println(count(keyname))
+                        println(getChildrenKVs(path).asString)
+                        println(count(path))
                         sleep(1.seconds)
                     }
                 }

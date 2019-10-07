@@ -32,8 +32,7 @@ import java.io.Closeable
 
 class ServiceDiscovery(val url: String,
                        basePath: String,
-                       val clientId: String
-) : EtcdConnector(url), Closeable {
+                       val clientId: String) : EtcdConnector(url), Closeable {
 
     // Java constructor
     constructor(url: String, basePath: String) : this(url, basePath, "Client:${randomId(9)}")
@@ -42,18 +41,18 @@ class ServiceDiscovery(val url: String,
     private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()
     private val serviceCacheList = mutableListOf<ServiceCache>()
 
-    class ServiceInstanceContext(val service: ServiceInstance) : Closeable {
-        var lease by nonNullableReference<LeaseGrantResponse>()
-        var keepAlive by nonNullableReference<CloseableClient>()
+    init {
+        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(basePath.isNotEmpty()) { "Service base path cannot be empty" }
+    }
+
+    private class ServiceInstanceContext(val service: ServiceInstance) : Closeable {
+        var lease: LeaseGrantResponse by nonNullableReference<LeaseGrantResponse>()
+        var keepAlive: CloseableClient by nonNullableReference<CloseableClient>()
 
         override fun close() {
             keepAlive.close()
         }
-    }
-
-    init {
-        require(url.isNotEmpty()) { "URL cannot be empty" }
-        require(basePath.isNotEmpty()) { "Service base path cannot be empty" }
     }
 
     @Throws(EtcdRecipeException::class)

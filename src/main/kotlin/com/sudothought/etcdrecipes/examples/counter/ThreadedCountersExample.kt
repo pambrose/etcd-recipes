@@ -87,8 +87,5 @@ fun main() {
             outerLatch.await()
         }
 
-    DistributedAtomicLong(url, counterPath)
-        .use { counter ->
-            println("Counter value = ${counter.get()} in $dur")
-        }
+    DistributedAtomicLong(url, counterPath).use { println("Counter value = ${it.get()} in $dur") }
 }

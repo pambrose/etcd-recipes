@@ -20,16 +20,19 @@ package com.sudothought.etcdrecipes.common
 
 import com.sudothought.common.delegate.AtomicDelegates
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.KV
+import io.etcd.jetcd.Lease
+import io.etcd.jetcd.Watch
 import java.util.concurrent.Semaphore
 
 open class EtcdConnector(url: String) {
 
-    protected val semaphore = Semaphore(1, true)
-    protected val client = lazy { Client.builder().endpoints(url).build() }
-    protected val kvClient = lazy { client.value.kvClient }
-    protected val leaseClient = lazy { client.value.leaseClient }
-    protected val watchClient = lazy { client.value.watchClient }
-    protected var closeCalled by AtomicDelegates.atomicBoolean(false)
+    protected val semaphore: Semaphore = Semaphore(1, true)
+    protected val client: Lazy<Client> = lazy { Client.builder().endpoints(url).build() }
+    protected val kvClient: Lazy<KV> = lazy { client.value.kvClient }
+    protected val leaseClient: Lazy<Lease> = lazy { client.value.leaseClient }
+    protected val watchClient: Lazy<Watch> = lazy { client.value.watchClient }
+    protected var closeCalled: Boolean by AtomicDelegates.atomicBoolean(false)
 
     protected fun checkCloseNotCalled() {
         if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")

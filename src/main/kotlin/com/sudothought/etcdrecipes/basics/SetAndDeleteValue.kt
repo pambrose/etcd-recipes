@@ -31,9 +31,9 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val countdown = CountDownLatch(2)
-    val keyname = "/foo"
+    val path = "/foo"
     val keyval = "foobar"
+    val countdown = CountDownLatch(2)
 
     thread {
         try {
@@ -42,13 +42,13 @@ fun main() {
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
-                        println("Assigning $keyname = $keyval")
-                        kvClient.putValue(keyname, keyval)
+                        println("Assigning $path = $keyval")
+                        kvClient.putValue(path, keyval)
 
                         sleep(5.seconds)
 
-                        println("Deleting $keyname")
-                        kvClient.delete(keyname)
+                        println("Deleting $path")
+                        kvClient.delete(path)
                     }
                 }
         } finally {
@@ -62,8 +62,8 @@ fun main() {
                 .use { client ->
                     client.withKvClient { kvClient ->
                         repeatWithSleep(12) { _, start ->
-                            val respval = kvClient.getStringValue(keyname, "unset")
-                            println("Key $keyname = $respval after ${System.currentTimeMillis() - start}ms")
+                            val respval = kvClient.getStringValue(path, "unset")
+                            println("Key $path = $respval after ${System.currentTimeMillis() - start}ms")
                         }
                     }
                 }

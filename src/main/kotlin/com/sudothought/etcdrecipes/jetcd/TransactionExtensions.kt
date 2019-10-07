@@ -41,13 +41,13 @@ fun <T> lessThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByt
 
 fun <T> greaterThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.GREATER, target)
 
-fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
-
 fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
     txn().run {
         block()
         commit()
     }.get()
+
+fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
 
 fun deleteOp(keyname: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
     Op.delete(keyname.asByteSequence, option)

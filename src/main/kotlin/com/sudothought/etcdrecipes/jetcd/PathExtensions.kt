@@ -24,5 +24,5 @@ fun String.stripLeading(delim: String = "/"): String = if (startsWith(delim)) dr
 
 fun String.stripTrailing(delim: String = "/"): String = if (endsWith(delim)) dropLast(1) else this
 
-fun String.appendToPath(suffix: String, delim: String = "/"): String =
+fun String.appendToPath(suffix: String, delim: String = "/") =
     "${stripTrailing(delim)}$delim${suffix.stripLeading(delim)}"

@@ -98,8 +98,7 @@ class LeaderSelector(
             }
         },
         clientId,
-        executorService
-                                                                )
+        executorService)
 
     private val closeSemaphore = Semaphore(1, true)
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
@@ -141,7 +140,7 @@ class LeaderSelector(
 
         val connectedToEtcd = BooleanMonitor(false)
 
-        executor.submit {
+        executor.execute {
             try {
                 Client.builder().endpoints(url).build()
                     .use { client ->
@@ -154,7 +153,7 @@ class LeaderSelector(
                                 val watchStopped = BooleanMonitor(false)
                                 val advertiseComplete = BooleanMonitor(false)
 
-                                executor.submit {
+                                executor.execute {
                                     try {
                                         client.withWatchClient { watchClient ->
                                             // Run for leader when leader key is deleted
@@ -176,7 +175,7 @@ class LeaderSelector(
                                     }
                                 }
 
-                                executor.submit {
+                                executor.execute {
                                     try {
                                         advertiseParticipation(leaseClient, kvClient)
                                     } catch (e: Exception) {
@@ -262,11 +261,12 @@ class LeaderSelector(
     private fun watchForDeleteEvents(watchClient: Watch,
                                      watchStarted: BooleanMonitor,
                                      block: () -> Unit): Watch.Watcher {
-        val watcher = watchClient.watcher(leaderPath) { watchResponse ->
-            watchResponse.events.forEach { event ->
-                if (event.eventType == DELETE) block.invoke()
+        val watcher =
+            watchClient.watcher(leaderPath) { watchResponse ->
+                watchResponse.events.forEach { event ->
+                    if (event.eventType == DELETE) block.invoke()
+                }
             }
-        }
         watchStarted.set(true)
         return watcher
     }
@@ -358,16 +358,16 @@ class LeaderSelector(
 
         fun getParticipants(url: String, electionPath: String): List<Participant> {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
-            val retval = mutableListOf<Participant>()
+            val participants = mutableListOf<Participant>()
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
                         val leader = kvClient.getStringValue(electionPath)?.stripUniqueSuffix
                         kvClient.getChildrenStringValues(participationPath(electionPath))
-                            .forEach { retval += Participant(it, leader == it) }
+                            .forEach { participants += Participant(it, leader == it) }
                     }
                 }
-            return retval
+            return participants
         }
 
         fun reportLeader(url: String,

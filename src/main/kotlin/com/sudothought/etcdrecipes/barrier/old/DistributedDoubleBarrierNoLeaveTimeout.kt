@@ -105,7 +105,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
             throw EtcdRecipeException("Failed to assign waitingPath unique value")
 
         // Keep key alive
-        executor.value.submit { leaseClient.keepAliveWith(lease) { keepAliveLatch.await() } }
+        executor.value.execute { leaseClient.keepAliveWith(lease) { keepAliveLatch.await() } }
 
         fun checkWaiterCountInEnter() {
             // First see if /ready is missing

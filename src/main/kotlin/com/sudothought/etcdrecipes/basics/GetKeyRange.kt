@@ -19,25 +19,14 @@
 package com.sudothought.etcdrecipes.basics
 
 import com.sudothought.common.util.sleep
-import com.sudothought.etcdrecipes.jetcd.asByteSequence
-import com.sudothought.etcdrecipes.jetcd.asPair
-import com.sudothought.etcdrecipes.jetcd.asString
-import com.sudothought.etcdrecipes.jetcd.count
-import com.sudothought.etcdrecipes.jetcd.delete
-import com.sudothought.etcdrecipes.jetcd.getChildrenKVs
-import com.sudothought.etcdrecipes.jetcd.getChildrenKeys
-import com.sudothought.etcdrecipes.jetcd.putValue
-import com.sudothought.etcdrecipes.jetcd.watcher
-import com.sudothought.etcdrecipes.jetcd.withKvClient
-import com.sudothought.etcdrecipes.jetcd.withWatchClient
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.WatchOption
 import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val keyname = "/keyrangetest"
-
+    val path = "/keyrangetest"
 
     Client.builder().endpoints(url).build()
         .use { client ->
@@ -46,57 +35,56 @@ fun main() {
                     kvClient.apply {
 
                         val option = WatchOption.newBuilder().withPrefix("/".asByteSequence).build()
-                        watchClient.watcher(keyname, option) { watchResponse ->
+                        watchClient.watcher(path, option) { watchResponse ->
                             watchResponse.events
                                 .forEach { watchEvent ->
                                     println("${watchEvent.eventType} for ${watchEvent.keyValue.asPair.asString}")
                                 }
                         }.use {
                             // Create empty root
-                            putValue(keyname, "root")
+                            putValue(path, "root")
 
                             println("After creation:")
-                            println(getChildrenKVs(keyname).asString)
-                            println(count(keyname))
+                            println(getChildrenKVs(path).asString)
+                            println(count(path))
 
                             sleep(5.seconds)
 
                             // Add children
-                            putValue("$keyname/election/a", "a")
-                            putValue("$keyname/election/b", "bb")
-                            putValue("$keyname/waiting/c", "ccc")
-                            putValue("$keyname/waiting/d", "dddd")
+                            putValue("$path/election/a", "a")
+                            putValue("$path/election/b", "bb")
+                            putValue("$path/waiting/c", "ccc")
+                            putValue("$path/waiting/d", "dddd")
 
                             println("\nAfter addition:")
-                            println(getChildrenKVs(keyname).asString)
-                            println(count(keyname))
+                            println(getChildrenKVs(path).asString)
+                            println(count(path))
 
                             println("\nElections only:")
-                            println(getChildrenKVs("$keyname/election").asString)
-                            println(count("$keyname/election"))
+                            println(getChildrenKVs("$path/election").asString)
+                            println(count("$path/election"))
 
                             println("\nWaitings only:")
-                            println(getChildrenKVs("$keyname/waiting").asString)
-                            println(count("$keyname/waiting"))
+                            println(getChildrenKVs("$path/waiting").asString)
+                            println(count("$path/waiting"))
 
                             sleep(5.seconds)
 
                             // Delete root
-                            delete(keyname)
+                            delete(path)
 
                             // Delete children
-                            getChildrenKeys(keyname).forEach {
+                            getChildrenKeys(path).forEach {
                                 println("Deleting key: $it")
                                 delete(it)
                             }
 
 
                             println("\nAfter removal:")
-                            println(getChildrenKVs(keyname).asString)
-                            println(count(keyname))
+                            println(getChildrenKVs(path).asString)
+                            println(count(path))
 
                             sleep(5.seconds)
-
                         }
                     }
                 }

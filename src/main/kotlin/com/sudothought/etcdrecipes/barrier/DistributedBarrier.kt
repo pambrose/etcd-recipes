@@ -38,8 +38,7 @@ import kotlin.time.days
 class DistributedBarrier(val url: String,
                          val barrierPath: String,
                          private val waitOnMissingBarriers: Boolean,
-                         val clientId: String
-) : EtcdConnector(url), Closeable {
+                         val clientId: String) : EtcdConnector(url), Closeable {
 
     constructor(url: String,
                 barrierPath: String,
@@ -108,12 +107,10 @@ class DistributedBarrier(val url: String,
     fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
     @Throws(InterruptedException::class)
-    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
-        waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
+    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
     @Throws(InterruptedException::class)
     fun waitOnBarrier(timeout: Duration): Boolean {
-
         checkCloseNotCalled()
 
         // Check if barrier is present before using watcher

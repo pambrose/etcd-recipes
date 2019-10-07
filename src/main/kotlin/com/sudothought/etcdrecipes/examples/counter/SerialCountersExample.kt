@@ -46,5 +46,4 @@ fun main() {
     println("Total: $total in $dur")
 
     counters.forEach { it.close() }
-
 }

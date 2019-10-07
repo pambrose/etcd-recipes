@@ -39,14 +39,14 @@ public class DistributedAtomicLongExample {
 
         for (int i = 0; i < counterCount; i++) {
             final int id = i;
-            executor.submit(() -> {
+            executor.execute(() -> {
                 try (DistributedAtomicLong counter = new DistributedAtomicLong(url, counterPath)) {
                     System.out.println("Creating counter #" + id);
                     CountDownLatch innerLatch = new CountDownLatch(4);
                     int count = 50;
                     int pause = 50;
 
-                    executor.submit(() -> {
+                    executor.execute(() -> {
                         System.out.println("Begin increments for counter #" + id);
                         for (int j = 0; j < count; j++) counter.increment();
                         sleepMillis(random(pause));
@@ -54,7 +54,7 @@ public class DistributedAtomicLongExample {
                         System.out.println("Completed increments for counter #" + id);
                     });
 
-                    executor.submit(() -> {
+                    executor.execute(() -> {
                         System.out.println("Begin decrements for counter #" + id);
                         for (int j = 0; j < count; j++) counter.decrement();
                         sleepMillis(random(pause));
@@ -62,7 +62,7 @@ public class DistributedAtomicLongExample {
                         System.out.println("Completed decrements for counter #" + id);
                     });
 
-                    executor.submit(() -> {
+                    executor.execute(() -> {
                         System.out.println("Begin adds for counter #" + id);
                         for (int j = 0; j < count; j++) counter.add(5);
                         sleepMillis(random(pause));
@@ -70,7 +70,7 @@ public class DistributedAtomicLongExample {
                         System.out.println("Completed adds for counter #" + id);
                     });
 
-                    executor.submit(() -> {
+                    executor.execute(() -> {
                         System.out.println("Begin subtracts for counter #" + id);
                         for (int j = 0; j < count; j++) counter.subtract(5);
                         sleepMillis(random(pause));

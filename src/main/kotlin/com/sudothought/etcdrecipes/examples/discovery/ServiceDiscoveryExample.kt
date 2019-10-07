@@ -23,7 +23,6 @@ import com.sudothought.etcdrecipes.discovery.ServiceDiscovery
 import com.sudothought.etcdrecipes.discovery.ServiceInstance
 import kotlin.time.seconds
 
-
 fun main() {
     val url = "http://localhost:2379"
     val servicePath = "/services/test"

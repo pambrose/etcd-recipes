@@ -31,20 +31,21 @@ public class LeaderSelectorSerialExample {
 
         LeaderSelector.Static.reset(url, electionPath);
 
-        LeaderSelectorListener listener = new LeaderSelectorListener() {
-            @Override
-            public void takeLeadership(@NotNull LeaderSelector selector) {
-                System.out.println(selector.getClientId() + " elected leader");
-                long pause = random(5);
-                sleepSecs(pause);
-                System.out.println(selector.getClientId() + " surrendering after " + pause + " seconds");
-            }
+        LeaderSelectorListener listener =
+                new LeaderSelectorListener() {
+                    @Override
+                    public void takeLeadership(@NotNull LeaderSelector selector) {
+                        System.out.println(selector.getClientId() + " elected leader");
+                        long pause = random(5);
+                        sleepSecs(pause);
+                        System.out.println(selector.getClientId() + " surrendering after " + pause + " seconds");
+                    }
 
-            @Override
-            public void relinquishLeadership(@NotNull LeaderSelector selector) {
-                System.out.println(selector.getClientId() + " relinquished leadership");
-            }
-        };
+                    @Override
+                    public void relinquishLeadership(@NotNull LeaderSelector selector) {
+                        System.out.println(selector.getClientId() + " relinquished leadership");
+                    }
+                };
 
         try (LeaderSelector selector = new LeaderSelector(url, electionPath, listener)) {
             for (int i = 0; i < 5; i++) {

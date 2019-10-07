@@ -20,11 +20,7 @@ package com.sudothought.etcdrecipes.basics
 
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
-import com.sudothought.etcdrecipes.jetcd.asPutOption
-import com.sudothought.etcdrecipes.jetcd.getStringValue
-import com.sudothought.etcdrecipes.jetcd.putValue
-import com.sudothought.etcdrecipes.jetcd.withKvClient
-import com.sudothought.etcdrecipes.jetcd.withLeaseClient
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.Client
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -32,9 +28,9 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val countdown = CountDownLatch(2)
-    val keyname = "/foo"
+    val path = "/foo"
     val keyval = "foobar"
+    val countdown = CountDownLatch(2)
 
     thread {
         try {
@@ -44,9 +40,9 @@ fun main() {
                 .use { client ->
                     client.withLeaseClient { leaseClient ->
                         client.withKvClient { kvClient ->
-                            println("Assigning $keyname = $keyval")
+                            println("Assigning $path = $keyval")
                             val lease = leaseClient.grant(5).get()
-                            kvClient.putValue(keyname, keyval, lease.asPutOption)
+                            kvClient.putValue(path, keyval, lease.asPutOption)
                         }
                     }
                 }
@@ -61,8 +57,8 @@ fun main() {
                 .use { client ->
                     client.withKvClient { kvClient ->
                         repeatWithSleep(12) { _, start ->
-                            val kval = kvClient.getStringValue(keyname, "unset")
-                            println("Key $keyname = $kval after ${System.currentTimeMillis() - start}ms")
+                            val kval = kvClient.getStringValue(path, "unset")
+                            println("Key $path = $kval after ${System.currentTimeMillis() - start}ms")
                         }
                     }
                 }
