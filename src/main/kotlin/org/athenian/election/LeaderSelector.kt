@@ -40,8 +40,8 @@ import org.athenian.jetcd.equalTo
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getChildrenStringValues
 import org.athenian.jetcd.getStringValue
+import org.athenian.jetcd.isKeyPresent
 import org.athenian.jetcd.keepAliveWith
-import org.athenian.jetcd.keyExists
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
 import org.athenian.jetcd.watcher
@@ -286,9 +286,9 @@ class LeaderSelector(val url: String,
         val path = participationPath(electionPath).appendToPath(clientId)
 
         // Wait until key goes away when previous keep alive finishes
-        repeat(10) {
-            if (!kvClient.keyExists(path))
-                return@repeat
+        for (i in (0..10)) {
+            if (!kvClient.isKeyPresent(path))
+                break
             sleep(1.seconds)
         }
 
