@@ -1,11 +1,14 @@
-# jetcd Example
+# etcd Recipes
 
-Start a server with:
+## Setup
+Start a localhost server with:
 ```bash
 etcd --listen-client-urls=http://localhost:2379 --advertise-client-urls=http://localhost:2379
 ```
 
-## Helpful Links
+## Relevant Links
+
+### etcd
 *   [Introduction to etcd v3](https://www.youtube.com/watch?v=hQigKX0MxPw)
 *   [etcd for Beginners](https://www.youtube.com/watch?v=L9xkXzpEY6Q)
 *   [etc3 Documentation](https://github.com/etcd-io/etcd/blob/master/Documentation/docs.md)
@@ -16,9 +19,9 @@ etcd --listen-client-urls=http://localhost:2379 --advertise-client-urls=http://l
 *   [play.etcd.io](http://play.etcd.io/play)
 *   [Go etcd3 API](https://godoc.org/github.com/coreos/etcd/clientv3)
 
-## Elections
+### Elections
 *   [etcd3 leader election using Python](https://www.sandtable.com/etcd3-leader-election-using-python/)
 
-## ZK and Curator
+### ZK and Curator
 *   [ZooKeeper Tutorial](https://data-flair.training/blogs/zookeeper-tutorial/)
 *   [Curator Examples](https://github.com/yiming187/curator-example/tree/master/src/main/java/com/ctrip/zk/curator/example)

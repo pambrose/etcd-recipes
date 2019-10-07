@@ -31,8 +31,6 @@ fun main() {
     val url = "http://localhost:2379"
     val keyname = "/"
 
-    // DistributedBarrierWithCount.reset(url, keyname)
-
     Client.builder().endpoints(url).build()
         .use { client ->
             client.withKvClient { kvClient ->
