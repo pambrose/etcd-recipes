@@ -40,7 +40,7 @@ import org.athenian.jetcd.count
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.deleteOp
 import org.athenian.jetcd.ensureTrailing
-import org.athenian.jetcd.equals
+import org.athenian.jetcd.equalTo
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getStringValue
 import org.athenian.jetcd.keepAliveWith
@@ -105,7 +105,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
         // Do a CAS on the /ready name. If it is not found, then set it
         kvClient.transaction {
-            If(equals(readyPath, CmpTarget.version(0)))
+            If(equalTo(readyPath, CmpTarget.version(0)))
             Then(putOp(readyPath, uniqueToken))
         }
 
@@ -114,7 +114,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
         val txn =
             kvClient.transaction {
-                If(equals(waitingPath, CmpTarget.version(0)))
+                If(equalTo(waitingPath, CmpTarget.version(0)))
                 Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
             }
 
@@ -137,7 +137,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
                     // Delete /ready key
                     kvClient.transaction {
-                        If(equals(readyPath, CmpTarget.version(0)))
+                        If(equalTo(readyPath, CmpTarget.version(0)))
                         Then()
                         Else(deleteOp(readyPath))
                     }

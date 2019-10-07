@@ -54,7 +54,7 @@ fun main() {
                     println("$i Waiting on Barrier")
                     barrier.waitOnBarrier(1.seconds)
 
-                    println("$i Timedout waiting on barrier, waiting again")
+                    println("$i Timed out waiting on barrier, waiting again")
                     barrier.waitOnBarrier()
 
                     println("$i Done Waiting on Barrier")

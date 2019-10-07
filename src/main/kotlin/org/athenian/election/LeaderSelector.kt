@@ -36,7 +36,7 @@ import org.athenian.common.EtcdRecipeRuntimeException
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
-import org.athenian.jetcd.equals
+import org.athenian.jetcd.equalTo
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getChildrenStringValues
 import org.athenian.jetcd.getStringValue
@@ -296,7 +296,7 @@ class LeaderSelector(val url: String,
         val lease = leaseClient.grant(2).get()
         val txn =
             kvClient.transaction {
-                If(equals(path, CmpTarget.version(0)))
+                If(equalTo(path, CmpTarget.version(0)))
                 Then(putOp(path, clientId, lease.asPutOption))
             }
 
@@ -322,7 +322,7 @@ class LeaderSelector(val url: String,
         // Do a CAS on the key name. If it is not found, then set it
         val txn =
             kvClient.transaction {
-                If(equals(leaderPath, CmpTarget.version(0)))
+                If(equalTo(leaderPath, CmpTarget.version(0)))
                 Then(putOp(leaderPath, uniqueToken, lease.asPutOption))
             }
 
@@ -349,7 +349,7 @@ class LeaderSelector(val url: String,
 
     companion object Static {
 
-        private val uniqueSuffixLength = 9
+        private const val uniqueSuffixLength = 9
 
         private fun participationPath(path: String) = path.appendToPath("participants")
 

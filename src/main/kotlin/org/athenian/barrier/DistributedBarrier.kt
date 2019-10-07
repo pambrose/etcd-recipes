@@ -31,7 +31,7 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import org.athenian.common.EtcdRecipeRuntimeException
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
-import org.athenian.jetcd.equals
+import org.athenian.jetcd.equalTo
 import org.athenian.jetcd.getStringValue
 import org.athenian.jetcd.keepAlive
 import org.athenian.jetcd.keyIsPresent
@@ -93,7 +93,7 @@ class DistributedBarrier(val url: String,
                 // Do a CAS on the key name. If it is not found, then set it
                 val txn =
                     kvClient.transaction {
-                        If(equals(barrierPath, CmpTarget.version(0)))
+                        If(equalTo(barrierPath, CmpTarget.version(0)))
                         Then(putOp(barrierPath, uniqueToken, lease.asPutOption))
                     }
 

@@ -147,4 +147,4 @@ fun KV.count(keyname: String): Long {
                            .build()).count
 }
 
-fun KV.keyExists(keyname: String): Boolean = !(transaction { If(equals(keyname, CmpTarget.version(0))) }.isSucceeded)
+fun KV.keyExists(keyname: String): Boolean = !(transaction { If(equalTo(keyname, CmpTarget.version(0))) }.isSucceeded)

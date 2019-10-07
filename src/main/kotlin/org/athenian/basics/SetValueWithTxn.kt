@@ -23,7 +23,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.op.CmpTarget
 import org.athenian.jetcd.delete
-import org.athenian.jetcd.equals
+import org.athenian.jetcd.equalTo
 import org.athenian.jetcd.getStringValue
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.putValue
@@ -37,7 +37,7 @@ fun main() {
 
     fun checkForKey(kvClient: KV) {
         kvClient.transaction {
-            If(equals(keyname, CmpTarget.version(0)))
+            If(equalTo(keyname, CmpTarget.version(0)))
             Then(putOp(debug, "Key $keyname not found"))
             Else(putOp(debug, "Key $keyname found"))
         }

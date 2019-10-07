@@ -102,7 +102,7 @@ class ServiceDiscovery(val url: String,
 
             val txn =
                 kvClient.transaction {
-                    If(org.athenian.jetcd.equals(instancePath, CmpTarget.version(0)))
+                    If(org.athenian.jetcd.equalTo(instancePath, CmpTarget.version(0)))
                     Then(putOp(instancePath, service.toJson(), context.lease.asPutOption))
                 }
 
@@ -122,7 +122,7 @@ class ServiceDiscovery(val url: String,
                 ?: throw EtcdRecipeException("ServiceInstance ${service.name} was not first registered with registerService()")
             val txn =
                 kvClient.transaction {
-                    If(org.athenian.jetcd.equals(instancePath, CmpTarget.version(0)))
+                    If(org.athenian.jetcd.equalTo(instancePath, CmpTarget.version(0)))
                     Else(putOp(instancePath, service.toJson(), context.lease.asPutOption))
                 }
             if (txn.isSucceeded) throw EtcdRecipeException("Service update failed for $instancePath")
@@ -177,7 +177,7 @@ class ServiceDiscovery(val url: String,
                 serviceCacheList.forEach { it.close() }
 
                 if (startCalled && !closeCalled) {
-                    serviceContextMap.forEach { k, v -> unregisterService(v.service) }
+                    serviceContextMap.forEach { (k, v) -> unregisterService(v.service) }
                     kvClient.close()
                     leaseClient.close()
                     client.close()

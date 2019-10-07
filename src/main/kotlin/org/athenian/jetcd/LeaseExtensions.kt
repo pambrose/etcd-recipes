@@ -19,13 +19,15 @@
 
 package org.athenian.jetcd
 
+import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Observers
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.options.PutOption
 
 val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(id).build()
-fun Lease.keepAlive(lease: LeaseGrantResponse) =
+
+fun Lease.keepAlive(lease: LeaseGrantResponse): CloseableClient =
     keepAlive(lease.id, Observers.observer(
         { /*println("KeepAlive next resp: $next")*/ },
         { /*println("KeepAlive err resp: $err")*/ }))

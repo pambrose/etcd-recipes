@@ -62,7 +62,7 @@ public class DistributedBarrierDemo {
                                 System.out.println(String.format("%d Waiting on Barrier", id));
                                 barrier.waitOnBarrier(1, TimeUnit.SECONDS);
 
-                                System.out.println(String.format("%d Timedout waiting on barrier, waiting again", id));
+                                System.out.println(String.format("%d Timed out waiting on barrier, waiting again", id));
                                 barrier.waitOnBarrier();
 
                                 System.out.println(String.format("%d Done Waiting on Barrier", id));

@@ -29,7 +29,7 @@ import io.etcd.jetcd.op.CmpTarget
 import org.athenian.common.EtcdRecipeRuntimeException
 import org.athenian.jetcd.asLong
 import org.athenian.jetcd.delete
-import org.athenian.jetcd.equals
+import org.athenian.jetcd.equalTo
 import org.athenian.jetcd.getLongValue
 import org.athenian.jetcd.getResponse
 import org.athenian.jetcd.putOp
@@ -92,7 +92,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
         if (kvClient.getResponse(counterPath).kvs.isEmpty()) {
             val txn =
                 kvClient.transaction {
-                    If(equals(counterPath, CmpTarget.version(0)))
+                    If(equalTo(counterPath, CmpTarget.version(0)))
                     Then(putOp(counterPath, 0L))
                 }
             txn.isSucceeded
@@ -104,7 +104,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
         kvClient.transaction {
             val kvlist = kvClient.getResponse(counterPath).kvs
             val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
-            If(equals(counterPath, CmpTarget.modRevision(kv.modRevision)))
+            If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
             Then(putOp(counterPath, kv.value.asLong + amount))
         }
 

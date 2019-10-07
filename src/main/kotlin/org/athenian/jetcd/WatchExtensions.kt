@@ -31,7 +31,7 @@ fun Lazy<Watch>.watcher(keyname: String,
                         option: WatchOption = WatchOption.DEFAULT,
                         block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyname, option, block)
 
-val nullWatchOption = WatchOption.newBuilder().withRange(ByteSequence.from(ByteArray(1))).build()
+val nullWatchOption: WatchOption = WatchOption.newBuilder().withRange(ByteSequence.from(ByteArray(1))).build()
 
 fun Watch.watcher(keyname: String,
                   option: WatchOption = WatchOption.DEFAULT,
