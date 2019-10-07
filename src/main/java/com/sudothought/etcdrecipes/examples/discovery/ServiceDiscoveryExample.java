@@ -18,7 +18,6 @@
 package com.sudothought.etcdrecipes.examples.discovery;
 
 import com.sudothought.etcdrecipes.common.EtcdRecipeException;
-import com.sudothought.etcdrecipes.discovery.IntPayload;
 import com.sudothought.etcdrecipes.discovery.ServiceDiscovery;
 import com.sudothought.etcdrecipes.discovery.ServiceInstance;
 

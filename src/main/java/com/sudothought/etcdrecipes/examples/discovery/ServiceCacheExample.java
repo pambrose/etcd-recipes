@@ -17,7 +17,6 @@
 
 package com.sudothought.etcdrecipes.examples.discovery;
 
-import com.sudothought.etcdrecipes.discovery.IntPayload;
 import com.sudothought.etcdrecipes.discovery.ServiceCache;
 import com.sudothought.etcdrecipes.discovery.ServiceDiscovery;
 

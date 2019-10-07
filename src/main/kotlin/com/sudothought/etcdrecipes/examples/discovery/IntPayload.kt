@@ -17,7 +17,7 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package com.sudothought.etcdrecipes.discovery
+package com.sudothought.etcdrecipes.examples.discovery
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
