@@ -25,24 +25,9 @@ import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
 import com.sudothought.common.delegate.AtomicDelegates.nullableReference
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
+import com.sudothought.etcdrecipes.common.EtcdConnector
 import com.sudothought.etcdrecipes.common.EtcdRecipeException
-import com.sudothought.etcdrecipes.jetcd.appendToPath
-import com.sudothought.etcdrecipes.jetcd.asByteSequence
-import com.sudothought.etcdrecipes.jetcd.asPutOption
-import com.sudothought.etcdrecipes.jetcd.asString
-import com.sudothought.etcdrecipes.jetcd.count
-import com.sudothought.etcdrecipes.jetcd.delete
-import com.sudothought.etcdrecipes.jetcd.deleteOp
-import com.sudothought.etcdrecipes.jetcd.ensureTrailing
-import com.sudothought.etcdrecipes.jetcd.equalTo
-import com.sudothought.etcdrecipes.jetcd.getChildrenKeys
-import com.sudothought.etcdrecipes.jetcd.getStringValue
-import com.sudothought.etcdrecipes.jetcd.isKeyPresent
-import com.sudothought.etcdrecipes.jetcd.keepAliveWith
-import com.sudothought.etcdrecipes.jetcd.putOp
-import com.sudothought.etcdrecipes.jetcd.transaction
-import com.sudothought.etcdrecipes.jetcd.watcher
-import com.sudothought.etcdrecipes.jetcd.withKvClient
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
@@ -59,16 +44,13 @@ import kotlin.time.days
 class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
                                              val barrierPath: String,
                                              val memberCount: Int,
-                                             val clientId: String) : Closeable {
+                                             val clientId: String
+) : EtcdConnector(url), Closeable {
 
     constructor(url: String,
                 barrierPath: String,
                 memberCount: Int) : this(url, barrierPath, memberCount, "Client:${randomId(9)}")
 
-    private val client = lazy { Client.builder().endpoints(url).build() }
-    private val kvClient = lazy { client.value.kvClient }
-    private val leaseClient = lazy { client.value.leaseClient }
-    private val watchClient = lazy { client.value.watchClient }
     private val executor = lazy { Executors.newSingleThreadExecutor() }
     private var enterCalled by atomicBoolean(false)
     private var leaveCalled by atomicBoolean(false)
@@ -110,7 +92,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
         }
 
         waitingPath = "$waitingPrefix/$uniqueToken"
-        val lease = leaseClient.value.grant(2).get()
+        val lease = leaseClient.grant(2).get()
 
         val txn =
             kvClient.transaction {
@@ -124,7 +106,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
             throw EtcdRecipeException("Failed to assign waitingPath unique value")
 
         // Keep key alive
-        executor.value.submit { leaseClient.value.keepAliveWith(lease) { keepAliveLatch.await() } }
+        executor.value.submit { leaseClient.keepAliveWith(lease) { keepAliveLatch.await() } }
 
         fun checkWaiterCountInEnter() {
             // First see if /ready is missing
@@ -208,17 +190,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
     override fun close() {
         watcher?.close()
 
-        if (watchClient.isInitialized())
-            watchClient.value.close()
-
-        if (leaseClient.isInitialized())
-            leaseClient.value.close()
-
-        if (kvClient.isInitialized())
-            kvClient.value.close()
-
-        if (client.isInitialized())
-            client.value.close()
+        super.close()
 
         if (executor.isInitialized())
             executor.value.shutdown()

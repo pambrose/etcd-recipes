@@ -21,32 +21,21 @@ package com.sudothought.etcdrecipes.discovery
 
 import com.google.common.collect.Maps
 import com.sudothought.common.concurrent.withLock
-import com.sudothought.common.delegate.AtomicDelegates
+import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.sudothought.etcdrecipes.common.EtcdConnector
 import com.sudothought.etcdrecipes.common.EtcdRecipeRuntimeException
-import com.sudothought.etcdrecipes.jetcd.appendToPath
-import com.sudothought.etcdrecipes.jetcd.asPair
-import com.sudothought.etcdrecipes.jetcd.asString
-import com.sudothought.etcdrecipes.jetcd.nullWatchOption
-import com.sudothought.etcdrecipes.jetcd.watcher
-import io.etcd.jetcd.Client
-import io.etcd.jetcd.Watch
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.watch.WatchEvent
-import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.jetcd.watch.WatchEvent.EventType.*
 import mu.KLogging
 import java.io.Closeable
-import java.util.concurrent.Semaphore
 
 class ServiceCache(val url: String,
                    namesPath: String,
-                   val serviceName: String) : Closeable {
+                   val serviceName: String
+) : EtcdConnector(url), Closeable {
 
-    private val semaphore = Semaphore(1, true)
-    private var client by AtomicDelegates.nonNullableReference<Client>()
-    private var watchClient by AtomicDelegates.nonNullableReference<Watch>()
-    private var startCalled by AtomicDelegates.atomicBoolean(false)
-    private var closeCalled by AtomicDelegates.atomicBoolean(false)
+    private var startCalled by atomicBoolean(false)
     private val watchPath = namesPath.appendToPath(serviceName)
     private val serviceMap = Maps.newConcurrentMap<String, String>()
     private val listeners = mutableListOf<ServiceCacheListener>()
@@ -61,9 +50,6 @@ class ServiceCache(val url: String,
                 throw EtcdRecipeRuntimeException("start() already called")
             checkCloseNotCalled()
 
-            client = Client.builder().endpoints(url).build()
-
-            watchClient = client.watchClient
             watchClient.watcher(watchPath, nullWatchOption) { watchResponse ->
                 watchResponse.events
                     .forEach { event ->
@@ -115,17 +101,9 @@ class ServiceCache(val url: String,
         listeners += listener
     }
 
-    private fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
-    }
-
     override fun close() {
         semaphore.withLock {
-            if (startCalled && !closeCalled) {
-                watchClient.close()
-                client.close()
-            }
-            closeCalled = true
+            super.close()
         }
     }
 

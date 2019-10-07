@@ -29,8 +29,6 @@ fun main() {
 
     ServiceDiscovery(url, serviceName).use { sd ->
 
-        sd.start()
-
         sd.serviceCache("TestName").use { cache ->
 
             cache.addListenerForChanges { eventType, serviceName, serviceInstance ->

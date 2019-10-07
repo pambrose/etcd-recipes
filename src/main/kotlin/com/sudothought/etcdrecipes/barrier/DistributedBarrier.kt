@@ -24,24 +24,14 @@ import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.delegate.AtomicDelegates.nullableReference
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
-import com.sudothought.etcdrecipes.common.EtcdRecipeRuntimeException
-import com.sudothought.etcdrecipes.jetcd.asPutOption
-import com.sudothought.etcdrecipes.jetcd.delete
-import com.sudothought.etcdrecipes.jetcd.equalTo
-import com.sudothought.etcdrecipes.jetcd.getStringValue
-import com.sudothought.etcdrecipes.jetcd.isKeyPresent
-import com.sudothought.etcdrecipes.jetcd.keepAlive
-import com.sudothought.etcdrecipes.jetcd.putOp
-import com.sudothought.etcdrecipes.jetcd.transaction
-import com.sudothought.etcdrecipes.jetcd.watcher
-import com.sudothought.etcdrecipes.jetcd.withKvClient
+import com.sudothought.etcdrecipes.common.EtcdConnector
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
@@ -49,7 +39,8 @@ import kotlin.time.days
 class DistributedBarrier(val url: String,
                          val barrierPath: String,
                          private val waitOnMissingBarriers: Boolean,
-                         val clientId: String) : Closeable {
+                         val clientId: String
+) : EtcdConnector(url), Closeable {
 
     constructor(url: String,
                 barrierPath: String,
@@ -58,12 +49,6 @@ class DistributedBarrier(val url: String,
                                                              waitOnMissingBarrier,
                                                              "Client:${randomId(9)}")
 
-    private val semaphore = Semaphore(1, true)
-    private val client = lazy { Client.builder().endpoints(url).build() }
-    private val kvClient = lazy { client.value.kvClient }
-    private val leaseClient = lazy { client.value.leaseClient }
-    private val watchClient = lazy { client.value.watchClient }
-    private var closeCalled by atomicBoolean(false)
     private var keepAliveLease by nullableReference<CloseableClient?>(null)
     private var barrierRemoved by atomicBoolean(false)
 
@@ -88,7 +73,7 @@ class DistributedBarrier(val url: String,
                 val uniqueToken = "$clientId:${randomId(9)}"
 
                 // Prime lease with 2 seconds to give keepAlive a chance to get started
-                val lease = leaseClient.value.grant(2).get()
+                val lease = leaseClient.grant(2).get()
 
                 // Do a CAS on the key name. If it is not found, then set it
                 val txn =
@@ -99,7 +84,7 @@ class DistributedBarrier(val url: String,
 
                 // Check to see if unique value was successfully set in the CAS step
                 if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
-                    keepAliveLease = leaseClient.value.keepAlive(lease)
+                    keepAliveLease = leaseClient.keepAlive(lease)
                     true
                 } else {
                     false
@@ -154,29 +139,13 @@ class DistributedBarrier(val url: String,
         }
     }
 
-    private fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
-    }
-
     override fun close() {
         semaphore.withLock {
             if (!closeCalled) {
                 keepAliveLease?.close()
                 keepAliveLease = null
 
-                if (watchClient.isInitialized())
-                    watchClient.value.close()
-
-                if (leaseClient.isInitialized())
-                    leaseClient.value.close()
-
-                if (kvClient.isInitialized())
-                    kvClient.value.close()
-
-                if (client.isInitialized())
-                    client.value.close()
-
-                closeCalled = true
+                super.close()
             }
         }
     }

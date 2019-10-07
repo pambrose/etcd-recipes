@@ -21,41 +21,24 @@ package com.sudothought.etcdrecipes.discovery
 
 import com.google.common.collect.Maps
 import com.sudothought.common.concurrent.withLock
-import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
 import com.sudothought.common.util.randomId
+import com.sudothought.etcdrecipes.common.EtcdConnector
 import com.sudothought.etcdrecipes.common.EtcdRecipeException
-import com.sudothought.etcdrecipes.common.EtcdRecipeRuntimeException
-import com.sudothought.etcdrecipes.jetcd.appendToPath
-import com.sudothought.etcdrecipes.jetcd.asPutOption
-import com.sudothought.etcdrecipes.jetcd.getChildrenKeys
-import com.sudothought.etcdrecipes.jetcd.getChildrenStringValues
-import com.sudothought.etcdrecipes.jetcd.getStringValue
-import com.sudothought.etcdrecipes.jetcd.keepAlive
-import com.sudothought.etcdrecipes.jetcd.putOp
-import com.sudothought.etcdrecipes.jetcd.transaction
-import io.etcd.jetcd.Client
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.CloseableClient
-import io.etcd.jetcd.KV
-import io.etcd.jetcd.Lease
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.op.CmpTarget
 import java.io.Closeable
-import java.util.concurrent.Semaphore
 
 class ServiceDiscovery(val url: String,
                        basePath: String,
-                       val clientId: String) : Closeable {
+                       val clientId: String
+) : EtcdConnector(url), Closeable {
 
     // Java constructor
     constructor(url: String, basePath: String) : this(url, basePath, "Client:${randomId(9)}")
 
-    private val semaphore = Semaphore(1, true)
-    private var client by nonNullableReference<Client>()
-    private var leaseClient by nonNullableReference<Lease>()
-    private var kvClient by nonNullableReference<KV>()
-    private var startCalled by atomicBoolean(false)
-    private var closeCalled by atomicBoolean(false)
     private val namesPath = basePath.appendToPath("/names")
     private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()
     private val serviceCacheList = mutableListOf<ServiceCache>()
@@ -74,23 +57,10 @@ class ServiceDiscovery(val url: String,
         require(basePath.isNotEmpty()) { "Service base path cannot be empty" }
     }
 
-    fun start() {
-        semaphore.withLock {
-            if (startCalled)
-                throw EtcdRecipeRuntimeException("start() already called")
-            checkCloseNotCalled()
-
-            client = Client.builder().endpoints(url).build()
-            leaseClient = client.leaseClient
-            kvClient = client.kvClient
-            startCalled = true
-        }
-    }
-
     @Throws(EtcdRecipeException::class)
     fun registerService(service: ServiceInstance) {
         semaphore.withLock {
-            checkStatus()
+            checkCloseNotCalled()
 
             val instancePath = getNamesPath(service)
             val context = ServiceInstanceContext(service)
@@ -116,7 +86,7 @@ class ServiceDiscovery(val url: String,
     @Throws(EtcdRecipeException::class)
     fun updateService(service: ServiceInstance) {
         semaphore.withLock {
-            checkStatus()
+            checkCloseNotCalled()
             val instancePath = getNamesPath(service)
             val context = serviceContextMap[service.id]
                 ?: throw EtcdRecipeException("ServiceInstance ${service.name} was not first registered with registerService()")
@@ -132,7 +102,7 @@ class ServiceDiscovery(val url: String,
     @Throws(EtcdRecipeException::class)
     fun unregisterService(service: ServiceInstance) {
         semaphore.withLock {
-            checkStatus()
+            checkCloseNotCalled()
             serviceContextMap[service.id]?.close()
                 ?: throw EtcdRecipeException("ServiceInstance not published with registerService()")
             serviceContextMap.remove(service.id)
@@ -140,7 +110,7 @@ class ServiceDiscovery(val url: String,
     }
 
     fun serviceCache(name: String): ServiceCache {
-        checkStatus()
+        checkCloseNotCalled()
         val cache = ServiceCache(url, namesPath, name)
         serviceCacheList += cache
         return cache
@@ -148,20 +118,20 @@ class ServiceDiscovery(val url: String,
 
     fun queryForNames(): List<String> =
         semaphore.withLock {
-            checkStatus()
+            checkCloseNotCalled()
             kvClient.getChildrenKeys(namesPath)
         }
 
     fun queryForInstances(name: String): List<ServiceInstance> =
         semaphore.withLock {
-            checkStatus()
+            checkCloseNotCalled()
             kvClient.getChildrenStringValues(getNamesPath(name)).map { ServiceInstance.toObject(it) }
         }
 
     @Throws(EtcdRecipeException::class)
     fun queryForInstance(name: String, id: String): ServiceInstance =
         semaphore.withLock {
-            checkStatus()
+            checkCloseNotCalled()
             val path = getNamesPath(name, id)
             val json = kvClient.getStringValue(path)
                 ?: throw EtcdRecipeException("ServiceInstance $path not present")
@@ -176,26 +146,13 @@ class ServiceDiscovery(val url: String,
                 // Close all service caches
                 serviceCacheList.forEach { it.close() }
 
-                if (startCalled && !closeCalled) {
+                if (!closeCalled) {
                     serviceContextMap.forEach { (k, v) -> unregisterService(v.service) }
-                    kvClient.close()
-                    leaseClient.close()
-                    client.close()
                 }
 
-                closeCalled = true
+                super.close()
             }
         }
-    }
-
-    private fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
-    }
-
-    private fun checkStatus() {
-        if (!startCalled)
-            throw EtcdRecipeRuntimeException("start() must be called first")
-        checkCloseNotCalled()
     }
 
     private fun getNamesPath(service: ServiceInstance) = getNamesPath(service.name, service.id)

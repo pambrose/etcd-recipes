@@ -29,9 +29,7 @@ public class ServiceCacheExample {
         String serviceName = "/services/test";
 
         try (ServiceDiscovery sd = new ServiceDiscovery(url, serviceName)) {
-
-            sd.start();
-
+            
             try (ServiceCache cache = sd.serviceCache("TestName")) {
                 cache.addListenerForChanges(
                         (eventType, name, serviceInstance) -> {

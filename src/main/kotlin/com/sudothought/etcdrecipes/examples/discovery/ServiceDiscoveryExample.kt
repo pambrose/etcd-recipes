@@ -31,8 +31,6 @@ fun main() {
 
     ServiceDiscovery(url, serviceName).use { sd ->
 
-        sd.start()
-
         val payload = IntPayload(-999)
         val service = ServiceInstance("TestName", payload.toJson())
 

@@ -27,21 +27,7 @@ import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
 import com.sudothought.etcdrecipes.common.EtcdRecipeException
 import com.sudothought.etcdrecipes.common.EtcdRecipeRuntimeException
-import com.sudothought.etcdrecipes.jetcd.appendToPath
-import com.sudothought.etcdrecipes.jetcd.asPutOption
-import com.sudothought.etcdrecipes.jetcd.delete
-import com.sudothought.etcdrecipes.jetcd.equalTo
-import com.sudothought.etcdrecipes.jetcd.getChildrenKeys
-import com.sudothought.etcdrecipes.jetcd.getChildrenStringValues
-import com.sudothought.etcdrecipes.jetcd.getStringValue
-import com.sudothought.etcdrecipes.jetcd.isKeyPresent
-import com.sudothought.etcdrecipes.jetcd.keepAliveWith
-import com.sudothought.etcdrecipes.jetcd.putOp
-import com.sudothought.etcdrecipes.jetcd.transaction
-import com.sudothought.etcdrecipes.jetcd.watcher
-import com.sudothought.etcdrecipes.jetcd.withKvClient
-import com.sudothought.etcdrecipes.jetcd.withLeaseClient
-import com.sudothought.etcdrecipes.jetcd.withWatchClient
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
@@ -303,9 +289,7 @@ class LeaderSelector(val url: String,
         if (!txn.isSucceeded) throw EtcdRecipeException("Participation registration failed [$path]")
 
         // Run keep-alive until closed
-        leaseClient.keepAliveWith(lease) {
-            terminateKeepAlive.waitUntilTrue()
-        }
+        leaseClient.keepAliveWith(lease) { terminateKeepAlive.waitUntilTrue() }
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected

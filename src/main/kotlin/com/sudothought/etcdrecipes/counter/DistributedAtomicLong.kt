@@ -20,32 +20,19 @@
 package com.sudothought.etcdrecipes.counter
 
 import com.sudothought.common.concurrent.withLock
-import com.sudothought.common.delegate.AtomicDelegates
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
-import com.sudothought.etcdrecipes.common.EtcdRecipeRuntimeException
-import com.sudothought.etcdrecipes.jetcd.asLong
-import com.sudothought.etcdrecipes.jetcd.delete
-import com.sudothought.etcdrecipes.jetcd.equalTo
-import com.sudothought.etcdrecipes.jetcd.getLongValue
-import com.sudothought.etcdrecipes.jetcd.getResponse
-import com.sudothought.etcdrecipes.jetcd.putOp
-import com.sudothought.etcdrecipes.jetcd.transaction
-import com.sudothought.etcdrecipes.jetcd.withKvClient
+import com.sudothought.etcdrecipes.common.EtcdConnector
+import com.sudothought.etcdrecipes.jetcd.*
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
 import java.io.Closeable
-import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.milliseconds
 
-class DistributedAtomicLong(val url: String, val counterPath: String) : Closeable {
-
-    private val semaphore = Semaphore(1, true)
-    private val client = lazy { Client.builder().endpoints(url).build() }
-    private val kvClient = lazy { client.value.kvClient }
-    private var closeCalled by AtomicDelegates.atomicBoolean(false)
+class DistributedAtomicLong(val url: String, val counterPath: String) : EtcdConnector(url), Closeable {
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -102,27 +89,16 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
 
     private fun applyCounterTransaction(amount: Long): TxnResponse =
         kvClient.transaction {
-            val kvlist = kvClient.getResponse(counterPath).kvs
-            val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
+            val kvlist: MutableList<KeyValue> = kvClient.getResponse(counterPath).kvs
+            val kv: KeyValue =
+                if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
             If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
-            Then(putOp(counterPath, kv.value.asLong + amount))
+            Then(putOp(counterPath, kv.asLong + amount))
         }
-
-    private fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
-    }
 
     override fun close() {
         semaphore.withLock {
-            if (!closeCalled) {
-                if (kvClient.isInitialized())
-                    kvClient.value.close()
-
-                if (client.isInitialized())
-                    client.value.close()
-
-                closeCalled = true
-            }
+            super.close()
         }
     }
 

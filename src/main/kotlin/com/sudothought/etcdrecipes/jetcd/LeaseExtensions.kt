@@ -28,14 +28,24 @@ import io.etcd.jetcd.options.PutOption
 val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(id).build()
 
 fun Lease.keepAlive(lease: LeaseGrantResponse): CloseableClient =
-    keepAlive(lease.id, Observers.observer(
-        { /*println("KeepAlive next resp: $next")*/ },
-        { /*println("KeepAlive err resp: $err")*/ }))
+    keepAlive(
+        lease.id, Observers.observer(
+            { /*println("KeepAlive next resp: $next")*/ },
+            { /*println("KeepAlive err resp: $err")*/ })
+    )
+
+fun Lazy<Lease>.keepAlive(lease: LeaseGrantResponse) = value.keepAlive(lease)
 
 fun Lease.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) =
-    keepAlive(lease.id, Observers.observer(
-        { /*next -> println("KeepAlive next resp: $next")*/ },
-        { /*err -> println("KeepAlive err resp: $err")*/ }))
+    keepAlive(
+        lease.id, Observers.observer(
+            { /*next -> println("KeepAlive next resp: $next")*/ },
+            { /*err -> println("KeepAlive err resp: $err")*/ })
+    )
         .use {
             block.invoke()
         }
+
+fun Lazy<Lease>.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) = value.keepAliveWith(lease, block)
+
+fun Lazy<Lease>.grant(timeSecs: Long) = value.grant(timeSecs)

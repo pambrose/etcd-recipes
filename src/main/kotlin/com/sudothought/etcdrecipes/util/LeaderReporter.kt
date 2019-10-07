@@ -26,9 +26,7 @@ import com.sudothought.etcdrecipes.jetcd.asString
 import com.sudothought.etcdrecipes.jetcd.watcher
 import com.sudothought.etcdrecipes.jetcd.withWatchClient
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.jetcd.watch.WatchEvent.EventType.*
 import kotlin.time.MonoClock
 import kotlin.time.days
 
@@ -45,7 +43,7 @@ fun main() {
                     watchResponse.events
                         .forEach { event ->
                             when (event.eventType) {
-                                PUT -> println("${translateLeaderId(event.keyValue.value.asString)} is now the leader [${unelectedTime.elapsedNow()}]")
+                                PUT -> println("${translateLeaderId(event.keyValue.asString)} is now the leader [${unelectedTime.elapsedNow()}]")
                                 DELETE -> unelectedTime = clock.markNow()
                                 UNRECOGNIZED -> println("Error with watch")
                                 else -> println("Error with watch")

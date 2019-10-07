@@ -21,6 +21,7 @@ package com.sudothought.etcdrecipes.jetcd
 
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.KV
+import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.Cmp
@@ -28,6 +29,12 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.PutOption
+
+val KeyValue.asString get() = value.asString
+
+val KeyValue.asInt get() = value.asInt
+
+val KeyValue.asLong get() = value.asLong
 
 fun <T> equalTo(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, target)
 

@@ -31,8 +31,6 @@ public class ServiceDiscoveryExample {
 
         try (ServiceDiscovery sd = new ServiceDiscovery(url, serviceName)) {
 
-            sd.start();
-
             IntPayload payload = new IntPayload(-999);
             ServiceInstance service = ServiceInstance.Companion.newBuilder("TestName", payload.toJson()).build();
 
