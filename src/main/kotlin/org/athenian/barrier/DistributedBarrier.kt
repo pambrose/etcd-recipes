@@ -33,8 +33,8 @@ import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.equalTo
 import org.athenian.jetcd.getStringValue
+import org.athenian.jetcd.isKeyPresent
 import org.athenian.jetcd.keepAlive
-import org.athenian.jetcd.keyIsPresent
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
 import org.athenian.jetcd.watcher
@@ -75,13 +75,13 @@ class DistributedBarrier(val url: String,
     val isBarrierSet: Boolean
         get() = semaphore.withLock {
             checkCloseNotCalled()
-            kvClient.keyIsPresent(barrierPath)
+            kvClient.isKeyPresent(barrierPath)
         }
 
     fun setBarrier(): Boolean =
         semaphore.withLock {
             checkCloseNotCalled()
-            if (kvClient.keyIsPresent(barrierPath))
+            if (kvClient.isKeyPresent(barrierPath))
                 false
             else {
                 // Create unique token to avoid collision from clients with same id

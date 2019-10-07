@@ -64,13 +64,13 @@ fun Lazy<KV>.getResponse(keyname: String, option: GetOption = GetOption.DEFAULT)
 fun KV.getResponse(keyname: String, option: GetOption = GetOption.DEFAULT): GetResponse =
     get(keyname.asByteSequence, option).get()
 
-fun Lazy<KV>.keyIsPresent(keyname: String): Boolean = value.keyIsPresent(keyname)
+fun Lazy<KV>.isKeyPresent(keyname: String): Boolean = value.isKeyPresent(keyname)
 
-fun KV.keyIsPresent(keyname: String): Boolean = getStringValue(keyname) != null
+fun KV.isKeyPresent(keyname: String): Boolean = getStringValue(keyname) != null
 
 fun Lazy<KV>.keyIsNotPresent(keyname: String): Boolean = value.keyIsNotPresent(keyname)
 
-fun KV.keyIsNotPresent(keyname: String): Boolean = !keyIsPresent(keyname)
+fun KV.keyIsNotPresent(keyname: String): Boolean = !isKeyPresent(keyname)
 
 fun Lazy<KV>.getStringValue(keyname: String): String? = value.getStringValue(keyname)
 
@@ -138,6 +138,7 @@ fun KV.getKVs(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<P
     getResponse(keyname, getOption).kvs.map { it.key.asString to it.value }
 
 fun Lazy<KV>.count(keyname: String): Long = value.count(keyname)
+
 fun KV.count(keyname: String): Long {
     val adjustedKey = keyname.ensureTrailing("/")
     return getResponse(adjustedKey,

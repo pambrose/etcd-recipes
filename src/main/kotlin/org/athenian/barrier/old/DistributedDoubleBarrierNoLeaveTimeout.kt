@@ -43,8 +43,8 @@ import org.athenian.jetcd.ensureTrailing
 import org.athenian.jetcd.equalTo
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getStringValue
+import org.athenian.jetcd.isKeyPresent
 import org.athenian.jetcd.keepAliveWith
-import org.athenian.jetcd.keyIsPresent
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
 import org.athenian.jetcd.watcher
@@ -86,7 +86,7 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
         require(memberCount > 0) { "Member count must be > 0" }
     }
 
-    private val isReadySet: Boolean get() = kvClient.keyIsPresent(readyPath)
+    private val isReadySet: Boolean get() = kvClient.isKeyPresent(readyPath)
 
     val waiterCount: Long get() = kvClient.count(waitingPrefix)
 

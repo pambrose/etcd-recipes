@@ -43,8 +43,8 @@ import org.athenian.jetcd.ensureTrailing
 import org.athenian.jetcd.equalTo
 import org.athenian.jetcd.getChildrenKeys
 import org.athenian.jetcd.getStringValue
+import org.athenian.jetcd.isKeyPresent
 import org.athenian.jetcd.keepAlive
-import org.athenian.jetcd.keyIsPresent
 import org.athenian.jetcd.putOp
 import org.athenian.jetcd.transaction
 import org.athenian.jetcd.watcher
@@ -89,7 +89,7 @@ class DistributedBarrierWithCount(val url: String,
     private val isReadySet: Boolean
         get() {
             checkCloseNotCalled()
-            return kvClient.keyIsPresent(readyPath)
+            return kvClient.isKeyPresent(readyPath)
         }
 
     val waiterCount: Long
