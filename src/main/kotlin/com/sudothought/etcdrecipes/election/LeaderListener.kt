@@ -18,9 +18,9 @@
 
 package com.sudothought.etcdrecipes.election
 
-interface LeaderSelectorListener {
+interface LeaderListener {
 
-    fun takeLeadership(selector: LeaderSelector)
+    fun takeLeadership(leaderName: String)
 
-    fun relinquishLeadership(selector: LeaderSelector)
+    fun relinquishLeadership()
 }

@@ -149,7 +149,7 @@ class DistributedBarrier(val url: String,
         }
     }
 
-    companion object {
+    companion object Static {
         fun reset(url: String, barrierPath: String) {
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
             Client.builder().endpoints(url).build()

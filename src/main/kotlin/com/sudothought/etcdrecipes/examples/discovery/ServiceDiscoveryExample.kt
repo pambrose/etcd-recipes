@@ -26,9 +26,9 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val serviceName = "/services/test"
+    val servicePath = "/services/test"
 
-    ServiceDiscovery(url, serviceName).use { sd ->
+    ServiceDiscovery(url, servicePath).use { sd ->
 
         val payload = IntPayload(-999)
         val service = ServiceInstance("TestName", payload.toJson())

@@ -30,17 +30,17 @@ public class DistributedAtomicLongExample {
 
     public static void main(String[] args) throws InterruptedException {
         String url = "http://localhost:2379";
-        String counterName = "/counter/counterdemo";
+        String counterPath = "/counter/counterdemo";
         int counterCount = 10;
         CountDownLatch outerLatch = new CountDownLatch(counterCount);
         ExecutorService executor = Executors.newCachedThreadPool();
 
-        DistributedAtomicLong.Static.reset(url, counterName);
+        DistributedAtomicLong.Static.reset(url, counterPath);
 
         for (int i = 0; i < counterCount; i++) {
             final int id = i;
             executor.submit(() -> {
-                try (DistributedAtomicLong counter = new DistributedAtomicLong(url, counterName)) {
+                try (DistributedAtomicLong counter = new DistributedAtomicLong(url, counterPath)) {
                     System.out.println("Creating counter #" + id);
                     CountDownLatch innerLatch = new CountDownLatch(4);
                     int count = 50;
@@ -93,7 +93,7 @@ public class DistributedAtomicLongExample {
 
         executor.shutdown();
 
-        try (DistributedAtomicLong counter = new DistributedAtomicLong(url, counterName)) {
+        try (DistributedAtomicLong counter = new DistributedAtomicLong(url, counterPath)) {
             System.out.println(String.format("Counter value = %d", counter.get()));
         }
     }

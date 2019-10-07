@@ -25,16 +25,16 @@ public class ServiceCacheExample {
 
     public static void main(String[] args) {
         String url = "http://localhost:2379";
-        String serviceName = "/services/test";
+        String servicePath = "/services/test";
 
-        try (ServiceDiscovery sd = new ServiceDiscovery(url, serviceName)) {
+        try (ServiceDiscovery sd = new ServiceDiscovery(url, servicePath)) {
 
             try (ServiceCache cache = sd.serviceCache("TestName")) {
                 cache.addListenerForChanges(
                         (eventType, name, serviceInstance) -> {
                             System.out.println(String.format("Change %s %s %s", eventType, name, serviceInstance));
                             if (serviceInstance != null)
-                                System.out.println("Payload: " + IntPayload.Companion.toObject(serviceInstance.getJsonPayload()));
+                                System.out.println("Payload: " + IntPayload.Static.toObject(serviceInstance.getJsonPayload()));
                             System.out.println(cache.getInstances());
                         }
                 );

@@ -25,7 +25,7 @@ import kotlinx.serialization.json.Json
 data class IntPayload(var intval: Int) {
     fun toJson() = Json.stringify(serializer(), this)
 
-    companion object {
+    companion object Static {
         fun toObject(json: String) = Json.parse(serializer(), json)
     }
 }

@@ -32,23 +32,22 @@ import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.*
+import mu.KLogging
 import java.io.Closeable
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Semaphore
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import kotlin.time.Duration
 import kotlin.time.days
 import kotlin.time.seconds
 
 
 // For Java clients
-class LeaderSelector(val url: String,
-                     val electionPath: String,
-                     private val listener: LeaderSelectorListener,
-                     val clientId: String,
-                     private val userExecutor: ExecutorService?) : Closeable {
+class LeaderSelector(
+    val url: String,
+    val electionPath: String,
+    private val listener: LeaderSelectorListener,
+    val clientId: String,
+    private val userExecutor: ExecutorService?) : Closeable {
 
     // For Java clients
     constructor(url: String,
@@ -70,29 +69,37 @@ class LeaderSelector(val url: String,
                                          null)
 
     // For Java clients
-    constructor(url: String,
-                electionPath: String,
-                listener: LeaderSelectorListener,
-                executorService: ExecutorService) : this(url,
-                                                         electionPath,
-                                                         listener,
-                                                         "Client:${randomId(9)}",
-                                                         executorService)
+    constructor(
+        url: String,
+        electionPath: String,
+        listener: LeaderSelectorListener,
+        executorService: ExecutorService) : this(url,
+                                                 electionPath,
+                                                 listener,
+                                                 "Client:${randomId(9)}",
+                                                 executorService)
 
     // For Kotlin clients
     constructor(url: String,
                 electionPath: String,
-                lambda: (selector: LeaderSelector) -> Unit,
+                takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+                relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
                 clientId: String = "Client:${randomId(9)}",
-                executorService: ExecutorService? = null) : this(url,
-                                                                 electionPath,
-                                                                 object : LeaderSelectorListener {
-                                                                     override fun takeLeadership(selector: LeaderSelector) {
-                                                                         lambda.invoke(selector)
-                                                                     }
-                                                                 },
-                                                                 clientId,
-                                                                 executorService)
+                executorService: ExecutorService? = null) : this(
+        url,
+        electionPath,
+        object : LeaderSelectorListener {
+            override fun takeLeadership(selector: LeaderSelector) {
+                takeLeadershipBlock.invoke(selector)
+            }
+
+            override fun relinquishLeadership(selector: LeaderSelector) {
+                relinquishLeadershipBlock.invoke(selector)
+            }
+        },
+        clientId,
+        executorService
+                                                                )
 
     private val closeSemaphore = Semaphore(1, true)
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
@@ -153,8 +160,10 @@ class LeaderSelector(val url: String,
                                             // Run for leader when leader key is deleted
                                             watchForDeleteEvents(watchClient, watchStarted) {
                                                 leaderSemaphore.withLock {
-                                                    attemptToBecomeLeader(leaseClient,
-                                                                          kvClient)
+                                                    attemptToBecomeLeader(
+                                                        leaseClient,
+                                                        kvClient
+                                                                         )
                                                 }
                                             }.use {
                                                 terminateWatch.waitUntilTrue()
@@ -242,13 +251,9 @@ class LeaderSelector(val url: String,
 
             if (!closeCalled) {
                 closeCalled = true
-
                 markLeadershipComplete()
-
                 startThreadComplete.waitUntilTrue()
-
-                if (userExecutor == null)
-                    executor.shutdown()
+                if (userExecutor == null) executor.shutdown()
             }
         }
     }
@@ -293,8 +298,7 @@ class LeaderSelector(val url: String,
 
     // This will not return until election failure or leader surrenders leadership after being elected
     private fun attemptToBecomeLeader(leaseClient: Lease, kvClient: KV): Boolean {
-        if (isLeader)
-            return false
+        if (isLeader) return false
 
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$clientId:${randomId(uniqueSuffixLength)}"
@@ -319,6 +323,8 @@ class LeaderSelector(val url: String,
             }
 
             // Leadership was relinquished
+            listener.relinquishLeadership(this)
+
             // Do this after leadership is complete so the thread does not terminate
             markLeadershipComplete()
             startCallAllowed = true
@@ -330,15 +336,15 @@ class LeaderSelector(val url: String,
         }
     }
 
-    companion object Static {
+    companion object Static : KLogging() {
 
         private const val uniqueSuffixLength = 9
 
         private fun participationPath(path: String) = path.appendToPath("participants")
 
-        fun translateLeaderId(id: String) = id.dropLast(uniqueSuffixLength + 1)
+        private fun leaderPath(electionPath: String) = electionPath.appendToPath("LEADER")
 
-        fun leaderPath(electionPath: String) = electionPath.appendToPath("LEADER")
+        val String.stripUniqueSuffix get() = dropLast(uniqueSuffixLength + 1)
 
         fun reset(url: String, electionPath: String) {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
@@ -356,12 +362,40 @@ class LeaderSelector(val url: String,
             Client.builder().endpoints(url).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
-                        val leader = kvClient.getStringValue(electionPath)?.dropLast(uniqueSuffixLength + 1)
+                        val leader = kvClient.getStringValue(electionPath)?.stripUniqueSuffix
                         kvClient.getChildrenStringValues(participationPath(electionPath))
                             .forEach { retval += Participant(it, leader == it) }
                     }
                 }
             return retval
+        }
+
+        fun reportLeader(url: String,
+                         electionPath: String,
+                         listener: LeaderListener,
+                         executor: Executor): CountDownLatch {
+            val terminateListener = CountDownLatch(1)
+            executor.execute {
+                Client.builder().endpoints(url).build()
+                    .use { client ->
+                        client.withWatchClient { watchClient ->
+                            watchClient.watcher(leaderPath(electionPath)) { watchResponse ->
+                                watchResponse.events
+                                    .forEach { event ->
+                                        when (event.eventType) {
+                                            PUT          -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
+                                            DELETE       -> listener.relinquishLeadership()
+                                            UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
+                                            else         -> logger.error { "Unknown error with $electionPath watch" }
+                                        }
+                                    }
+                            }.use {
+                                terminateListener.await()
+                            }
+                        }
+                    }
+            }
+            return terminateListener
         }
     }
 }

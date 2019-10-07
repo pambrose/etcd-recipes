@@ -27,13 +27,13 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val barrierName = "/barriers/doublebarriertest"
+    val barrierPath = "/barriers/doublebarriertest"
     val count = 5
     val enterLatch = CountDownLatch(count - 1)
     val leaveLatch = CountDownLatch(count - 1)
     val doneLatch = CountDownLatch(count)
 
-    DistributedDoubleBarrier.reset(url, barrierName)
+    DistributedDoubleBarrier.reset(url, barrierPath)
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
         sleep(10.random.seconds)
@@ -69,7 +69,7 @@ fun main() {
 
     repeat(count - 1) { i ->
         thread {
-            DistributedDoubleBarrier(url, barrierName, count)
+            DistributedDoubleBarrier(url, barrierPath, count)
                 .use { barrier ->
                     enterBarrier(i, barrier, 2)
                     sleep(5.random.seconds)
@@ -78,7 +78,7 @@ fun main() {
         }
     }
 
-    DistributedDoubleBarrier(url, barrierName, count)
+    DistributedDoubleBarrier(url, barrierPath, count)
         .use { barrier ->
             enterLatch.await()
             sleep(2.seconds)

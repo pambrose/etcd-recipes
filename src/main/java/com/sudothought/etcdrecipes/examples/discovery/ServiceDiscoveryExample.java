@@ -26,12 +26,12 @@ public class ServiceDiscoveryExample {
 
     public static void main(String[] args) throws EtcdRecipeException {
         String url = "http://localhost:2379";
-        String serviceName = "/services/test";
+        String servicePath = "/services/test";
 
-        try (ServiceDiscovery sd = new ServiceDiscovery(url, serviceName)) {
+        try (ServiceDiscovery sd = new ServiceDiscovery(url, servicePath)) {
 
             IntPayload payload = new IntPayload(-999);
-            ServiceInstance service = ServiceInstance.Companion.newBuilder("TestName", payload.toJson()).build();
+            ServiceInstance service = ServiceInstance.Static.newBuilder("TestName", payload.toJson()).build();
 
             System.out.println(service.toJson());
 

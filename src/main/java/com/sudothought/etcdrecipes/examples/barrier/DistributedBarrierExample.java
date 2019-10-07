@@ -27,16 +27,16 @@ public class DistributedBarrierExample {
 
     public static void main(String[] args) throws InterruptedException {
         String url = "http://localhost:2379";
-        String barrierName = "/barriers/threadedclients";
+        String barrierPath = "/barriers/threadedclients";
         int threadCount = 5;
         CountDownLatch waitLatch = new CountDownLatch(threadCount);
         CountDownLatch goLatch = new CountDownLatch(1);
         ExecutorService executor = Executors.newCachedThreadPool();
 
-        DistributedBarrier.Companion.reset(url, barrierName);
+        DistributedBarrier.Static.reset(url, barrierPath);
 
         executor.execute(() -> {
-            try (DistributedBarrier barrier = new DistributedBarrier(url, barrierName, true)) {
+            try (DistributedBarrier barrier = new DistributedBarrier(url, barrierPath, true)) {
                 System.out.println("Setting Barrier");
                 barrier.setBarrier();
 
@@ -57,7 +57,7 @@ public class DistributedBarrierExample {
             executor.execute(() -> {
                         try {
                             goLatch.await();
-                            try (DistributedBarrier barrier = new DistributedBarrier(url, barrierName, true)) {
+                            try (DistributedBarrier barrier = new DistributedBarrier(url, barrierPath, true)) {
                                 System.out.println(String.format("%d Waiting on Barrier", id));
                                 barrier.waitOnBarrier(1, TimeUnit.SECONDS);
 

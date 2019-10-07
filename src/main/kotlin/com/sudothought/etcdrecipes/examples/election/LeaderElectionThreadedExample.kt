@@ -28,13 +28,13 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val electionName = "/election/threaded"
+    val electionPath = "/election/threaded"
     val count = 50
     val latch = CountDownLatch(count)
 
-    LeaderSelector.reset(url, electionName)
+    LeaderSelector.reset(url, electionPath)
 
-    val leadershipAction =
+    val takeLeadershipAction =
         { selector: LeaderSelector ->
             println("${selector.clientId} elected leader")
             val pause = Random.nextInt(1, 3).seconds
@@ -42,9 +42,14 @@ fun main() {
             println("${selector.clientId} surrendering after $pause")
         }
 
+    val relinquishLeadershipAction =
+        { selector: LeaderSelector ->
+            println("${selector.clientId} relinquished leadership")
+        }
+
     repeat(count) {
         thread {
-            LeaderSelector(url, electionName, leadershipAction, "Thread$it")
+            LeaderSelector(url, electionPath, takeLeadershipAction, relinquishLeadershipAction, "Thread$it")
                 .use { election ->
                     election.start()
                     election.waitOnLeadershipComplete()
@@ -54,7 +59,7 @@ fun main() {
     }
 
     while (latch.count > 0) {
-        println("Participants: ${getParticipants(url, electionName)}")
+        println("Participants: ${getParticipants(url, electionPath)}")
         sleep(1.seconds)
     }
 

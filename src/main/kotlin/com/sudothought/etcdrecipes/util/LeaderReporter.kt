@@ -19,39 +19,38 @@
 package com.sudothought.etcdrecipes.util
 
 import com.sudothought.common.util.sleep
-import com.sudothought.etcdrecipes.election.LeaderSelector.Static.leaderPath
-import com.sudothought.etcdrecipes.election.LeaderSelector.Static.translateLeaderId
-import com.sudothought.etcdrecipes.jetcd.asString
-import com.sudothought.etcdrecipes.jetcd.watcher
-import com.sudothought.etcdrecipes.jetcd.withWatchClient
-import io.etcd.jetcd.Client
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
+import com.sudothought.etcdrecipes.election.LeaderListener
+import com.sudothought.etcdrecipes.election.LeaderSelector
+import java.util.concurrent.Executors
 import kotlin.time.MonoClock
 import kotlin.time.days
 
 fun main() {
     val url = "http://localhost:2379"
     val electionName = "/election/threaded"
-    val clock = MonoClock
-    var unelectedTime = clock.markNow()
+    val executor = Executors.newSingleThreadExecutor()
+    val latch =
+        LeaderSelector.reportLeader(url,
+                                    electionName,
+                                    object : LeaderListener {
+                                        //val electedClock = MonoClock
+                                        val unelectedClock = MonoClock
+                                        //var electedTime = electedClock.markNow()
+                                        var unelectedTime = unelectedClock.markNow()
 
-    Client.builder().endpoints(url).build()
-        .use { client ->
-            client.withWatchClient { watchClient ->
-                watchClient.watcher(leaderPath(electionName)) { watchResponse ->
-                    watchResponse.events
-                        .forEach { event ->
-                            when (event.eventType) {
-                                PUT -> println("${translateLeaderId(event.keyValue.asString)} is now the leader [${unelectedTime.elapsedNow()}]")
-                                DELETE -> unelectedTime = clock.markNow()
-                                UNRECOGNIZED -> println("Error with watch")
-                                else -> println("Error with watch")
-                            }
-                        }
-                }.use {
-                    // Sleep forever
-                    sleep(Long.MAX_VALUE.days)
-                }
-            }
-        }
+                                        override fun takeLeadership(leaderName: String) {
+                                            println("$leaderName is now the leader [${unelectedTime.elapsedNow()}]")
+                                            //electedClock.markNow()
+                                        }
+
+                                        override fun relinquishLeadership() {
+                                            //println("No longer the leader [${electedTime.elapsedNow()}]")
+                                            unelectedClock.markNow()
+                                        }
+                                    },
+                                    executor)
+
+    sleep(1.days)
+    latch.countDown()
+    executor.shutdown()
 }

@@ -24,9 +24,9 @@ import kotlin.time.seconds
 
 fun main() {
     val url = "http://localhost:2379"
-    val electionName = "/election/single"
+    val electionPath = "/election/single"
 
-    LeaderSelector.reset(url, electionName)
+    LeaderSelector.reset(url, electionPath)
 
     val leadershipAction = { selector: LeaderSelector ->
         println("${selector.clientId} elected leader")
@@ -35,7 +35,7 @@ fun main() {
         println("${selector.clientId} surrendering after $pause")
     }
 
-    LeaderSelector(url, electionName, leadershipAction)
+    LeaderSelector(url, electionPath, leadershipAction)
         .use { selector ->
             repeat(100) {
                 println("Iteration $it")
@@ -45,7 +45,7 @@ fun main() {
         }
 
     repeat(5) {
-        LeaderSelector(url, electionName, leadershipAction)
+        LeaderSelector(url, electionPath, leadershipAction)
             .use { selector ->
                 println("Iteration $it")
                 selector.start()

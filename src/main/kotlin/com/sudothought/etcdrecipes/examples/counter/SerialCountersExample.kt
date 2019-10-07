@@ -23,11 +23,11 @@ import kotlin.time.measureTimedValue
 
 fun main() {
     val url = "http://localhost:2379"
-    val counterName = "counter2"
+    val counterPath = "counter2"
 
-    DistributedAtomicLong.reset(url, counterName)
+    DistributedAtomicLong.reset(url, counterPath)
 
-    val counters = List(30) { DistributedAtomicLong(url, counterName) }
+    val counters = List(30) { DistributedAtomicLong(url, counterPath) }
 
     val (total, dur) =
         measureTimedValue {
