@@ -138,7 +138,7 @@ class DistributedBarrier(val url: String,
 
         val waitLatch = CountDownLatch(1)
 
-        watchClient.watcher(barrierPath) { watchResponse ->
+        return watchClient.watcher(barrierPath) { watchResponse ->
             watchResponse.events
                 .forEach { watchEvent ->
                     if (watchEvent.eventType == DELETE)
@@ -150,7 +150,7 @@ class DistributedBarrier(val url: String,
             if (!waitOnMissingBarriers && !isBarrierSet)
                 waitLatch.countDown()
 
-            return@waitOnBarrier waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+            waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
         }
     }
 

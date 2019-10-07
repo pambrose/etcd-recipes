@@ -171,7 +171,8 @@ class DistributedBarrierWithCount(val url: String,
         // Watch for DELETE of /ready and PUTS on /waiters/*
         val adjustedKey = barrierPath.ensureTrailing("/")
         val watchOption = WatchOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build()
-        watchClient.watcher(adjustedKey, watchOption) { watchResponse ->
+
+        return watchClient.watcher(adjustedKey, watchOption) { watchResponse ->
             watchResponse.events
                 .forEach { watchEvent ->
                     val key = watchEvent.keyValue.key.asString
@@ -192,7 +193,7 @@ class DistributedBarrierWithCount(val url: String,
                 kvClient.delete(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
             }
 
-            return@waitOnBarrier success
+            success
         }
     }
 
