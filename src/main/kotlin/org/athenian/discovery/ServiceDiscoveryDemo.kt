@@ -15,6 +15,8 @@
  *  limitations under the License.
  */
 
+@file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
+
 package org.athenian.discovery
 
 import com.sudothought.common.util.sleep
@@ -22,7 +24,6 @@ import kotlin.time.seconds
 
 
 fun main() {
-
     val url = "http://localhost:2379"
     val serviceName = "/services/test"
 

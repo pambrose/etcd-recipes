@@ -19,8 +19,6 @@
 
 package org.athenian.jetcd
 
-import com.google.common.primitives.Ints
-import com.google.common.primitives.Longs
 import io.etcd.jetcd.Auth
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
@@ -30,14 +28,12 @@ import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Lock
 import io.etcd.jetcd.Maintenance
-import io.etcd.jetcd.Observers
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.kv.PutResponse
 import io.etcd.jetcd.kv.TxnResponse
-import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lock.LockResponse
 import io.etcd.jetcd.lock.UnlockResponse
 import io.etcd.jetcd.op.Cmp
@@ -49,29 +45,9 @@ import io.etcd.jetcd.options.PutOption
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchResponse
 
-val String.asByteSequence: ByteSequence get() = ByteSequence.from(toByteArray())
-
-val Int.asByteSequence: ByteSequence get() = ByteSequence.from(Ints.toByteArray(this))
-
-val Long.asByteSequence: ByteSequence get() = ByteSequence.from(Longs.toByteArray(this))
-
-val ByteSequence.asString: String get() = toString(Charsets.UTF_8)
-
-val ByteSequence.asInt: Int get() = Ints.fromByteArray(bytes)
-
-val ByteSequence.asLong: Long get() = Longs.fromByteArray(bytes)
-
-val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(id).build()
-
 val String.asPrefixGetOption get() = GetOption.newBuilder().withPrefix(asByteSequence).build()
 
 val KeyValue.asPair: Pair<String, ByteSequence> get() = Pair(key.asString, value)
-
-val Pair<String, ByteSequence>.asString get() = Pair(first, second.asString)
-
-val Pair<String, ByteSequence>.asInt get() = Pair(first, second.asInt)
-
-val Pair<String, ByteSequence>.asLong get() = Pair(first, second.asLong)
 
 fun KV.putValue(keyname: String, keyval: String): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
 
@@ -258,19 +234,6 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
         block()
         commit()
     }.get()
-
-fun Lease.keepAlive(lease: LeaseGrantResponse) =
-    keepAlive(lease.id, Observers.observer(
-        { /*println("KeepAlive next resp: $next")*/ },
-        { /*println("KeepAlive err resp: $err")*/ }))
-
-fun Lease.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) =
-    keepAlive(lease.id, Observers.observer(
-        { /*next -> println("KeepAlive next resp: $next")*/ },
-        { /*err -> println("KeepAlive err resp: $err")*/ }))
-        .use {
-            block.invoke()
-        }
 
 
 fun String.ensureTrailing(delim: String = "/"): String = "$this${if (endsWith(delim)) "" else delim}"

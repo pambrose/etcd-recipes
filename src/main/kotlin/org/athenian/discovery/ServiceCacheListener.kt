@@ -15,6 +15,8 @@
  *  limitations under the License.
  */
 
+@file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
+
 package org.athenian.discovery
 
 import io.etcd.jetcd.watch.WatchEvent

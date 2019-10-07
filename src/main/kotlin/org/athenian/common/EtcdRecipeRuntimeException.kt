@@ -15,6 +15,8 @@
  *  limitations under the License.
  */
 
+@file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
+
 package org.athenian.common
 
 class EtcdRecipeRuntimeException(msg: String) : RuntimeException(msg)

@@ -23,10 +23,9 @@ import org.athenian.election.LeaderSelectorListener;
 import static com.sudothought.common.util.Misc.random;
 import static com.sudothought.common.util.Misc.sleepSecs;
 
-public class LeaderSelectorDemoSingle {
+public class LeaderSelectorSingleDemo {
 
     public static void main(String[] args) throws InterruptedException {
-
         String url = "http://localhost:2379";
         String electionName = "/election/javademo";
 
