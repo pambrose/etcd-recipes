@@ -56,7 +56,12 @@ fun main() {
         sd.unregisterService(service)
         sleep(3.seconds)
 
-        println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+        try {
+            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+        } catch (e: Exception) {
+            println("Exception $e")
+        }
+
         sleep(2.seconds)
     }
 }

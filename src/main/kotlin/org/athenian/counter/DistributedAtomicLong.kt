@@ -20,11 +20,13 @@
 package org.athenian.counter
 
 import com.sudothought.common.concurrent.withLock
+import com.sudothought.common.delegate.AtomicDelegates
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
+import org.athenian.common.EtcdRecipeRuntimeException
 import org.athenian.jetcd.asLong
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.equals
@@ -43,6 +45,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
     private val semaphore = Semaphore(1, true)
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }
+    private var closeCalled by AtomicDelegates.atomicBoolean(false)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -52,7 +55,10 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
         createCounterIfNotPresent()
     }
 
-    fun get(): Long = semaphore.withLock { kvClient.getLongValue(counterPath) ?: -1L }
+    fun get(): Long = semaphore.withLock {
+        checkCloseNotCalled()
+        kvClient.getLongValue(counterPath) ?: -1L
+    }
 
     fun increment(): Long = modifyCounterValue(1)
 
@@ -62,8 +68,9 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
 
     fun subtract(value: Long): Long = modifyCounterValue(-value)
 
-    private fun modifyCounterValue(value: Long): Long =
-        semaphore.withLock {
+    private fun modifyCounterValue(value: Long): Long {
+        checkCloseNotCalled()
+        return semaphore.withLock {
             var count = 1
             totalCount.incrementAndGet()
             do {
@@ -78,6 +85,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
 
             kvClient.getLongValue(counterPath) ?: -1
         }
+    }
 
     private fun createCounterIfNotPresent(): Boolean =
         // Run the transaction if the counter is not present
@@ -100,12 +108,22 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
             Then(putOp(counterPath, kv.value.asLong + amount))
         }
 
-    override fun close() {
-        if (kvClient.isInitialized())
-            kvClient.value.close()
+    private fun checkCloseNotCalled() {
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
+    }
 
-        if (client.isInitialized())
-            client.value.close()
+    override fun close() {
+        semaphore.withLock {
+            if (!closeCalled) {
+                if (kvClient.isInitialized())
+                    kvClient.value.close()
+
+                if (client.isInitialized())
+                    client.value.close()
+
+                closeCalled = true
+            }
+        }
     }
 
     companion object Static {
@@ -116,9 +134,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : Closeabl
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->
-                    client.withKvClient { kvClient ->
-                        kvClient.delete(counterPath)
-                    }
+                    client.withKvClient { kvClient -> kvClient.delete(counterPath) }
                 }
         }
     }

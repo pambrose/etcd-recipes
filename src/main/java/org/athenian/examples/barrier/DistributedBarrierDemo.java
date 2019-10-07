@@ -24,7 +24,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-public class DistributedBarrierDemo {
+public class
+DistributedBarrierDemo {
 
     public static void main(String[] args) throws InterruptedException {
         String url = "http://localhost:2379";

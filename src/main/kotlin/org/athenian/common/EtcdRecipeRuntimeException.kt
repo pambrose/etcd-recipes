@@ -15,6 +15,6 @@
  *  limitations under the License.
  */
 
-package org.athenian.discovery
+package org.athenian.common
 
-class ServiceDiscoveryException(msg: String) : Exception(msg)
+class EtcdRecipeRuntimeException(msg: String) : RuntimeException(msg)

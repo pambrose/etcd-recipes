@@ -17,6 +17,7 @@
 
 package org.athenian.examples.discovery;
 
+import org.athenian.common.EtcdRecipeException;
 import org.athenian.discovery.IntPayload;
 import org.athenian.discovery.ServiceCache;
 import org.athenian.discovery.ServiceDiscovery;
@@ -25,7 +26,7 @@ import static com.sudothought.common.util.Misc.sleepSecs;
 
 public class ServiceCacheDemo {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws EtcdRecipeException {
         String url = "http://localhost:2379";
         String serviceName = "/services/test";
 

@@ -28,6 +28,8 @@ import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.op.CmpTarget
+import org.athenian.common.EtcdRecipeException
+import org.athenian.common.EtcdRecipeRuntimeException
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.getChildrenKeys
@@ -54,6 +56,7 @@ class ServiceDiscovery(val url: String,
     private var closeCalled by atomicBoolean(false)
     private val namesPath = basePath.appendToPath("/names")
     private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()
+    private val serviceCacheList = mutableListOf<ServiceCache>()
 
     class ServiceInstanceContext(val service: ServiceInstance) : Closeable {
         var lease by nonNullableReference<LeaseGrantResponse>()
@@ -72,9 +75,9 @@ class ServiceDiscovery(val url: String,
     fun start() {
         semaphore.withLock {
             if (startCalled)
-                throw ServiceDiscoveryException("start() already called")
-            if (closeCalled)
-                throw ServiceDiscoveryException("close() already called")
+                throw EtcdRecipeRuntimeException("start() already called")
+            checkCloseNotCalled()
+
             client = Client.builder().endpoints(url).build()
             leaseClient = client.leaseClient
             kvClient = client.kvClient
@@ -82,6 +85,7 @@ class ServiceDiscovery(val url: String,
         }
     }
 
+    @Throws(EtcdRecipeException::class)
     fun registerService(service: ServiceInstance) {
         semaphore.withLock {
             checkStatus()
@@ -100,40 +104,44 @@ class ServiceDiscovery(val url: String,
                     Then(putOp(instancePath, service.toJson(), context.lease.asPutOption))
                 }
 
-            if (!txn.isSucceeded) throw ServiceDiscoveryException("Service registration failed for $instancePath")
+            if (!txn.isSucceeded) throw EtcdRecipeException("Service registration failed for $instancePath")
 
             // Run keep-alive until closed
             context.keepAlive = leaseClient.keepAlive(context.lease)
         }
     }
 
+    @Throws(EtcdRecipeException::class)
     fun updateService(service: ServiceInstance) {
         semaphore.withLock {
             checkStatus()
             val instancePath = getNamesPath(service)
             val context = serviceContextMap[service.id]
-                ?: throw ServiceDiscoveryException("ServiceInstance not already registered with registerService()")
+                ?: throw EtcdRecipeException("ServiceInstance ${service.name} was not first registered with registerService()")
             val txn =
                 kvClient.transaction {
                     If(org.athenian.jetcd.equals(instancePath, CmpTarget.version(0)))
                     Else(putOp(instancePath, service.toJson(), context.lease.asPutOption))
                 }
-            if (txn.isSucceeded) throw ServiceDiscoveryException("Service update failed for $instancePath")
+            if (txn.isSucceeded) throw EtcdRecipeException("Service update failed for $instancePath")
         }
     }
 
+    @Throws(EtcdRecipeException::class)
     fun unregisterService(service: ServiceInstance) {
         semaphore.withLock {
             checkStatus()
             serviceContextMap[service.id]?.close()
-                ?: throw ServiceDiscoveryException("ServiceInstance not published with registerService()")
+                ?: throw EtcdRecipeException("ServiceInstance not published with registerService()")
             serviceContextMap.remove(service.id)
         }
     }
 
     fun serviceCache(name: String): ServiceCache {
         checkStatus()
-        return ServiceCache(url, namesPath, name)
+        val cache = ServiceCache(url, namesPath, name)
+        serviceCacheList += cache
+        return cache
     }
 
     fun queryForNames(): List<String> =
@@ -148,12 +156,13 @@ class ServiceDiscovery(val url: String,
             kvClient.getChildrenStringValues(getNamesPath(name)).map { ServiceInstance.toObject(it) }
         }
 
+    @Throws(EtcdRecipeException::class)
     fun queryForInstance(name: String, id: String): ServiceInstance =
         semaphore.withLock {
             checkStatus()
             val path = getNamesPath(name, id)
             val json = kvClient.getStringValue(path)
-                ?: throw ServiceDiscoveryException("ServiceInstance $path not present")
+                ?: throw EtcdRecipeException("ServiceInstance $path not present")
             ServiceInstance.toObject(json)
         }
 
@@ -161,21 +170,30 @@ class ServiceDiscovery(val url: String,
 
     override fun close() {
         semaphore.withLock {
-            if (startCalled && !closeCalled) {
-                serviceContextMap.forEach { k, v -> unregisterService(v.service) }
-                kvClient.close()
-                leaseClient.close()
-                client.close()
+            if (!closeCalled) {
+                // Close all service caches
+                serviceCacheList.forEach { it.close() }
+
+                if (startCalled && !closeCalled) {
+                    serviceContextMap.forEach { k, v -> unregisterService(v.service) }
+                    kvClient.close()
+                    leaseClient.close()
+                    client.close()
+                }
+
+                closeCalled = true
             }
-            closeCalled = true
         }
+    }
+
+    private fun checkCloseNotCalled() {
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
     }
 
     private fun checkStatus() {
         if (!startCalled)
-            throw ServiceDiscoveryException("start() must be called first")
-        if (closeCalled)
-            throw ServiceDiscoveryException("close() already called")
+            throw EtcdRecipeRuntimeException("start() must be called first")
+        checkCloseNotCalled()
     }
 
     private fun getNamesPath(service: ServiceInstance) = getNamesPath(service.name, service.id)

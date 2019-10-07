@@ -31,7 +31,7 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import org.athenian.barrier.DistributedBarrierException
+import org.athenian.common.EtcdRecipeException
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asByteSequence
 import org.athenian.jetcd.asPutOption
@@ -90,10 +90,13 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     val waiterCount: Long get() = kvClient.count(waitingPrefix)
 
+    @Throws(EtcdRecipeException::class)
     fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 
+    @Throws(EtcdRecipeException::class)
     fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
 
+    @Throws(EtcdRecipeException::class)
     fun enter(timeout: Duration): Boolean {
 
         val uniqueToken = "$clientId:${randomId(9)}"
@@ -116,9 +119,9 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
             }
 
         if (!txn.isSucceeded)
-            throw DistributedBarrierException("Failed to set waitingPath")
+            throw EtcdRecipeException("Failed to set waitingPath")
         if (kvClient.getStringValue(waitingPath) != uniqueToken)
-            throw DistributedBarrierException("Failed to assign waitingPath unique value")
+            throw EtcdRecipeException("Failed to assign waitingPath unique value")
 
         // Keep key alive
         executor.value.submit { leaseClient.value.keepAliveWith(lease) { keepAliveLatch.await() } }
@@ -188,9 +191,9 @@ class DistributedDoubleBarrierNoLeaveTimeout(val url: String,
 
     fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))
 
+    @Throws(EtcdRecipeException::class)
     fun leave(timeout: Duration): Boolean {
-
-        if (!enterCalled) throw DistributedBarrierException("enter() must be called before leave()")
+        if (!enterCalled) throw EtcdRecipeException("enter() must be called before leave()")
 
         leaveCalled = true
 

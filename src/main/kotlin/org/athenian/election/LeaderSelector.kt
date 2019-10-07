@@ -31,6 +31,8 @@ import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import org.athenian.common.EtcdRecipeException
+import org.athenian.common.EtcdRecipeRuntimeException
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
@@ -107,7 +109,7 @@ class LeaderSelector(val url: String,
                                                                  clientId,
                                                                  executorService)
 
-    private val semaphore = Semaphore(1, true)
+    private val closeSemaphore = Semaphore(1, true)
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
     private val terminateWatch = BooleanMonitor(false)
     private val terminateKeepAlive = BooleanMonitor(false)
@@ -118,15 +120,12 @@ class LeaderSelector(val url: String,
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
     private val leaderPath = leaderPath(electionPath)
+    private val exceptionList = mutableListOf<Exception>()
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
-
-    val isStartCalled get() = startCalled
-
-    val isCloseCalled get() = closeCalled
 
     val isLeader get() = electedLeader
 
@@ -134,7 +133,9 @@ class LeaderSelector(val url: String,
 
     fun start(): LeaderSelector {
 
-        if (!startCallAllowed) throw LeaderSelectorException("Previous call to start() not complete")
+        if (!startCallAllowed)
+            throw EtcdRecipeRuntimeException("Previous call to start() not complete")
+
         checkCloseNotCalled()
 
         terminateWatch.set(false)
@@ -156,6 +157,7 @@ class LeaderSelector(val url: String,
                             client.withKvClient { kvClient ->
 
                                 connectedToEtcd.set(true)
+                                val leaderSemaphore = Semaphore(1, true)
                                 val watchStarted = BooleanMonitor(false)
                                 val watchStopped = BooleanMonitor(false)
                                 val advertiseComplete = BooleanMonitor(false)
@@ -165,7 +167,10 @@ class LeaderSelector(val url: String,
                                         client.withWatchClient { watchClient ->
                                             // Run for leader when leader key is deleted
                                             watchForDeleteEvents(watchClient, watchStarted) {
-                                                semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
+                                                leaderSemaphore.withLock {
+                                                    attemptToBecomeLeader(leaseClient,
+                                                                          kvClient)
+                                                }
                                             }.use {
                                                 terminateWatch.waitUntilTrue()
                                             }
@@ -173,6 +178,7 @@ class LeaderSelector(val url: String,
                                         }
                                     } catch (e: Exception) {
                                         e.printStackTrace()
+                                        exceptionList += e
                                     }
                                 }
 
@@ -181,6 +187,7 @@ class LeaderSelector(val url: String,
                                         advertiseParticipation(leaseClient, kvClient)
                                     } catch (e: Exception) {
                                         e.printStackTrace()
+                                        exceptionList += e
                                     } finally {
                                         advertiseComplete.set(true)
                                     }
@@ -190,7 +197,7 @@ class LeaderSelector(val url: String,
                                 watchStarted.waitUntilTrue()
 
                                 // Clients should run for leader in case they are the first to run
-                                semaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
+                                leaderSemaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
 
                                 leadershipComplete.waitUntilTrue()
                                 watchStopped.waitUntilTrue()
@@ -200,6 +207,7 @@ class LeaderSelector(val url: String,
                     }
             } catch (e: Exception) {
                 e.printStackTrace()
+                exceptionList += e
             } finally {
                 startThreadComplete.set(true)
             }
@@ -208,6 +216,12 @@ class LeaderSelector(val url: String,
         connectedToEtcd.waitUntilTrue()
         return this
     }
+
+    val backgroundExceptions get() = exceptionList
+
+    val hasBackgroundExceptions get() = exceptionList.size > 0
+
+    fun clearBackgroundExceptions() = exceptionList.clear()
 
     @Throws(InterruptedException::class)
     fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Long.MAX_VALUE.days)
@@ -229,27 +243,31 @@ class LeaderSelector(val url: String,
         leadershipComplete.set(true)
     }
 
-    override fun close() {
-        checkStartCalled()
-        checkCloseNotCalled()
-
-        closeCalled = true
-
-        markLeadershipComplete()
-
-        startThreadComplete.waitUntilTrue()
-
-        if (userExecutor == null)
-            executor.shutdown()
-    }
-
     private fun checkStartCalled() {
-        if (!isStartCalled) throw LeaderSelectorException("start() not called")
+        if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
     }
 
     private fun checkCloseNotCalled() {
-        if (isCloseCalled) throw LeaderSelectorException("close() already closed")
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
     }
+
+    override fun close() {
+        closeSemaphore.withLock {
+            checkStartCalled()
+
+            if (!closeCalled) {
+                closeCalled = true
+
+                markLeadershipComplete()
+
+                startThreadComplete.waitUntilTrue()
+
+                if (userExecutor == null)
+                    executor.shutdown()
+            }
+        }
+    }
+
 
     private fun watchForDeleteEvents(watchClient: Watch,
                                      watchStarted: BooleanMonitor,
@@ -263,8 +281,8 @@ class LeaderSelector(val url: String,
         return watcher
     }
 
+    @Throws(EtcdRecipeException::class)
     private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
-
         val path = participationPath(electionPath).appendToPath(clientId)
 
         // Wait until key goes away when previous keep alive finishes
@@ -282,7 +300,7 @@ class LeaderSelector(val url: String,
                 Then(putOp(path, clientId, lease.asPutOption))
             }
 
-        if (!txn.isSucceeded) throw LeaderSelectorException("Participation registration failed [$path]")
+        if (!txn.isSucceeded) throw EtcdRecipeException("Participation registration failed [$path]")
 
         // Run keep-alive until closed
         leaseClient.keepAliveWith(lease) {

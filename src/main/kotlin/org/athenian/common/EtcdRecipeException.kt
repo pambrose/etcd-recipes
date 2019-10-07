@@ -15,6 +15,6 @@
  *  limitations under the License.
  */
 
-package org.athenian.election
+package org.athenian.common
 
-class LeaderSelectorException(msg: String) : Exception(msg)
+class EtcdRecipeException(msg: String) : Exception(msg)

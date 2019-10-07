@@ -17,6 +17,7 @@
 
 package org.athenian.examples.discovery;
 
+import org.athenian.common.EtcdRecipeException;
 import org.athenian.discovery.IntPayload;
 import org.athenian.discovery.ServiceDiscovery;
 import org.athenian.discovery.ServiceInstance;
@@ -25,7 +26,7 @@ import static com.sudothought.common.util.Misc.sleepSecs;
 
 public class ServiceDiscoveryDemo {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws EtcdRecipeException {
         String url = "http://localhost:2379";
         String serviceName = "/services/test";
 
@@ -58,7 +59,11 @@ public class ServiceDiscoveryDemo {
             sd.unregisterService(service);
             sleepSecs(3);
 
-            System.out.println("Retrieved value: " + sd.queryForInstance(service.getName(), service.getId()));
+            try {
+                System.out.println("Retrieved value: " + sd.queryForInstance(service.getName(), service.getId()));
+            } catch (EtcdRecipeException e) {
+                System.out.println();
+            }
 
             sleepSecs(2);
         }

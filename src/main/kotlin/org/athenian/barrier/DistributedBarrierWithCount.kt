@@ -20,6 +20,8 @@
 package org.athenian.barrier
 
 import com.sudothought.common.concurrent.BooleanMonitor
+import com.sudothought.common.concurrent.withLock
+import com.sudothought.common.delegate.AtomicDelegates
 import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
@@ -28,6 +30,8 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import org.athenian.common.EtcdRecipeException
+import org.athenian.common.EtcdRecipeRuntimeException
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asByteSequence
 import org.athenian.jetcd.asPutOption
@@ -46,6 +50,7 @@ import org.athenian.jetcd.transaction
 import org.athenian.jetcd.watcher
 import org.athenian.jetcd.withKvClient
 import java.io.Closeable
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
@@ -66,10 +71,12 @@ class DistributedBarrierWithCount(val url: String,
                 barrierPath: String,
                 memberCount: Int) : this(url, barrierPath, memberCount, "Client:${randomId(9)}")
 
+    private val semaphore = Semaphore(1, true)
     private val client = lazy { Client.builder().endpoints(url).build() }
     private val kvClient = lazy { client.value.kvClient }
     private val leaseClient = lazy { client.value.leaseClient }
     private val watchClient = lazy { client.value.watchClient }
+    private var closeCalled by AtomicDelegates.atomicBoolean(false)
     private val readyPath = barrierPath.appendToPath("ready")
     private val waitingPath = barrierPath.appendToPath("waiting")
 
@@ -79,23 +86,32 @@ class DistributedBarrierWithCount(val url: String,
         require(memberCount > 0) { "Member count must be > 0" }
     }
 
-    private val isReadySet: Boolean get() = kvClient.keyIsPresent(readyPath)
+    private val isReadySet: Boolean
+        get() {
+            checkCloseNotCalled()
+            return kvClient.keyIsPresent(readyPath)
+        }
 
-    val waiterCount: Long get() = kvClient.count(waitingPath)
+    val waiterCount: Long
+        get() {
+            checkCloseNotCalled()
+            return kvClient.count(waitingPath)
+        }
 
-    @Throws(InterruptedException::class)
+    @Throws(InterruptedException::class, EtcdRecipeException::class)
     fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
-    @Throws(InterruptedException::class)
+    @Throws(InterruptedException::class, EtcdRecipeException::class)
     fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
         waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
-    @Throws(InterruptedException::class)
+    @Throws(InterruptedException::class, EtcdRecipeException::class)
     fun waitOnBarrier(timeout: Duration): Boolean {
-
         var keepAliveLease: CloseableClient? = null
         val keepAliveClosed = BooleanMonitor(false)
         val uniqueToken = "$clientId:${randomId(9)}"
+
+        checkCloseNotCalled()
 
         fun closeKeepAlive() {
             if (!keepAliveClosed.get()) {
@@ -139,9 +155,9 @@ class DistributedBarrierWithCount(val url: String,
             }
 
         if (!txn.isSucceeded)
-            throw DistributedBarrierException("Failed to set waitingPath")
+            throw EtcdRecipeException("Failed to set waitingPath")
         if (kvClient.getStringValue(waitingPath) != uniqueToken)
-            throw DistributedBarrierException("Failed to assign waitingPath unique value")
+            throw EtcdRecipeException("Failed to assign waitingPath unique value")
 
         // Keep key alive
         keepAliveLease = leaseClient.value.keepAlive(lease)
@@ -180,18 +196,28 @@ class DistributedBarrierWithCount(val url: String,
         }
     }
 
+    private fun checkCloseNotCalled() {
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
+    }
+
     override fun close() {
-        if (watchClient.isInitialized())
-            watchClient.value.close()
+        semaphore.withLock {
+            if (!closeCalled) {
+                if (watchClient.isInitialized())
+                    watchClient.value.close()
 
-        if (leaseClient.isInitialized())
-            leaseClient.value.close()
+                if (leaseClient.isInitialized())
+                    leaseClient.value.close()
 
-        if (kvClient.isInitialized())
-            kvClient.value.close()
+                if (kvClient.isInitialized())
+                    kvClient.value.close()
 
-        if (client.isInitialized())
-            client.value.close()
+                if (client.isInitialized())
+                    client.value.close()
+
+                closeCalled = true
+            }
+        }
     }
 
     companion object {

@@ -28,6 +28,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import org.athenian.common.EtcdRecipeRuntimeException
 import org.athenian.jetcd.asPutOption
 import org.athenian.jetcd.delete
 import org.athenian.jetcd.equals
@@ -62,6 +63,7 @@ class DistributedBarrier(val url: String,
     private val kvClient = lazy { client.value.kvClient }
     private val leaseClient = lazy { client.value.leaseClient }
     private val watchClient = lazy { client.value.watchClient }
+    private var closeCalled by atomicBoolean(false)
     private var keepAliveLease by nullableReference<CloseableClient?>(null)
     private var barrierRemoved by atomicBoolean(false)
 
@@ -70,10 +72,15 @@ class DistributedBarrier(val url: String,
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
     }
 
-    val isBarrierSet: Boolean get() = semaphore.withLock { kvClient.keyIsPresent(barrierPath) }
+    val isBarrierSet: Boolean
+        get() = semaphore.withLock {
+            checkCloseNotCalled()
+            kvClient.keyIsPresent(barrierPath)
+        }
 
     fun setBarrier(): Boolean =
         semaphore.withLock {
+            checkCloseNotCalled()
             if (kvClient.keyIsPresent(barrierPath))
                 false
             else {
@@ -102,6 +109,7 @@ class DistributedBarrier(val url: String,
 
     fun removeBarrier(): Boolean =
         semaphore.withLock {
+            checkCloseNotCalled()
             if (barrierRemoved) {
                 false
             } else {
@@ -121,6 +129,9 @@ class DistributedBarrier(val url: String,
 
     @Throws(InterruptedException::class)
     fun waitOnBarrier(timeout: Duration): Boolean {
+
+        checkCloseNotCalled()
+
         // Check if barrier is present before using watcher
         if (!waitOnMissingBarriers && !isBarrierSet)
             return true
@@ -143,23 +154,30 @@ class DistributedBarrier(val url: String,
         }
     }
 
+    private fun checkCloseNotCalled() {
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
+    }
+
     override fun close() {
         semaphore.withLock {
+            if (!closeCalled) {
+                keepAliveLease?.close()
+                keepAliveLease = null
 
-            keepAliveLease?.close()
-            keepAliveLease = null
+                if (watchClient.isInitialized())
+                    watchClient.value.close()
 
-            if (watchClient.isInitialized())
-                watchClient.value.close()
+                if (leaseClient.isInitialized())
+                    leaseClient.value.close()
 
-            if (leaseClient.isInitialized())
-                leaseClient.value.close()
+                if (kvClient.isInitialized())
+                    kvClient.value.close()
 
-            if (kvClient.isInitialized())
-                kvClient.value.close()
+                if (client.isInitialized())
+                    client.value.close()
 
-            if (client.isInitialized())
-                client.value.close()
+                closeCalled = true
+            }
         }
     }
 

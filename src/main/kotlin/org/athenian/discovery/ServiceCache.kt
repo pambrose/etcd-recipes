@@ -27,6 +27,7 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import mu.KLogging
+import org.athenian.common.EtcdRecipeRuntimeException
 import org.athenian.jetcd.appendToPath
 import org.athenian.jetcd.asPair
 import org.athenian.jetcd.asString
@@ -55,9 +56,8 @@ class ServiceCache(val url: String,
     fun start() {
         semaphore.withLock {
             if (startCalled)
-                throw ServiceDiscoveryException("start() already called")
-            if (closeCalled)
-                throw ServiceDiscoveryException("close() already called")
+                throw EtcdRecipeRuntimeException("start() already called")
+            checkCloseNotCalled()
 
             client = Client.builder().endpoints(url).build()
 
@@ -89,20 +89,32 @@ class ServiceCache(val url: String,
         }
     }
 
-    val instances: List<ServiceInstance> get() = serviceMap.values.map { ServiceInstance.toObject(it) }
-
-    fun addListenerForChanges(listener: (eventType: WatchEvent.EventType, serviceName: String, serviceInstance: ServiceInstance?) -> Unit) {
-        listeners += object : ServiceCacheListener {
-            override fun cacheChanged(eventType: WatchEvent.EventType,
-                                      serviceName: String,
-                                      serviceInstance: ServiceInstance?) {
-                listener.invoke(eventType, serviceName, serviceInstance)
-            }
+    val instances: List<ServiceInstance>
+        get() {
+            checkCloseNotCalled()
+            return serviceMap.values.map { ServiceInstance.toObject(it) }
         }
+
+    fun addListenerForChanges(listener: (eventType: WatchEvent.EventType,
+                                         serviceName: String,
+                                         serviceInstance: ServiceInstance?) -> Unit) {
+        addListenerForChanges(
+            object : ServiceCacheListener {
+                override fun cacheChanged(eventType: WatchEvent.EventType,
+                                          serviceName: String,
+                                          serviceInstance: ServiceInstance?) {
+                    listener.invoke(eventType, serviceName, serviceInstance)
+                }
+            })
     }
 
     fun addListenerForChanges(listener: ServiceCacheListener) {
+        checkCloseNotCalled()
         listeners += listener
+    }
+
+    private fun checkCloseNotCalled() {
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
     }
 
     override fun close() {
