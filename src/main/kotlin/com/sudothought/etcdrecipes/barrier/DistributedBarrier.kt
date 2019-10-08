@@ -25,7 +25,6 @@ import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.etcdrecipes.common.EtcdConnector
 import com.sudothought.etcdrecipes.jetcd.*
-import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
@@ -78,6 +77,7 @@ class DistributedBarrier(val urls: List<String>,
                     kvClient.transaction {
                         If(equalTo(barrierPath, CmpTarget.version(0)))
                         Then(putOp(barrierPath, uniqueToken, lease.asPutOption))
+                        Else()
                     }
 
                 // Check to see if unique value was successfully set in the CAS step
@@ -143,18 +143,6 @@ class DistributedBarrier(val urls: List<String>,
 
                 super.close()
             }
-        }
-    }
-
-    companion object Static {
-        fun delete(urls: List<String>, barrierPath: String) {
-            require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withKvClient { kvClient ->
-                        kvClient.delete(barrierPath)
-                    }
-                }
         }
     }
 }

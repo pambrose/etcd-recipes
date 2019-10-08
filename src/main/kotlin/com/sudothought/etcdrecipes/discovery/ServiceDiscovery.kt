@@ -70,8 +70,9 @@ class ServiceDiscovery(val urls: List<String>,
 
             val txn =
                 kvClient.transaction {
-                    If(com.sudothought.etcdrecipes.jetcd.equalTo(instancePath, CmpTarget.version(0)))
+                    If(equalTo(instancePath, CmpTarget.version(0)))
                     Then(putOp(instancePath, service.toJson(), context.lease.asPutOption))
+                    Else()
                 }
 
             if (!txn.isSucceeded) throw EtcdRecipeException("Service registration failed for $instancePath")
@@ -90,7 +91,8 @@ class ServiceDiscovery(val urls: List<String>,
                 ?: throw EtcdRecipeException("ServiceInstance ${service.name} was not first registered with registerService()")
             val txn =
                 kvClient.transaction {
-                    If(com.sudothought.etcdrecipes.jetcd.equalTo(instancePath, CmpTarget.version(0)))
+                    If(equalTo(instancePath, CmpTarget.version(0)))
+                    Then()
                     Else(putOp(instancePath, service.toJson(), context.lease.asPutOption))
                 }
             if (txn.isSucceeded) throw EtcdRecipeException("Service update failed for $instancePath")

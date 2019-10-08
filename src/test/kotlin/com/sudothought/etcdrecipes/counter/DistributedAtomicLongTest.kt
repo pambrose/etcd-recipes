@@ -29,7 +29,7 @@ import kotlin.time.milliseconds
 
 class DistributedAtomicLongTest {
     val urls = listOf("http://localhost:2379")
-    val path = "/DistributedAtomicLongTest"
+    val path = "/counters/${javaClass.simpleName}"
 
     @BeforeEach
     fun deleteCounter() = DistributedAtomicLong.delete(urls, path)

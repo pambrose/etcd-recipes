@@ -32,8 +32,6 @@ fun main() {
     val count = 50
     val latch = CountDownLatch(count)
 
-    LeaderSelector.delete(urls, electionPath)
-
     repeat(count) {
         thread {
             val takeLeadershipAction =

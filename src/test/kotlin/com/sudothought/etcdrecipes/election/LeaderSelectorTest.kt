@@ -20,9 +20,7 @@ package com.sudothought.etcdrecipes.election
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
-import com.sudothought.etcdrecipes.counter.DistributedAtomicLong
 import org.amshove.kluent.shouldEqual
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
@@ -31,10 +29,7 @@ import kotlin.time.seconds
 
 class LeaderSelectorTest {
     val urls = listOf("http://localhost:2379")
-    val path = "/election/LeaderSelectorTest"
-
-    @BeforeEach
-    fun deleteElection() = DistributedAtomicLong.delete(urls, path)
+    val path = "/election/${javaClass.simpleName}"
 
     @Test
     fun serialElectionTest() {

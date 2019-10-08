@@ -32,8 +32,6 @@ public class LeaderSelectorSerialExample {
         List<String> urls = Lists.newArrayList("http://localhost:2379");
         String electionPath = "/election/javademo";
 
-        LeaderSelector.Static.delete(urls, electionPath);
-
         LeaderSelectorListener listener =
                 new LeaderSelectorListener() {
                     @Override

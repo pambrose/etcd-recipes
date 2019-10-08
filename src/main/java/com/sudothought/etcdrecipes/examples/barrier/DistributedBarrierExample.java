@@ -35,8 +35,6 @@ public class DistributedBarrierExample {
         CountDownLatch goLatch = new CountDownLatch(1);
         ExecutorService executor = Executors.newCachedThreadPool();
 
-        DistributedBarrier.Static.delete(urls, barrierPath);
-
         executor.execute(() -> {
             try (DistributedBarrier barrier = new DistributedBarrier(urls, barrierPath, true)) {
                 System.out.println("Setting Barrier");

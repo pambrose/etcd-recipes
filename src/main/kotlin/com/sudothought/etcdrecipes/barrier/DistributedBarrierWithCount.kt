@@ -118,6 +118,7 @@ class DistributedBarrierWithCount(val urls: List<String>,
         kvClient.transaction {
             If(equalTo(readyPath, CmpTarget.version(0)))
             Then(putOp(readyPath, uniqueToken))
+            Else()
         }
 
         val waitingPath = waitingPath.appendToPath(uniqueToken)
@@ -127,6 +128,7 @@ class DistributedBarrierWithCount(val urls: List<String>,
             kvClient.transaction {
                 If(equalTo(waitingPath, CmpTarget.version(0)))
                 Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
+                Else()
             }
 
         if (!txn.isSucceeded)

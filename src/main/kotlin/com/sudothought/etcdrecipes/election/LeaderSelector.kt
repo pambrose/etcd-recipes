@@ -285,6 +285,7 @@ class LeaderSelector(val urls: List<String>,
             kvClient.transaction {
                 If(equalTo(path, CmpTarget.version(0)))
                 Then(putOp(path, clientId, lease.asPutOption))
+                Else()
             }
 
         if (!txn.isSucceeded) throw EtcdRecipeException("Participation registration failed [$path]")
@@ -308,6 +309,7 @@ class LeaderSelector(val urls: List<String>,
             kvClient.transaction {
                 If(equalTo(leaderPath, CmpTarget.version(0)))
                 Then(putOp(leaderPath, uniqueToken, lease.asPutOption))
+                Else()
             }
 
         // Check to see if unique value was successfully set in the CAS step
@@ -342,16 +344,6 @@ class LeaderSelector(val urls: List<String>,
         private fun leaderPath(electionPath: String) = electionPath.appendToPath("LEADER")
 
         val String.stripUniqueSuffix get() = dropLast(uniqueSuffixLength + 1)
-
-        fun delete(urls: List<String>, electionPath: String) {
-            require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withKvClient { kvClient ->
-                        kvClient.getChildrenKeys(electionPath).forEach { kvClient.delete(it) }
-                    }
-                }
-        }
 
         fun getParticipants(urls: List<String>, electionPath: String): List<Participant> {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }

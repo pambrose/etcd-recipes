@@ -16,43 +16,26 @@
 
 package com.sudothought.etcdrecipes.election
 
-import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.time.seconds
 
-class ReportLeaderTest {
+class ParticipantTest {
     val urls = listOf("http://localhost:2379")
     val path = "/election/${javaClass.simpleName}"
 
     @Test
     fun reportLeaderTest() {
-        val count = 25
-        val latch = CountDownLatch(count)
-        val takeLeadershiptCounter = AtomicInteger(0)
-        val relinquishLeadershiptCounter = AtomicInteger(0)
+        val count = 20
+        val startedLatch = CountDownLatch(count)
+        val finishedLatch = CountDownLatch(count)
+        val holdLatch = CountDownLatch(1)
+        val participantCounts = mutableListOf<Int>()
+        val leaderNames = mutableListOf<String>()
 
-        val executor = Executors.newSingleThreadExecutor()
-        LeaderSelector.reportLeader(urls,
-                                    path,
-                                    object : LeaderListener {
-                                        override fun takeLeadership(leaderName: String) {
-                                            println("$leaderName elected leader")
-                                            takeLeadershiptCounter.incrementAndGet()
-                                        }
-
-                                        override fun relinquishLeadership() {
-                                            relinquishLeadershiptCounter.incrementAndGet()
-                                        }
-                                    },
-                                    executor)
-
-        sleep(5.seconds)
 
         repeat(count) {
             thread {
@@ -60,29 +43,51 @@ class ReportLeaderTest {
                                path,
                                object : LeaderSelectorListenerAdapter() {
                                    override fun takeLeadership(selector: LeaderSelector) {
-                                       val pause = 3.random.seconds
+                                       val pause = 2.seconds
                                        println("${selector.clientId} elected leader for $pause")
                                        sleep(pause)
+
+                                       // Wait until participation count has been taken
+                                       holdLatch.await()
+                                       participantCounts += LeaderSelector.getParticipants(urls, path).size
+                                       leaderNames += selector.clientId
                                    }
                                },
                                "Thread$it")
                     .use { election ->
                         election.start()
+                        startedLatch.countDown()
                         election.waitOnLeadershipComplete()
-                        latch.countDown()
+                        finishedLatch.countDown()
                     }
             }
         }
 
-        latch.await()
+        startedLatch.await()
 
-        // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
+        // Wait for participants to register
         sleep(3.seconds)
 
-        executor.shutdown()
+        var particpants = LeaderSelector.getParticipants(urls, path)
+        println("Found ${particpants.size} participants")
+        particpants.size shouldEqual count
 
-        takeLeadershiptCounter.get() shouldEqual count
-        relinquishLeadershiptCounter.get() shouldEqual count
+        holdLatch.countDown()
+
+        finishedLatch.await()
+
+        sleep(3.seconds)
+        particpants = LeaderSelector.getParticipants(urls, path)
+        println("Found ${particpants.size} participants")
+        particpants.size shouldEqual 0
+
+        // Compare participant counts
+        println("participantCounts = $participantCounts")
+        participantCounts.size shouldEqual count
+        participantCounts shouldEqual (count downTo 1).toList()
+
+        // Compare leader names
+        println("leaderNames = $leaderNames")
+        leaderNames.sorted() shouldEqual List(count) { "Thread$it" }.sorted()
     }
-
 }

@@ -26,8 +26,6 @@ fun main() {
     val urls = listOf("http://localhost:2379")
     val electionPath = "/election/single"
 
-    LeaderSelector.delete(urls, electionPath)
-
     val leadershipAction = { selector: LeaderSelector ->
         println("${selector.clientId} elected leader")
         val pause = 0.seconds //Random.nextInt(1, 3).seconds

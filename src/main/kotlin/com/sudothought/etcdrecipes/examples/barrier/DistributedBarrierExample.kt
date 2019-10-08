@@ -31,8 +31,6 @@ fun main() {
     val waitLatch = CountDownLatch(count)
     val goLatch = CountDownLatch(1)
 
-    DistributedBarrier.delete(urls, barrierPath)
-
     thread {
         DistributedBarrier(urls, barrierPath)
             .use { barrier ->
