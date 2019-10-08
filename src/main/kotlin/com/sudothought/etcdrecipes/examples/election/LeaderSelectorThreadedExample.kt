@@ -34,7 +34,6 @@ fun main() {
 
     LeaderSelector.delete(urls, electionPath)
 
-
     repeat(count) {
         thread {
             val takeLeadershipAction =

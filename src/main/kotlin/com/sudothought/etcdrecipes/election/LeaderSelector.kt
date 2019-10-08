@@ -104,6 +104,7 @@ class LeaderSelector(val urls: List<String>,
     private val terminateKeepAlive = BooleanMonitor(false)
     private val leadershipComplete = BooleanMonitor(false)
     private val startThreadComplete = BooleanMonitor(false)
+    private val attemptLeadership = BooleanMonitor(true)
     private var startCalled by atomicBoolean(false)
     private var closeCalled by atomicBoolean(false)
     private var electedLeader by atomicBoolean(false)
@@ -131,6 +132,7 @@ class LeaderSelector(val urls: List<String>,
         terminateKeepAlive.set(false)
         leadershipComplete.set(false)
         startThreadComplete.set(false)
+        attemptLeadership.set(true)
         startCalled = true
         closeCalled = false
         electedLeader = false
@@ -144,23 +146,20 @@ class LeaderSelector(val urls: List<String>,
                     .use { client ->
                         client.withLeaseClient { leaseClient ->
                             client.withKvClient { kvClient ->
-
                                 connectedToEtcd.set(true)
                                 val leaderSemaphore = Semaphore(1, true)
                                 val watchStarted = BooleanMonitor(false)
                                 val watchStopped = BooleanMonitor(false)
                                 val advertiseComplete = BooleanMonitor(false)
 
+
                                 executor.execute {
                                     try {
                                         client.withWatchClient { watchClient ->
-                                            // Run for leader when leader key is deleted
+                                            // Run for leader whenever leader key is deleted
                                             watchForDeleteEvents(watchClient, watchStarted) {
                                                 leaderSemaphore.withLock {
-                                                    attemptToBecomeLeader(
-                                                        leaseClient,
-                                                        kvClient
-                                                                         )
+                                                    attemptToBecomeLeader(leaseClient, kvClient)
                                                 }
                                             }.use {
                                                 terminateWatch.waitUntilTrue()
@@ -296,7 +295,7 @@ class LeaderSelector(val urls: List<String>,
 
     // This will not return until election failure or leader surrenders leadership after being elected
     private fun attemptToBecomeLeader(leaseClient: Lease, kvClient: KV): Boolean {
-        if (isLeader) return false
+        if (isLeader || !attemptLeadership.get()) return false
 
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$clientId:${randomId(uniqueSuffixLength)}"
@@ -313,9 +312,8 @@ class LeaderSelector(val urls: List<String>,
 
         // Check to see if unique value was successfully set in the CAS step
         return if (!isLeader && txn.isSucceeded && kvClient.getStringValue(leaderPath) == uniqueToken) {
-            // This will exit when leadership is relinquished
+            // Selected as leader. This will exit when leadership is relinquished
             leaseClient.keepAliveWith(lease) {
-                // Selected as leader
                 electedLeader = true
                 listener.takeLeadership(this)
             }
@@ -324,9 +322,10 @@ class LeaderSelector(val urls: List<String>,
             listener.relinquishLeadership(this)
 
             // Do this after leadership is complete so the thread does not terminate
-            markLeadershipComplete()
+            attemptLeadership.set(false)
             startCallAllowed = true
             electedLeader = false
+            markLeadershipComplete()
             true
         } else {
             // Failed to become leader
