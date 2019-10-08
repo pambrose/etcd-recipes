@@ -66,6 +66,46 @@ fun KV.getResponse(keyname: String, option: GetOption = GetOption.DEFAULT): GetR
 fun Lazy<KV>.getResponse(keyname: String, option: GetOption = GetOption.DEFAULT): GetResponse =
     value.getResponse(keyname, option)
 
+// Get children key value pairs
+private val String.asPrefixGetOption get() = GetOption.newBuilder().withPrefix(asByteSequence).build()
+
+fun KV.getKeyValues(keyname: String, getOption: GetOption): List<Pair<String, ByteSequence>> =
+    getResponse(keyname, getOption).kvs.map { it.key.asString to it.value }
+
+fun KV.getKeyValues(keyname: String): List<Pair<String, ByteSequence>> {
+    val adjustedKey = keyname.ensureTrailing("/")
+    return getKeyValues(adjustedKey, adjustedKey.asPrefixGetOption)
+}
+
+fun Lazy<KV>.getKeyValues(keyname: String): List<Pair<String, ByteSequence>> = value.getKeyValues(keyname)
+
+fun KV.getKeys(keyname: String): List<String> = getKeyValues(keyname).keys
+
+fun KV.getValues(keyname: String): List<ByteSequence> = getKeyValues(keyname).values
+
+fun Lazy<KV>.getKeys(keyname: String): List<String> = value.getKeys(keyname)
+
+fun Lazy<KV>.getValues(keyname: String): List<ByteSequence> = value.getValues(keyname)
+
+// Get single key value
+fun KV.getValue(keyname: String): ByteSequence? =
+    getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value
+
+fun Lazy<KV>.getValue(keyname: String): ByteSequence? = value.getValue(keyname)
+
+// Get single key value with default
+fun KV.getValue(keyname: String, defaultVal: String): String = getValue(keyname)?.asString ?: defaultVal
+
+fun KV.getValue(keyname: String, defaultVal: Int): Int = getValue(keyname)?.asInt ?: defaultVal
+
+fun KV.getValue(keyname: String, defaultVal: Long): Long = getValue(keyname)?.asLong ?: defaultVal
+
+fun Lazy<KV>.getValue(keyname: String, defaultVal: String): String = value.getValue(keyname, defaultVal)
+
+fun Lazy<KV>.getValue(keyname: String, defaultVal: Int): Int = value.getValue(keyname, defaultVal)
+
+fun Lazy<KV>.getValue(keyname: String, defaultVal: Long): Long = value.getValue(keyname, defaultVal)
+
 // Key checking
 fun KV.isKeyPresent(keyname: String) = !(transaction { If(equalTo(keyname, CmpTarget.version(0))) }.isSucceeded)
 
@@ -75,104 +115,11 @@ fun Lazy<KV>.isKeyPresent(keyname: String) = value.isKeyPresent(keyname)
 
 fun Lazy<KV>.isKeyNotPresent(keyname: String) = value.isKeyNotPresent(keyname)
 
-// Get children keys
-private val String.asPrefixGetOption get() = GetOption.newBuilder().withPrefix(asByteSequence).build()
-
-fun KV.getChildrenKeys(keyname: String): List<String> {
-    val adjustedKey = keyname.ensureTrailing("/")
-    return getKeys(adjustedKey, adjustedKey.asPrefixGetOption)
-}
-
-fun Lazy<KV>.getChildrenKeys(keyname: String): List<String> = value.getChildrenKeys(keyname)
-
-fun KV.getKeys(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<String> =
-    getResponse(keyname, getOption).kvs.map { it.key.asString }
-
-// Get values with GetOption
-fun KV.getValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<ByteSequence> =
-    getResponse(keyname, getOption).kvs.map { it.value }
-
-fun KV.getStringValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<String> =
-    getResponse(keyname, getOption).kvs.map { it.value.asString }
-
-fun KV.getIntValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<Int> =
-    getResponse(keyname, getOption).kvs.map { it.value.asInt }
-
-fun KV.getLongValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<Long> =
-    getResponse(keyname, getOption).kvs.map { it.value.asLong }
-
-// Get children values
-fun KV.getChildrenValues(keyname: String): List<ByteSequence> {
-    val adjustedKey = keyname.ensureTrailing("/")
-    return getValues(adjustedKey, adjustedKey.asPrefixGetOption)
-}
-
-fun KV.getChildrenStringValues(keyname: String): List<String> {
-    val adjustedKey = keyname.ensureTrailing("/")
-    return getStringValues(adjustedKey, adjustedKey.asPrefixGetOption)
-}
-
-fun KV.getChildrenIntValues(keyname: String): List<Int> {
-    val adjustedKey = keyname.ensureTrailing("/")
-    return getIntValues(adjustedKey, adjustedKey.asPrefixGetOption)
-}
-
-fun KV.getChildrenLongValues(keyname: String): List<Long> {
-    val adjustedKey = keyname.ensureTrailing("/")
-    return getLongValues(adjustedKey, adjustedKey.asPrefixGetOption)
-}
-
-fun Lazy<KV>.getChildrenValues(keyname: String): List<ByteSequence> = value.getChildrenValues(keyname)
-
-fun Lazy<KV>.getChildrenStringValues(keyname: String): List<String> = value.getChildrenStringValues(keyname)
-
-fun Lazy<KV>.getChildrenIntValues(keyname: String): List<Int> = value.getChildrenIntValues(keyname)
-
-fun Lazy<KV>.getChildrenLongValues(keyname: String): List<Long> = value.getChildrenLongValues(keyname)
-
-// Get children KVs
-fun KV.getChildrenKVs(keyname: String): List<Pair<String, ByteSequence>> {
-    val adjustedKey = keyname.ensureTrailing("/")
-    return getKVs(adjustedKey, adjustedKey.asPrefixGetOption)
-}
-
-fun KV.getKVs(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<Pair<String, ByteSequence>> =
-    getResponse(keyname, getOption).kvs.map { it.key.asString to it.value }
-
-// Get single key value
-fun KV.getStringValue(keyname: String): String? =
-    getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asString
-
-fun KV.getIntValue(keyname: String): Int? =
-    getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asInt
-
-fun KV.getLongValue(keyname: String): Long? =
-    getResponse(keyname).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value?.asLong
-
-fun Lazy<KV>.getStringValue(keyname: String): String? = value.getStringValue(keyname)
-
-fun Lazy<KV>.getIntValue(keyname: String): Int? = value.getIntValue(keyname)
-
-fun Lazy<KV>.getLongValue(keyname: String): Long? = value.getLongValue(keyname)
-
-// Get single key value with default
-fun KV.getStringValue(keyname: String, defaultVal: String): String = getStringValue(keyname) ?: defaultVal
-
-fun KV.getIntValue(keyname: String, defaultVal: Int): Int = getIntValue(keyname) ?: defaultVal
-
-fun KV.getLongValue(keyname: String, defaultVal: Long): Long = getLongValue(keyname) ?: defaultVal
-
-fun Lazy<KV>.getStringValue(keyname: String, defaultVal: String): String = value.getStringValue(keyname, defaultVal)
-
-fun Lazy<KV>.getIntValue(keyname: String, defaultVal: Int): Int = value.getIntValue(keyname, defaultVal)
-
-fun Lazy<KV>.getLongValue(keyname: String, defaultVal: Long): Long = value.getLongValue(keyname, defaultVal)
-
 // Count children keys
-fun Lazy<KV>.count(keyname: String): Long = value.count(keyname)
-
 fun KV.count(keyname: String): Long {
     val adjustedKey = keyname.ensureTrailing("/")
     val option = GetOption.newBuilder().withPrefix(adjustedKey.asByteSequence).withCountOnly(true).build()
     return getResponse(adjustedKey, option).count
 }
+
+fun Lazy<KV>.count(keyname: String): Long = value.count(keyname)

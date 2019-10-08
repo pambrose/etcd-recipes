@@ -133,7 +133,7 @@ class DistributedBarrierWithCount(val urls: List<String>,
 
         if (!txn.isSucceeded)
             throw EtcdRecipeException("Failed to set waitingPath")
-        if (kvClient.getStringValue(waitingPath) != uniqueToken)
+        if (kvClient.getValue(waitingPath)?.asString != uniqueToken)
             throw EtcdRecipeException("Failed to assign waitingPath unique value")
 
         // Keep key alive
@@ -187,7 +187,7 @@ class DistributedBarrierWithCount(val urls: List<String>,
                 .use { client ->
                     client.withKvClient { kvClient ->
                         // Delete all children
-                        kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
+                        kvClient.getKeys(barrierPath).forEach { kvClient.delete(it) }
                     }
                 }
         }

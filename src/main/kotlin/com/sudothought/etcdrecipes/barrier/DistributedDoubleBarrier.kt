@@ -22,7 +22,7 @@ import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.etcdrecipes.jetcd.appendToPath
 import com.sudothought.etcdrecipes.jetcd.delete
-import com.sudothought.etcdrecipes.jetcd.getChildrenKeys
+import com.sudothought.etcdrecipes.jetcd.getKeys
 import com.sudothought.etcdrecipes.jetcd.withKvClient
 import io.etcd.jetcd.Client
 import java.io.Closeable
@@ -76,7 +76,7 @@ class DistributedDoubleBarrier(val urls: List<String>,
                 .use { client ->
                     client.withKvClient { kvClient ->
                         // Delete all children
-                        kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
+                        kvClient.getKeys(barrierPath).forEach { kvClient.delete(it) }
                     }
                 }
         }

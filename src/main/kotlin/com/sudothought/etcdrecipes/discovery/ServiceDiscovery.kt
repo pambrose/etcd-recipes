@@ -119,13 +119,13 @@ data class ServiceDiscovery(val urls: List<String>,
     fun queryForNames(): List<String> =
         semaphore.withLock {
             checkCloseNotCalled()
-            kvClient.getChildrenKeys(namesPath)
+            kvClient.getKeys(namesPath)
         }
 
     fun queryForInstances(name: String): List<ServiceInstance> =
         semaphore.withLock {
             checkCloseNotCalled()
-            kvClient.getChildrenStringValues(getNamesPath(name)).map { ServiceInstance.toObject(it) }
+            kvClient.getValues(getNamesPath(name)).asString.map { ServiceInstance.toObject(it) }
         }
 
     @Throws(EtcdRecipeException::class)
@@ -133,7 +133,7 @@ data class ServiceDiscovery(val urls: List<String>,
         semaphore.withLock {
             checkCloseNotCalled()
             val path = getNamesPath(name, id)
-            val json = kvClient.getStringValue(path)
+            val json = kvClient.getValue(path)?.asString
                 ?: throw EtcdRecipeException("ServiceInstance $path not present")
             ServiceInstance.toObject(json)
         }

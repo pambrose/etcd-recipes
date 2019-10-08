@@ -313,7 +313,7 @@ class LeaderSelector(val urls: List<String>,
             }
 
         // Check to see if unique value was successfully set in the CAS step
-        return if (!isLeader && txn.isSucceeded && kvClient.getStringValue(leaderPath) == uniqueToken) {
+        return if (!isLeader && txn.isSucceeded && kvClient.getValue(leaderPath)?.asString == uniqueToken) {
             // Selected as leader. This will exit when leadership is relinquished
             leaseClient.keepAliveWith(lease) {
                 electedLeader = true
@@ -351,8 +351,8 @@ class LeaderSelector(val urls: List<String>,
             Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
-                        val leader = kvClient.getStringValue(electionPath)?.stripUniqueSuffix
-                        kvClient.getChildrenStringValues(participationPath(electionPath))
+                        val leader = kvClient.getValue(electionPath)?.asString?.stripUniqueSuffix
+                        kvClient.getValues(participationPath(electionPath)).asString
                             .forEach { participants += Participant(it, leader == it) }
                     }
                 }

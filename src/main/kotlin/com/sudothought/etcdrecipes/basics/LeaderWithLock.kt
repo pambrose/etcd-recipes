@@ -57,7 +57,7 @@ fun main() {
                                 println("Thread $i assigning $keyval")
                                 kvClient.putValue(path, keyval)
 
-                                if (kvClient.getStringValue(path) == keyval)
+                                if (kvClient.getValue(path)?.asString == keyval)
                                     println("Thread $i is the leader")
 
                                 // delete the key

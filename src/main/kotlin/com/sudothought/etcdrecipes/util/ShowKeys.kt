@@ -19,9 +19,9 @@
 package com.sudothought.etcdrecipes.util
 
 import com.sudothought.common.util.sleep
-import com.sudothought.etcdrecipes.jetcd.asString
 import com.sudothought.etcdrecipes.jetcd.count
-import com.sudothought.etcdrecipes.jetcd.getChildrenKVs
+import com.sudothought.etcdrecipes.jetcd.getKeyValues
+import com.sudothought.etcdrecipes.jetcd.valuesAsString
 import com.sudothought.etcdrecipes.jetcd.withKvClient
 import io.etcd.jetcd.Client
 import kotlin.time.seconds
@@ -35,7 +35,7 @@ fun main() {
             client.withKvClient { kvClient ->
                 kvClient.apply {
                     repeat(600) {
-                        println(getChildrenKVs(path).asString)
+                        println(getKeyValues(path).valuesAsString)
                         println(count(path))
                         sleep(1.seconds)
                     }

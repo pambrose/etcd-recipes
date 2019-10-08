@@ -45,7 +45,7 @@ fun main() {
                             putValue(path, "root")
 
                             println("After creation:")
-                            println(getChildrenKVs(path).asString)
+                            println(getKeyValues(path).valuesAsString)
                             println(count(path))
 
                             sleep(5.seconds)
@@ -57,15 +57,15 @@ fun main() {
                             putValue("$path/waiting/d", "dddd")
 
                             println("\nAfter addition:")
-                            println(getChildrenKVs(path).asString)
+                            println(getKeyValues(path).valuesAsString)
                             println(count(path))
 
                             println("\nElections only:")
-                            println(getChildrenKVs("$path/election").asString)
+                            println(getKeyValues("$path/election").valuesAsString)
                             println(count("$path/election"))
 
                             println("\nWaitings only:")
-                            println(getChildrenKVs("$path/waiting").asString)
+                            println(getKeyValues("$path/waiting").valuesAsString)
                             println(count("$path/waiting"))
 
                             sleep(5.seconds)
@@ -74,14 +74,14 @@ fun main() {
                             delete(path)
 
                             // Delete children
-                            getChildrenKeys(path).forEach {
+                            getKeys(path).forEach {
                                 println("Deleting key: $it")
                                 delete(it)
                             }
 
 
                             println("\nAfter removal:")
-                            println(getChildrenKVs(path).asString)
+                            println(getKeyValues(path).valuesAsString)
                             println(count(path))
 
                             sleep(5.seconds)

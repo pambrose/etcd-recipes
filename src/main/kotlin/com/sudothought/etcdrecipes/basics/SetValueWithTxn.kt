@@ -35,7 +35,7 @@ fun main() {
             Else(putOp(debug, "Key $path found"))
         }
 
-        println("Debug value: ${kvClient.getStringValue(debug, "unset")}")
+        println("Debug value: ${kvClient.getValue(debug, "unset")}")
     }
 
     Client.builder().endpoints(*urls.toTypedArray()).build()

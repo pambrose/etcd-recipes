@@ -151,6 +151,8 @@ class LeaderSelectorTest {
 
         latch.await()
 
+        sleep(5.seconds)
+
         println("Size = ${electionList.size}")
         electionList
             .onEach { it.waitOnLeadershipComplete() }

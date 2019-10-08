@@ -48,7 +48,7 @@ class DistributedAtomicLong(val urls: List<String>,
 
     fun get(): Long = semaphore.withLock {
         checkCloseNotCalled()
-        kvClient.getLongValue(counterPath) ?: -1L
+        kvClient.getValue(counterPath, -1L)
     }
 
     fun increment(): Long = modifyCounterValue(1)
@@ -80,7 +80,7 @@ class DistributedAtomicLong(val urls: List<String>,
                 }
             } while (!txnResponse.isSucceeded)
 
-            kvClient.getLongValue(counterPath) ?: -1
+            kvClient.getValue(counterPath, -1L)
         }
     }
 

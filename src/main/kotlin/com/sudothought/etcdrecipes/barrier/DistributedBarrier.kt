@@ -81,7 +81,7 @@ class DistributedBarrier(val urls: List<String>,
                     }
 
                 // Check to see if unique value was successfully set in the CAS step
-                if (txn.isSucceeded && kvClient.getStringValue(barrierPath) == uniqueToken) {
+                if (txn.isSucceeded && kvClient.getValue(barrierPath)?.asString == uniqueToken) {
                     keepAliveLease = leaseClient.keepAlive(lease)
                     true
                 } else {

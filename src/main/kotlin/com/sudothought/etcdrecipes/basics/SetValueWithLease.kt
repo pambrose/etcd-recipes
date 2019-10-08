@@ -57,7 +57,7 @@ fun main() {
                 .use { client ->
                     client.withKvClient { kvClient ->
                         repeatWithSleep(12) { _, start ->
-                            val kval = kvClient.getStringValue(path, "unset")
+                            val kval = kvClient.getValue(path, "unset")
                             println("Key $path = $kval after ${System.currentTimeMillis() - start}ms")
                         }
                     }

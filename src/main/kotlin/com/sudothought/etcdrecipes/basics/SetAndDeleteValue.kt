@@ -21,7 +21,7 @@ package com.sudothought.etcdrecipes.basics
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
 import com.sudothought.etcdrecipes.jetcd.delete
-import com.sudothought.etcdrecipes.jetcd.getStringValue
+import com.sudothought.etcdrecipes.jetcd.getValue
 import com.sudothought.etcdrecipes.jetcd.putValue
 import com.sudothought.etcdrecipes.jetcd.withKvClient
 import io.etcd.jetcd.Client
@@ -62,7 +62,7 @@ fun main() {
                 .use { client ->
                     client.withKvClient { kvClient ->
                         repeatWithSleep(12) { _, start ->
-                            val respval = kvClient.getStringValue(path, "unset")
+                            val respval = kvClient.getValue(path, "unset")
                             println("Key $path = $respval after ${System.currentTimeMillis() - start}ms")
                         }
                     }
