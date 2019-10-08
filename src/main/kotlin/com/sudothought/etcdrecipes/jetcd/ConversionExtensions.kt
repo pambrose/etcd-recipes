@@ -34,6 +34,8 @@ val ByteSequence.asInt: Int get() = Ints.fromByteArray(bytes)
 
 val ByteSequence.asLong: Long get() = Longs.fromByteArray(bytes)
 
+//val List<ByteSequence>.asString: List<String> get() = map { it.asString }
+
 val Pair<String, ByteSequence>.asString: Pair<String, String> get() = first to second.asString
 
 val Pair<String, ByteSequence>.asInt: Pair<String, Int> get() = first to second.asInt

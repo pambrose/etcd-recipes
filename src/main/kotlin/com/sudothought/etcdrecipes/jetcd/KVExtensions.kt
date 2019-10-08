@@ -89,6 +89,9 @@ fun KV.getKeys(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<
     getResponse(keyname, getOption).kvs.map { it.key.asString }
 
 // Get values with GetOption
+fun KV.getValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<ByteSequence> =
+    getResponse(keyname, getOption).kvs.map { it.value }
+
 fun KV.getStringValues(keyname: String, getOption: GetOption = GetOption.DEFAULT): List<String> =
     getResponse(keyname, getOption).kvs.map { it.value.asString }
 
@@ -99,6 +102,11 @@ fun KV.getLongValues(keyname: String, getOption: GetOption = GetOption.DEFAULT):
     getResponse(keyname, getOption).kvs.map { it.value.asLong }
 
 // Get children values
+fun KV.getChildrenValues(keyname: String): List<ByteSequence> {
+    val adjustedKey = keyname.ensureTrailing("/")
+    return getValues(adjustedKey, adjustedKey.asPrefixGetOption)
+}
+
 fun KV.getChildrenStringValues(keyname: String): List<String> {
     val adjustedKey = keyname.ensureTrailing("/")
     return getStringValues(adjustedKey, adjustedKey.asPrefixGetOption)
@@ -113,6 +121,8 @@ fun KV.getChildrenLongValues(keyname: String): List<Long> {
     val adjustedKey = keyname.ensureTrailing("/")
     return getLongValues(adjustedKey, adjustedKey.asPrefixGetOption)
 }
+
+fun Lazy<KV>.getChildrenValues(keyname: String): List<ByteSequence> = value.getChildrenValues(keyname)
 
 fun Lazy<KV>.getChildrenStringValues(keyname: String): List<String> = value.getChildrenStringValues(keyname)
 

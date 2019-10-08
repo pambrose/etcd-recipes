@@ -60,7 +60,7 @@ class ReportLeaderTest {
                                path,
                                object : LeaderSelectorListenerAdapter() {
                                    override fun takeLeadership(selector: LeaderSelector) {
-                                       val pause = 3.random.seconds
+                                       val pause = 2.random.seconds
                                        println("${selector.clientId} elected leader for $pause")
                                        sleep(pause)
                                    }

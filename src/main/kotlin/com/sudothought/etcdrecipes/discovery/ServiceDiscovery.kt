@@ -30,9 +30,9 @@ import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.op.CmpTarget
 import java.io.Closeable
 
-class ServiceDiscovery(val urls: List<String>,
-                       basePath: String,
-                       val clientId: String) : EtcdConnector(urls), Closeable {
+data class ServiceDiscovery(val urls: List<String>,
+                            private val basePath: String,
+                            val clientId: String) : EtcdConnector(urls), Closeable {
 
     // For Java clients
     constructor(urls: List<String>, basePath: String) : this(urls, basePath, "Client:${randomId(9)}")
@@ -146,9 +146,8 @@ class ServiceDiscovery(val urls: List<String>,
                 // Close all service caches
                 serviceCacheList.forEach { it.close() }
 
-                if (!closeCalled) {
-                    serviceContextMap.forEach { (k, v) -> unregisterService(v.service) }
-                }
+                if (!closeCalled)
+                    serviceContextMap.forEach { (_, v) -> unregisterService(v.service) }
 
                 super.close()
             }
