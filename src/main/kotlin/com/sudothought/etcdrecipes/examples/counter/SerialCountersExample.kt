@@ -25,7 +25,7 @@ fun main() {
     val url = "http://localhost:2379"
     val counterPath = "counter2"
 
-    DistributedAtomicLong.reset(url, counterPath)
+    DistributedAtomicLong.delete(url, counterPath)
 
     val counters = List(30) { DistributedAtomicLong(url, counterPath) }
 

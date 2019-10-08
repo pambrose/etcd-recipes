@@ -32,7 +32,7 @@ fun main() {
     val waitLatch = CountDownLatch(count)
     val retryLatch = CountDownLatch(count - 1)
 
-    DistributedBarrierWithCount.reset(url, barrierPath)
+    DistributedBarrierWithCount.delete(url, barrierPath)
 
     fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
         sleep(10.random.seconds)

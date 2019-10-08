@@ -31,7 +31,7 @@ fun main() {
     val waitLatch = CountDownLatch(count)
     val goLatch = CountDownLatch(1)
 
-    DistributedBarrier.reset(url, barrierPath)
+    DistributedBarrier.delete(url, barrierPath)
 
     repeat(count) { i ->
         thread {

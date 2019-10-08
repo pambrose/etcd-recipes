@@ -26,7 +26,7 @@ fun main() {
     val url = "http://localhost:2379"
     val electionPath = "/election/single"
 
-    LeaderSelector.reset(url, electionPath)
+    LeaderSelector.delete(url, electionPath)
 
     val leadershipAction = { selector: LeaderSelector ->
         println("${selector.clientId} elected leader")

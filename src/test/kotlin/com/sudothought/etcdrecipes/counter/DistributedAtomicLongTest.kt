@@ -18,28 +18,35 @@
 
 package com.sudothought.etcdrecipes.counter
 
+import com.sudothought.common.util.random
+import com.sudothought.common.util.sleep
 import org.amshove.kluent.shouldEqual
-import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
+import kotlin.time.milliseconds
 
 class DistributedAtomicLongTest {
-    val count = 100
+    val url = "http://localhost:2379"
+    val path = "/DistributedAtomicLongTest"
 
+    @BeforeEach
+    fun deleteCounter() = DistributedAtomicLong.delete(url, path)
 
     @Test
-    fun initialValueTest() {
+    fun defaultInitialValueTest() {
         DistributedAtomicLong(url, path).use { counter -> counter.get() shouldEqual 0L }
-        resetCounter()
-
-        DistributedAtomicLong(url, path, 100L).use { counter -> counter.get() shouldEqual 100L }
-        resetCounter()
     }
 
+    @Test
+    fun nondefaultInitialValueTest() {
+        DistributedAtomicLong(url, path, 100L).use { counter -> counter.get() shouldEqual 100L }
+    }
 
     @Test
     fun incrementDecrementTest() {
+        val count = 100
         DistributedAtomicLong(url, path)
             .use { counter ->
                 repeat(count) {
@@ -48,12 +55,11 @@ class DistributedAtomicLongTest {
                 }
                 counter.get() shouldEqual 0L
             }
-
-        resetCounter()
     }
 
     @Test
     fun addSubtractTest() {
+        val count = 100
         DistributedAtomicLong(url, path)
             .use { counter ->
                 repeat(count) {
@@ -62,15 +68,33 @@ class DistributedAtomicLongTest {
                 }
                 counter.get() shouldEqual 0L
             }
-
-        resetCounter()
     }
 
     @Test
-    fun threadedTest() {
+    fun serialTest() {
+        val count = 20
+        val counters = List(20) { DistributedAtomicLong(url, path) }
+        val total =
+            counters
+                .onEach { counter ->
+                    repeat(count) { counter.increment() }
+                    repeat(count) { counter.decrement() }
+                    repeat(count) { counter.add(5) }
+                    repeat(count) { counter.subtract(5) }
+                }
+                .first()
+                .get()
+
+        counters.forEach { it.close() }
+        total shouldEqual 0L
+    }
+
+    @Test
+    fun threaded1Test() {
         DistributedAtomicLong(url, path)
             .use { counter ->
                 val threadCount = 5
+                val count = 50
                 val latch = CountDownLatch(threadCount)
 
                 repeat(threadCount) {
@@ -87,22 +111,64 @@ class DistributedAtomicLongTest {
                 latch.await()
                 counter.get() shouldEqual 0L
             }
-
-        resetCounter()
     }
 
+    @Test
+    fun threaded2Test() {
+        val threadCount = 10
+        val outerLatch = CountDownLatch(threadCount)
 
-    companion object {
-        val url = "http://localhost:2379"
-        val path = "/countertest"
+        repeat(threadCount) { i ->
+            thread {
+                println("Creating counter #$i")
+                DistributedAtomicLong(url, path)
+                    .use { counter ->
+                        val innerLatch = CountDownLatch(4)
+                        val count = 25
+                        val maxPause = 50
 
-        fun resetCounter() = DistributedAtomicLong.reset(url, path)
+                        thread {
+                            println("Begin increments for counter #$i")
+                            repeat(count) { counter.increment() }
+                            sleep(maxPause.random.milliseconds)
+                            innerLatch.countDown()
+                            println("Completed increments for counter #$i")
+                        }
 
-        @JvmStatic
-        @BeforeAll
-        fun setup() {
-            resetCounter()
+                        thread {
+                            println("Begin decrements for counter #$i")
+                            repeat(count) { counter.decrement() }
+                            sleep(maxPause.random.milliseconds)
+                            innerLatch.countDown()
+                            println("Completed decrements for counter #$i")
+                        }
+
+                        thread {
+                            println("Begin adds for counter #$i")
+                            repeat(count) { counter.add(5) }
+                            sleep(maxPause.random.milliseconds)
+                            innerLatch.countDown()
+                            println("Completed adds for counter #$i")
+                        }
+
+                        thread {
+                            println("Begin subtracts for counter #$i")
+                            repeat(count) { counter.subtract(5) }
+                            sleep(maxPause.random.milliseconds)
+                            innerLatch.countDown()
+                            println("Completed subtracts for counter #$i")
+                        }
+
+                        innerLatch.await()
+                    }
+
+                outerLatch.countDown()
+            }
         }
+
+        outerLatch.await()
+
+        DistributedAtomicLong(url, path).use { counter -> counter.get() shouldEqual 0L }
     }
 }
 

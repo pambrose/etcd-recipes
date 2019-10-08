@@ -33,7 +33,7 @@ fun main() {
     val leaveLatch = CountDownLatch(count - 1)
     val doneLatch = CountDownLatch(count)
 
-    DistributedDoubleBarrier.reset(url, barrierPath)
+    DistributedDoubleBarrier.delete(url, barrierPath)
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
         sleep(10.random.seconds)

@@ -346,7 +346,7 @@ class LeaderSelector(
 
         val String.stripUniqueSuffix get() = dropLast(uniqueSuffixLength + 1)
 
-        fun reset(url: String, electionPath: String) {
+        fun delete(url: String, electionPath: String) {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->

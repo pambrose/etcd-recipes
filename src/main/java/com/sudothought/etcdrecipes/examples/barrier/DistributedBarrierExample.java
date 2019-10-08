@@ -33,7 +33,7 @@ public class DistributedBarrierExample {
         CountDownLatch goLatch = new CountDownLatch(1);
         ExecutorService executor = Executors.newCachedThreadPool();
 
-        DistributedBarrier.Static.reset(url, barrierPath);
+        DistributedBarrier.Static.delete(url, barrierPath);
 
         executor.execute(() -> {
             try (DistributedBarrier barrier = new DistributedBarrier(url, barrierPath, true)) {

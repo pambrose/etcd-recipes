@@ -32,7 +32,7 @@ fun main() {
     val threadCount = 10
     val outerLatch = CountDownLatch(threadCount)
 
-    DistributedAtomicLong.reset(url, counterPath)
+    DistributedAtomicLong.delete(url, counterPath)
 
     val (_, dur) =
         measureTimedValue {

@@ -110,7 +110,7 @@ class DistributedAtomicLong(val url: String,
         val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 
-        fun reset(url: String, counterPath: String) {
+        fun delete(url: String, counterPath: String) {
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
             Client.builder().endpoints(url).build()
                 .use { client ->

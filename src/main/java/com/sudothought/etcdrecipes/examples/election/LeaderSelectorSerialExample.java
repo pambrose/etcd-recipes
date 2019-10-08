@@ -29,7 +29,7 @@ public class LeaderSelectorSerialExample {
         String url = "http://localhost:2379";
         String electionPath = "/election/javademo";
 
-        LeaderSelector.Static.reset(url, electionPath);
+        LeaderSelector.Static.delete(url, electionPath);
 
         LeaderSelectorListener listener =
                 new LeaderSelectorListener() {
