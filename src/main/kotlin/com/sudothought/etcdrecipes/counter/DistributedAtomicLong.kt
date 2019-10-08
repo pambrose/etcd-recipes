@@ -31,7 +31,12 @@ import java.io.Closeable
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.milliseconds
 
-class DistributedAtomicLong(val url: String, val counterPath: String) : EtcdConnector(url), Closeable {
+class DistributedAtomicLong(val url: String,
+                            val counterPath: String,
+                            private val defaultValue: Long) : EtcdConnector(url), Closeable {
+
+    // For Java clients
+    constructor(url: String, counterPath: String) : this(url, counterPath, 0L)
 
     init {
         require(url.isNotEmpty()) { "URL cannot be empty" }
@@ -53,6 +58,12 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : EtcdConn
     fun add(value: Long): Long = modifyCounterValue(value)
 
     fun subtract(value: Long): Long = modifyCounterValue(-value)
+
+    override fun close() {
+        semaphore.withLock {
+            super.close()
+        }
+    }
 
     private fun modifyCounterValue(value: Long): Long {
         checkCloseNotCalled()
@@ -79,7 +90,7 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : EtcdConn
             val txn =
                 kvClient.transaction {
                     If(equalTo(counterPath, CmpTarget.version(0)))
-                    Then(putOp(counterPath, 0L))
+                    Then(putOp(counterPath, defaultValue))
                 }
             txn.isSucceeded
         } else {
@@ -94,12 +105,6 @@ class DistributedAtomicLong(val url: String, val counterPath: String) : EtcdConn
             If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
             Then(putOp(counterPath, kv.asLong + amount))
         }
-
-    override fun close() {
-        semaphore.withLock {
-            super.close()
-        }
-    }
 
     companion object Static {
         val collisionCount = AtomicLong()

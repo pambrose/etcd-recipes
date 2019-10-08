@@ -34,7 +34,7 @@ class ServiceDiscovery(val url: String,
                        basePath: String,
                        val clientId: String) : EtcdConnector(url), Closeable {
 
-    // Java constructor
+    // For Java clients
     constructor(url: String, basePath: String) : this(url, basePath, "Client:${randomId(9)}")
 
     private val namesPath = basePath.appendToPath("/names")

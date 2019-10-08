@@ -15,6 +15,8 @@ def serializationVersion = '0.13.0'
 def jetcdVersion = '0.3.0'
 def utilsVersion = '6cacd0b453'
 def loggingVersion = '1.7.6'
+def kluentVersion = '1.56'
+def junitVersion = '5.5.2'
 
 repositories {
     maven { url "https://kotlin.bintray.com/kotlinx" }
@@ -30,7 +32,9 @@ dependencies {
     implementation "com.github.pambrose:common-utils:${utilsVersion}"
     implementation "io.github.microutils:kotlin-logging:$loggingVersion"
 
-    testCompile group: 'junit', name: 'junit', version: '4.12'
+    testImplementation "org.amshove.kluent:kluent:$kluentVersion"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:$junitVersion"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
 }
 
 compileKotlin {
@@ -43,4 +47,8 @@ compileTestKotlin {
     kotlinOptions.jvmTarget = "1.8"
     kotlinOptions.freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
                                        '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
+}
+
+test {
+    useJUnitPlatform()
 }
