@@ -34,7 +34,7 @@ public class ServiceDiscoveryExample {
         try (ServiceDiscovery sd = new ServiceDiscovery(urls, servicePath)) {
 
             IntPayload payload = new IntPayload(-999);
-            ServiceInstance service = ServiceInstance.Static.newBuilder("TestName", payload.toJson()).build();
+            ServiceInstance service = ServiceInstance.newBuilder("TestName", payload.toJson()).build();
 
             System.out.println(service.toJson());
 

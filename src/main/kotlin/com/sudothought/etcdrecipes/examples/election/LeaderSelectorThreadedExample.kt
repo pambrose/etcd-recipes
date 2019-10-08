@@ -21,7 +21,7 @@ package com.sudothought.etcdrecipes.examples.election
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import com.sudothought.etcdrecipes.election.LeaderSelector
-import com.sudothought.etcdrecipes.election.LeaderSelector.Static.getParticipants
+import com.sudothought.etcdrecipes.election.LeaderSelector.Companion.getParticipants
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds

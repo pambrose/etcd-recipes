@@ -34,7 +34,7 @@ data class ServiceInstance(val name: String,
                            var uri: String = "",
                            var enabled: Boolean = true) {
 
-    val id: String = randomId(9)
+    val id: String = randomId(7)
 
     init {
         require(name.isNotEmpty()) { "Name cannot be empty" }
@@ -42,7 +42,7 @@ data class ServiceInstance(val name: String,
 
     fun toJson() = Json.stringify(serializer(), this)
 
-    companion object Static {
+    companion object {
         fun toObject(json: String) = Json.parse(serializer(), json)
 
         class ServiceInstanceBuilder(val name: String, val jsonPayload: String) {
@@ -66,6 +66,7 @@ data class ServiceInstance(val name: String,
                                 enabled)
         }
 
+        @JvmStatic
         fun newBuilder(name: String, jsonPayload: String) = ServiceInstanceBuilder(name, jsonPayload)
     }
 }

@@ -21,7 +21,7 @@ package com.sudothought.etcdrecipes.barrier
 import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.delegate.AtomicDelegates.nullableReference
-import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
+import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.etcdrecipes.common.EtcdConnector
 import com.sudothought.etcdrecipes.jetcd.*
@@ -44,7 +44,7 @@ class DistributedBarrier(val urls: List<String>,
                 waitOnMissingBarrier: Boolean = true) : this(urls,
                                                              barrierPath,
                                                              waitOnMissingBarrier,
-                                                             "Client:${randomId(9)}")
+                                                             "Client:${randomId(7)}")
 
     private var keepAliveLease by nullableReference<CloseableClient?>(null)
     private var barrierRemoved by atomicBoolean(false)
@@ -67,7 +67,7 @@ class DistributedBarrier(val urls: List<String>,
                 false
             else {
                 // Create unique token to avoid collision from clients with same id
-                val uniqueToken = "$clientId:${randomId(9)}"
+                val uniqueToken = "$clientId:${randomId(7)}"
 
                 // Prime lease with 2 seconds to give keepAlive a chance to get started
                 val lease = leaseClient.grant(2).get()

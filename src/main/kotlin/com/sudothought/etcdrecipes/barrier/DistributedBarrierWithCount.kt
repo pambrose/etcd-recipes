@@ -20,7 +20,7 @@ package com.sudothought.etcdrecipes.barrier
 
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.concurrent.withLock
-import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
+import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.etcdrecipes.common.EtcdConnector
 import com.sudothought.etcdrecipes.common.EtcdRecipeException
@@ -50,7 +50,7 @@ class DistributedBarrierWithCount(val urls: List<String>,
 
     constructor(urls: List<String>,
                 barrierPath: String,
-                memberCount: Int) : this(urls, barrierPath, memberCount, "Client:${randomId(9)}")
+                memberCount: Int) : this(urls, barrierPath, memberCount, "Client:${randomId(7)}")
 
     private val readyPath = barrierPath.appendToPath("ready")
     private val waitingPath = barrierPath.appendToPath("waiting")
@@ -84,7 +84,7 @@ class DistributedBarrierWithCount(val urls: List<String>,
     fun waitOnBarrier(timeout: Duration): Boolean {
         var keepAliveLease: CloseableClient? = null
         val keepAliveClosed = BooleanMonitor(false)
-        val uniqueToken = "$clientId:${randomId(9)}"
+        val uniqueToken = "$clientId:${randomId(7)}"
 
         checkCloseNotCalled()
 
@@ -180,7 +180,8 @@ class DistributedBarrierWithCount(val urls: List<String>,
         }
     }
 
-    companion object Static {
+    companion object {
+        @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
             Client.builder().endpoints(*urls.toTypedArray()).build()

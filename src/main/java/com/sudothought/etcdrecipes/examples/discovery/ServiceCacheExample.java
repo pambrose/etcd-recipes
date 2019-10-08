@@ -37,7 +37,7 @@ public class ServiceCacheExample {
                         (eventType, name, serviceInstance) -> {
                             System.out.println(String.format("Change %s %s %s", eventType, name, serviceInstance));
                             if (serviceInstance != null)
-                                System.out.println("Payload: " + IntPayload.Static.toObject(serviceInstance.getJsonPayload()));
+                                System.out.println("Payload: " + IntPayload.toObject(serviceInstance.getJsonPayload()));
                             System.out.println(cache.getInstances());
                         }
                 );

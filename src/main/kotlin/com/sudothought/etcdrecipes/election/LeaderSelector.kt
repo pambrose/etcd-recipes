@@ -21,7 +21,7 @@ package com.sudothought.etcdrecipes.election
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
-import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
+import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
 import com.sudothought.etcdrecipes.common.EtcdRecipeException
@@ -54,7 +54,7 @@ class LeaderSelector(val urls: List<String>,
                 listener: LeaderSelectorListener) : this(urls,
                                                          electionPath,
                                                          listener,
-                                                         "Client:${randomId(9)}",
+                                                         "Client:${randomId(7)}",
                                                          null)
 
     // For Java clients
@@ -74,7 +74,7 @@ class LeaderSelector(val urls: List<String>,
                 executorService: ExecutorService) : this(urls,
                                                          electionPath,
                                                          listener,
-                                                         "Client:${randomId(9)}",
+                                                         "Client:${randomId(7)}",
                                                          executorService)
 
     // For Kotlin clients
@@ -82,7 +82,7 @@ class LeaderSelector(val urls: List<String>,
                 electionPath: String,
                 takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
                 relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-                clientId: String = "Client:${randomId(9)}",
+                clientId: String = "Client:${randomId(7)}",
                 executorService: ExecutorService? = null) :
             this(urls,
                  electionPath,
@@ -335,16 +335,17 @@ class LeaderSelector(val urls: List<String>,
         }
     }
 
-    companion object Static : KLogging() {
+    companion object : KLogging() {
 
-        private const val uniqueSuffixLength = 9
+        private const val uniqueSuffixLength = 7
 
         private fun participationPath(path: String) = path.appendToPath("participants")
 
         private fun leaderPath(electionPath: String) = electionPath.appendToPath("LEADER")
 
-        val String.stripUniqueSuffix get() = dropLast(uniqueSuffixLength + 1)
+        internal val String.stripUniqueSuffix get() = dropLast(uniqueSuffixLength + 1)
 
+        @JvmStatic
         fun getParticipants(urls: List<String>, electionPath: String): List<Participant> {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
             val participants = mutableListOf<Participant>()
@@ -359,6 +360,7 @@ class LeaderSelector(val urls: List<String>,
             return participants
         }
 
+        @JvmStatic
         fun reportLeader(urls: List<String>,
                          electionPath: String,
                          listener: LeaderListener,

@@ -106,5 +106,5 @@ class ServiceCache(val urls: List<String>,
         }
     }
 
-    companion object Static : KLogging()
+    companion object : KLogging()
 }

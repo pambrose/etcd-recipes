@@ -53,7 +53,7 @@ public class LeaderSelectorSerialExample {
                 selector.start();
 
                 while (!selector.isFinished()) {
-                    System.out.println(LeaderSelector.Static.getParticipants(urls, electionPath));
+                    System.out.println(LeaderSelector.getParticipants(urls, electionPath));
                     sleepSecs(1);
                 }
 
@@ -66,7 +66,7 @@ public class LeaderSelectorSerialExample {
                 selector.start();
 
                 while (!selector.isFinished()) {
-                    System.out.println(LeaderSelector.Static.getParticipants(urls, electionPath));
+                    System.out.println(LeaderSelector.getParticipants(urls, electionPath));
                     sleepSecs(1);
                 }
 

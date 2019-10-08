@@ -18,7 +18,7 @@
 
 package com.sudothought.etcdrecipes.barrier
 
-import com.sudothought.common.time.Conversions.Static.timeUnitToDuration
+import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.etcdrecipes.jetcd.appendToPath
 import com.sudothought.etcdrecipes.jetcd.delete
@@ -37,7 +37,7 @@ class DistributedDoubleBarrier(val urls: List<String>,
 
     constructor(urls: List<String>,
                 barrierPath: String,
-                memberCount: Int) : this(urls, barrierPath, memberCount, "Client:${randomId(9)}")
+                memberCount: Int) : this(urls, barrierPath, memberCount, "Client:${randomId(7)}")
 
     private val enterBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("enter"), memberCount)
     private val leaveBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("leave"), memberCount)
@@ -69,7 +69,8 @@ class DistributedDoubleBarrier(val urls: List<String>,
         leaveBarrier.close()
     }
 
-    companion object Static {
+    companion object {
+        @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
             Client.builder().endpoints(*urls.toTypedArray()).build()

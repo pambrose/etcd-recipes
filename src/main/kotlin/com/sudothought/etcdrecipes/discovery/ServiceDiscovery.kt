@@ -35,7 +35,7 @@ data class ServiceDiscovery(val urls: List<String>,
                             val clientId: String) : EtcdConnector(urls), Closeable {
 
     // For Java clients
-    constructor(urls: List<String>, basePath: String) : this(urls, basePath, "Client:${randomId(9)}")
+    constructor(urls: List<String>, basePath: String) : this(urls, basePath, "Client:${randomId(7)}")
 
     private val namesPath = basePath.appendToPath("/names")
     private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()

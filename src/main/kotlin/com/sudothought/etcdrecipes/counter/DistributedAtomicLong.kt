@@ -108,10 +108,11 @@ class DistributedAtomicLong(val urls: List<String>,
             Else()
         }
 
-    companion object Static {
+    companion object {
         val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 
+        @JvmStatic
         fun delete(urls: List<String>, counterPath: String) {
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
             Client.builder().endpoints(*urls.toTypedArray()).build()

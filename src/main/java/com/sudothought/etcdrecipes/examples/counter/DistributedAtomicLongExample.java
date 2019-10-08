@@ -37,7 +37,7 @@ public class DistributedAtomicLongExample {
         CountDownLatch outerLatch = new CountDownLatch(counterCount);
         ExecutorService executor = Executors.newCachedThreadPool();
 
-        DistributedAtomicLong.Static.delete(urls, counterPath);
+        DistributedAtomicLong.delete(urls, counterPath);
 
         for (int i = 0; i < counterCount; i++) {
             final int id = i;
