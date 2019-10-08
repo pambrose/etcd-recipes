@@ -25,10 +25,8 @@ import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
-import kotlin.random.Random
 import kotlin.time.seconds
 
 class LeaderSelectorTest {
@@ -66,7 +64,6 @@ class LeaderSelectorTest {
                     selector.waitOnLeadershipComplete()
                 }
             }
-        //sleep(3.seconds)
 
         takeLeadershiptCounter.get() shouldEqual count
         relinquishLeadershiptCounter.get() shouldEqual count
@@ -83,15 +80,14 @@ class LeaderSelectorTest {
                     selector.waitOnLeadershipComplete()
                 }
         }
-        //sleep(3.seconds)
 
         takeLeadershiptCounter.get() shouldEqual count
         relinquishLeadershiptCounter.get() shouldEqual count
     }
 
     @Test
-    fun threadedElectionTest() {
-        val count = 5
+    fun threadedElection1Test() {
+        val count = 10
         val latch = CountDownLatch(count)
         val takeLeadershiptCounter = AtomicInteger(0)
         val relinquishLeadershiptCounter = AtomicInteger(0)
@@ -100,7 +96,7 @@ class LeaderSelectorTest {
             thread {
                 val takeLeadershipAction =
                     { selector: LeaderSelector ->
-                        val pause = Random.nextInt(1, 3).seconds
+                        val pause = 3.random.seconds
                         println("${selector.clientId} elected leader for $pause")
                         takeLeadershiptCounter.incrementAndGet()
                         sleep(pause)
@@ -116,7 +112,6 @@ class LeaderSelectorTest {
                     .use { election ->
                         election.start()
                         election.waitOnLeadershipComplete()
-                        //sleep(2.seconds)
                         latch.countDown()
                     }
             }
@@ -129,46 +124,44 @@ class LeaderSelectorTest {
     }
 
     @Test
-    fun reportLeaderTest() {
-        val count = 5
+    fun threadedElection2Test() {
+        val count = 10
         val latch = CountDownLatch(count)
         val takeLeadershiptCounter = AtomicInteger(0)
         val relinquishLeadershiptCounter = AtomicInteger(0)
+        val electionList = mutableListOf<LeaderSelector>()
 
-        val executor = Executors.newSingleThreadExecutor()
-        LeaderSelector.reportLeader(urls,
-                                    path,
-                                    object : LeaderListener {
-                                        override fun takeLeadership(leaderName: String) {
-                                            takeLeadershiptCounter.incrementAndGet()
-                                            val pause = Random.nextInt(1, 3).seconds
-                                            sleep(pause)
-                                        }
-
-                                        override fun relinquishLeadership() {
-                                            relinquishLeadershiptCounter.incrementAndGet()
-                                        }
-                                    },
-                                    executor)
         repeat(count) {
             thread {
-                LeaderSelector(urls, path, {}, {}, "Thread$it")
-                    .use { election ->
-                        election.start()
-                        election.waitOnLeadershipComplete()
-                        latch.countDown()
+                val takeLeadershipAction =
+                    { selector: LeaderSelector ->
+                        val pause = 3.random.seconds
+                        println("${selector.clientId} elected leader for $pause")
+                        takeLeadershiptCounter.incrementAndGet()
+                        sleep(pause)
                     }
+
+                val relinquishLeadershipAction =
+                    { selector: LeaderSelector ->
+                        relinquishLeadershiptCounter.incrementAndGet()
+                        println("${selector.clientId} relinquished leadership")
+                    }
+
+                val election = LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, "Thread$it")
+                electionList += election
+                election.start()
+                latch.countDown()
             }
         }
 
         latch.await()
 
-        // This requires a pause because reportLeader() needs to get notified of the change in leadership
-        sleep(5.seconds)
+        println("Size = ${electionList.size}")
+        electionList
+            .onEach { it.waitOnLeadershipComplete() }
+            .forEach { it.close() }
 
         takeLeadershiptCounter.get() shouldEqual count
         relinquishLeadershiptCounter.get() shouldEqual count
-
-        executor.shutdown()
     }
 }

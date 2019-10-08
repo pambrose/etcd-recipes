@@ -18,12 +18,12 @@
 
 package com.sudothought.etcdrecipes.examples.election
 
+import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import com.sudothought.etcdrecipes.election.LeaderSelector
 import com.sudothought.etcdrecipes.election.LeaderSelector.Static.getParticipants
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.random.Random
 import kotlin.time.seconds
 
 fun main() {
@@ -39,7 +39,7 @@ fun main() {
             val takeLeadershipAction =
                 { selector: LeaderSelector ->
                     println("${selector.clientId} elected leader")
-                    val pause = Random.nextInt(1, 3).seconds
+                    val pause = 3.random.seconds
                     sleep(pause)
                     println("${selector.clientId} surrendering after $pause")
                 }
