@@ -24,7 +24,7 @@ import io.etcd.jetcd.KV
 import io.etcd.jetcd.op.CmpTarget
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val path = "/txntest"
     val debug = "/debug"
 
@@ -38,7 +38,7 @@ fun main() {
         println("Debug value: ${kvClient.getStringValue(debug, "unset")}")
     }
 
-    Client.builder().endpoints(url).build()
+    Client.builder().endpoints(*urls.toTypedArray()).build()
         .use { client ->
             client.withKvClient { kvClient ->
                 println("Deleting keys")

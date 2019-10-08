@@ -16,8 +16,10 @@
 
 package com.sudothought.etcdrecipes.examples.barrier;
 
+import com.google.common.collect.Lists;
 import com.sudothought.etcdrecipes.barrier.DistributedBarrier;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,17 +28,17 @@ import java.util.concurrent.TimeUnit;
 public class DistributedBarrierExample {
 
     public static void main(String[] args) throws InterruptedException {
-        String url = "http://localhost:2379";
+        List<String> urls = Lists.newArrayList("http://localhost:2379");
         String barrierPath = "/barriers/threadedclients";
         int threadCount = 5;
         CountDownLatch waitLatch = new CountDownLatch(threadCount);
         CountDownLatch goLatch = new CountDownLatch(1);
         ExecutorService executor = Executors.newCachedThreadPool();
 
-        DistributedBarrier.Static.delete(url, barrierPath);
+        DistributedBarrier.Static.delete(urls, barrierPath);
 
         executor.execute(() -> {
-            try (DistributedBarrier barrier = new DistributedBarrier(url, barrierPath, true)) {
+            try (DistributedBarrier barrier = new DistributedBarrier(urls, barrierPath, true)) {
                 System.out.println("Setting Barrier");
                 barrier.setBarrier();
 
@@ -57,7 +59,7 @@ public class DistributedBarrierExample {
             executor.execute(() -> {
                         try {
                             goLatch.await();
-                            try (DistributedBarrier barrier = new DistributedBarrier(url, barrierPath, true)) {
+                            try (DistributedBarrier barrier = new DistributedBarrier(urls, barrierPath, true)) {
                                 System.out.println(String.format("%d Waiting on Barrier", id));
                                 barrier.waitOnBarrier(1, TimeUnit.SECONDS);
 

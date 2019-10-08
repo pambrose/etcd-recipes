@@ -43,20 +43,20 @@ import kotlin.time.days
     Query the number of children after each PUT on waiter and DELETE /ready if memberCount seen
     Leave if DELETE of /ready is seen
 */
-class DistributedBarrierWithCount(val url: String,
+class DistributedBarrierWithCount(val urls: List<String>,
                                   val barrierPath: String,
                                   val memberCount: Int,
-                                  val clientId: String) : EtcdConnector(url), Closeable {
+                                  val clientId: String) : EtcdConnector(urls), Closeable {
 
-    constructor(url: String,
+    constructor(urls: List<String>,
                 barrierPath: String,
-                memberCount: Int) : this(url, barrierPath, memberCount, "Client:${randomId(9)}")
+                memberCount: Int) : this(urls, barrierPath, memberCount, "Client:${randomId(9)}")
 
     private val readyPath = barrierPath.appendToPath("ready")
     private val waitingPath = barrierPath.appendToPath("waiting")
 
     init {
-        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URL cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
         require(memberCount > 0) { "Member count must be > 0" }
     }
@@ -179,9 +179,9 @@ class DistributedBarrierWithCount(val url: String,
     }
 
     companion object Static {
-        fun delete(url: String, barrierPath: String) {
+        fun delete(urls: List<String>, barrierPath: String) {
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-            Client.builder().endpoints(url).build()
+            Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
                         // Delete all children

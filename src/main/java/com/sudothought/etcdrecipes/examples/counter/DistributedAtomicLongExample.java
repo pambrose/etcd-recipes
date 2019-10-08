@@ -17,8 +17,10 @@
 package com.sudothought.etcdrecipes.examples.counter;
 
 
+import com.google.common.collect.Lists;
 import com.sudothought.etcdrecipes.counter.DistributedAtomicLong;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,18 +31,18 @@ import static com.sudothought.common.util.Misc.sleepMillis;
 public class DistributedAtomicLongExample {
 
     public static void main(String[] args) throws InterruptedException {
-        String url = "http://localhost:2379";
+        List<String> urls = Lists.newArrayList("http://localhost:2379");
         String counterPath = "/counter/counterdemo";
         int counterCount = 10;
         CountDownLatch outerLatch = new CountDownLatch(counterCount);
         ExecutorService executor = Executors.newCachedThreadPool();
 
-        DistributedAtomicLong.Static.delete(url, counterPath);
+        DistributedAtomicLong.Static.delete(urls, counterPath);
 
         for (int i = 0; i < counterCount; i++) {
             final int id = i;
             executor.execute(() -> {
-                try (DistributedAtomicLong counter = new DistributedAtomicLong(url, counterPath)) {
+                try (DistributedAtomicLong counter = new DistributedAtomicLong(urls, counterPath)) {
                     System.out.println("Creating counter #" + id);
                     CountDownLatch innerLatch = new CountDownLatch(4);
                     int count = 50;
@@ -93,7 +95,7 @@ public class DistributedAtomicLongExample {
 
         executor.shutdown();
 
-        try (DistributedAtomicLong counter = new DistributedAtomicLong(url, counterPath)) {
+        try (DistributedAtomicLong counter = new DistributedAtomicLong(urls, counterPath)) {
             System.out.println(String.format("Counter value = %d", counter.get()));
         }
     }

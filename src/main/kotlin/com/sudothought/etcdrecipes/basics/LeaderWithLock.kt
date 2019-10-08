@@ -30,7 +30,7 @@ import kotlin.time.seconds
 // Note: This is *not* the way to do an election
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val path = "/lockedElection"
     val count = 3
     val countdown = CountDownLatch(count)
@@ -39,7 +39,7 @@ fun main() {
         thread {
             println("Started Thread $i")
 
-            Client.builder().endpoints(url).build()
+            Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     val keyval = "client$i"
 

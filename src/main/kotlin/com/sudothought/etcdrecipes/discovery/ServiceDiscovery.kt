@@ -30,19 +30,19 @@ import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.op.CmpTarget
 import java.io.Closeable
 
-class ServiceDiscovery(val url: String,
+class ServiceDiscovery(val urls: List<String>,
                        basePath: String,
-                       val clientId: String) : EtcdConnector(url), Closeable {
+                       val clientId: String) : EtcdConnector(urls), Closeable {
 
     // For Java clients
-    constructor(url: String, basePath: String) : this(url, basePath, "Client:${randomId(9)}")
+    constructor(urls: List<String>, basePath: String) : this(urls, basePath, "Client:${randomId(9)}")
 
     private val namesPath = basePath.appendToPath("/names")
     private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()
     private val serviceCacheList = mutableListOf<ServiceCache>()
 
     init {
-        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URL cannot be empty" }
         require(basePath.isNotEmpty()) { "Service base path cannot be empty" }
     }
 
@@ -109,7 +109,7 @@ class ServiceDiscovery(val url: String,
 
     fun serviceCache(name: String): ServiceCache {
         checkCloseNotCalled()
-        val cache = ServiceCache(url, namesPath, name)
+        val cache = ServiceCache(urls, namesPath, name)
         serviceCacheList += cache
         return cache
     }

@@ -23,10 +23,10 @@ import com.sudothought.etcdrecipes.discovery.ServiceDiscovery
 import kotlin.time.days
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val servicePath = "/services/test"
 
-    ServiceDiscovery(url, servicePath).use { sd ->
+    ServiceDiscovery(urls, servicePath).use { sd ->
 
         sd.serviceCache("TestName").use { cache ->
 

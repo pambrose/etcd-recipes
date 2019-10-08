@@ -25,10 +25,10 @@ import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
 import java.util.concurrent.Semaphore
 
-open class EtcdConnector(url: String) {
+open class EtcdConnector(urls: List<String>) {
 
     protected val semaphore: Semaphore = Semaphore(1, true)
-    protected val client: Lazy<Client> = lazy { Client.builder().endpoints(url).build() }
+    protected val client: Lazy<Client> = lazy { Client.builder().endpoints(*urls.toTypedArray()).build() }
     protected val kvClient: Lazy<KV> = lazy { client.value.kvClient }
     protected val leaseClient: Lazy<Lease> = lazy { client.value.leaseClient }
     protected val watchClient: Lazy<Watch> = lazy { client.value.watchClient }

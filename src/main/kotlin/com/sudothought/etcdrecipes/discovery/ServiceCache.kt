@@ -29,10 +29,10 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.*
 import mu.KLogging
 import java.io.Closeable
 
-class ServiceCache(val url: String,
+class ServiceCache(val urls: List<String>,
                    namesPath: String,
                    val serviceName: String
-) : EtcdConnector(url), Closeable {
+                  ) : EtcdConnector(urls), Closeable {
 
     private var startCalled by atomicBoolean(false)
     private val servicePath = namesPath.appendToPath(serviceName)

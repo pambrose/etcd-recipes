@@ -28,26 +28,26 @@ import kotlin.concurrent.thread
 import kotlin.time.milliseconds
 
 class DistributedAtomicLongTest {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val path = "/DistributedAtomicLongTest"
 
     @BeforeEach
-    fun deleteCounter() = DistributedAtomicLong.delete(url, path)
+    fun deleteCounter() = DistributedAtomicLong.delete(urls, path)
 
     @Test
     fun defaultInitialValueTest() {
-        DistributedAtomicLong(url, path).use { counter -> counter.get() shouldEqual 0L }
+        DistributedAtomicLong(urls, path).use { counter -> counter.get() shouldEqual 0L }
     }
 
     @Test
     fun nondefaultInitialValueTest() {
-        DistributedAtomicLong(url, path, 100L).use { counter -> counter.get() shouldEqual 100L }
+        DistributedAtomicLong(urls, path, 100L).use { counter -> counter.get() shouldEqual 100L }
     }
 
     @Test
     fun incrementDecrementTest() {
         val count = 100
-        DistributedAtomicLong(url, path)
+        DistributedAtomicLong(urls, path)
             .use { counter ->
                 repeat(count) {
                     counter.increment()
@@ -60,7 +60,7 @@ class DistributedAtomicLongTest {
     @Test
     fun addSubtractTest() {
         val count = 100
-        DistributedAtomicLong(url, path)
+        DistributedAtomicLong(urls, path)
             .use { counter ->
                 repeat(count) {
                     counter.add(5)
@@ -73,7 +73,7 @@ class DistributedAtomicLongTest {
     @Test
     fun serialTest() {
         val count = 20
-        val counters = List(20) { DistributedAtomicLong(url, path) }
+        val counters = List(20) { DistributedAtomicLong(urls, path) }
         val total =
             counters
                 .onEach { counter ->
@@ -91,7 +91,7 @@ class DistributedAtomicLongTest {
 
     @Test
     fun threaded1Test() {
-        DistributedAtomicLong(url, path)
+        DistributedAtomicLong(urls, path)
             .use { counter ->
                 val threadCount = 5
                 val count = 50
@@ -121,7 +121,7 @@ class DistributedAtomicLongTest {
         repeat(threadCount) { i ->
             thread {
                 println("Creating counter #$i")
-                DistributedAtomicLong(url, path)
+                DistributedAtomicLong(urls, path)
                     .use { counter ->
                         val innerLatch = CountDownLatch(4)
                         val count = 25
@@ -168,7 +168,7 @@ class DistributedAtomicLongTest {
 
         outerLatch.await()
 
-        DistributedAtomicLong(url, path).use { counter -> counter.get() shouldEqual 0L }
+        DistributedAtomicLong(urls, path).use { counter -> counter.get() shouldEqual 0L }
     }
 }
 

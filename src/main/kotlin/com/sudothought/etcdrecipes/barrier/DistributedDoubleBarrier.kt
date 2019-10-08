@@ -30,20 +30,20 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 
-class DistributedDoubleBarrier(val url: String,
+class DistributedDoubleBarrier(val urls: List<String>,
                                barrierPath: String,
                                memberCount: Int,
                                val clientId: String) : Closeable {
 
-    constructor(url: String,
+    constructor(urls: List<String>,
                 barrierPath: String,
-                memberCount: Int) : this(url, barrierPath, memberCount, "Client:${randomId(9)}")
+                memberCount: Int) : this(urls, barrierPath, memberCount, "Client:${randomId(9)}")
 
-    private val enterBarrier = DistributedBarrierWithCount(url, barrierPath.appendToPath("enter"), memberCount)
-    private val leaveBarrier = DistributedBarrierWithCount(url, barrierPath.appendToPath("leave"), memberCount)
+    private val enterBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("enter"), memberCount)
+    private val leaveBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("leave"), memberCount)
 
     init {
-        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URL cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
         require(memberCount > 0) { "Member count must be > 0" }
     }
@@ -70,9 +70,9 @@ class DistributedDoubleBarrier(val url: String,
     }
 
     companion object Static {
-        fun delete(url: String, barrierPath: String) {
+        fun delete(urls: List<String>, barrierPath: String) {
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-            Client.builder().endpoints(url).build()
+            Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
                         // Delete all children

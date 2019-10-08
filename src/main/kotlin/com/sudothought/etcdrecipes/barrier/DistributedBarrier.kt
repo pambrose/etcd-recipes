@@ -35,14 +35,14 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 
-class DistributedBarrier(val url: String,
+class DistributedBarrier(val urls: List<String>,
                          val barrierPath: String,
                          private val waitOnMissingBarriers: Boolean,
-                         val clientId: String) : EtcdConnector(url), Closeable {
+                         val clientId: String) : EtcdConnector(urls), Closeable {
 
-    constructor(url: String,
+    constructor(urls: List<String>,
                 barrierPath: String,
-                waitOnMissingBarrier: Boolean = true) : this(url,
+                waitOnMissingBarrier: Boolean = true) : this(urls,
                                                              barrierPath,
                                                              waitOnMissingBarrier,
                                                              "Client:${randomId(9)}")
@@ -51,7 +51,7 @@ class DistributedBarrier(val url: String,
     private var barrierRemoved by atomicBoolean(false)
 
     init {
-        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URL cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
     }
 
@@ -147,9 +147,9 @@ class DistributedBarrier(val url: String,
     }
 
     companion object Static {
-        fun delete(url: String, barrierPath: String) {
+        fun delete(urls: List<String>, barrierPath: String) {
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-            Client.builder().endpoints(url).build()
+            Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
                         kvClient.delete(barrierPath)

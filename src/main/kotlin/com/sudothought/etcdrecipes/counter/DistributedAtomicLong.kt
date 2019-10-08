@@ -31,15 +31,15 @@ import java.io.Closeable
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.milliseconds
 
-class DistributedAtomicLong(val url: String,
+class DistributedAtomicLong(val urls: List<String>,
                             val counterPath: String,
-                            private val defaultValue: Long) : EtcdConnector(url), Closeable {
+                            private val defaultValue: Long) : EtcdConnector(urls), Closeable {
 
     // For Java clients
-    constructor(url: String, counterPath: String) : this(url, counterPath, 0L)
+    constructor(urls: List<String>, counterPath: String) : this(urls, counterPath, 0L)
 
     init {
-        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URL cannot be empty" }
         require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
 
         // Create counter if first time through
@@ -110,9 +110,9 @@ class DistributedAtomicLong(val url: String,
         val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 
-        fun delete(url: String, counterPath: String) {
+        fun delete(urls: List<String>, counterPath: String) {
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
-            Client.builder().endpoints(url).build()
+            Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     client.withKvClient { kvClient -> kvClient.delete(counterPath) }
                 }

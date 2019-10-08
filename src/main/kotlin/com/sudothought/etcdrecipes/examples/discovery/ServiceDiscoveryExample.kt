@@ -24,10 +24,10 @@ import com.sudothought.etcdrecipes.discovery.ServiceInstance
 import kotlin.time.seconds
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val servicePath = "/services/test"
 
-    ServiceDiscovery(url, servicePath).use { sd ->
+    ServiceDiscovery(urls, servicePath).use { sd ->
 
         val payload = IntPayload(-999)
         val service = ServiceInstance("TestName", payload.toJson())

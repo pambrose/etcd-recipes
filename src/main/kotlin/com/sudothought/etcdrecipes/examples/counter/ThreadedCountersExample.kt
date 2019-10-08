@@ -27,19 +27,19 @@ import kotlin.time.measureTimedValue
 import kotlin.time.milliseconds
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val counterPath = "counter2"
     val threadCount = 10
     val outerLatch = CountDownLatch(threadCount)
 
-    DistributedAtomicLong.delete(url, counterPath)
+    DistributedAtomicLong.delete(urls, counterPath)
 
     val (_, dur) =
         measureTimedValue {
             repeat(threadCount) { i ->
                 thread {
                     println("Creating counter #$i")
-                    DistributedAtomicLong(url, counterPath)
+                    DistributedAtomicLong(urls, counterPath)
                         .use { counter ->
                             val innerLatch = CountDownLatch(4)
                             val count = 50
@@ -87,5 +87,5 @@ fun main() {
             outerLatch.await()
         }
 
-    DistributedAtomicLong(url, counterPath).use { println("Counter value = ${it.get()} in $dur") }
+    DistributedAtomicLong(urls, counterPath).use { println("Counter value = ${it.get()} in $dur") }
 }

@@ -16,9 +16,12 @@
 
 package com.sudothought.etcdrecipes.examples.election;
 
+import com.google.common.collect.Lists;
 import com.sudothought.etcdrecipes.election.LeaderSelector;
 import com.sudothought.etcdrecipes.election.LeaderSelectorListener;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
 
 import static com.sudothought.common.util.Misc.random;
 import static com.sudothought.common.util.Misc.sleepSecs;
@@ -26,10 +29,10 @@ import static com.sudothought.common.util.Misc.sleepSecs;
 public class LeaderSelectorSerialExample {
 
     public static void main(String[] args) throws InterruptedException {
-        String url = "http://localhost:2379";
+        List<String> urls = Lists.newArrayList("http://localhost:2379");
         String electionPath = "/election/javademo";
 
-        LeaderSelector.Static.delete(url, electionPath);
+        LeaderSelector.Static.delete(urls, electionPath);
 
         LeaderSelectorListener listener =
                 new LeaderSelectorListener() {
@@ -47,12 +50,12 @@ public class LeaderSelectorSerialExample {
                     }
                 };
 
-        try (LeaderSelector selector = new LeaderSelector(url, electionPath, listener)) {
+        try (LeaderSelector selector = new LeaderSelector(urls, electionPath, listener)) {
             for (int i = 0; i < 5; i++) {
                 selector.start();
 
                 while (!selector.isFinished()) {
-                    System.out.println(LeaderSelector.Static.getParticipants(url, electionPath));
+                    System.out.println(LeaderSelector.Static.getParticipants(urls, electionPath));
                     sleepSecs(1);
                 }
 
@@ -61,11 +64,11 @@ public class LeaderSelectorSerialExample {
         }
 
         for (int i = 0; i < 5; i++) {
-            try (LeaderSelector selector = new LeaderSelector(url, electionPath, listener)) {
+            try (LeaderSelector selector = new LeaderSelector(urls, electionPath, listener)) {
                 selector.start();
 
                 while (!selector.isFinished()) {
-                    System.out.println(LeaderSelector.Static.getParticipants(url, electionPath));
+                    System.out.println(LeaderSelector.Static.getParticipants(urls, electionPath));
                     sleepSecs(1);
                 }
 

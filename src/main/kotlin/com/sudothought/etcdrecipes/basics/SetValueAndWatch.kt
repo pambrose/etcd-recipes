@@ -27,7 +27,7 @@ import kotlin.concurrent.thread
 import kotlin.time.seconds
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val path = "/foo"
     val keyval = "foobar"
     val countdown = CountDownLatch(2)
@@ -36,7 +36,7 @@ fun main() {
         try {
             sleep(3.seconds)
 
-            Client.builder().endpoints(url).build()
+            Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
                         repeatWithSleep(10) { i, _ ->
@@ -58,7 +58,7 @@ fun main() {
 
     thread {
         try {
-            Client.builder().endpoints(url).build()
+            Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     client.withWatchClient { watchClient ->
                         println("Starting watch")

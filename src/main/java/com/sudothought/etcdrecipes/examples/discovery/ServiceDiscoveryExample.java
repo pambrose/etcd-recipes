@@ -16,19 +16,22 @@
 
 package com.sudothought.etcdrecipes.examples.discovery;
 
+import com.google.common.collect.Lists;
 import com.sudothought.etcdrecipes.common.EtcdRecipeException;
 import com.sudothought.etcdrecipes.discovery.ServiceDiscovery;
 import com.sudothought.etcdrecipes.discovery.ServiceInstance;
+
+import java.util.List;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 
 public class ServiceDiscoveryExample {
 
     public static void main(String[] args) throws EtcdRecipeException {
-        String url = "http://localhost:2379";
+        List<String> urls = Lists.newArrayList("http://localhost:2379");
         String servicePath = "/services/test";
 
-        try (ServiceDiscovery sd = new ServiceDiscovery(url, servicePath)) {
+        try (ServiceDiscovery sd = new ServiceDiscovery(urls, servicePath)) {
 
             IntPayload payload = new IntPayload(-999);
             ServiceInstance service = ServiceInstance.Static.newBuilder("TestName", payload.toJson()).build();

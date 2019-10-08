@@ -27,10 +27,10 @@ import io.etcd.jetcd.Client
 import kotlin.time.seconds
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val path = "/"
 
-    Client.builder().endpoints(url).build()
+    Client.builder().endpoints(*urls.toTypedArray()).build()
         .use { client ->
             client.withKvClient { kvClient ->
                 kvClient.apply {

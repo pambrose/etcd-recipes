@@ -25,10 +25,10 @@ import io.etcd.jetcd.options.WatchOption
 import kotlin.time.seconds
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val path = "/keyrangetest"
 
-    Client.builder().endpoints(url).build()
+    Client.builder().endpoints(*urls.toTypedArray()).build()
         .use { client ->
             client.withWatchClient { watchClient ->
                 client.withKvClient { kvClient ->

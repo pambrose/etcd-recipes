@@ -42,63 +42,61 @@ import kotlin.time.seconds
 
 
 // For Java clients
-class LeaderSelector(
-    val url: String,
-    val electionPath: String,
-    private val listener: LeaderSelectorListener,
-    val clientId: String,
-    private val userExecutor: ExecutorService?) : Closeable {
+class LeaderSelector(val urls: List<String>,
+                     val electionPath: String,
+                     private val listener: LeaderSelectorListener,
+                     val clientId: String,
+                     private val userExecutor: ExecutorService?) : Closeable {
 
     // For Java clients
-    constructor(url: String,
+    constructor(urls: List<String>,
                 electionPath: String,
-                listener: LeaderSelectorListener) : this(url,
+                listener: LeaderSelectorListener) : this(urls,
                                                          electionPath,
                                                          listener,
                                                          "Client:${randomId(9)}",
                                                          null)
 
     // For Java clients
-    constructor(url: String,
+    constructor(urls: List<String>,
                 electionPath: String,
                 listener: LeaderSelectorListener,
-                clientId: String) : this(url,
+                clientId: String) : this(urls,
                                          electionPath,
                                          listener,
                                          clientId,
                                          null)
 
     // For Java clients
-    constructor(
-        url: String,
-        electionPath: String,
-        listener: LeaderSelectorListener,
-        executorService: ExecutorService) : this(url,
-                                                 electionPath,
-                                                 listener,
-                                                 "Client:${randomId(9)}",
-                                                 executorService)
+    constructor(urls: List<String>,
+                electionPath: String,
+                listener: LeaderSelectorListener,
+                executorService: ExecutorService) : this(urls,
+                                                         electionPath,
+                                                         listener,
+                                                         "Client:${randomId(9)}",
+                                                         executorService)
 
     // For Kotlin clients
-    constructor(url: String,
+    constructor(urls: List<String>,
                 electionPath: String,
                 takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
                 relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
                 clientId: String = "Client:${randomId(9)}",
-                executorService: ExecutorService? = null) : this(
-        url,
-        electionPath,
-        object : LeaderSelectorListener {
-            override fun takeLeadership(selector: LeaderSelector) {
-                takeLeadershipBlock.invoke(selector)
-            }
+                executorService: ExecutorService? = null) :
+            this(urls,
+                 electionPath,
+                 object : LeaderSelectorListener {
+                     override fun takeLeadership(selector: LeaderSelector) {
+                         takeLeadershipBlock.invoke(selector)
+                     }
 
-            override fun relinquishLeadership(selector: LeaderSelector) {
-                relinquishLeadershipBlock.invoke(selector)
-            }
-        },
-        clientId,
-        executorService)
+                     override fun relinquishLeadership(selector: LeaderSelector) {
+                         relinquishLeadershipBlock.invoke(selector)
+                     }
+                 },
+                 clientId,
+                 executorService)
 
     private val closeSemaphore = Semaphore(1, true)
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
@@ -114,7 +112,7 @@ class LeaderSelector(
     private val exceptionList = mutableListOf<Exception>()
 
     init {
-        require(url.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URL cannot be empty" }
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
 
@@ -142,7 +140,7 @@ class LeaderSelector(
 
         executor.execute {
             try {
-                Client.builder().endpoints(url).build()
+                Client.builder().endpoints(*urls.toTypedArray()).build()
                     .use { client ->
                         client.withLeaseClient { leaseClient ->
                             client.withKvClient { kvClient ->
@@ -346,9 +344,9 @@ class LeaderSelector(
 
         val String.stripUniqueSuffix get() = dropLast(uniqueSuffixLength + 1)
 
-        fun delete(url: String, electionPath: String) {
+        fun delete(urls: List<String>, electionPath: String) {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
-            Client.builder().endpoints(url).build()
+            Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
                         kvClient.getChildrenKeys(electionPath).forEach { kvClient.delete(it) }
@@ -356,10 +354,10 @@ class LeaderSelector(
                 }
         }
 
-        fun getParticipants(url: String, electionPath: String): List<Participant> {
+        fun getParticipants(urls: List<String>, electionPath: String): List<Participant> {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
             val participants = mutableListOf<Participant>()
-            Client.builder().endpoints(url).build()
+            Client.builder().endpoints(*urls.toTypedArray()).build()
                 .use { client ->
                     client.withKvClient { kvClient ->
                         val leader = kvClient.getStringValue(electionPath)?.stripUniqueSuffix
@@ -370,13 +368,13 @@ class LeaderSelector(
             return participants
         }
 
-        fun reportLeader(url: String,
+        fun reportLeader(urls: List<String>,
                          electionPath: String,
                          listener: LeaderListener,
                          executor: Executor): CountDownLatch {
             val terminateListener = CountDownLatch(1)
             executor.execute {
-                Client.builder().endpoints(url).build()
+                Client.builder().endpoints(*urls.toTypedArray()).build()
                     .use { client ->
                         client.withWatchClient { watchClient ->
                             watchClient.watcher(leaderPath(electionPath)) { watchResponse ->

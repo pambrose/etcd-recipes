@@ -16,18 +16,21 @@
 
 package com.sudothought.etcdrecipes.examples.discovery;
 
+import com.google.common.collect.Lists;
 import com.sudothought.etcdrecipes.discovery.ServiceCache;
 import com.sudothought.etcdrecipes.discovery.ServiceDiscovery;
+
+import java.util.List;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 
 public class ServiceCacheExample {
 
     public static void main(String[] args) {
-        String url = "http://localhost:2379";
+        List<String> urls = Lists.newArrayList("http://localhost:2379");
         String servicePath = "/services/test";
 
-        try (ServiceDiscovery sd = new ServiceDiscovery(url, servicePath)) {
+        try (ServiceDiscovery sd = new ServiceDiscovery(urls, servicePath)) {
 
             try (ServiceCache cache = sd.serviceCache("TestName")) {
                 cache.addListenerForChanges(

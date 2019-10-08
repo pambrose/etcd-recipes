@@ -28,11 +28,11 @@ import io.etcd.jetcd.Observers
 import kotlin.time.seconds
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val path = "/foo"
     val keyval = "foobar"
 
-    Client.builder().endpoints(url).build()
+    Client.builder().endpoints(*urls.toTypedArray()).build()
         .use { client ->
             client.withLeaseClient { leaseClient ->
                 client.withKvClient { kvClient ->

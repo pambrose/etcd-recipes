@@ -23,10 +23,10 @@ import com.sudothought.etcdrecipes.election.LeaderSelector
 import kotlin.time.seconds
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val electionPath = "/election/single"
 
-    LeaderSelector.delete(url, electionPath)
+    LeaderSelector.delete(urls, electionPath)
 
     val leadershipAction = { selector: LeaderSelector ->
         println("${selector.clientId} elected leader")
@@ -35,7 +35,7 @@ fun main() {
         println("${selector.clientId} surrendering after $pause")
     }
 
-    LeaderSelector(url, electionPath, leadershipAction)
+    LeaderSelector(urls, electionPath, leadershipAction)
         .use { selector ->
             repeat(100) {
                 println("Iteration $it")
@@ -45,7 +45,7 @@ fun main() {
         }
 
     repeat(5) {
-        LeaderSelector(url, electionPath, leadershipAction)
+        LeaderSelector(urls, electionPath, leadershipAction)
             .use { selector ->
                 println("Iteration $it")
                 selector.start()

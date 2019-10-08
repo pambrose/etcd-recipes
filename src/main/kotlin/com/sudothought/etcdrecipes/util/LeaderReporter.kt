@@ -26,12 +26,12 @@ import kotlin.time.MonoClock
 import kotlin.time.days
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val electionPath = "/election/threaded"
     val executor = Executors.newSingleThreadExecutor()
 
     val latch =
-        LeaderSelector.reportLeader(url,
+        LeaderSelector.reportLeader(urls,
                                     electionPath,
                                     object : LeaderListener {
                                         val electedClock = MonoClock

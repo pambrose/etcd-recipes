@@ -27,29 +27,30 @@ import kotlin.random.Random
 import kotlin.time.seconds
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val electionPath = "/election/threaded"
     val count = 50
     val latch = CountDownLatch(count)
 
-    LeaderSelector.delete(url, electionPath)
+    LeaderSelector.delete(urls, electionPath)
 
-    val takeLeadershipAction =
-        { selector: LeaderSelector ->
-            println("${selector.clientId} elected leader")
-            val pause = Random.nextInt(1, 3).seconds
-            sleep(pause)
-            println("${selector.clientId} surrendering after $pause")
-        }
-
-    val relinquishLeadershipAction =
-        { selector: LeaderSelector ->
-            println("${selector.clientId} relinquished leadership")
-        }
 
     repeat(count) {
         thread {
-            LeaderSelector(url, electionPath, takeLeadershipAction, relinquishLeadershipAction, "Thread$it")
+            val takeLeadershipAction =
+                { selector: LeaderSelector ->
+                    println("${selector.clientId} elected leader")
+                    val pause = Random.nextInt(1, 3).seconds
+                    sleep(pause)
+                    println("${selector.clientId} surrendering after $pause")
+                }
+
+            val relinquishLeadershipAction =
+                { selector: LeaderSelector ->
+                    println("${selector.clientId} relinquished leadership")
+                }
+
+            LeaderSelector(urls, electionPath, takeLeadershipAction, relinquishLeadershipAction, "Thread$it")
                 .use { election ->
                     election.start()
                     election.waitOnLeadershipComplete()
@@ -59,7 +60,7 @@ fun main() {
     }
 
     while (latch.count > 0) {
-        println("Participants: ${getParticipants(url, electionPath)}")
+        println("Participants: ${getParticipants(urls, electionPath)}")
         sleep(1.seconds)
     }
 

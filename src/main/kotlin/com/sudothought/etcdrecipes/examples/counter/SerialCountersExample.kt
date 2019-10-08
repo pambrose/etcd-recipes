@@ -22,12 +22,12 @@ import com.sudothought.etcdrecipes.counter.DistributedAtomicLong
 import kotlin.time.measureTimedValue
 
 fun main() {
-    val url = "http://localhost:2379"
+    val urls = listOf("http://localhost:2379")
     val counterPath = "counter2"
 
-    DistributedAtomicLong.delete(url, counterPath)
+    DistributedAtomicLong.delete(urls, counterPath)
 
-    val counters = List(30) { DistributedAtomicLong(url, counterPath) }
+    val counters = List(30) { DistributedAtomicLong(urls, counterPath) }
 
     val (total, dur) =
         measureTimedValue {
