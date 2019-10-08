@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
+
 package com.sudothought.etcdrecipes.election
 
 import com.sudothought.common.util.random

@@ -152,7 +152,6 @@ class LeaderSelector(val urls: List<String>,
                                 val watchStopped = BooleanMonitor(false)
                                 val advertiseComplete = BooleanMonitor(false)
 
-
                                 executor.execute {
                                     try {
                                         client.withWatchClient { watchClient ->
