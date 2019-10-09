@@ -19,9 +19,14 @@
 package io.etcd.recipes.discovery
 
 import com.google.common.collect.Maps
+import com.sudothought.common.util.sleep
+import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.blockingThreads
+import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
+import kotlin.time.seconds
 
 class ThreadedServiceDiscoveryTest {
     val urls = listOf("http://localhost:2379")
@@ -37,6 +42,7 @@ class ThreadedServiceDiscoveryTest {
     @Test
     fun discoveryTest() {
 
+        // Create services
         blockingThreads(threadCount) {
             // Close ServiceDiscovery objects at end
             val sd = ServiceDiscovery(urls, path)
@@ -51,7 +57,7 @@ class ThreadedServiceDiscoveryTest {
             }
         }
 
-        // Query the services
+        // Query services
         blockingThreads(threadCount) {
             ServiceDiscovery(urls, path).use { sd ->
                 contextMap.values.forEach { context ->
@@ -64,20 +70,18 @@ class ThreadedServiceDiscoveryTest {
             }
         }
 
-        // Update the services
-        blockingThreads(threadCount) {
-            contextMap.forEach { k, context ->
-                context.serviceMap.forEach { id, service ->
-                    val payload = TestPayload.toObject(service.jsonPayload)
-                    payload.testval = payload.testval * -1
-                    service.jsonPayload = payload.toJson()
-                    println("Updating service: $service")
-                    context.serviceDiscovery.updateService(service)
-                }
+        // Update services
+        contextMap.forEach { k, context ->
+            context.serviceMap.forEach { id, service ->
+                val payload = TestPayload.toObject(service.jsonPayload)
+                payload.testval = payload.testval * -1
+                service.jsonPayload = payload.toJson()
+                println("Updating service: $service")
+                context.serviceDiscovery.updateService(service)
             }
         }
 
-        // Query the updated services
+        // Query updated services
         blockingThreads(threadCount) {
             ServiceDiscovery(urls, path).use { sd ->
                 contextMap.values.forEach { context ->
@@ -93,6 +97,34 @@ class ThreadedServiceDiscoveryTest {
         ServiceDiscovery(urls, path).use { sd ->
             println("Retrieved all names: ${sd.queryForNames().size}")
             sd.queryForNames().size shouldEqual threadCount * serviceCount
+        }
+
+        // Delete services
+        contextMap.forEach { k, context ->
+            context.serviceMap.forEach { id, service ->
+                val payload = TestPayload.toObject(service.jsonPayload)
+                payload.testval = payload.testval * -1
+                service.jsonPayload = payload.toJson()
+                println("Unregistering service: $service")
+                context.serviceDiscovery.unregisterService(service)
+            }
+        }
+
+        // Give unregister a chance to take place
+        sleep(2.seconds)
+
+        // Query deleted services
+        blockingThreads(threadCount) {
+            ServiceDiscovery(urls, path).use { sd ->
+                contextMap.values.forEach { context ->
+                    context.serviceMap.forEach { k, service ->
+                        println("Query deleted service: ${service.name}  ${service.id}")
+                        invoking {
+                            sd.queryForInstance(service.name, service.id)
+                        } shouldThrow EtcdRecipeException::class
+                    }
+                }
+            }
         }
 
         contextMap.values.forEach { it.serviceDiscovery.close() }
