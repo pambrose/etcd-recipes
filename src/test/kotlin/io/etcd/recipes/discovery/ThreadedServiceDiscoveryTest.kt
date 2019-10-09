@@ -22,39 +22,72 @@ import com.google.common.collect.Maps
 import io.etcd.recipes.common.blockingThreads
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
-import java.util.*
 
 class ThreadedServiceDiscoveryTest {
     val urls = listOf("http://localhost:2379")
     val path = "/discovery/${javaClass.simpleName}"
     val threadCount = 2
-    val serviceCount = 3
-    val serviceList = Collections.synchronizedList(mutableListOf<ServiceDiscovery>())
-    val serviceMap = Maps.newConcurrentMap<String, ServiceInstance>()
+    val serviceCount = 2
+    val contextMap = Maps.newConcurrentMap<Int, ServiceDiscoveryContext>()
+
+    class ServiceDiscoveryContext(val serviceDiscovery: ServiceDiscovery) {
+        val serviceMap = Maps.newConcurrentMap<String, ServiceInstance>()
+    }
 
     @Test
     fun discoveryTest() {
 
         blockingThreads(threadCount) {
+            // Close ServiceDiscovery objects at end
             val sd = ServiceDiscovery(urls, path)
-            serviceList += sd
+            val context = ServiceDiscoveryContext(sd)
+            contextMap[it] = context
 
             repeat(serviceCount) {
                 val service = ServiceInstance("TestInstance$it", TestPayload(it).toJson())
-                serviceMap[service.id] = service
+                context.serviceMap[service.id] = service
                 println("Registering: $service")
                 sd.registerService(service)
             }
         }
 
+        // Query the services
         blockingThreads(threadCount) {
             ServiceDiscovery(urls, path).use { sd ->
-                serviceMap.forEach { k, service ->
-                    println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-                    sd.queryForInstance(service.name, service.id) shouldEqual service
+                contextMap.values.forEach { context ->
+                    context.serviceMap.forEach { k, service ->
+                        println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+                        sd.queryForInstance(service.name, service.id) shouldEqual service
+                    }
+
                 }
             }
-            println("Counting down $it")
+        }
+
+        // Update the services
+        blockingThreads(threadCount) {
+            contextMap.forEach { k, context ->
+                context.serviceMap.forEach { id, service ->
+                    val payload = TestPayload.toObject(service.jsonPayload)
+                    payload.testval = payload.testval * -1
+                    service.jsonPayload = payload.toJson()
+                    println("Updating service: $service")
+                    context.serviceDiscovery.updateService(service)
+                }
+            }
+        }
+
+        // Query the updated services
+        blockingThreads(threadCount) {
+            ServiceDiscovery(urls, path).use { sd ->
+                contextMap.values.forEach { context ->
+                    context.serviceMap.forEach { k, service ->
+                        println("Retrieved updated value: ${sd.queryForInstance(service.name, service.id)}")
+                        sd.queryForInstance(service.name, service.id) shouldEqual service
+                    }
+
+                }
+            }
         }
 
         ServiceDiscovery(urls, path).use { sd ->
@@ -62,7 +95,7 @@ class ThreadedServiceDiscoveryTest {
             sd.queryForNames().size shouldEqual threadCount * serviceCount
         }
 
-        serviceList.forEach { it.close() }
+        contextMap.values.forEach { it.serviceDiscovery.close() }
 
         /*
         ServiceDiscovery(urls, path).use { sd ->

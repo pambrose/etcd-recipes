@@ -18,23 +18,37 @@
 
 package io.etcd.recipes.common
 
+import org.junit.jupiter.api.Assertions.fail
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
-fun nonblockingThreads(threadCount: Int, block: (index: Int) -> Unit): CountDownLatch {
+fun nonblockingThreads(threadCount: Int,
+                       block: (index: Int) -> Unit): Pair<CountDownLatch, AtomicReference<Throwable>> {
     val latch = CountDownLatch(threadCount)
+    val exception = AtomicReference<Throwable>()
     repeat(threadCount) {
         thread {
             try {
                 block.invoke(it)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } catch (e: Throwable) {
+                exception.set(e)
             } finally {
                 latch.countDown()
             }
         }
     }
-    return latch
+    return (latch to exception)
 }
 
-fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) = nonblockingThreads(threadCount, block).await()
+fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
+    val (latch, exception) = nonblockingThreads(threadCount, block)
+    latch.await()
+    checkForException(exception)
+}
+
+fun checkForException(exception: AtomicReference<Throwable>) {
+    val e = exception.get()
+    if (e != null)
+        return fail("Exception caught: $e", e)
+}
