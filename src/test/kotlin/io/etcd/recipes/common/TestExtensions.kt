@@ -16,13 +16,25 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package io.etcd.recipes.jetcd
+package io.etcd.recipes.common
 
-fun String.ensureTrailing(delim: String = "/"): String = "$this${if (endsWith(delim)) "" else delim}"
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 
-fun String.stripLeading(delim: String = "/"): String = if (startsWith(delim)) drop(1) else this
+fun nonblockingThreads(threadCount: Int, block: (index: Int) -> Unit): CountDownLatch {
+    val latch = CountDownLatch(threadCount)
+    repeat(threadCount) {
+        thread {
+            try {
+                block.invoke(it)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                latch.countDown()
+            }
+        }
+    }
+    return latch
+}
 
-fun String.stripTrailing(delim: String = "/"): String = if (endsWith(delim)) dropLast(1) else this
-
-fun String.appendToPath(suffix: String, delim: String = "/") =
-    "${stripTrailing(delim)}$delim${suffix.stripLeading(delim)}"
+fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) = nonblockingThreads(threadCount, block).await()

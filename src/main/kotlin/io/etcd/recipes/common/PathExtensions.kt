@@ -16,12 +16,13 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package io.etcd.recipes.jetcd
+package io.etcd.recipes.common
 
-import io.etcd.jetcd.Lock
-import io.etcd.jetcd.lock.LockResponse
-import io.etcd.jetcd.lock.UnlockResponse
+fun String.ensureTrailing(delim: String = "/"): String = "$this${if (endsWith(delim)) "" else delim}"
 
-fun Lock.lock(keyname: String, leaseId: Long): LockResponse = lock(keyname.asByteSequence, leaseId).get()
+fun String.stripLeading(delim: String = "/"): String = if (startsWith(delim)) drop(1) else this
 
-fun Lock.unlock(keyname: String): UnlockResponse = unlock(keyname.asByteSequence).get()
+fun String.stripTrailing(delim: String = "/"): String = if (endsWith(delim)) dropLast(1) else this
+
+fun String.appendToPath(suffix: String, delim: String = "/") =
+    "${stripTrailing(delim)}$delim${suffix.stripLeading(delim)}"

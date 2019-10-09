@@ -21,10 +21,10 @@ package io.etcd.recipes.barrier
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
-import io.etcd.recipes.jetcd.appendToPath
-import io.etcd.recipes.jetcd.delete
-import io.etcd.recipes.jetcd.getKeys
-import io.etcd.recipes.jetcd.withKvClient
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.getKeys
+import io.etcd.recipes.common.withKvClient
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration

@@ -19,8 +19,10 @@
 package io.etcd.recipes.election
 
 import com.sudothought.common.util.sleep
+import io.etcd.recipes.common.blockingThreads
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
+import java.util.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -35,11 +37,10 @@ class ParticipantTest {
         val startedLatch = CountDownLatch(count)
         val finishedLatch = CountDownLatch(count)
         val holdLatch = CountDownLatch(1)
-        val participantCounts = mutableListOf<Int>()
-        val leaderNames = mutableListOf<String>()
+        val participantCounts = Collections.synchronizedList(mutableListOf<Int>())
+        val leaderNames = Collections.synchronizedList(mutableListOf<String>())
 
-
-        repeat(count) {
+        blockingThreads(count) {
             thread {
                 LeaderSelector(urls,
                                path,

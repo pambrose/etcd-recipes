@@ -20,12 +20,11 @@ package io.etcd.recipes.election
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import io.etcd.recipes.common.blockingThreads
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.concurrent.thread
 import kotlin.time.seconds
 
 class ReportLeaderTest {
@@ -35,7 +34,6 @@ class ReportLeaderTest {
     @Test
     fun reportLeaderTest() {
         val count = 25
-        val latch = CountDownLatch(count)
         val takeLeadershiptCounter = AtomicInteger(0)
         val relinquishLeadershiptCounter = AtomicInteger(0)
 
@@ -56,27 +54,22 @@ class ReportLeaderTest {
 
         sleep(5.seconds)
 
-        repeat(count) {
-            thread {
-                LeaderSelector(urls,
-                               path,
-                               object : LeaderSelectorListenerAdapter() {
-                                   override fun takeLeadership(selector: LeaderSelector) {
-                                       val pause = 2.random.seconds
-                                       println("${selector.clientId} elected leader for $pause")
-                                       sleep(pause)
-                                   }
-                               },
-                               "Thread$it")
-                    .use { election ->
-                        election.start()
-                        election.waitOnLeadershipComplete()
-                        latch.countDown()
-                    }
-            }
+        blockingThreads(count) {
+            LeaderSelector(urls,
+                           path,
+                           object : LeaderSelectorListenerAdapter() {
+                               override fun takeLeadership(selector: LeaderSelector) {
+                                   val pause = 2.random.seconds
+                                   println("${selector.clientId} elected leader for $pause")
+                                   sleep(pause)
+                               }
+                           },
+                           "Thread$it")
+                .use { election ->
+                    election.start()
+                    election.waitOnLeadershipComplete()
+                }
         }
-
-        latch.await()
 
         // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
         sleep(3.seconds)

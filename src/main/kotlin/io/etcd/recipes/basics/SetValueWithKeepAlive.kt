@@ -21,10 +21,10 @@ package io.etcd.recipes.basics
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
-import io.etcd.recipes.jetcd.asPutOption
-import io.etcd.recipes.jetcd.putValue
-import io.etcd.recipes.jetcd.withKvClient
-import io.etcd.recipes.jetcd.withLeaseClient
+import io.etcd.recipes.common.asPutOption
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.withLeaseClient
 import kotlin.time.seconds
 
 fun main() {

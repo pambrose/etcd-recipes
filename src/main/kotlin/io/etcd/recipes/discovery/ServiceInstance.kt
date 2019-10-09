@@ -43,6 +43,7 @@ data class ServiceInstance(val name: String,
     fun toJson() = Json.stringify(serializer(), this)
 
     companion object {
+        @JvmStatic
         fun toObject(json: String) = Json.parse(serializer(), json)
 
         class ServiceInstanceBuilder(val name: String, val jsonPayload: String) {

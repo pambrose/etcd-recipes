@@ -21,10 +21,10 @@ package io.etcd.recipes.basics
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
-import io.etcd.recipes.jetcd.delete
-import io.etcd.recipes.jetcd.getValue
-import io.etcd.recipes.jetcd.putValue
-import io.etcd.recipes.jetcd.withKvClient
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.withKvClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds

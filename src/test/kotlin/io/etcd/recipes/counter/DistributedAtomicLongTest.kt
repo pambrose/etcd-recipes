@@ -20,6 +20,7 @@ package io.etcd.recipes.counter
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import io.etcd.recipes.common.blockingThreads
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -95,20 +96,16 @@ class DistributedAtomicLongTest {
             .use { counter ->
                 val threadCount = 5
                 val count = 50
-                val latch = CountDownLatch(threadCount)
 
-                repeat(threadCount) {
-                    thread {
-                        repeat(count) {
-                            counter.increment()
-                            counter.decrement()
-                            counter.add(5)
-                            counter.subtract(5)
-                        }
-                        latch.countDown()
+                blockingThreads(threadCount) {
+                    repeat(count) {
+                        counter.increment()
+                        counter.decrement()
+                        counter.add(5)
+                        counter.subtract(5)
                     }
                 }
-                latch.await()
+
                 counter.get() shouldEqual 0L
             }
     }
@@ -118,20 +115,19 @@ class DistributedAtomicLongTest {
         val threadCount = 10
         val outerLatch = CountDownLatch(threadCount)
 
-        repeat(threadCount) { i ->
-            thread {
+        blockingThreads(threadCount) { i ->
                 println("Creating counter #$i")
                 DistributedAtomicLong(urls, path)
                     .use { counter ->
-                        val innerLatch = CountDownLatch(4)
                         val count = 25
                         val maxPause = 50
+                        val latch = CountDownLatch(4)
 
                         thread {
                             println("Begin increments for counter #$i")
                             repeat(count) { counter.increment() }
                             sleep(maxPause.random.milliseconds)
-                            innerLatch.countDown()
+                            latch.countDown()
                             println("Completed increments for counter #$i")
                         }
 
@@ -139,7 +135,7 @@ class DistributedAtomicLongTest {
                             println("Begin decrements for counter #$i")
                             repeat(count) { counter.decrement() }
                             sleep(maxPause.random.milliseconds)
-                            innerLatch.countDown()
+                            latch.countDown()
                             println("Completed decrements for counter #$i")
                         }
 
@@ -147,7 +143,7 @@ class DistributedAtomicLongTest {
                             println("Begin adds for counter #$i")
                             repeat(count) { counter.add(5) }
                             sleep(maxPause.random.milliseconds)
-                            innerLatch.countDown()
+                            latch.countDown()
                             println("Completed adds for counter #$i")
                         }
 
@@ -155,18 +151,13 @@ class DistributedAtomicLongTest {
                             println("Begin subtracts for counter #$i")
                             repeat(count) { counter.subtract(5) }
                             sleep(maxPause.random.milliseconds)
-                            innerLatch.countDown()
+                            latch.countDown()
                             println("Completed subtracts for counter #$i")
                         }
 
-                        innerLatch.await()
+                        latch.await()
                     }
-
-                outerLatch.countDown()
-            }
         }
-
-        outerLatch.await()
 
         DistributedAtomicLong(urls, path).use { counter -> counter.get() shouldEqual 0L }
     }

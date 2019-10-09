@@ -25,10 +25,9 @@ import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdRecipeException
-import io.etcd.recipes.jetcd.*
+import io.etcd.recipes.common.*
 import java.io.Closeable
+import java.util.*
 
 data class ServiceDiscovery(val urls: List<String>,
                             private val basePath: String,
@@ -39,7 +38,8 @@ data class ServiceDiscovery(val urls: List<String>,
 
     private val namesPath = basePath.appendToPath("/names")
     private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()
-    private val serviceCacheList = mutableListOf<ServiceCache>()
+    private val serviceCacheList = Collections.synchronizedList(mutableListOf<ServiceCache>())
+    private val serviceProviderList = Collections.synchronizedList(mutableListOf<ServiceProvider>())
 
     init {
         require(urls.isNotEmpty()) { "URL cannot be empty" }
@@ -103,10 +103,16 @@ data class ServiceDiscovery(val urls: List<String>,
     fun unregisterService(service: ServiceInstance) {
         semaphore.withLock {
             checkCloseNotCalled()
-            serviceContextMap[service.id]?.close()
-                ?: throw EtcdRecipeException("ServiceInstance not published with registerService()")
-            serviceContextMap.remove(service.id)
+            val found = internalUnregisterService(service)
+            if (!found) throw EtcdRecipeException("ServiceInstance not published with registerService()")
         }
+    }
+
+    private fun internalUnregisterService(service: ServiceInstance): Boolean {
+        val context = serviceContextMap[service.id]
+        context?.close()
+        serviceContextMap.remove(service.id)
+        return context != null
     }
 
     fun serviceCache(name: String): ServiceCache {
@@ -114,6 +120,12 @@ data class ServiceDiscovery(val urls: List<String>,
         val cache = ServiceCache(urls, namesPath, name)
         serviceCacheList += cache
         return cache
+    }
+
+    fun serviceProvider(serviceName: String): ServiceProvider {
+        val provider = ServiceProvider(urls, namesPath, serviceName)
+        serviceProviderList += provider
+        return provider
     }
 
     fun queryForNames(): List<String> =
@@ -138,16 +150,12 @@ data class ServiceDiscovery(val urls: List<String>,
             ServiceInstance.toObject(json)
         }
 
-    //fun serviceProviderBuilder(): ServiceProviderBuilder<T?>? {return null}
-
     override fun close() {
         semaphore.withLock {
             if (!closeCalled) {
                 // Close all service caches
                 serviceCacheList.forEach { it.close() }
-
-                if (!closeCalled)
-                    serviceContextMap.forEach { (_, v) -> unregisterService(v.service) }
+                serviceContextMap.forEach { (_, v) -> internalUnregisterService(v.service) }
 
                 super.close()
             }

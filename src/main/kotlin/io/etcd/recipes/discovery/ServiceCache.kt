@@ -23,21 +23,20 @@ import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.jetcd.*
+import io.etcd.recipes.common.*
 import mu.KLogging
 import java.io.Closeable
+import java.util.*
 
-class ServiceCache(val urls: List<String>,
-                   namesPath: String,
-                   val serviceName: String
-                  ) : EtcdConnector(urls), Closeable {
+class ServiceCache internal constructor(val urls: List<String>,
+                                        namesPath: String,
+                                        val serviceName: String
+                                       ) : EtcdConnector(urls), Closeable {
 
     private var startCalled by atomicBoolean(false)
     private val servicePath = namesPath.appendToPath(serviceName)
     private val serviceMap = Maps.newConcurrentMap<String, String>()
-    private val listeners = mutableListOf<ServiceCacheListener>()
+    private val listeners = Collections.synchronizedList(mutableListOf<ServiceCacheListener>())
 
     init {
         require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }

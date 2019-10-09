@@ -21,7 +21,7 @@ package io.etcd.recipes.basics
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
-import io.etcd.recipes.jetcd.*
+import io.etcd.recipes.common.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.milliseconds

@@ -20,10 +20,10 @@ package io.etcd.recipes.util
 
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
-import io.etcd.recipes.jetcd.count
-import io.etcd.recipes.jetcd.getKeyValues
-import io.etcd.recipes.jetcd.valuesAsString
-import io.etcd.recipes.jetcd.withKvClient
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.count
+import io.etcd.recipes.common.getKeyValues
+import io.etcd.recipes.common.withKvClient
 import kotlin.time.seconds
 
 fun main() {
@@ -35,7 +35,7 @@ fun main() {
             client.withKvClient { kvClient ->
                 kvClient.apply {
                     repeat(600) {
-                        println(getKeyValues(path).valuesAsString)
+                        println(getKeyValues(path).asString)
                         println(count(path))
                         sleep(1.seconds)
                     }

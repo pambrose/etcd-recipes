@@ -16,7 +16,7 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package io.etcd.recipes.jetcd
+package io.etcd.recipes.common
 
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.Lease

@@ -26,8 +26,7 @@ import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.jetcd.*
+import io.etcd.recipes.common.*
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit

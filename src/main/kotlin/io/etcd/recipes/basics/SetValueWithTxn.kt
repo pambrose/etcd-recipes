@@ -21,7 +21,7 @@ package io.etcd.recipes.basics
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.recipes.jetcd.*
+import io.etcd.recipes.common.*
 
 fun main() {
     val urls = listOf("http://localhost:2379")

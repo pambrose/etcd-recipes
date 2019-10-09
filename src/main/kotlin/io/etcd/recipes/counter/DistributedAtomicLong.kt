@@ -25,8 +25,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.jetcd.*
+import io.etcd.recipes.common.*
 import java.io.Closeable
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.milliseconds

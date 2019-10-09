@@ -28,9 +28,7 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdRecipeException
-import io.etcd.recipes.jetcd.*
+import io.etcd.recipes.common.*
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration

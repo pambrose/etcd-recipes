@@ -21,7 +21,7 @@ package io.etcd.recipes.basics
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.WatchOption
-import io.etcd.recipes.jetcd.*
+import io.etcd.recipes.common.*
 import kotlin.time.seconds
 
 fun main() {
@@ -45,7 +45,7 @@ fun main() {
                             putValue(path, "root")
 
                             println("After creation:")
-                            println(getKeyValues(path).valuesAsString)
+                            println(getKeyValues(path))
                             println(count(path))
 
                             sleep(5.seconds)
@@ -57,15 +57,15 @@ fun main() {
                             putValue("$path/waiting/d", "dddd")
 
                             println("\nAfter addition:")
-                            println(getKeyValues(path).valuesAsString)
+                            println(getKeyValues(path).asString)
                             println(count(path))
 
                             println("\nElections only:")
-                            println(getKeyValues("$path/election").valuesAsString)
+                            println(getKeyValues("$path/election").asString)
                             println(count("$path/election"))
 
                             println("\nWaitings only:")
-                            println(getKeyValues("$path/waiting").valuesAsString)
+                            println(getKeyValues("$path/waiting").asString)
                             println(count("$path/waiting"))
 
                             sleep(5.seconds)
@@ -81,7 +81,7 @@ fun main() {
 
 
                             println("\nAfter removal:")
-                            println(getKeyValues(path).valuesAsString)
+                            println(getKeyValues(path).asString)
                             println(count(path))
 
                             sleep(5.seconds)

@@ -30,11 +30,10 @@ import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.common.EtcdRecipeException
-import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.jetcd.*
+import io.etcd.recipes.common.*
 import mu.KLogging
 import java.io.Closeable
+import java.util.*
 import java.util.concurrent.*
 import kotlin.time.Duration
 import kotlin.time.days
@@ -110,7 +109,7 @@ class LeaderSelector(val urls: List<String>,
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
     private val leaderPath = leaderPath(electionPath)
-    private val exceptionList = mutableListOf<Exception>()
+    private val exceptionList = Collections.synchronizedList(mutableListOf<Exception>())
 
     init {
         require(urls.isNotEmpty()) { "URL cannot be empty" }
