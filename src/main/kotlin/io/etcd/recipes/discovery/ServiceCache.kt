@@ -38,6 +38,8 @@ class ServiceCache internal constructor(val urls: List<String>,
     private val serviceMap = Maps.newConcurrentMap<String, String>()
     private val listeners = Collections.synchronizedList(mutableListOf<ServiceCacheListener>())
 
+    val exceptionHolder = ExceptionHolder()
+
     init {
         require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }
     }
@@ -62,6 +64,7 @@ class ServiceCache internal constructor(val urls: List<String>,
                                         it.cacheChanged(PUT, isNew, k, ServiceInstance.toObject(v))
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
+                                        exceptionHolder.exception = e
                                     }
                                 }
                                 //println("$k $v ${if (newKey) "added" else "updated"}")
@@ -74,6 +77,7 @@ class ServiceCache internal constructor(val urls: List<String>,
                                         it.cacheChanged(DELETE, false, k, prevValue)
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
+                                        exceptionHolder.exception = e
                                     }
                                 }
                                 println("$k deleted")
