@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
-class SerialLeaderSelectorTest {
+class SerialLeaderSelectorTests {
     val urls = listOf("http://localhost:2379")
     val path = "/election/${javaClass.simpleName}"
 

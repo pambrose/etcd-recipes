@@ -27,7 +27,7 @@ import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
 
-class ParticipantTest {
+class ParticipantTests {
     val urls = listOf("http://localhost:2379")
     val path = "/election/${javaClass.simpleName}"
 

@@ -28,7 +28,7 @@ import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import kotlin.time.seconds
 
-class ThreadedServiceDiscoveryTest {
+class ThreadedServiceDiscoveryTests {
     val urls = listOf("http://localhost:2379")
     val path = "/discovery/${javaClass.simpleName}"
     val threadCount = 2
@@ -127,59 +127,7 @@ class ThreadedServiceDiscoveryTest {
             }
         }
 
+        // Close ServiceDiscovery objects
         contextMap.values.forEach { it.serviceDiscovery.close() }
-
-        /*
-        ServiceDiscovery(urls, path).use { sd ->
-
-            val payload = TestPayload(-999)
-            val service = ServiceInstance("TestName", payload.toJson())
-
-            println(service.toJson())
-
-            println("Registering")
-            sd.registerService(service)
-
-            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-            sd.queryForInstance(service.name, service.id) shouldEqual service
-
-            println("Retrieved values: ${sd.queryForInstances(service.name)}")
-            sd.queryForInstances(service.name) shouldEqual listOf(service)
-
-            println("Retrieved names: ${sd.queryForNames()}")
-            sd.queryForNames().first() shouldEndWith service.id
-
-            println("Updating payload")
-            payload.testval = -888
-            service.jsonPayload = payload.toJson()
-            sd.updateService(service)
-
-            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-            sd.queryForInstance(service.name, service.id) shouldEqual service
-
-            println("Retrieved values: ${sd.queryForInstances(service.name)}")
-            sd.queryForInstances(service.name) shouldEqual listOf(service)
-
-            println("Retrieved names: ${sd.queryForNames()}")
-            sd.queryForNames().first() shouldEndWith service.id
-
-            println("Unregistering")
-            sd.unregisterService(service)
-            sleep(3.seconds)
-
-
-            sd.queryForNames().size shouldEqual 0
-            sd.queryForInstances(service.name).size shouldEqual 0
-
-            invoking { sd.queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
-
-            try {
-                println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-            } catch (e: EtcdRecipeException) {
-                println("Exception: $e")
-            }
-        }
-
-         */
     }
 }

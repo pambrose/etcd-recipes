@@ -30,7 +30,7 @@ fun nonblockingThreads(threadCount: Int,
     repeat(threadCount) {
         thread {
             try {
-                block.invoke(it)
+                block(it)
             } catch (e: Throwable) {
                 exception.set(e)
             } finally {
@@ -47,8 +47,34 @@ fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
     checkForException(exception)
 }
 
-fun checkForException(exception: AtomicReference<Throwable>) {
-    val e = exception.get()
+fun checkForException(e: AtomicReference<Throwable>) {
+    if (e.get() != null)
+        return fail("Exception caught: ${e.get()}", e.get())
+}
+
+fun throwExceptionFromList(exceptions: List<AtomicReference<Throwable>>) {
+    val e =
+        exceptions
+            .filter { it.get() != null }
+            .map { it.get() }
+            .firstOrNull()
     if (e != null)
-        return fail("Exception caught: $e", e)
+        throw e
+}
+
+fun threadWithExceptionCheck(block: () -> Unit): Pair<CountDownLatch, AtomicReference<Throwable>> {
+    val latch = CountDownLatch(1)
+    val exception = AtomicReference<Throwable>()
+
+    thread {
+        try {
+            block()
+        } catch (e: Throwable) {
+            exception.set(e)
+        } finally {
+            latch.countDown()
+        }
+    }
+
+    return (latch to exception)
 }

@@ -27,7 +27,7 @@ import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import kotlin.time.seconds
 
-class SerialServiceDiscoveryTest {
+class SerialServiceDiscoveryTests {
     val urls = listOf("http://localhost:2379")
     val path = "/discovery/${javaClass.simpleName}"
 

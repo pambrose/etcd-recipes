@@ -27,7 +27,7 @@ import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
-class ThreadedLeaderSelectorTest {
+class ThreadedLeaderSelectorTests {
     val urls = listOf("http://localhost:2379")
     val path = "/election/${javaClass.simpleName}"
     val count = 10

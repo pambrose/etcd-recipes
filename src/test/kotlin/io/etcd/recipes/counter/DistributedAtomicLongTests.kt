@@ -21,14 +21,16 @@ package io.etcd.recipes.counter
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import io.etcd.recipes.common.threadWithExceptionCheck
+import io.etcd.recipes.common.throwExceptionFromList
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
-import kotlin.concurrent.thread
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.milliseconds
 
-class DistributedAtomicLongTest {
+class DistributedAtomicLongTests {
     val urls = listOf("http://localhost:2379")
     val path = "/counters/${javaClass.simpleName}"
 
@@ -116,47 +118,60 @@ class DistributedAtomicLongTest {
         val outerLatch = CountDownLatch(threadCount)
 
         blockingThreads(threadCount) { i ->
-                println("Creating counter #$i")
-                DistributedAtomicLong(urls, path)
-                    .use { counter ->
-                        val count = 25
-                        val maxPause = 50
-                        val latch = CountDownLatch(4)
+            println("Creating counter #$i")
+            DistributedAtomicLong(urls, path)
+                .use { counter ->
+                    val count = 25
+                    val maxPause = 50
+                    val latchList = mutableListOf<CountDownLatch>()
+                    val exceptionList = mutableListOf<AtomicReference<Throwable>>()
 
-                        thread {
+                    val (latch0, e0) =
+                        threadWithExceptionCheck {
                             println("Begin increments for counter #$i")
                             repeat(count) { counter.increment() }
                             sleep(maxPause.random.milliseconds)
-                            latch.countDown()
                             println("Completed increments for counter #$i")
                         }
+                    latchList += latch0
+                    exceptionList += e0
 
-                        thread {
+                    val (latch1, e1) =
+                        threadWithExceptionCheck {
                             println("Begin decrements for counter #$i")
                             repeat(count) { counter.decrement() }
                             sleep(maxPause.random.milliseconds)
-                            latch.countDown()
                             println("Completed decrements for counter #$i")
                         }
+                    latchList += latch1
+                    exceptionList += e1
 
-                        thread {
+                    val (latch2, e2) =
+                        threadWithExceptionCheck {
                             println("Begin adds for counter #$i")
                             repeat(count) { counter.add(5) }
                             sleep(maxPause.random.milliseconds)
-                            latch.countDown()
                             println("Completed adds for counter #$i")
                         }
+                    latchList += latch2
+                    exceptionList += e2
 
-                        thread {
+                    val (latch3, e3) =
+                        threadWithExceptionCheck {
                             println("Begin subtracts for counter #$i")
                             repeat(count) { counter.subtract(5) }
                             sleep(maxPause.random.milliseconds)
-                            latch.countDown()
                             println("Completed subtracts for counter #$i")
                         }
+                    latchList += latch3
+                    exceptionList += e3
 
-                        latch.await()
-                    }
+                    // Wait for all the threads to finish
+                    latchList.forEach { it.await() }
+
+                    // If an exception occurred, throw it
+                    throwExceptionFromList(exceptionList)
+                }
         }
 
         DistributedAtomicLong(urls, path).use { counter -> counter.get() shouldEqual 0L }

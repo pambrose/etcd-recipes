@@ -27,7 +27,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
-class ReportLeaderTest {
+class ReportLeaderTests {
     val urls = listOf("http://localhost:2379")
     val path = "/election/${javaClass.simpleName}"
 
