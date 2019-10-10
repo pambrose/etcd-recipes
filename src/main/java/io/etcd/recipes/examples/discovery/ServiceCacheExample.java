@@ -34,7 +34,7 @@ public class ServiceCacheExample {
 
             try (ServiceCache cache = sd.serviceCache("TestName")) {
                 cache.addListenerForChanges(
-                        (eventType, name, serviceInstance) -> {
+                        (eventType, isNew, name, serviceInstance) -> {
                             System.out.println(String.format("Change %s %s %s", eventType, name, serviceInstance));
                             if (serviceInstance != null)
                                 System.out.println("Payload: " + IntPayload.toObject(serviceInstance.getJsonPayload()));

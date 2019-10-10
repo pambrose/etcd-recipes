@@ -30,7 +30,10 @@ fun main() {
 
         sd.serviceCache("TestName").use { cache ->
 
-            cache.addListenerForChanges { eventType, serviceName, serviceInstance ->
+            cache.addListenerForChanges { eventType,
+                                          isNew,
+                                          serviceName,
+                                          serviceInstance ->
                 println("Change $eventType $serviceName $serviceInstance")
                 serviceInstance?.let {
                     println("Payload: ${IntPayload.toObject(

@@ -17,14 +17,13 @@
 package io.etcd.recipes.discovery
 
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.watch.WatchEvent
+import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.recipes.common.captureException
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
 import org.amshove.kluent.shouldEqual
 import org.amshove.kluent.shouldEqualTo
 import org.junit.jupiter.api.Test
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.seconds
@@ -37,13 +36,13 @@ class ServiceCacheTests {
         val path = "/discovery/${javaClass.simpleName}"
         val threadCount = 10
         val serviceCount = 10
-        val waitLatch = CountDownLatch(1)
         val name = "ServiceCacheTest"
+        val addCounter = AtomicInteger(0)
+        val updateCounter = AtomicInteger(0)
+        val deleteCounter = AtomicInteger(0)
+        val watchException = AtomicReference<Throwable>()
 
         ServiceDiscovery(urls, path).use { cachesd ->
-
-            val changeCounter = AtomicInteger(0)
-            val watchException = AtomicReference<Throwable>()
 
             cachesd.serviceCache(name).apply {
 
@@ -55,14 +54,20 @@ class ServiceCacheTests {
                 urls shouldEqual urls
 
                 addListenerForChanges(object : ServiceCacheListener {
-                    override fun cacheChanged(eventType: WatchEvent.EventType,
+                    override fun cacheChanged(eventType: EventType,
+                                              isNew: Boolean,
                                               serviceName: String,
                                               serviceInstance: ServiceInstance?) {
                         captureException(watchException) {
-                            if (eventType == WatchEvent.EventType.PUT) {
-                                changeCounter.incrementAndGet()
+                            serviceName.split("/").dropLast(1).last() shouldEqual name
 
-                                serviceName.split("/").dropLast(1).last() shouldEqual name
+                            if (eventType == EventType.PUT) {
+                                if (isNew) addCounter.incrementAndGet() else updateCounter.incrementAndGet()
+                                serviceInstance!!.name shouldEqual name
+                            }
+
+                            if (eventType == EventType.DELETE) {
+                                deleteCounter.incrementAndGet()
                                 serviceInstance!!.name shouldEqual name
                             }
                         }
@@ -70,8 +75,8 @@ class ServiceCacheTests {
                 })
             }
 
-            val (latch, exception) =
-                nonblockingThreads(threadCount, waitLatch) {
+            val (latch0, exception0) =
+                nonblockingThreads(threadCount) {
                     ServiceDiscovery(urls, path).use { sd ->
                         repeat(serviceCount) {
                             val service = ServiceInstance(name, TestPayload(it).toJson())
@@ -79,20 +84,28 @@ class ServiceCacheTests {
                             sd.registerService(service)
 
                             sleep(1.seconds)
+
+                            val payload = TestPayload.toObject(service.jsonPayload)
+                            payload.testval = payload.testval * -1
+                            service.jsonPayload = payload.toJson()
+                            println("Updating: ${service.name} ${service.id}")
+                            sd.updateService(service)
+
+                            sleep(1.seconds)
                         }
                     }
                 }
 
-            waitLatch.countDown()
-            latch.await()
-
-            watchException.checkForException()
-            changeCounter.get() shouldEqual threadCount * serviceCount
-
-            exception.checkForException()
-
+            latch0.await()
+            exception0.checkForException()
         }
 
-    }
+        // Wait for deletes to propagate
+        sleep(2.seconds)
 
+        watchException.checkForException()
+        addCounter.get() shouldEqual threadCount * serviceCount
+        updateCounter.get() shouldEqual threadCount * serviceCount
+        deleteCounter.get() shouldEqual threadCount * serviceCount
+    }
 }

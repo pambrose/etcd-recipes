@@ -54,13 +54,13 @@ class ServiceCache internal constructor(val urls: List<String>,
                         when (event.eventType) {
                             PUT          -> {
                                 val (k, v) = event.keyValue.asPair.asString
-                                val newKey = !serviceMap.containsKey(k)
+                                val isNew = !serviceMap.containsKey(k)
                                 serviceMap[k] = v
                                 //println("$k ${if (newKey) "added" else "updated"}")
 
                                 listeners.forEach {
                                     try {
-                                        it.cacheChanged(PUT, k, ServiceInstance.toObject(v))
+                                        it.cacheChanged(PUT, isNew, k, ServiceInstance.toObject(v))
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
                                         e.printStackTrace()
@@ -73,7 +73,7 @@ class ServiceCache internal constructor(val urls: List<String>,
                                 val prevValue = serviceMap.remove(k)?.let { ServiceInstance.toObject(it) }
                                 listeners.forEach {
                                     try {
-                                        it.cacheChanged(DELETE, k, prevValue)
+                                        it.cacheChanged(DELETE, false, k, prevValue)
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
                                         e.printStackTrace()
@@ -98,14 +98,16 @@ class ServiceCache internal constructor(val urls: List<String>,
         }
 
     fun addListenerForChanges(listener: (eventType: WatchEvent.EventType,
+                                         isNew: Boolean,
                                          serviceName: String,
                                          serviceInstance: ServiceInstance?) -> Unit) {
         addListenerForChanges(
             object : ServiceCacheListener {
                 override fun cacheChanged(eventType: WatchEvent.EventType,
+                                          isNew: Boolean,
                                           serviceName: String,
                                           serviceInstance: ServiceInstance?) {
-                    listener.invoke(eventType, serviceName, serviceInstance)
+                    listener.invoke(eventType, isNew, serviceName, serviceInstance)
                 }
             })
     }
