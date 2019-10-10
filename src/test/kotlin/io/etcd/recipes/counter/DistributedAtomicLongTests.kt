@@ -115,7 +115,6 @@ class DistributedAtomicLongTests {
     @Test
     fun threaded2Test() {
         val threadCount = 10
-        val outerLatch = CountDownLatch(threadCount)
 
         blockingThreads(threadCount) { i ->
             println("Creating counter #$i")
@@ -170,7 +169,7 @@ class DistributedAtomicLongTests {
                     latchList.forEach { it.await() }
 
                     // If an exception occurred, throw it
-                    throwExceptionFromList(exceptionList)
+                    exceptionList.throwExceptionFromList()
                 }
         }
 

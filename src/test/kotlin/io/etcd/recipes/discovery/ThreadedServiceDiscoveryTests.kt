@@ -61,7 +61,7 @@ class ThreadedServiceDiscoveryTests {
         blockingThreads(threadCount) {
             ServiceDiscovery(urls, path).use { sd ->
                 contextMap.values.forEach { context ->
-                    context.serviceMap.forEach { k, service ->
+                    context.serviceMap.forEach { _, service ->
                         println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
                         sd.queryForInstance(service.name, service.id) shouldEqual service
                     }
@@ -71,8 +71,8 @@ class ThreadedServiceDiscoveryTests {
         }
 
         // Update services
-        contextMap.forEach { k, context ->
-            context.serviceMap.forEach { id, service ->
+        contextMap.forEach { _, context ->
+            context.serviceMap.forEach { _, service ->
                 val payload = TestPayload.toObject(service.jsonPayload)
                 payload.testval = payload.testval * -1
                 service.jsonPayload = payload.toJson()
@@ -85,7 +85,7 @@ class ThreadedServiceDiscoveryTests {
         blockingThreads(threadCount) {
             ServiceDiscovery(urls, path).use { sd ->
                 contextMap.values.forEach { context ->
-                    context.serviceMap.forEach { k, service ->
+                    context.serviceMap.forEach { _, service ->
                         println("Retrieved updated value: ${sd.queryForInstance(service.name, service.id)}")
                         sd.queryForInstance(service.name, service.id) shouldEqual service
                     }
@@ -100,8 +100,8 @@ class ThreadedServiceDiscoveryTests {
         }
 
         // Delete services
-        contextMap.forEach { k, context ->
-            context.serviceMap.forEach { id, service ->
+        contextMap.forEach { _, context ->
+            context.serviceMap.forEach { _, service ->
                 val payload = TestPayload.toObject(service.jsonPayload)
                 payload.testval = payload.testval * -1
                 service.jsonPayload = payload.toJson()
@@ -111,13 +111,13 @@ class ThreadedServiceDiscoveryTests {
         }
 
         // Give unregister a chance to take place
-        sleep(2.seconds)
+        sleep(5.seconds)
 
         // Query deleted services
         blockingThreads(threadCount) {
             ServiceDiscovery(urls, path).use { sd ->
                 contextMap.values.forEach { context ->
-                    context.serviceMap.forEach { k, service ->
+                    context.serviceMap.forEach { _, service ->
                         println("Query deleted service: ${service.name}  ${service.id}")
                         invoking {
                             sd.queryForInstance(service.name, service.id)
