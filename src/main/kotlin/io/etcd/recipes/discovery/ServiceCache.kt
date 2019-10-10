@@ -56,14 +56,30 @@ class ServiceCache internal constructor(val urls: List<String>,
                                 val (k, v) = event.keyValue.asPair.asString
                                 val newKey = !serviceMap.containsKey(k)
                                 serviceMap[k] = v
-                                listeners.forEach { it.cacheChanged(PUT, k, ServiceInstance.toObject(v)) }
+                                //println("$k ${if (newKey) "added" else "updated"}")
+
+                                listeners.forEach {
+                                    try {
+                                        it.cacheChanged(PUT, k, ServiceInstance.toObject(v))
+                                    } catch (e: Throwable) {
+                                        logger.error(e) { "Exception in cacheChanged()" }
+                                        e.printStackTrace()
+                                    }
+                                }
                                 //println("$k $v ${if (newKey) "added" else "updated"}")
                             }
                             DELETE       -> {
                                 val k = event.keyValue.key.asString
                                 val prevValue = serviceMap.remove(k)?.let { ServiceInstance.toObject(it) }
-                                listeners.forEach { it.cacheChanged(DELETE, k, prevValue) }
-                                //println("$k deleted")
+                                listeners.forEach {
+                                    try {
+                                        it.cacheChanged(DELETE, k, prevValue)
+                                    } catch (e: Throwable) {
+                                        logger.error(e) { "Exception in cacheChanged()" }
+                                        e.printStackTrace()
+                                    }
+                                }
+                                println("$k deleted")
                             }
                             UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
                             else         -> logger.error { "Unknown error with $servicePath watch" }

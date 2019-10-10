@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 fun nonblockingThreads(threadCount: Int,
+                       waithLatch: CountDownLatch? = null,
                        block: (index: Int) -> Unit): Pair<CountDownLatch, AtomicReference<Throwable>> {
     val latch = CountDownLatch(threadCount)
     val exception = AtomicReference<Throwable>()
@@ -31,6 +32,7 @@ fun nonblockingThreads(threadCount: Int,
         thread {
             try {
                 block(it)
+                waithLatch?.await()
             } catch (e: Throwable) {
                 exception.set(e)
             } finally {
@@ -38,11 +40,11 @@ fun nonblockingThreads(threadCount: Int,
             }
         }
     }
-    return (latch to exception)
+    return Pair(latch, exception)
 }
 
 fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
-    val (latch, exception) = nonblockingThreads(threadCount, block)
+    val (latch, exception) = nonblockingThreads(threadCount, block = block)
     latch.await()
     exception.checkForException()
 }
@@ -74,5 +76,13 @@ fun threadWithExceptionCheck(block: () -> Unit): Pair<CountDownLatch, AtomicRefe
         }
     }
 
-    return (latch to exception)
+    return Pair(latch, exception)
+}
+
+fun captureException(exceptionRef: AtomicReference<Throwable>, block: () -> Unit) {
+    try {
+        block()
+    } catch (e: Throwable) {
+        exceptionRef.set(e)
+    }
 }

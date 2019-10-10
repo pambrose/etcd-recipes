@@ -31,8 +31,8 @@ import kotlin.time.seconds
 class ThreadedServiceDiscoveryTests {
     val urls = listOf("http://localhost:2379")
     val path = "/discovery/${javaClass.simpleName}"
-    val threadCount = 2
-    val serviceCount = 2
+    val threadCount = 10
+    val serviceCount = 10
     val contextMap = Maps.newConcurrentMap<Int, ServiceDiscoveryContext>()
 
     class ServiceDiscoveryContext(val serviceDiscovery: ServiceDiscovery) {
