@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
+
 package io.etcd.recipes.election
 
 open class LeaderSelectorListenerAdapter : LeaderSelectorListener {

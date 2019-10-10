@@ -109,7 +109,7 @@ class LeaderSelector(val urls: List<String>,
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
     private val leaderPath = leaderPath(electionPath)
-    private val exceptionList = Collections.synchronizedList(mutableListOf<Exception>())
+    private val exceptionList = Collections.synchronizedList(mutableListOf<Throwable>())
 
     init {
         require(urls.isNotEmpty()) { "URL cannot be empty" }
@@ -164,7 +164,7 @@ class LeaderSelector(val urls: List<String>,
                                             }
                                             watchStopped.set(true)
                                         }
-                                    } catch (e: Exception) {
+                                    } catch (e: Throwable) {
                                         logger.error(e) { "In withWatchClient()" }
                                         exceptionList += e
                                     }
@@ -173,7 +173,7 @@ class LeaderSelector(val urls: List<String>,
                                 executor.execute {
                                     try {
                                         advertiseParticipation(leaseClient, kvClient)
-                                    } catch (e: Exception) {
+                                    } catch (e: Throwable) {
                                         logger.error(e) { "In advertiseParticipation()" }
                                         exceptionList += e
                                     } finally {
@@ -251,7 +251,6 @@ class LeaderSelector(val urls: List<String>,
             }
         }
     }
-
 
     private fun watchForDeleteEvents(watchClient: Watch,
                                      watchStarted: BooleanMonitor,
