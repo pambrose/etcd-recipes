@@ -48,7 +48,7 @@ class ServiceCache internal constructor(val urls: List<String>,
                 throw EtcdRecipeRuntimeException("start() already called")
             checkCloseNotCalled()
 
-            watchClient.watcher(servicePath, servicePath.asRangeWatchOption) { watchResponse ->
+            watchClient.watcher(servicePath, servicePath.asPrefixWatchOption) { watchResponse ->
                 watchResponse.events
                     .forEach { event ->
                         when (event.eventType) {
