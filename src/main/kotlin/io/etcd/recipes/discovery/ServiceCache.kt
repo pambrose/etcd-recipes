@@ -48,7 +48,7 @@ class ServiceCache internal constructor(val urls: List<String>,
                 throw EtcdRecipeRuntimeException("start() already called")
             checkCloseNotCalled()
 
-            watchClient.watcher(servicePath, nullWatchOption) { watchResponse ->
+            watchClient.watcher(servicePath, servicePath.asRangeWatchOption) { watchResponse ->
                 watchResponse.events
                     .forEach { event ->
                         when (event.eventType) {
@@ -57,13 +57,11 @@ class ServiceCache internal constructor(val urls: List<String>,
                                 val isNew = !serviceMap.containsKey(k)
                                 serviceMap[k] = v
                                 //println("$k ${if (newKey) "added" else "updated"}")
-
                                 listeners.forEach {
                                     try {
                                         it.cacheChanged(PUT, isNew, k, ServiceInstance.toObject(v))
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
-                                        e.printStackTrace()
                                     }
                                 }
                                 //println("$k $v ${if (newKey) "added" else "updated"}")
@@ -76,7 +74,6 @@ class ServiceCache internal constructor(val urls: List<String>,
                                         it.cacheChanged(DELETE, false, k, prevValue)
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
-                                        e.printStackTrace()
                                     }
                                 }
                                 println("$k deleted")

@@ -165,7 +165,7 @@ class LeaderSelector(val urls: List<String>,
                                             watchStopped.set(true)
                                         }
                                     } catch (e: Exception) {
-                                        e.printStackTrace()
+                                        logger.error(e) { "In withWatchClient()" }
                                         exceptionList += e
                                     }
                                 }
@@ -174,7 +174,7 @@ class LeaderSelector(val urls: List<String>,
                                     try {
                                         advertiseParticipation(leaseClient, kvClient)
                                     } catch (e: Exception) {
-                                        e.printStackTrace()
+                                        logger.error(e) { "In advertiseParticipation()" }
                                         exceptionList += e
                                     } finally {
                                         advertiseComplete.set(true)
@@ -194,7 +194,7 @@ class LeaderSelector(val urls: List<String>,
                         }
                     }
             } catch (e: Exception) {
-                e.printStackTrace()
+                logger.error(e) { "In start()" }
                 exceptionList += e
             } finally {
                 startThreadComplete.set(true)
@@ -371,11 +371,15 @@ class LeaderSelector(val urls: List<String>,
                             watchClient.watcher(leaderPath(electionPath)) { watchResponse ->
                                 watchResponse.events
                                     .forEach { event ->
-                                        when (event.eventType) {
-                                            PUT          -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
-                                            DELETE       -> listener.relinquishLeadership()
-                                            UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
-                                            else         -> logger.error { "Unknown error with $electionPath watch" }
+                                        try {
+                                            when (event.eventType) {
+                                                PUT          -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
+                                                DELETE       -> listener.relinquishLeadership()
+                                                UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
+                                                else         -> logger.error { "Unknown error with $electionPath watch" }
+                                            }
+                                        } catch (e: Throwable) {
+                                            logger.error(e) { "Exception in reportLeader()" }
                                         }
                                     }
                             }.use {

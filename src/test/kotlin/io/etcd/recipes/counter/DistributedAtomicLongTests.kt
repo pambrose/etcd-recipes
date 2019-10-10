@@ -20,6 +20,7 @@ package io.etcd.recipes.counter
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.threadWithExceptionCheck
 import io.etcd.recipes.common.throwExceptionFromList
@@ -27,7 +28,6 @@ import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.milliseconds
 
 class DistributedAtomicLongTests {
@@ -123,7 +123,7 @@ class DistributedAtomicLongTests {
                     val count = 25
                     val maxPause = 50
                     val latchList = mutableListOf<CountDownLatch>()
-                    val exceptionList = mutableListOf<AtomicReference<Throwable>>()
+                    val exceptionList = mutableListOf<ExceptionHolder>()
 
                     val (latch0, e0) =
                         threadWithExceptionCheck {

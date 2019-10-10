@@ -18,6 +18,7 @@ package io.etcd.recipes.discovery
 
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.watch.WatchEvent.EventType
+import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.captureException
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
@@ -25,7 +26,6 @@ import org.amshove.kluent.shouldEqual
 import org.amshove.kluent.shouldEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.seconds
 
 class ServiceCacheTests {
@@ -37,10 +37,10 @@ class ServiceCacheTests {
         val threadCount = 10
         val serviceCount = 10
         val name = "ServiceCacheTest"
-        val addCounter = AtomicInteger(0)
+        val registerCounter = AtomicInteger(0)
         val updateCounter = AtomicInteger(0)
-        val deleteCounter = AtomicInteger(0)
-        val watchException = AtomicReference<Throwable>()
+        val unregisterCounter = AtomicInteger(0)
+        val holder = ExceptionHolder()
 
         ServiceDiscovery(urls, path).use { cachesd ->
 
@@ -58,16 +58,16 @@ class ServiceCacheTests {
                                               isNew: Boolean,
                                               serviceName: String,
                                               serviceInstance: ServiceInstance?) {
-                        captureException(watchException) {
+                        captureException(holder) {
                             serviceName.split("/").dropLast(1).last() shouldEqual name
 
                             if (eventType == EventType.PUT) {
-                                if (isNew) addCounter.incrementAndGet() else updateCounter.incrementAndGet()
+                                if (isNew) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
                                 serviceInstance!!.name shouldEqual name
                             }
 
                             if (eventType == EventType.DELETE) {
-                                deleteCounter.incrementAndGet()
+                                unregisterCounter.incrementAndGet()
                                 serviceInstance!!.name shouldEqual name
                             }
                         }
@@ -92,6 +92,11 @@ class ServiceCacheTests {
                             sd.updateService(service)
 
                             sleep(1.seconds)
+
+                            println("Unregistering: ${service.name} ${service.id}")
+                            sd.unregisterService(service)
+
+                            sleep(1.seconds)
                         }
                     }
                 }
@@ -101,11 +106,11 @@ class ServiceCacheTests {
         }
 
         // Wait for deletes to propagate
-        sleep(2.seconds)
+        sleep(5.seconds)
 
-        watchException.checkForException()
-        addCounter.get() shouldEqual threadCount * serviceCount
+        holder.checkForException()
+        registerCounter.get() shouldEqual threadCount * serviceCount
         updateCounter.get() shouldEqual threadCount * serviceCount
-        deleteCounter.get() shouldEqual threadCount * serviceCount
+        unregisterCounter.get() shouldEqual threadCount * serviceCount
     }
 }

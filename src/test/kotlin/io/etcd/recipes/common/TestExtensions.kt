@@ -20,27 +20,26 @@ package io.etcd.recipes.common
 
 import org.junit.jupiter.api.Assertions.fail
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 fun nonblockingThreads(threadCount: Int,
-                       waithLatch: CountDownLatch? = null,
-                       block: (index: Int) -> Unit): Pair<CountDownLatch, AtomicReference<Throwable>> {
+                       waitLatch: CountDownLatch? = null,
+                       block: (index: Int) -> Unit): Pair<CountDownLatch, ExceptionHolder> {
     val latch = CountDownLatch(threadCount)
-    val exception = AtomicReference<Throwable>()
+    val holder = ExceptionHolder()
     repeat(threadCount) {
         thread {
             try {
                 block(it)
-                waithLatch?.await()
+                waitLatch?.await()
             } catch (e: Throwable) {
-                exception.set(e)
+                holder.exception = e
             } finally {
                 latch.countDown()
             }
         }
     }
-    return Pair(latch, exception)
+    return Pair(latch, holder)
 }
 
 fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
@@ -49,40 +48,40 @@ fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
     exception.checkForException()
 }
 
-fun AtomicReference<Throwable>.checkForException() {
-    if (get() != null)
-        return fail("Exception caught: ${get()}", get())
+fun ExceptionHolder.checkForException() {
+    if (exception != null)
+        return fail("Exception caught: $exception", exception)
 }
 
-fun List<AtomicReference<Throwable>>.throwExceptionFromList() {
-    val e = filter { it.get() != null }.firstOrNull()?.get()
+fun List<ExceptionHolder>.throwExceptionFromList() {
+    val e = filter { it.exception != null }.firstOrNull()?.exception
     if (e != null)
         throw e
 }
 
 fun List<CountDownLatch>.waitForAll() = forEach { it.await() }
 
-fun threadWithExceptionCheck(block: () -> Unit): Pair<CountDownLatch, AtomicReference<Throwable>> {
+fun threadWithExceptionCheck(block: () -> Unit): Pair<CountDownLatch, ExceptionHolder> {
     val latch = CountDownLatch(1)
-    val exception = AtomicReference<Throwable>()
+    val holder = ExceptionHolder()
 
     thread {
         try {
             block()
         } catch (e: Throwable) {
-            exception.set(e)
+            holder.exception = e
         } finally {
             latch.countDown()
         }
     }
 
-    return Pair(latch, exception)
+    return Pair(latch, holder)
 }
 
-fun captureException(exceptionRef: AtomicReference<Throwable>, block: () -> Unit) {
+fun captureException(holder: ExceptionHolder, block: () -> Unit) {
     try {
         block()
     } catch (e: Throwable) {
-        exceptionRef.set(e)
+        holder.exception = e
     }
 }
