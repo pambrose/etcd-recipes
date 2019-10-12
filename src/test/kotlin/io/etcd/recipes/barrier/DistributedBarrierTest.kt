@@ -33,7 +33,7 @@ class DistributedBarrierTest {
     @Test
     fun barrierTest() {
         val urls = listOf("http://localhost:2379")
-        val barrierPath = "/barriers/threadedclients"
+        val path = "/barriers/${javaClass.simpleName}"
         val count = 5
         val setBarrierLatch = CountDownLatch(1)
         val completeLatch = CountDownLatch(1)
@@ -42,7 +42,7 @@ class DistributedBarrierTest {
         val advancedCount = AtomicInteger()
 
         thread {
-            DistributedBarrier(urls, barrierPath)
+            DistributedBarrier(urls, path)
                 .use { barrier ->
                     println("Setting Barrier")
                     barrier.setBarrier()
@@ -61,7 +61,7 @@ class DistributedBarrierTest {
 
         blockingThreads(count) { i ->
             setBarrierLatch.await()
-            DistributedBarrier(urls, barrierPath)
+            DistributedBarrier(urls, path)
                 .use { barrier ->
                     println("$i Waiting on Barrier")
                     barrier.waitOnBarrier(1.seconds)
@@ -71,9 +71,9 @@ class DistributedBarrierTest {
                     println("$i Timed out waiting on barrier, waiting again")
                     barrier.waitOnBarrier()
 
-                    // Make sure the waiter advanced in less than 3 secs
-                    abs(System.currentTimeMillis() - removeBarrierTime.get()) shouldBeLessThan 500
                     println(abs(System.currentTimeMillis() - removeBarrierTime.get()))
+                    // Make sure the waiter advanced quickly
+                    System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500
                     advancedCount.incrementAndGet()
 
                     println("$i Done Waiting on Barrier")
