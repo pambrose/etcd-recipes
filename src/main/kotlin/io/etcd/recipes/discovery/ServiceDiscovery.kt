@@ -23,6 +23,7 @@ import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
+import io.etcd.jetcd.KV
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.recipes.common.*
@@ -46,12 +47,15 @@ data class ServiceDiscovery(val urls: List<String>,
         require(basePath.isNotEmpty()) { "Service base path cannot be empty" }
     }
 
-    private class ServiceInstanceContext(val service: ServiceInstance) : Closeable {
+    private class ServiceInstanceContext(val service: ServiceInstance,
+                                         val kvClient: KV,
+                                         val instancePath: String) : Closeable {
         var lease: LeaseGrantResponse by nonNullableReference<LeaseGrantResponse>()
         var keepAlive: CloseableClient by nonNullableReference<CloseableClient>()
 
         override fun close() {
             keepAlive.close()
+            kvClient.delete(instancePath)
         }
     }
 
@@ -61,7 +65,7 @@ data class ServiceDiscovery(val urls: List<String>,
             checkCloseNotCalled()
 
             val instancePath = getNamesPath(service)
-            val context = ServiceInstanceContext(service)
+            val context = ServiceInstanceContext(service, kvClient.value, instancePath)
 
             serviceContextMap[service.id] = context
 

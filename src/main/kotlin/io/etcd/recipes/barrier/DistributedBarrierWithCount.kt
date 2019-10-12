@@ -83,12 +83,15 @@ class DistributedBarrierWithCount(val urls: List<String>,
         var keepAliveLease: CloseableClient? = null
         val keepAliveClosed = BooleanMonitor(false)
         val uniqueToken = "$clientId:${randomId(7)}"
+        val waitingPath = waitingPath.appendToPath(uniqueToken)
 
         checkCloseNotCalled()
 
         fun closeKeepAlive() {
             if (!keepAliveClosed.get()) {
                 keepAliveLease?.close()
+                keepAliveLease = null
+                kvClient.value.delete(waitingPath)
                 keepAliveClosed.set(true)
             }
         }
@@ -119,7 +122,6 @@ class DistributedBarrierWithCount(val urls: List<String>,
             Else()
         }
 
-        val waitingPath = waitingPath.appendToPath(uniqueToken)
         val lease = leaseClient.grant(2).get()
 
         val txn =

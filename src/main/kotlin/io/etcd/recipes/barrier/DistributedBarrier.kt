@@ -62,12 +62,13 @@ class DistributedBarrier(val urls: List<String>,
     fun setBarrier(): Boolean =
         semaphore.withLock {
             checkCloseNotCalled()
+
+            // Create unique token to avoid collision from clients with same id
+            val uniqueToken = "$clientId:${randomId(7)}"
+
             if (kvClient.isKeyPresent(barrierPath))
                 false
             else {
-                // Create unique token to avoid collision from clients with same id
-                val uniqueToken = "$clientId:${randomId(7)}"
-
                 // Prime lease with 2 seconds to give keepAlive a chance to get started
                 val lease = leaseClient.grant(2).get()
 
@@ -97,7 +98,11 @@ class DistributedBarrier(val urls: List<String>,
             } else {
                 keepAliveLease?.close()
                 keepAliveLease = null
+
+                kvClient.delete(barrierPath)
+
                 barrierRemoved = true
+
                 true
             }
         }
