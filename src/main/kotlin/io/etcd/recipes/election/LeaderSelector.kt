@@ -193,7 +193,7 @@ class LeaderSelector(val urls: List<String>,
                             }
                         }
                     }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 logger.error(e) { "In start()" }
                 exceptionList += e
             } finally {

@@ -57,7 +57,7 @@ fun main() {
 
         try {
             println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             println("Exception: $e")
         }
 
