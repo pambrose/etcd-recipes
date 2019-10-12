@@ -25,7 +25,7 @@ import kotlin.concurrent.thread
 fun nonblockingThreads(threadCount: Int,
                        waitLatch: CountDownLatch? = null,
                        block: (index: Int) -> Unit): Pair<CountDownLatch, ExceptionHolder> {
-    val latch = CountDownLatch(threadCount)
+    val finishedLatch = CountDownLatch(threadCount)
     val holder = ExceptionHolder()
     repeat(threadCount) {
         thread {
@@ -35,16 +35,16 @@ fun nonblockingThreads(threadCount: Int,
             } catch (e: Throwable) {
                 holder.exception = e
             } finally {
-                latch.countDown()
+                finishedLatch.countDown()
             }
         }
     }
-    return Pair(latch, holder)
+    return Pair(finishedLatch, holder)
 }
 
 fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
-    val (latch, exception) = nonblockingThreads(threadCount, block = block)
-    latch.await()
+    val (finishedLatch, exception) = nonblockingThreads(threadCount, block = block)
+    finishedLatch.await()
     exception.checkForException()
 }
 

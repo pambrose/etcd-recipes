@@ -131,46 +131,47 @@ class DistributedBarrierWithCount(val urls: List<String>,
                 Else()
             }
 
-        if (!txn.isSucceeded)
-            throw EtcdRecipeException("Failed to set waitingPath")
-        if (kvClient.getValue(waitingPath)?.asString != uniqueToken)
-            throw EtcdRecipeException("Failed to assign waitingPath unique value")
+        when {
+            !txn.isSucceeded                                        -> throw EtcdRecipeException("Failed to set waitingPath")
+            kvClient.getValue(waitingPath)?.asString != uniqueToken -> throw EtcdRecipeException("Failed to assign waitingPath unique value")
+            else                                                    -> {
+                // Keep key alive
+                keepAliveLease = leaseClient.keepAlive(lease)
 
-        // Keep key alive
-        keepAliveLease = leaseClient.keepAlive(lease)
+                checkWaiterCount()
 
-        checkWaiterCount()
+                // Do not bother starting watcher if latch is already done
+                if (keepAliveClosed.get())
+                    return true
 
-        // Do not bother starting watcher if latch is already done
-        if (keepAliveClosed.get())
-            return true
+                // Watch for DELETE of /ready and PUTS on /waiters/*
+                val adjustedKey = barrierPath.ensureTrailing("/")
+                val watchOption = WatchOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build()
 
-        // Watch for DELETE of /ready and PUTS on /waiters/*
-        val adjustedKey = barrierPath.ensureTrailing("/")
-        val watchOption = WatchOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build()
+                return watchClient.watcher(adjustedKey, watchOption) { watchResponse ->
+                    watchResponse.events
+                        .forEach { watchEvent ->
+                            val key = watchEvent.keyValue.key.asString
+                            when {
+                                key.startsWith(this.waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
+                                key.startsWith(readyPath) && watchEvent.eventType == DELETE     -> closeKeepAlive()
+                            }
+                        }
 
-        return watchClient.watcher(adjustedKey, watchOption) { watchResponse ->
-            watchResponse.events
-                .forEach { watchEvent ->
-                    val key = watchEvent.keyValue.key.asString
-                    when {
-                        key.startsWith(this.waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
-                        key.startsWith(readyPath) && watchEvent.eventType == DELETE     -> closeKeepAlive()
+                }.use {
+                    // Check one more time in case watch missed the delete just after last check
+                    checkWaiterCount()
+
+                    val success = keepAliveClosed.waitUntilTrue(timeout)
+                    // Cleanup if a time-out occurred
+                    if (!success) {
+                        closeKeepAlive()
+                        kvClient.delete(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
                     }
+
+                    success
                 }
-
-        }.use {
-            // Check one more time in case watch missed the delete just after last check
-            checkWaiterCount()
-
-            val success = keepAliveClosed.waitUntilTrue(timeout)
-            // Cleanup if a time-out occurred
-            if (!success) {
-                closeKeepAlive()
-                kvClient.delete(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
             }
-
-            success
         }
     }
 
