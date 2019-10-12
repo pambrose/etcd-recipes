@@ -43,6 +43,7 @@ class ServiceCacheTests {
         val updateCounter = AtomicInteger(0)
         val unregisterCounter = AtomicInteger(0)
         val holder = ExceptionHolder()
+        val totalCounter = AtomicInteger(0)
 
         ServiceDiscovery(urls, path).use { cachesd ->
 
@@ -75,6 +76,13 @@ class ServiceCacheTests {
                         }
                     }
                 })
+
+                addListenerForChanges { eventType: EventType,
+                                        isNew: Boolean,
+                                        serviceName: String,
+                                        serviceInstance: ServiceInstance? ->
+                    totalCounter.incrementAndGet()
+                }
             }
 
             val (finishedLatch, holder) =
@@ -114,5 +122,6 @@ class ServiceCacheTests {
         registerCounter.get() shouldEqual threadCount * serviceCount
         updateCounter.get() shouldEqual threadCount * serviceCount
         unregisterCounter.get() shouldEqual threadCount * serviceCount
+        totalCounter.get() shouldEqual (threadCount * serviceCount) * 3
     }
 }

@@ -108,7 +108,7 @@ class DistributedAtomicLong(val urls: List<String>,
         }
 
     companion object {
-        val collisionCount = AtomicLong()
+        //val collisionCount = AtomicLong()
         val totalCount = AtomicLong()
 
         @JvmStatic

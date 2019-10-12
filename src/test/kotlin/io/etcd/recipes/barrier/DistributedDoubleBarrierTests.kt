@@ -25,6 +25,7 @@ import io.etcd.recipes.common.nonblockingThreads
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.milliseconds
 import kotlin.time.seconds
@@ -35,7 +36,7 @@ class DistributedDoubleBarrierTests {
     fun main() {
         val urls = listOf("http://localhost:2379")
         val path = "/barriers/${javaClass.simpleName}"
-        val count = 5
+        val count = 10
         val retryAttempts = 5
         val enterLatch = CountDownLatch(count - 1)
         val leaveLatch = CountDownLatch(count - 1)
@@ -53,7 +54,10 @@ class DistributedDoubleBarrierTests {
 
             repeat(retryCount) {
                 println("#$id Waiting to enter barrier")
-                barrier.enter(1000.random.milliseconds)
+                if (it % 2 == 0)
+                    barrier.enter(1000.random.milliseconds)
+                else
+                    barrier.enter(1000, TimeUnit.MILLISECONDS)
                 enterRetryCounter.incrementAndGet()
                 println("#$id Timed out entering barrier")
             }
@@ -71,7 +75,10 @@ class DistributedDoubleBarrierTests {
 
             repeat(retryCount) {
                 println("#$id Waiting to leave barrier")
-                barrier.leave(1000.random.milliseconds)
+                if (it % 2 == 0)
+                    barrier.leave(1000.random.milliseconds)
+                else
+                    barrier.leave(1000, TimeUnit.MILLISECONDS)
                 leaveRetryCounter.incrementAndGet()
                 println("#$id Timed out leaving barrier")
             }
@@ -99,10 +106,13 @@ class DistributedDoubleBarrierTests {
             .use { barrier ->
                 enterLatch.await()
                 sleep(2.seconds)
+                barrier.enterWaiterCount shouldEqual count - 1
                 enterBarrier(99, barrier)
 
                 leaveLatch.await()
                 sleep(2.seconds)
+
+                barrier.leaveWaiterCount shouldEqual count - 1
                 leaveBarrier(99, barrier)
             }
 

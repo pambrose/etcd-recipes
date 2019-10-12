@@ -96,7 +96,7 @@ class DistributedAtomicLongTests {
     fun threaded1Test() {
         DistributedAtomicLong(urls, path)
             .use { counter ->
-                val threadCount = 5
+                val threadCount = 10
                 val count = 50
 
                 blockingThreads(threadCount) {

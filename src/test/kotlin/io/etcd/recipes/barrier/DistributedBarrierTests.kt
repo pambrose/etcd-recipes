@@ -22,10 +22,13 @@ import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
+import org.amshove.kluent.shouldBeFalse
 import org.amshove.kluent.shouldBeLessThan
+import org.amshove.kluent.shouldBeTrue
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
@@ -47,16 +50,32 @@ class DistributedBarrierTests {
         thread {
             DistributedBarrier(urls, path)
                 .use { barrier ->
+
+                    barrier.isBarrierSet shouldEqual false
+
                     println("Setting Barrier")
-                    barrier.setBarrier()
+                    val isSet = barrier.setBarrier()
+                    isSet.shouldBeTrue()
+                    barrier.isBarrierSet.shouldBeTrue()
                     setBarrierLatch.countDown()
+
+                    // This should return false because barrier is already set
+                    val isSet2 = barrier.setBarrier()
+                    isSet2.shouldBeFalse()
 
                     // Pause to give time-outs a chance
                     sleep(6.seconds)
 
                     println("Removing Barrier")
                     removeBarrierTime.set(System.currentTimeMillis())
-                    barrier.removeBarrier()
+                    val isRemoved = barrier.removeBarrier()
+                    isRemoved.shouldBeTrue()
+
+                    // This should return false because remove already called
+                    val isRemoved2 = barrier.removeBarrier()
+                    isRemoved2.shouldBeFalse()
+
+
 
                     sleep(3.seconds)
                 }
@@ -105,7 +124,7 @@ class DistributedBarrierTests {
                 DistributedBarrier(urls, path)
                     .use { barrier ->
                         println("$i Waiting on Barrier")
-                        barrier.waitOnBarrier(1.seconds)
+                        barrier.waitOnBarrier(1, TimeUnit.SECONDS)
 
                         timeoutCount.incrementAndGet()
 
@@ -123,8 +142,17 @@ class DistributedBarrierTests {
         sleep(5.seconds)
         DistributedBarrier(urls, path)
             .use { barrier ->
+
+                barrier.isBarrierSet shouldEqual false
+
                 println("Setting Barrier")
-                barrier.setBarrier()
+                val isSet = barrier.setBarrier()
+                isSet.shouldBeTrue()
+                barrier.isBarrierSet.shouldBeTrue()
+
+                // This sould return false because barrier is already set
+                val isSet2 = barrier.setBarrier()
+                isSet2.shouldBeFalse()
 
                 // Pause to give time-outs a chance
                 sleep(6.seconds)
