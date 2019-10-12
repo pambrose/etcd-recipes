@@ -25,78 +25,39 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.sudothought.common.util.Misc.random;
-import static com.sudothought.common.util.Misc.sleepMillis;
-
 public class DistributedAtomicLongExample {
 
     public static void main(String[] args) throws InterruptedException {
         List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String counterPath = "/counter/counterdemo";
-        int counterCount = 10;
-        CountDownLatch outerLatch = new CountDownLatch(counterCount);
-        ExecutorService executor = Executors.newCachedThreadPool();
+        String path = "/counter/counterdemo";
+        int threadCount = 10;
+        int repeatCount = 25;
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
-        DistributedAtomicLong.delete(urls, counterPath);
+        DistributedAtomicLong.delete(urls, path);
 
-        for (int i = 0; i < counterCount; i++) {
+        for (int i = 0; i < threadCount; i++) {
             final int id = i;
             executor.execute(() -> {
-                try (DistributedAtomicLong counter = new DistributedAtomicLong(urls, counterPath)) {
+                try (DistributedAtomicLong counter = new DistributedAtomicLong(urls, path)) {
                     System.out.println("Creating counter #" + id);
-                    CountDownLatch innerLatch = new CountDownLatch(4);
-                    int count = 50;
-                    int pause = 50;
-
-                    executor.execute(() -> {
-                        System.out.println("Begin increments for counter #" + id);
-                        for (int j = 0; j < count; j++) counter.increment();
-                        sleepMillis(random(pause));
-                        innerLatch.countDown();
-                        System.out.println("Completed increments for counter #" + id);
-                    });
-
-                    executor.execute(() -> {
-                        System.out.println("Begin decrements for counter #" + id);
-                        for (int j = 0; j < count; j++) counter.decrement();
-                        sleepMillis(random(pause));
-                        innerLatch.countDown();
-                        System.out.println("Completed decrements for counter #" + id);
-                    });
-
-                    executor.execute(() -> {
-                        System.out.println("Begin adds for counter #" + id);
-                        for (int j = 0; j < count; j++) counter.add(5);
-                        sleepMillis(random(pause));
-                        innerLatch.countDown();
-                        System.out.println("Completed adds for counter #" + id);
-                    });
-
-                    executor.execute(() -> {
-                        System.out.println("Begin subtracts for counter #" + id);
-                        for (int j = 0; j < count; j++) counter.subtract(5);
-                        sleepMillis(random(pause));
-                        innerLatch.countDown();
-                        System.out.println("Completed subtracts for counter #" + id);
-                    });
-
-                    try {
-                        innerLatch.await();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+                    for (int j = 0; j < repeatCount; j++) counter.increment();
+                    for (int j = 0; j < repeatCount; j++) counter.decrement();
+                    for (int j = 0; j < repeatCount; j++) counter.add(5);
+                    for (int j = 0; j < repeatCount; j++) counter.subtract(5);
                 }
 
-                outerLatch.countDown();
+                latch.countDown();
             });
         }
 
-        outerLatch.await();
+        latch.await();
 
-        executor.shutdown();
-
-        try (DistributedAtomicLong counter = new DistributedAtomicLong(urls, counterPath)) {
+        try (DistributedAtomicLong counter = new DistributedAtomicLong(urls, path)) {
             System.out.println(String.format("Counter value = %d", counter.get()));
         }
+
+        executor.shutdown();
     }
 }

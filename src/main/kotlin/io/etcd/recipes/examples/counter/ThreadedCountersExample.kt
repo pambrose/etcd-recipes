@@ -18,74 +18,37 @@
 
 package io.etcd.recipes.examples.counter
 
-import com.sudothought.common.util.random
-import com.sudothought.common.util.sleep
 import io.etcd.recipes.counter.DistributedAtomicLong
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.measureTimedValue
-import kotlin.time.milliseconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
-    val counterPath = "counter2"
+    val path = "/counters"
     val threadCount = 10
-    val outerLatch = CountDownLatch(threadCount)
+    val repeatCount = 25
+    val latch = CountDownLatch(threadCount)
 
-    DistributedAtomicLong.delete(urls, counterPath)
+    DistributedAtomicLong.delete(urls, path)
 
     val (_, dur) =
         measureTimedValue {
             repeat(threadCount) { i ->
                 thread {
                     println("Creating counter #$i")
-                    DistributedAtomicLong(urls, counterPath)
+                    DistributedAtomicLong(urls, path)
                         .use { counter ->
-                            val innerLatch = CountDownLatch(4)
-                            val count = 50
-                            val maxPause = 50
-
-                            thread {
-                                println("Begin increments for counter #$i")
-                                repeat(count) { counter.increment() }
-                                sleep(maxPause.random.milliseconds)
-                                innerLatch.countDown()
-                                println("Completed increments for counter #$i")
-                            }
-
-                            thread {
-                                println("Begin decrements for counter #$i")
-                                repeat(count) { counter.decrement() }
-                                sleep(maxPause.random.milliseconds)
-                                innerLatch.countDown()
-                                println("Completed decrements for counter #$i")
-                            }
-
-                            thread {
-                                println("Begin adds for counter #$i")
-                                repeat(count) { counter.add(5) }
-                                sleep(maxPause.random.milliseconds)
-                                innerLatch.countDown()
-                                println("Completed adds for counter #$i")
-                            }
-
-                            thread {
-                                println("Begin subtracts for counter #$i")
-                                repeat(count) { counter.subtract(5) }
-                                sleep(maxPause.random.milliseconds)
-                                innerLatch.countDown()
-                                println("Completed subtracts for counter #$i")
-                            }
-
-                            innerLatch.await()
+                            repeat(repeatCount) { counter.increment() }
+                            repeat(repeatCount) { counter.decrement() }
+                            repeat(repeatCount) { counter.add(5) }
+                            repeat(repeatCount) { counter.subtract(5) }
                         }
-
-                    outerLatch.countDown()
+                    latch.countDown()
                 }
             }
-
-            outerLatch.await()
+            latch.await()
         }
 
-    DistributedAtomicLong(urls, counterPath).use { println("Counter value = ${it.get()} in $dur") }
+    DistributedAtomicLong(urls, path).use { println("Counter value = ${it.get()} in $dur") }
 }

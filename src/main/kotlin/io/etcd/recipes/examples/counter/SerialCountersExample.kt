@@ -33,11 +33,11 @@ fun main() {
         measureTimedValue {
             val count = 25
             counters
-                .onEach { dal ->
-                    repeat(count) { dal.increment() }
-                    repeat(count) { dal.decrement() }
-                    repeat(count) { dal.add(5) }
-                    repeat(count) { dal.subtract(5) }
+                .onEach { counter ->
+                    repeat(count) { counter.increment() }
+                    repeat(count) { counter.decrement() }
+                    repeat(count) { counter.add(5) }
+                    repeat(count) { counter.subtract(5) }
                 }
                 .first()
                 .get()
