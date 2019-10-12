@@ -20,6 +20,7 @@ package io.etcd.recipes.barrier
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
@@ -79,6 +80,8 @@ class DistributedBarrierWithCountTests {
             }
 
         finishedLatch.await()
+
+        holder.checkForException()
 
         retryCounter.get() shouldEqual retryAttempts * (count - 1)
         advancedCounter.get() shouldEqual count
