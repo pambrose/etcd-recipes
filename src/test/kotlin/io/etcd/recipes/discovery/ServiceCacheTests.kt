@@ -24,6 +24,7 @@ import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.captureException
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
+import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.amshove.kluent.shouldEqualTo
 import org.junit.jupiter.api.Test
@@ -119,4 +120,6 @@ class ServiceCacheTests {
         unregisterCounter.get() shouldEqual threadCount * serviceCount
         totalCounter.get() shouldEqual (threadCount * serviceCount) * 3
     }
+
+    companion object : KLogging()
 }

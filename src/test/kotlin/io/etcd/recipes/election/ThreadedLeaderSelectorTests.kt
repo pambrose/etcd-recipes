@@ -21,6 +21,7 @@ package io.etcd.recipes.election
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.*
@@ -41,7 +42,7 @@ class ThreadedLeaderSelectorTests {
             val takeLeadershipAction =
                 { selector: LeaderSelector ->
                     val pause = 3.random.seconds
-                    println("${selector.clientId} elected leader for $pause")
+                    logger.info { "${selector.clientId} elected leader for $pause" }
                     takeLeadershiptCounter.incrementAndGet()
                     sleep(pause)
                 }
@@ -49,7 +50,7 @@ class ThreadedLeaderSelectorTests {
             val relinquishLeadershipAction =
                 { selector: LeaderSelector ->
                     relinquishLeadershiptCounter.incrementAndGet()
-                    println("${selector.clientId} relinquished leadership")
+                    logger.info { "${selector.clientId} relinquished leadership" }
                 }
 
             LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, "Thread$it")
@@ -73,7 +74,7 @@ class ThreadedLeaderSelectorTests {
             val takeLeadershipAction =
                 { selector: LeaderSelector ->
                     val pause = 3.random.seconds
-                    println("${selector.clientId} elected leader for $pause")
+                    logger.info { "${selector.clientId} elected leader for $pause" }
                     takeLeadershiptCounter.incrementAndGet()
                     sleep(pause)
                 }
@@ -81,17 +82,17 @@ class ThreadedLeaderSelectorTests {
             val relinquishLeadershipAction =
                 { selector: LeaderSelector ->
                     relinquishLeadershiptCounter.incrementAndGet()
-                    println("${selector.clientId} relinquished leadership")
+                    logger.info { "${selector.clientId} relinquished leadership" }
                 }
 
-            println("Creating Thread$it")
+            logger.info { "Creating Thread$it" }
             val election =
                 LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, "Thread$it")
             electionList += election
             election.start()
         }
 
-        println("Size = ${electionList.size}")
+        logger.info { "Size = ${electionList.size}" }
         electionList
             .onEach { it.waitOnLeadershipComplete() }
             .forEach { it.close() }
@@ -99,4 +100,6 @@ class ThreadedLeaderSelectorTests {
         takeLeadershiptCounter.get() shouldEqual count
         relinquishLeadershiptCounter.get() shouldEqual count
     }
+
+    companion object : KLogging()
 }

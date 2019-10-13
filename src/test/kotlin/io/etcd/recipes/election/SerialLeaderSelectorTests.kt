@@ -20,6 +20,7 @@ package io.etcd.recipes.election
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
@@ -37,14 +38,14 @@ class SerialLeaderSelectorTests {
 
         val leadershipAction = { selector: LeaderSelector ->
             val pause = 3.random.seconds
-            println("${selector.clientId} elected leader for $pause")
+            logger.info { "${selector.clientId} elected leader for $pause" }
             sleep(pause)
             takeLeadershiptCounter.incrementAndGet()
             Unit
         }
 
         val relinquishAction = { selector: LeaderSelector ->
-            println("${selector.clientId} relinquished")
+            logger.info { "${selector.clientId} relinquished" }
             relinquishLeadershiptCounter.incrementAndGet()
             Unit
         }
@@ -52,7 +53,7 @@ class SerialLeaderSelectorTests {
         LeaderSelector(urls, path, leadershipAction, relinquishAction)
             .use { selector ->
                 repeat(count) {
-                    println("First iteration: $it")
+                    logger.info { "First iteration: $it" }
                     selector.start()
                     selector.waitOnLeadershipComplete()
                 }
@@ -66,7 +67,7 @@ class SerialLeaderSelectorTests {
         relinquishLeadershiptCounter.set(0)
 
         repeat(count) {
-            println("Second iteration: $it")
+            logger.info { "Second iteration: $it" }
             LeaderSelector(urls, path, leadershipAction, relinquishAction)
                 .use { selector ->
                     selector.start()
@@ -77,4 +78,6 @@ class SerialLeaderSelectorTests {
         takeLeadershiptCounter.get() shouldEqual count
         relinquishLeadershiptCounter.get() shouldEqual count
     }
+
+    companion object : KLogging()
 }

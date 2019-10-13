@@ -20,6 +20,7 @@ package io.etcd.recipes.discovery
 
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.EtcdRecipeException
+import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEndWith
 import org.amshove.kluent.shouldEqual
@@ -38,35 +39,35 @@ class SerialServiceDiscoveryTests {
             val payload = TestPayload(-999)
             val service = ServiceInstance("TestName", payload.toJson())
 
-            println(service.toJson())
+            logger.info { service.toJson() }
 
-            println("Registering")
+            logger.info { "Registering" }
             sd.registerService(service)
 
-            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+            logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
             sd.queryForInstance(service.name, service.id) shouldEqual service
 
-            println("Retrieved values: ${sd.queryForInstances(service.name)}")
+            logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
             sd.queryForInstances(service.name) shouldEqual listOf(service)
 
-            println("Retrieved names: ${sd.queryForNames()}")
+            logger.info { "Retrieved names: ${sd.queryForNames()}" }
             sd.queryForNames().first() shouldEndWith service.id
 
-            println("Updating payload")
+            logger.info { "Updating payload" }
             payload.testval = -888
             service.jsonPayload = payload.toJson()
             sd.updateService(service)
 
-            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+            logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
             sd.queryForInstance(service.name, service.id) shouldEqual service
 
-            println("Retrieved values: ${sd.queryForInstances(service.name)}")
+            logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
             sd.queryForInstances(service.name) shouldEqual listOf(service)
 
-            println("Retrieved names: ${sd.queryForNames()}")
+            logger.info { "Retrieved names: ${sd.queryForNames()}" }
             sd.queryForNames().first() shouldEndWith service.id
 
-            println("Unregistering")
+            logger.info { "Unregistering" }
             sd.unregisterService(service)
             sleep(3.seconds)
 
@@ -77,10 +78,12 @@ class SerialServiceDiscoveryTests {
             invoking { sd.queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
 
             try {
-                println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+                logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
             } catch (e: EtcdRecipeException) {
-                println("Exception: $e")
+                logger.info { "Exception: $e" }
             }
         }
     }
+
+    companion object : KLogging()
 }

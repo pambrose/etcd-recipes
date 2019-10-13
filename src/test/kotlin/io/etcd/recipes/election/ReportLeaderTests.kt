@@ -21,6 +21,7 @@ package io.etcd.recipes.election
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.Executors
@@ -42,7 +43,7 @@ class ReportLeaderTests {
                                     path,
                                     object : LeaderListener {
                                         override fun takeLeadership(leaderName: String) {
-                                            println("$leaderName elected leader")
+                                            logger.info { "$leaderName elected leader" }
                                             takeLeadershiptCounter.incrementAndGet()
                                         }
 
@@ -60,7 +61,7 @@ class ReportLeaderTests {
                            object : LeaderSelectorListenerAdapter() {
                                override fun takeLeadership(selector: LeaderSelector) {
                                    val pause = 2.random.seconds
-                                   println("${selector.clientId} elected leader for $pause")
+                                   logger.info { "${selector.clientId} elected leader for $pause" }
                                    sleep(pause)
                                }
                            },
@@ -80,4 +81,5 @@ class ReportLeaderTests {
         relinquishLeadershiptCounter.get() shouldEqual count
     }
 
+    companion object : KLogging()
 }

@@ -20,6 +20,7 @@ package io.etcd.recipes.election
 
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.*
@@ -47,7 +48,7 @@ class ParticipantTests {
                                object : LeaderSelectorListenerAdapter() {
                                    override fun takeLeadership(selector: LeaderSelector) {
                                        val pause = 2.seconds
-                                       println("${selector.clientId} elected leader for $pause")
+                                       logger.info { "${selector.clientId} elected leader for $pause" }
                                        sleep(pause)
 
                                        // Wait until participation count has been taken
@@ -72,7 +73,7 @@ class ParticipantTests {
         sleep(3.seconds)
 
         var particpants = LeaderSelector.getParticipants(urls, path)
-        println("Found ${particpants.size} participants")
+        logger.info { "Found ${particpants.size} participants" }
         particpants.size shouldEqual count
 
         holdLatch.countDown()
@@ -81,16 +82,18 @@ class ParticipantTests {
 
         sleep(3.seconds)
         particpants = LeaderSelector.getParticipants(urls, path)
-        println("Found ${particpants.size} participants")
+        logger.info { "Found ${particpants.size} participants" }
         particpants.size shouldEqual 0
 
         // Compare participant counts
-        println("participantCounts = $participantCounts")
+        logger.info { "participantCounts = $participantCounts" }
         participantCounts.size shouldEqual count
         participantCounts shouldEqual (count downTo 1).toList()
 
         // Compare leader names
-        println("leaderNames = $leaderNames")
+        logger.info { "leaderNames = $leaderNames" }
         leaderNames.sorted() shouldEqual List(count) { "Thread$it" }.sorted()
     }
+
+    companion object : KLogging()
 }

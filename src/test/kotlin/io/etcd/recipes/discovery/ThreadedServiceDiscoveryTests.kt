@@ -22,6 +22,7 @@ import com.google.common.collect.Maps
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.blockingThreads
+import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual
 import org.amshove.kluent.shouldThrow
@@ -130,4 +131,6 @@ class ThreadedServiceDiscoveryTests {
         // Close ServiceDiscovery objects
         contextMap.values.forEach { it.serviceDiscovery.close() }
     }
+
+    companion object : KLogging()
 }
