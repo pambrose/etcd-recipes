@@ -77,12 +77,7 @@ class ServiceCacheTests {
                     }
                 })
 
-                addListenerForChanges { eventType: EventType,
-                                        isNew: Boolean,
-                                        serviceName: String,
-                                        serviceInstance: ServiceInstance? ->
-                    totalCounter.incrementAndGet()
-                }
+                addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
             }
 
             val (finishedLatch, holder2) =
