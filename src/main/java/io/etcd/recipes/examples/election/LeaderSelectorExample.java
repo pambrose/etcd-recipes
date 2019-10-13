@@ -53,9 +53,6 @@ public class LeaderSelectorExample {
             for (int i = 0; i < count; i++) {
                 selector.start();
 
-                //System.out.print("Participants: ");
-                //System.out.println(LeaderSelector.getParticipants(urls, electionPath));
-
                 selector.waitOnLeadershipComplete();
             }
         }

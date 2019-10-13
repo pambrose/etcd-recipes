@@ -1,5 +1,6 @@
 # etcd Recipes
 
+
 ## Setup
 Start a localhost server with:
 ```bash
