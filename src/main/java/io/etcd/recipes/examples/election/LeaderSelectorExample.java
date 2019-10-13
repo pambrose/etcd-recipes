@@ -19,59 +19,61 @@ package io.etcd.recipes.examples.election;
 import com.google.common.collect.Lists;
 import io.etcd.recipes.election.LeaderSelector;
 import io.etcd.recipes.election.LeaderSelectorListener;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
 import static com.sudothought.common.util.Misc.random;
 import static com.sudothought.common.util.Misc.sleepSecs;
 
-public class LeaderSelectorSerialExample {
+public class LeaderSelectorExample {
 
     public static void main(String[] args) throws InterruptedException {
         List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String electionPath = "/election/javademo";
+        String electionPath = "/election/LeaderSelectorExample";
+        int count = 5;
 
         LeaderSelectorListener listener =
                 new LeaderSelectorListener() {
                     @Override
-                    public void takeLeadership(@NotNull LeaderSelector selector) {
+                    public void takeLeadership(LeaderSelector selector) {
                         System.out.println(selector.getClientId() + " elected leader");
                         long pause = random(5);
                         sleepSecs(pause);
-                        System.out.println(selector.getClientId() + " surrendering after " + pause + " seconds");
+                        System.out.println(String.format("%s surrendering after %s seconds", selector.getClientId(), pause));
                     }
 
                     @Override
-                    public void relinquishLeadership(@NotNull LeaderSelector selector) {
-                        System.out.println(selector.getClientId() + " relinquished leadership");
+                    public void relinquishLeadership(LeaderSelector selector) {
+                        System.out.println(String.format("%s relinquished leadership", selector.getClientId()));
                     }
                 };
 
+        System.out.println("Single leader is created and repeatedly runs for election");
         try (LeaderSelector selector = new LeaderSelector(urls, electionPath, listener)) {
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < count; i++) {
                 selector.start();
 
-                while (!selector.isFinished()) {
-                    System.out.println(LeaderSelector.getParticipants(urls, electionPath));
-                    sleepSecs(1);
-                }
+                //System.out.print("Participants: ");
+                //System.out.println(LeaderSelector.getParticipants(urls, electionPath));
 
                 selector.waitOnLeadershipComplete();
             }
         }
 
-        for (int i = 0; i < 5; i++) {
-            try (LeaderSelector selector = new LeaderSelector(urls, electionPath, listener)) {
-                selector.start();
+        System.out.println("\nMultiple leaders are created and each runs for election once");
+        List<LeaderSelector> selectors = Lists.newArrayList();
+        for (int i = 0; i < count; i++)
+            selectors.add(new LeaderSelector(urls, electionPath, listener));
 
-                while (!selector.isFinished()) {
-                    System.out.println(LeaderSelector.getParticipants(urls, electionPath));
-                    sleepSecs(1);
-                }
+        for (LeaderSelector selector : selectors)
+            selector.start();
 
-                selector.waitOnLeadershipComplete();
-            }
-        }
+        System.out.println(String.format("Participants: %s", LeaderSelector.getParticipants(urls, electionPath)));
+
+        for (LeaderSelector selector : selectors)
+            selector.waitOnLeadershipComplete();
+
+        for (LeaderSelector selector : selectors)
+            selector.close();
     }
 }

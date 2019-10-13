@@ -16,36 +16,49 @@
 
 package io.etcd.recipes.examples.discovery;
 
-import com.google.common.collect.Lists;
+import io.etcd.recipes.common.EtcdRecipeException;
 import io.etcd.recipes.discovery.ServiceCache;
 import io.etcd.recipes.discovery.ServiceDiscovery;
 
-import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 
 public class ServiceCacheExample {
 
-    public static void main(String[] args) {
-        List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String servicePath = "/services/test";
+    public static void main(String[] args) throws EtcdRecipeException {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        CountDownLatch latch = new CountDownLatch(1);
 
-        try (ServiceDiscovery sd = new ServiceDiscovery(urls, servicePath)) {
+        executor.execute(() -> {
+            try (ServiceDiscovery sd = new ServiceDiscovery(ServiceDiscoveryExample.urls, ServiceDiscoveryExample.path)) {
+                try (ServiceCache cache = sd.serviceCache(ServiceDiscoveryExample.serviceName)) {
+                    cache.addListenerForChanges(
+                            (eventType, isNew, name, serviceInstance) -> {
+                                String action = isNew ? "added" : "updated";
+                                System.out.println(String.format("Change %s %s %s", eventType, action, name));
+                                if (serviceInstance != null)
+                                    System.out.println("Payload = " + IntPayload.toObject(serviceInstance.getJsonPayload()));
+                                //System.out.println(cache.getInstances());
+                            }
+                    );
 
-            try (ServiceCache cache = sd.serviceCache("TestName")) {
-                cache.addListenerForChanges(
-                        (eventType, isNew, name, serviceInstance) -> {
-                            System.out.println(String.format("Change %s %s %s", eventType, name, serviceInstance));
-                            if (serviceInstance != null)
-                                System.out.println("Payload: " + IntPayload.toObject(serviceInstance.getJsonPayload()));
-                            System.out.println(cache.getInstances());
-                        }
-                );
+                    cache.start();
 
-                cache.start();
-
-                sleepSecs(Long.MAX_VALUE);
+                    try {
+                        latch.await();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
-        }
+        });
+
+        ServiceDiscoveryExample.serviceExample(false);
+        latch.countDown();
+        sleepSecs(1);
+        executor.shutdown();
     }
 }

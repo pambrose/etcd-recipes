@@ -27,44 +27,54 @@ import static com.sudothought.common.util.Misc.sleepSecs;
 
 public class ServiceDiscoveryExample {
 
-    public static void main(String[] args) throws EtcdRecipeException {
-        List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String servicePath = "/services/test";
+    static List<String> urls = Lists.newArrayList("http://localhost:2379");
+    static String path = "/services/ServiceDiscoveryExample";
+    static String serviceName = "ExampleService";
 
-        try (ServiceDiscovery sd = new ServiceDiscovery(urls, servicePath)) {
+    public static void main(String[] args) throws EtcdRecipeException {
+        serviceExample(true);
+    }
+
+    static void serviceExample(boolean verbose) throws EtcdRecipeException {
+
+        try (ServiceDiscovery sd = new ServiceDiscovery(urls, path)) {
 
             IntPayload payload = new IntPayload(-999);
-            ServiceInstance service = ServiceInstance.newBuilder("TestName", payload.toJson()).build();
+            ServiceInstance service = ServiceInstance.newBuilder(serviceName, payload.toJson()).build();
 
             System.out.println(service.toJson());
 
-            System.out.println("Registering");
+            System.out.println("Registering service");
             sd.registerService(service);
-            System.out.println("Retrieved value: " + sd.queryForInstance(service.getName(), service.getId()));
-            System.out.println("Retrieved values: " + sd.queryForInstances(service.getName()));
-            System.out.println("Retrieved names: " + sd.queryForNames());
+            if (verbose) {
+                System.out.println("Retrieved value: " + sd.queryForInstance(service.getName(), service.getId()));
+                System.out.println("Retrieved values: " + sd.queryForInstances(service.getName()));
+                System.out.println("Retrieved names: " + sd.queryForNames());
+            }
 
             sleepSecs(2);
-            System.out.println("Updating");
+            System.out.println("Updating service");
             payload.setIntval(-888);
             service.setJsonPayload(payload.toJson());
             sd.updateService(service);
-            System.out.println("Retrieved value: " + sd.queryForInstance(service.getName(), service.getId()));
-            System.out.println("Retrieved values: " + sd.queryForInstances(service.getName()));
-            System.out.println("Retrieved names: " + sd.queryForNames());
+            if (verbose) {
+                System.out.println("Retrieved value: " + sd.queryForInstance(service.getName(), service.getId()));
+                System.out.println("Retrieved values: " + sd.queryForInstances(service.getName()));
+                System.out.println("Retrieved names: " + sd.queryForNames());
+            }
 
             sleepSecs(2);
-            System.out.println("Unregistering");
+            System.out.println("Unregistering service");
             sd.unregisterService(service);
             sleepSecs(3);
 
             try {
                 System.out.println("Retrieved value: " + sd.queryForInstance(service.getName(), service.getId()));
             } catch (EtcdRecipeException e) {
-                System.out.println("Exception: " + e);
+                if (verbose) {
+                    System.out.println("Exception: " + e);
+                }
             }
-
-            sleepSecs(2);
         }
     }
 }

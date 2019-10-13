@@ -25,30 +25,29 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import static com.sudothought.common.util.Misc.sleepSecs;
+
 public class DistributedBarrierExample {
 
     public static void main(String[] args) throws InterruptedException {
         List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String barrierPath = "/barriers/threadedclients";
+        String path = "/barriers/DistributedBarrierExample";
         int threadCount = 5;
         CountDownLatch waitLatch = new CountDownLatch(threadCount);
         CountDownLatch goLatch = new CountDownLatch(1);
         ExecutorService executor = Executors.newCachedThreadPool();
 
         executor.execute(() -> {
-            try (DistributedBarrier barrier = new DistributedBarrier(urls, barrierPath, true)) {
+            try (DistributedBarrier barrier = new DistributedBarrier(urls, path, true)) {
                 System.out.println("Setting Barrier");
                 barrier.setBarrier();
 
                 goLatch.countDown();
-                Thread.sleep(6_000);
+                sleepSecs(6);
 
                 System.out.println("Removing Barrier");
                 barrier.removeBarrier();
-                Thread.sleep(3_000);
-
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                sleepSecs(3);
             }
         });
 
@@ -57,7 +56,7 @@ public class DistributedBarrierExample {
             executor.execute(() -> {
                         try {
                             goLatch.await();
-                            try (DistributedBarrier barrier = new DistributedBarrier(urls, barrierPath, true)) {
+                            try (DistributedBarrier barrier = new DistributedBarrier(urls, path, true)) {
                                 System.out.println(String.format("%d Waiting on Barrier", id));
                                 barrier.waitOnBarrier(1, TimeUnit.SECONDS);
 
@@ -76,7 +75,5 @@ public class DistributedBarrierExample {
 
         waitLatch.await();
         executor.shutdown();
-        System.out.println("Done");
-
     }
 }

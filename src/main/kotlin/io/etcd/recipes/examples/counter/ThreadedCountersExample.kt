@@ -26,8 +26,8 @@ import kotlin.time.measureTimedValue
 fun main() {
     val urls = listOf("http://localhost:2379")
     val path = "/counters"
-    val threadCount = 10
-    val repeatCount = 25
+    val threadCount = 5
+    val repeatCount = 10
     val latch = CountDownLatch(threadCount)
 
     DistributedAtomicLong.delete(urls, path)
