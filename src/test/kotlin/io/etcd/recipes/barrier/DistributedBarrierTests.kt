@@ -22,6 +22,7 @@ import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
+import mu.KLogging
 import org.amshove.kluent.shouldBeFalse
 import org.amshove.kluent.shouldBeLessThan
 import org.amshove.kluent.shouldBeTrue
@@ -53,7 +54,7 @@ class DistributedBarrierTests {
 
                     barrier.isBarrierSet shouldEqual false
 
-                    println("Setting Barrier")
+                    logger.info { "Setting Barrier" }
                     val isSet = barrier.setBarrier()
                     isSet.shouldBeTrue()
                     barrier.isBarrierSet.shouldBeTrue()
@@ -66,7 +67,7 @@ class DistributedBarrierTests {
                     // Pause to give time-outs a chance
                     sleep(6.seconds)
 
-                    println("Removing Barrier")
+                    logger.info { "Removing Barrier" }
                     removeBarrierTime.set(System.currentTimeMillis())
                     val isRemoved = barrier.removeBarrier()
                     isRemoved.shouldBeTrue()
@@ -86,19 +87,19 @@ class DistributedBarrierTests {
             setBarrierLatch.await()
             DistributedBarrier(urls, path)
                 .use { barrier ->
-                    println("$i Waiting on Barrier")
+                    logger.info { "$i Waiting on Barrier" }
                     barrier.waitOnBarrier(1.seconds)
 
                     timeoutCount.incrementAndGet()
 
-                    println("$i Timed out waiting on barrier, waiting again")
+                    logger.info { "$i Timed out waiting on barrier, waiting again" }
                     barrier.waitOnBarrier()
 
                     // Make sure the waiter advanced quickly
                     System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500
                     advancedCount.incrementAndGet()
 
-                    println("$i Done Waiting on Barrier")
+                    logger.info { "$i Done Waiting on Barrier" }
                 }
         }
 
@@ -107,7 +108,7 @@ class DistributedBarrierTests {
         timeoutCount.get() shouldEqual count
         advancedCount.get() shouldEqual count
 
-        println("Done")
+        logger.info { "Done" }
     }
 
     @Test
@@ -123,19 +124,19 @@ class DistributedBarrierTests {
             nonblockingThreads(count) { i ->
                 DistributedBarrier(urls, path)
                     .use { barrier ->
-                        println("$i Waiting on Barrier")
+                        logger.info { "$i Waiting on Barrier" }
                         barrier.waitOnBarrier(1, TimeUnit.SECONDS)
 
                         timeoutCount.incrementAndGet()
 
-                        println("$i Timed out waiting on barrier, waiting again")
+                        logger.info { "$i Timed out waiting on barrier, waiting again" }
                         barrier.waitOnBarrier()
 
                         // Make sure the waiter advanced quickly
                         System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500
                         advancedCount.incrementAndGet()
 
-                        println("$i Done Waiting on Barrier")
+                        logger.info { "$i Done Waiting on Barrier" }
                     }
             }
 
@@ -145,7 +146,7 @@ class DistributedBarrierTests {
 
                 barrier.isBarrierSet shouldEqual false
 
-                println("Setting Barrier")
+                logger.info { "Setting Barrier" }
                 val isSet = barrier.setBarrier()
                 isSet.shouldBeTrue()
                 barrier.isBarrierSet.shouldBeTrue()
@@ -157,7 +158,7 @@ class DistributedBarrierTests {
                 // Pause to give time-outs a chance
                 sleep(6.seconds)
 
-                println("Removing Barrier")
+                logger.info { "Removing Barrier" }
                 removeBarrierTime.set(System.currentTimeMillis())
                 barrier.removeBarrier()
 
@@ -171,6 +172,8 @@ class DistributedBarrierTests {
         timeoutCount.get() shouldEqual count
         advancedCount.get() shouldEqual count
 
-        println("Done")
+        logger.info { "Done" }
     }
+
+    companion object : KLogging()
 }

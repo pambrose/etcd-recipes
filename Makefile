@@ -7,7 +7,7 @@ build:
 	./gradlew build
 
 tests:
-	./gradlew testClasses
+	./gradlew check
 
 refresh:
 	./gradlew build --refresh-dependencies

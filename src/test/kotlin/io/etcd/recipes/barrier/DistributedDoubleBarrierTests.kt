@@ -22,6 +22,7 @@ import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
+import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
@@ -53,41 +54,41 @@ class DistributedDoubleBarrierTests {
             sleep(5.random.seconds)
 
             repeat(retryCount) {
-                println("#$id Waiting to enter barrier")
+                logger.info { "#$id Waiting to enter barrier" }
                 if (it % 2 == 0)
                     barrier.enter(1000.random.milliseconds)
                 else
                     barrier.enter(1000, TimeUnit.MILLISECONDS)
                 enterRetryCounter.incrementAndGet()
-                println("#$id Timed out entering barrier")
+                logger.info { "#$id Timed out entering barrier" }
             }
 
             enterLatch.countDown()
-            println("#$id Waiting to enter barrier")
+            logger.info { "#$id Waiting to enter barrier" }
             barrier.enter()
             enterCounter.incrementAndGet()
 
-            println("#$id Entered barrier")
+            logger.info { "#$id Entered barrier" }
         }
 
         fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
             sleep(10.random.seconds)
 
             repeat(retryCount) {
-                println("#$id Waiting to leave barrier")
+                logger.info { "#$id Waiting to leave barrier" }
                 if (it % 2 == 0)
                     barrier.leave(1000.random.milliseconds)
                 else
                     barrier.leave(1000, TimeUnit.MILLISECONDS)
                 leaveRetryCounter.incrementAndGet()
-                println("#$id Timed out leaving barrier")
+                logger.info { "#$id Timed out leaving barrier" }
             }
 
             leaveLatch.countDown()
-            println("#$id Waiting to leave barrier")
+            logger.info { "#$id Waiting to leave barrier" }
             barrier.leave()
             leaveCounter.incrementAndGet()
-            println("#$id Left barrier")
+            logger.info { "#$id Left barrier" }
 
             doneLatch.countDown()
         }
@@ -106,13 +107,14 @@ class DistributedDoubleBarrierTests {
             .use { barrier ->
                 enterLatch.await()
                 sleep(2.seconds)
-                barrier.enterWaiterCount shouldEqual count - 1
+
+                barrier.enterWaiterCount.toInt() shouldEqual count - 1
                 enterBarrier(99, barrier)
 
                 leaveLatch.await()
                 sleep(2.seconds)
 
-                barrier.leaveWaiterCount shouldEqual count - 1
+                barrier.leaveWaiterCount.toInt() shouldEqual count - 1
                 leaveBarrier(99, barrier)
             }
 
@@ -127,6 +129,8 @@ class DistributedDoubleBarrierTests {
         leaveRetryCounter.get() shouldEqual retryAttempts * (count - 1)
         leaveCounter.get() shouldEqual count
 
-        println("Done")
+        logger.info { "Done" }
     }
+
+    companion object : KLogging()
 }

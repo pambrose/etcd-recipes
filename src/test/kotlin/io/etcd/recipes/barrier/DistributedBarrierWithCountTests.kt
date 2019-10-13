@@ -22,6 +22,7 @@ import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
+import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
@@ -45,22 +46,22 @@ class DistributedBarrierWithCountTests {
         fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
 
             sleep(5.random.seconds)
-            println("#$id Waiting on barrier")
+            logger.info { "#$id Waiting on barrier" }
 
             repeat(retryCount) {
                 barrier.waitOnBarrier(1.seconds)
-                println("#$id Timed out waiting on barrier, waiting again")
+                logger.info { "#$id Timed out waiting on barrier, waiting again" }
                 retryCounter.incrementAndGet()
             }
 
             retryLatch.countDown()
 
-            println("#$id Waiter count = ${barrier.waiterCount}")
+            logger.info { "#$id Waiter count = ${barrier.waiterCount}" }
             barrier.waitOnBarrier()
 
             advancedCounter.incrementAndGet()
 
-            println("#$id Done waiting on barrier")
+            logger.info { "#$id Done waiting on barrier" }
         }
 
         val (finishedLatch, holder) =
@@ -86,6 +87,8 @@ class DistributedBarrierWithCountTests {
         retryCounter.get() shouldEqual retryAttempts * (count - 1)
         advancedCounter.get() shouldEqual count
 
-        println("Done")
+        logger.info { "Done" }
     }
+
+    companion object : KLogging()
 }
