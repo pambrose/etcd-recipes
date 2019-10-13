@@ -85,7 +85,7 @@ class ServiceCacheTests {
                 }
             }
 
-            val (finishedLatch, holder) =
+            val (finishedLatch, holder2) =
                 nonblockingThreads(threadCount) {
                     ServiceDiscovery(urls, path).use { sd ->
                         repeat(serviceCount) {
@@ -112,7 +112,7 @@ class ServiceCacheTests {
                 }
 
             finishedLatch.await()
-            holder.checkForException()
+            holder2.checkForException()
         }
 
         // Wait for deletes to propagate

@@ -118,6 +118,7 @@ class DistributedDoubleBarrierTests {
 
         doneLatch.await()
 
+        finishedLatch.await()
         holder.checkForException()
 
         enterRetryCounter.get() shouldEqual retryAttempts * (count - 1)

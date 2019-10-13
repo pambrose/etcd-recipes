@@ -6,6 +6,9 @@ clean:
 build:
 	./gradlew build
 
+tests:
+	./gradlew testClasses
+
 refresh:
 	./gradlew build --refresh-dependencies
 
