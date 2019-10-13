@@ -3,12 +3,21 @@ plugins {
     id 'org.jetbrains.kotlin.jvm' version '1.3.50'
     id 'org.jetbrains.kotlin.plugin.serialization' version '1.3.50'
     id "com.github.ben-manes.versions" version "0.26.0"
+    id 'jacoco'
+    id 'com.github.kt3k.coveralls' version '2.8.4'
 }
 
 group 'io.etcd'
 version '1.0-SNAPSHOT'
 
 sourceCompatibility = 1.8
+
+jacocoTestReport {
+    reports {
+        xml.enabled = true // coveralls plugin depends on xml format report
+        html.enabled = true
+    }
+}
 
 def kotlinVersion = '1.3.50'
 def serializationVersion = '0.13.0'

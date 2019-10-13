@@ -27,15 +27,15 @@ import static com.sudothought.common.util.Misc.sleepSecs;
 
 public class ServiceDiscoveryExample {
 
-    static List<String> urls = Lists.newArrayList("http://localhost:2379");
-    static String path = "/services/ServiceDiscoveryExample";
-    static String serviceName = "ExampleService";
+    public static List<String> urls = Lists.newArrayList("http://localhost:2379");
+    public static String path = "/services/ServiceDiscoveryExample";
+    public static String serviceName = "ExampleService";
 
     public static void main(String[] args) throws EtcdRecipeException {
         serviceExample(true);
     }
 
-    static void serviceExample(boolean verbose) throws EtcdRecipeException {
+    public static void serviceExample(boolean verbose) throws EtcdRecipeException {
 
         try (ServiceDiscovery sd = new ServiceDiscovery(urls, path)) {
 
