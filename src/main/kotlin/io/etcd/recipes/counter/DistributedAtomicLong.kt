@@ -110,6 +110,7 @@ class DistributedAtomicLong(val urls: List<String>,
 
         @JvmStatic
         fun delete(urls: List<String>, counterPath: String) {
+
             require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
 

@@ -142,20 +142,20 @@ class LeaderSelector(val urls: List<String>,
                 connectToEtcd(urls) { client ->
                     client.withLeaseClient { leaseClient ->
                         client.withKvClient { kvClient ->
-                            connectedToEtcd.set(true)
+
                             val leaderSemaphore = Semaphore(1, true)
                             val watchStarted = BooleanMonitor(false)
                             val watchStopped = BooleanMonitor(false)
                             val advertiseComplete = BooleanMonitor(false)
+
+                            connectedToEtcd.set(true)
 
                             executor.execute {
                                 try {
                                     client.withWatchClient { watchClient ->
                                         // Run for leader whenever leader key is deleted
                                         watchForDeleteEvents(watchClient, watchStarted) {
-                                            leaderSemaphore.withLock {
-                                                attemptToBecomeLeader(leaseClient, kvClient)
-                                            }
+                                            leaderSemaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
                                         }.use {
                                             terminateWatch.waitUntilTrue()
                                         }
@@ -202,11 +202,11 @@ class LeaderSelector(val urls: List<String>,
         return this
     }
 
-    val backgroundExceptions get() = exceptionList
+    val startExceptions get() = exceptionList
 
-    val hasBackgroundExceptions get() = exceptionList.size > 0
+    val hasStartExceptions get() = exceptionList.size > 0
 
-    fun clearBackgroundExceptions() = exceptionList.clear()
+    fun clearStartExceptions() = exceptionList.clear()
 
     @Throws(InterruptedException::class)
     fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Long.MAX_VALUE.days)
@@ -254,9 +254,7 @@ class LeaderSelector(val urls: List<String>,
                                      block: () -> Unit): Watch.Watcher {
         val watcher =
             watchClient.watcher(leaderPath) { watchResponse ->
-                watchResponse.events.forEach { event ->
-                    if (event.eventType == DELETE) block.invoke()
-                }
+                watchResponse.events.forEach { event -> if (event.eventType == DELETE) block.invoke() }
             }
         watchStarted.set(true)
         return watcher
@@ -339,6 +337,7 @@ class LeaderSelector(val urls: List<String>,
 
         @JvmStatic
         fun getParticipants(urls: List<String>, electionPath: String): List<Participant> {
+
             require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 
@@ -358,6 +357,7 @@ class LeaderSelector(val urls: List<String>,
                          electionPath: String,
                          listener: LeaderListener,
                          executor: Executor): CountDownLatch {
+
             require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 

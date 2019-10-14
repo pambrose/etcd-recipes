@@ -67,12 +67,13 @@ class ServiceCacheTests {
 
                             if (eventType == EventType.PUT) {
                                 if (isNew) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
-                                serviceInstance!!.name shouldEqual name
+
+                                serviceInstance?.name shouldEqual name
                             }
 
                             if (eventType == EventType.DELETE) {
                                 unregisterCounter.incrementAndGet()
-                                serviceInstance!!.name shouldEqual name
+                                serviceInstance?.name shouldEqual name
                             }
                         }
                     }

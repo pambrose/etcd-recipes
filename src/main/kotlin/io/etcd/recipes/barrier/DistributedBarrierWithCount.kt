@@ -179,6 +179,7 @@ class DistributedBarrierWithCount(val urls: List<String>,
     companion object {
         @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
+
             require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
 
