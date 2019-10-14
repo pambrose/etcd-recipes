@@ -48,16 +48,22 @@ class DistributedDoubleBarrier(val urls: List<String>,
 
     val leaveWaiterCount: Long get() = leaveBarrier.waiterCount
 
+    @Throws(InterruptedException::class, EtcdRecipeException::class)
     fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 
+    @Throws(InterruptedException::class, EtcdRecipeException::class)
     fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
 
+    @Throws(InterruptedException::class, EtcdRecipeException::class)
     fun enter(timeout: Duration): Boolean = enterBarrier.waitOnBarrier(timeout)
 
+    @Throws(InterruptedException::class, EtcdRecipeException::class)
     fun leave(): Boolean = leave(Long.MAX_VALUE.days)
 
+    @Throws(InterruptedException::class, EtcdRecipeException::class)
     fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))
 
+    @Throws(InterruptedException::class, EtcdRecipeException::class)
     fun leave(timeout: Duration): Boolean = leaveBarrier.waitOnBarrier(timeout)
 
     override fun close() {
