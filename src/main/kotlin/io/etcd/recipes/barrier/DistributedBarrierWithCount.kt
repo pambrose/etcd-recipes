@@ -24,7 +24,6 @@ import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
-import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
@@ -107,9 +106,8 @@ class DistributedBarrierWithCount(val urls: List<String>,
 
                     // Delete /ready key
                     kvClient.transaction {
-                        If(equalTo(readyPath, CmpTarget.version(0)))
-                        Then()
-                        Else(deleteOp(readyPath))
+                        If(readyPath.doesExist)
+                        Then(deleteOp(readyPath))
                     }
                 }
             }
@@ -117,18 +115,16 @@ class DistributedBarrierWithCount(val urls: List<String>,
 
         // Do a CAS on the /ready name. If it is not found, then set it
         kvClient.transaction {
-            If(equalTo(readyPath, CmpTarget.version(0)))
-            Then(putOp(readyPath, uniqueToken))
-            Else()
+            If(readyPath.doesNotExist)
+            Then(readyPath setTo uniqueToken)
         }
 
         val lease = leaseClient.grant(2).get()
 
         val txn =
             kvClient.transaction {
-                If(equalTo(waitingPath, CmpTarget.version(0)))
-                Then(putOp(waitingPath, uniqueToken, lease.asPutOption))
-                Else()
+                If(waitingPath.doesNotExist)
+                Then(waitingPath.setTo(uniqueToken, lease.asPutOption))
             }
 
         when {

@@ -24,7 +24,6 @@ import com.sudothought.common.delegate.AtomicDelegates.nullableReference
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
-import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.common.*
 import java.io.Closeable
@@ -75,9 +74,8 @@ class DistributedBarrier(val urls: List<String>,
                 // Do a CAS on the key name. If it is not found, then set it
                 val txn =
                     kvClient.transaction {
-                        If(equalTo(barrierPath, CmpTarget.version(0)))
-                        Then(putOp(barrierPath, uniqueToken, lease.asPutOption))
-                        Else()
+                        If(barrierPath.doesNotExist)
+                        Then(barrierPath.setTo(uniqueToken, lease.asPutOption))
                     }
 
                 // Check to see if unique value was successfully set in the CAS step

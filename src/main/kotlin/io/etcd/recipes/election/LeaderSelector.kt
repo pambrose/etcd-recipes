@@ -28,7 +28,6 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
-import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.watch.WatchEvent.EventType.*
 import io.etcd.recipes.common.*
 import mu.KLogging
@@ -280,9 +279,8 @@ class LeaderSelector(val urls: List<String>,
         val lease = leaseClient.grant(2).get()
         val txn =
             kvClient.transaction {
-                If(equalTo(path, CmpTarget.version(0)))
-                Then(putOp(path, clientId, lease.asPutOption))
-                Else()
+                If(path.doesNotExist)
+                Then(path.setTo(clientId, lease.asPutOption))
             }
 
         if (!txn.isSucceeded) throw EtcdRecipeException("Participation registration failed [$path]")
@@ -304,9 +302,8 @@ class LeaderSelector(val urls: List<String>,
         // Do a CAS on the key name. If it is not found, then set it
         val txn =
             kvClient.transaction {
-                If(equalTo(leaderPath, CmpTarget.version(0)))
-                Then(putOp(leaderPath, uniqueToken, lease.asPutOption))
-                Else()
+                If(leaderPath.doesNotExist)
+                Then(leaderPath.setTo(uniqueToken, lease.asPutOption))
             }
 
         // Check to see if unique value was successfully set in the CAS step

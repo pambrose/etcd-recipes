@@ -23,19 +23,13 @@ import com.google.common.primitives.Longs
 import io.etcd.jetcd.ByteSequence
 
 val String.asByteSequence: ByteSequence get() = ByteSequence.from(toByteArray())
-
 val Int.asByteSequence: ByteSequence get() = ByteSequence.from(Ints.toByteArray(this))
-
 val Long.asByteSequence: ByteSequence get() = ByteSequence.from(Longs.toByteArray(this))
 
 val ByteSequence.asString: String get() = toString(Charsets.UTF_8)
-
 val ByteSequence.asInt: Int get() = Ints.fromByteArray(bytes)
-
 val ByteSequence.asLong: Long get() = Longs.fromByteArray(bytes)
 
 val List<ByteSequence>.asString: List<String> get() = map { it.asString }
-
 val List<ByteSequence>.asInt: List<Int> get() = map { it.asInt }
-
 val List<ByteSequence>.asLong: List<Long> get() = map { it.asLong }

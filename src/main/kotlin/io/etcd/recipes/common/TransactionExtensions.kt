@@ -30,15 +30,11 @@ import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.PutOption
 
 val KeyValue.asString get() = value.asString
-
 val KeyValue.asInt get() = value.asInt
-
 val KeyValue.asLong get() = value.asLong
 
 fun <T> equalTo(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, target)
-
 fun <T> lessThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.LESS, target)
-
 fun <T> greaterThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.GREATER, target)
 
 fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
@@ -63,3 +59,14 @@ fun putOp(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT):
 
 fun putOp(keyname: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): Op.PutOp =
     Op.put(keyname.asByteSequence, keyval, option)
+
+val String.doesNotExist: Cmp get() = equalTo(this, CmpTarget.version(0))
+val String.doesExist: Cmp get() = greaterThan(this, CmpTarget.version(0))
+
+infix fun String.setTo(keyval: String): Op.PutOp = putOp(this, keyval)
+infix fun String.setTo(keyval: Int): Op.PutOp = putOp(this, keyval)
+infix fun String.setTo(keyval: Long): Op.PutOp = putOp(this, keyval)
+
+fun String.setTo(keyval: String, putOption: PutOption): Op.PutOp = putOp(this, keyval, putOption)
+fun String.setTo(keyval: Int, putOption: PutOption): Op.PutOp = putOp(this, keyval, putOption)
+fun String.setTo(keyval: Long, putOption: PutOption): Op.PutOp = putOp(this, keyval, putOption)

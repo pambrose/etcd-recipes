@@ -23,33 +23,26 @@ import io.etcd.jetcd.KV
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.kv.PutResponse
-import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 
 // Put values
-fun KV.putValue(keyname: String, keyval: String): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
-
-fun KV.putValue(keyname: String, keyval: Int): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
-
-fun KV.putValue(keyname: String, keyval: Long): PutResponse = put(keyname.asByteSequence, keyval.asByteSequence).get()
-
-fun KV.putValue(keyname: String, keyval: String, option: PutOption): PutResponse =
+fun KV.putValue(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): PutResponse =
     put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
-fun KV.putValue(keyname: String, keyval: Int, option: PutOption): PutResponse =
+fun KV.putValue(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): PutResponse =
     put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
-fun KV.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
+fun KV.putValue(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
     put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
-fun Lazy<KV>.putValue(keyname: String, keyval: String, option: PutOption): PutResponse =
+fun Lazy<KV>.putValue(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
 
-fun Lazy<KV>.putValue(keyname: String, keyval: Int, option: PutOption): PutResponse =
+fun Lazy<KV>.putValue(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
 
-fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
+fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
 
 // Delete keys
@@ -107,7 +100,7 @@ fun Lazy<KV>.getValue(keyname: String, defaultVal: Int): Int = value.getValue(ke
 fun Lazy<KV>.getValue(keyname: String, defaultVal: Long): Long = value.getValue(keyname, defaultVal)
 
 // Key checking
-fun KV.isKeyPresent(keyname: String) = !(transaction { If(equalTo(keyname, CmpTarget.version(0))) }.isSucceeded)
+fun KV.isKeyPresent(keyname: String) = transaction { If(keyname.doesExist) }.isSucceeded
 
 fun KV.isKeyNotPresent(keyname: String) = !isKeyPresent(keyname)
 

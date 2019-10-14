@@ -25,13 +25,9 @@ val <T> List<Pair<String, T>>.keys: List<String> get() = map { it.first }
 val <T> List<Pair<String, T>>.values: List<T> get() = map { it.second }
 
 val Pair<String, ByteSequence>.asString: Pair<String, String> get() = first to second.asString
-
 val Pair<String, ByteSequence>.asInt: Pair<String, Int> get() = first to second.asInt
-
 val Pair<String, ByteSequence>.asLong: Pair<String, Long> get() = first to second.asLong
 
 val List<Pair<String, ByteSequence>>.asString: List<Pair<String, String>> get() = map { it.first to it.second.asString }
-
 val List<Pair<String, ByteSequence>>.asInt: List<Pair<String, Int>> get() = map { it.first to it.second.asInt }
-
 val List<Pair<String, ByteSequence>>.asLong: List<Pair<String, Long>> get() = map { it.first to it.second.asLong }

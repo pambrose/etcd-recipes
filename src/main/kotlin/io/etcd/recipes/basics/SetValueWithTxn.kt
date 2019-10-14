@@ -20,31 +20,33 @@ package io.etcd.recipes.basics
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
-import io.etcd.jetcd.op.CmpTarget
 import io.etcd.recipes.common.*
 
 fun main() {
     val urls = listOf("http://localhost:2379")
     val path = "/txntest"
-    val debug = "/debug"
+    val keyval = "/debug"
 
     fun checkForKey(kvClient: KV) {
         kvClient.transaction {
-            If(equalTo(path, CmpTarget.version(0)))
-            Then(putOp(debug, "Key $path not found"))
-            Else(putOp(debug, "Key $path found"))
+            If(path.doesExist)
+            Then(keyval setTo "Key $path found")
+            Else(keyval setTo "Key $path not found")
         }
 
-        println("Debug value: ${kvClient.getValue(debug, "unset")}")
+
+        println("Debug value: ${kvClient.getValue(keyval, "not_used")}")
     }
 
     Client.builder().endpoints(*urls.toTypedArray()).build()
         .use { client ->
             client.withKvClient { kvClient ->
                 println("Deleting keys")
-                kvClient.delete(path, debug)
+                kvClient.delete(path, keyval)
 
+                println("Key present: ${kvClient.isKeyPresent(keyval)}")
                 checkForKey(kvClient)
+                println("Key present: ${kvClient.isKeyPresent(keyval)}")
                 kvClient.putValue(path, "Something")
                 checkForKey(kvClient)
             }

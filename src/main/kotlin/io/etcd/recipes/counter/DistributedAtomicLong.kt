@@ -88,9 +88,8 @@ class DistributedAtomicLong(val urls: List<String>,
         if (kvClient.getResponse(counterPath).kvs.isEmpty()) {
             val txn =
                 kvClient.transaction {
-                    If(equalTo(counterPath, CmpTarget.version(0)))
-                    Then(putOp(counterPath, defaultValue))
-                    Else()
+                    If(counterPath.doesNotExist)
+                    Then(counterPath setTo defaultValue)
                 }
             txn.isSucceeded
         } else {
@@ -103,8 +102,7 @@ class DistributedAtomicLong(val urls: List<String>,
             val kv: KeyValue =
                 if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
             If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
-            Then(putOp(counterPath, kv.asLong + amount))
-            Else()
+            Then(counterPath setTo kv.asLong + amount)
         }
 
     companion object {
