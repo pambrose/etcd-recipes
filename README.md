@@ -9,8 +9,8 @@
 
 
 [etcd-recipes](https://github.com/pambrose/etcd-recipes) is a Kotlin/Java/JVM client library 
-for [etcd](https://etcd.io) v3[1], a distributed, reliable key-value store. It attempts to provide the same 
-kind of support for [etcd](https://etcd.io) v3 that 
+for [etcd](https://etcd.io) v3, a distributed, reliable key-value store. It attempts to provide the same 
+kind of support for [etcd](https://etcd.io) that 
 [Curator](https://curator.apache.org) does for [ZooKeeper](https://zookeeper.apache.org).
 
 
