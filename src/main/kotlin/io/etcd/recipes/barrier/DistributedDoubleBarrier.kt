@@ -39,7 +39,7 @@ class DistributedDoubleBarrier(val urls: List<String>,
     private val leaveBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("leave"), memberCount)
 
     init {
-        require(urls.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
         require(memberCount > 0) { "Member count must be > 0" }
     }
@@ -68,7 +68,9 @@ class DistributedDoubleBarrier(val urls: List<String>,
     companion object {
         @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
+            require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
+
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
                     // Delete all children

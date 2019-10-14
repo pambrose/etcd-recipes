@@ -42,7 +42,7 @@ data class ServiceDiscovery(val urls: List<String>,
     private val serviceProviderList = Collections.synchronizedList(mutableListOf<ServiceProvider>())
 
     init {
-        require(urls.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(basePath.isNotEmpty()) { "Service base path cannot be empty" }
     }
 

@@ -48,7 +48,7 @@ class DistributedBarrier(val urls: List<String>,
     private var barrierRemoved by atomicBoolean(false)
 
     init {
-        require(urls.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
     }
 

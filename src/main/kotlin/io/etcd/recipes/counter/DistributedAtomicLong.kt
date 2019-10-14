@@ -37,7 +37,7 @@ class DistributedAtomicLong(val urls: List<String>,
     constructor(urls: List<String>, counterPath: String) : this(urls, counterPath, 0L)
 
     init {
-        require(urls.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
 
         // Create counter if first time through
@@ -110,7 +110,9 @@ class DistributedAtomicLong(val urls: List<String>,
 
         @JvmStatic
         fun delete(urls: List<String>, counterPath: String) {
+            require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
+
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient -> kvClient.delete(counterPath) }
             }

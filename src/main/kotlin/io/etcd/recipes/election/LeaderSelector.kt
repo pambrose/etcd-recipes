@@ -339,7 +339,9 @@ class LeaderSelector(val urls: List<String>,
 
         @JvmStatic
         fun getParticipants(urls: List<String>, electionPath: String): List<Participant> {
+            require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
+
             val participants = mutableListOf<Participant>()
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
@@ -356,7 +358,9 @@ class LeaderSelector(val urls: List<String>,
                          electionPath: String,
                          listener: LeaderListener,
                          executor: Executor): CountDownLatch {
+            require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
+
             val terminateListener = CountDownLatch(1)
             executor.execute {
                 connectToEtcd(urls) { client ->
