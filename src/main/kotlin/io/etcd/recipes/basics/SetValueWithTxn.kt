@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.basics
 
-import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.recipes.common.*
 
@@ -34,21 +33,19 @@ fun main() {
             Else(keyval setTo "Key $path not found")
         }
 
-
         println("Debug value: ${kvClient.getValue(keyval, "not_used")}")
     }
 
-    Client.builder().endpoints(*urls.toTypedArray()).build()
-        .use { client ->
-            client.withKvClient { kvClient ->
-                println("Deleting keys")
-                kvClient.delete(path, keyval)
+    connectToEtcd(urls) { client ->
+        client.withKvClient { kvClient ->
+            println("Deleting keys")
+            kvClient.delete(path, keyval)
 
-                println("Key present: ${kvClient.isKeyPresent(keyval)}")
-                checkForKey(kvClient)
-                println("Key present: ${kvClient.isKeyPresent(keyval)}")
-                kvClient.putValue(path, "Something")
-                checkForKey(kvClient)
-            }
+            println("Key present: ${kvClient.isKeyPresent(keyval)}")
+            checkForKey(kvClient)
+            println("Key present: ${kvClient.isKeyPresent(keyval)}")
+            kvClient.putValue(path, "Something")
+            checkForKey(kvClient)
         }
+    }
 }

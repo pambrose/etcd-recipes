@@ -24,7 +24,6 @@ import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
@@ -111,7 +110,7 @@ class LeaderSelector(val urls: List<String>,
     private val exceptionList = Collections.synchronizedList(mutableListOf<Throwable>())
 
     init {
-        require(urls.isNotEmpty()) { "URL cannot be empty" }
+        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
 
@@ -140,58 +139,57 @@ class LeaderSelector(val urls: List<String>,
 
         executor.execute {
             try {
-                Client.builder().endpoints(*urls.toTypedArray()).build()
-                    .use { client ->
-                        client.withLeaseClient { leaseClient ->
-                            client.withKvClient { kvClient ->
-                                connectedToEtcd.set(true)
-                                val leaderSemaphore = Semaphore(1, true)
-                                val watchStarted = BooleanMonitor(false)
-                                val watchStopped = BooleanMonitor(false)
-                                val advertiseComplete = BooleanMonitor(false)
+                connectToEtcd(urls) { client ->
+                    client.withLeaseClient { leaseClient ->
+                        client.withKvClient { kvClient ->
+                            connectedToEtcd.set(true)
+                            val leaderSemaphore = Semaphore(1, true)
+                            val watchStarted = BooleanMonitor(false)
+                            val watchStopped = BooleanMonitor(false)
+                            val advertiseComplete = BooleanMonitor(false)
 
-                                executor.execute {
-                                    try {
-                                        client.withWatchClient { watchClient ->
-                                            // Run for leader whenever leader key is deleted
-                                            watchForDeleteEvents(watchClient, watchStarted) {
-                                                leaderSemaphore.withLock {
-                                                    attemptToBecomeLeader(leaseClient, kvClient)
-                                                }
-                                            }.use {
-                                                terminateWatch.waitUntilTrue()
+                            executor.execute {
+                                try {
+                                    client.withWatchClient { watchClient ->
+                                        // Run for leader whenever leader key is deleted
+                                        watchForDeleteEvents(watchClient, watchStarted) {
+                                            leaderSemaphore.withLock {
+                                                attemptToBecomeLeader(leaseClient, kvClient)
                                             }
-                                            watchStopped.set(true)
+                                        }.use {
+                                            terminateWatch.waitUntilTrue()
                                         }
-                                    } catch (e: Throwable) {
-                                        logger.error(e) { "In withWatchClient()" }
-                                        exceptionList += e
+                                        watchStopped.set(true)
                                     }
+                                } catch (e: Throwable) {
+                                    logger.error(e) { "In withWatchClient()" }
+                                    exceptionList += e
                                 }
-
-                                executor.execute {
-                                    try {
-                                        advertiseParticipation(leaseClient, kvClient)
-                                    } catch (e: Throwable) {
-                                        logger.error(e) { "In advertiseParticipation()" }
-                                        exceptionList += e
-                                    } finally {
-                                        advertiseComplete.set(true)
-                                    }
-                                }
-
-                                // Wait for the watcher to start
-                                watchStarted.waitUntilTrue()
-
-                                // Clients should run for leader in case they are the first to run
-                                leaderSemaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
-
-                                leadershipComplete.waitUntilTrue()
-                                watchStopped.waitUntilTrue()
-                                advertiseComplete.waitUntilTrue()
                             }
+
+                            executor.execute {
+                                try {
+                                    advertiseParticipation(leaseClient, kvClient)
+                                } catch (e: Throwable) {
+                                    logger.error(e) { "In advertiseParticipation()" }
+                                    exceptionList += e
+                                } finally {
+                                    advertiseComplete.set(true)
+                                }
+                            }
+
+                            // Wait for the watcher to start
+                            watchStarted.waitUntilTrue()
+
+                            // Clients should run for leader in case they are the first to run
+                            leaderSemaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
+
+                            leadershipComplete.waitUntilTrue()
+                            watchStopped.waitUntilTrue()
+                            advertiseComplete.waitUntilTrue()
                         }
                     }
+                }
             } catch (e: Throwable) {
                 logger.error(e) { "In start()" }
                 exceptionList += e
@@ -343,14 +341,13 @@ class LeaderSelector(val urls: List<String>,
         fun getParticipants(urls: List<String>, electionPath: String): List<Participant> {
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
             val participants = mutableListOf<Participant>()
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withKvClient { kvClient ->
-                        val leader = kvClient.getValue(electionPath)?.asString?.stripUniqueSuffix
-                        kvClient.getValues(participationPath(electionPath)).asString
-                            .forEach { participants += Participant(it, leader == it) }
-                    }
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient ->
+                    val leader = kvClient.getValue(electionPath)?.asString?.stripUniqueSuffix
+                    kvClient.getValues(participationPath(electionPath)).asString
+                        .forEach { participants += Participant(it, leader == it) }
                 }
+            }
             return participants
         }
 
@@ -359,30 +356,30 @@ class LeaderSelector(val urls: List<String>,
                          electionPath: String,
                          listener: LeaderListener,
                          executor: Executor): CountDownLatch {
+            require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
             val terminateListener = CountDownLatch(1)
             executor.execute {
-                Client.builder().endpoints(*urls.toTypedArray()).build()
-                    .use { client ->
-                        client.withWatchClient { watchClient ->
-                            watchClient.watcher(leaderPath(electionPath)) { watchResponse ->
-                                watchResponse.events
-                                    .forEach { event ->
-                                        try {
-                                            when (event.eventType) {
-                                                PUT          -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
-                                                DELETE       -> listener.relinquishLeadership()
-                                                UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
-                                                else         -> logger.error { "Unknown error with $electionPath watch" }
-                                            }
-                                        } catch (e: Throwable) {
-                                            logger.error(e) { "Exception in reportLeader()" }
+                connectToEtcd(urls) { client ->
+                    client.withWatchClient { watchClient ->
+                        watchClient.watcher(leaderPath(electionPath)) { watchResponse ->
+                            watchResponse.events
+                                .forEach { event ->
+                                    try {
+                                        when (event.eventType) {
+                                            PUT          -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
+                                            DELETE       -> listener.relinquishLeadership()
+                                            UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
+                                            else         -> logger.error { "Unknown error with $electionPath watch" }
                                         }
+                                    } catch (e: Throwable) {
+                                        logger.error(e) { "Exception in reportLeader()" }
                                     }
-                            }.use {
-                                terminateListener.await()
-                            }
+                                }
+                        }.use {
+                            terminateListener.await()
                         }
                     }
+                }
             }
             return terminateListener
         }

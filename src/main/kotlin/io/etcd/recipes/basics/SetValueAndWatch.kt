@@ -20,7 +20,6 @@ package io.etcd.recipes.basics
 
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Client
 import io.etcd.recipes.common.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -36,21 +35,20 @@ fun main() {
         try {
             sleep(3.seconds)
 
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withKvClient { kvClient ->
-                        repeatWithSleep(10) { i, _ ->
-                            val kv = keyval + i
-                            println("Assigning $path = $kv")
-                            kvClient.putValue(path, kv)
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient ->
+                    repeatWithSleep(10) { i, _ ->
+                        val kv = keyval + i
+                        println("Assigning $path = $kv")
+                        kvClient.putValue(path, kv)
 
-                            sleep(1.seconds)
+                        sleep(1.seconds)
 
-                            println("Deleting $path")
-                            kvClient.delete(path)
-                        }
+                        println("Deleting $path")
+                        kvClient.delete(path)
                     }
                 }
+            }
         } finally {
             countdown.countDown()
         }
@@ -58,22 +56,21 @@ fun main() {
 
     thread {
         try {
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withWatchClient { watchClient ->
-                        println("Starting watch")
-                        watchClient.watcher(path) { watchResponse ->
-                            watchResponse.events
-                                .forEach { watchEvent ->
-                                    println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asPair.asString}")
-                                }
-                        }.use {
-                            sleep(5.seconds)
-                            println("Closing watch")
-                        }
-                        println("Closed watch")
+            connectToEtcd(urls) { client ->
+                client.withWatchClient { watchClient ->
+                    println("Starting watch")
+                    watchClient.watcher(path) { watchResponse ->
+                        watchResponse.events
+                            .forEach { watchEvent ->
+                                println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asPair.asString}")
+                            }
+                    }.use {
+                        sleep(5.seconds)
+                        println("Closing watch")
                     }
+                    println("Closed watch")
                 }
+            }
         } finally {
             countdown.countDown()
         }

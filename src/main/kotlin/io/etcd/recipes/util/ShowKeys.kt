@@ -19,27 +19,22 @@
 package io.etcd.recipes.util
 
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Client
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.count
-import io.etcd.recipes.common.getKeyValues
-import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.*
 import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
     val path = "/"
 
-    Client.builder().endpoints(*urls.toTypedArray()).build()
-        .use { client ->
-            client.withKvClient { kvClient ->
-                kvClient.apply {
-                    repeat(600) {
-                        println(getKeyValues(path).asString)
-                        println(count(path))
-                        sleep(1.seconds)
-                    }
+    connectToEtcd(urls) { client ->
+        client.withKvClient { kvClient ->
+            kvClient.apply {
+                repeat(600) {
+                    println(getKeyValues(path).asString)
+                    println(count(path))
+                    sleep(1.seconds)
                 }
             }
         }
+    }
 }

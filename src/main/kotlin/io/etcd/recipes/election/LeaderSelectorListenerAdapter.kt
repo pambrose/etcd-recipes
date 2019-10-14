@@ -19,8 +19,11 @@
 package io.etcd.recipes.election
 
 open class LeaderSelectorListenerAdapter : LeaderSelectorListener {
-    override fun takeLeadership(selector: LeaderSelector) {}
+    override fun takeLeadership(selector: LeaderSelector) {
+        // Default to no action
+    }
 
     override fun relinquishLeadership(selector: LeaderSelector) {
+        // Default to no action
     }
 }

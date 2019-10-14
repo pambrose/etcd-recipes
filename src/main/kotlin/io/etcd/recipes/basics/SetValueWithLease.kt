@@ -20,7 +20,6 @@ package io.etcd.recipes.basics
 
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Client
 import io.etcd.recipes.common.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -36,16 +35,15 @@ fun main() {
         try {
             sleep(3.seconds)
 
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withLeaseClient { leaseClient ->
-                        client.withKvClient { kvClient ->
-                            println("Assigning $path = $keyval")
-                            val lease = leaseClient.grant(5).get()
-                            kvClient.putValue(path, keyval, lease.asPutOption)
-                        }
+            connectToEtcd(urls) { client ->
+                client.withLeaseClient { leaseClient ->
+                    client.withKvClient { kvClient ->
+                        println("Assigning $path = $keyval")
+                        val lease = leaseClient.grant(5).get()
+                        kvClient.putValue(path, keyval, lease.asPutOption)
                     }
                 }
+            }
         } finally {
             countdown.countDown()
         }
@@ -53,15 +51,14 @@ fun main() {
 
     thread {
         try {
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withKvClient { kvClient ->
-                        repeatWithSleep(12) { _, start ->
-                            val kval = kvClient.getValue(path, "unset")
-                            println("Key $path = $kval after ${System.currentTimeMillis() - start}ms")
-                        }
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient ->
+                    repeatWithSleep(12) { _, start ->
+                        val kval = kvClient.getValue(path, "unset")
+                        println("Key $path = $kval after ${System.currentTimeMillis() - start}ms")
                     }
                 }
+            }
 
         } finally {
             countdown.countDown()

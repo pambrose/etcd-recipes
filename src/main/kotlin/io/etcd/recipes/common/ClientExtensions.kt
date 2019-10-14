@@ -33,3 +33,12 @@ fun Client.withClusterClient(block: (clusterClient: Cluster) -> Unit) = clusterC
 fun Client.withAuthrClient(block: (authClient: Auth) -> Unit) = authClient.use { block(it) }
 
 fun Client.withKvClient(block: (kvClient: KV) -> Unit) = kvClient.use { block(it) }
+
+fun connectToEtcd(urls: List<String>): Client = Client.builder().endpoints(*urls.toTypedArray()).build()
+
+fun connectToEtcd(urls: List<String>, block: (client: Client) -> Unit) {
+    connectToEtcd(urls)
+        .use {
+            block(it)
+        }
+}

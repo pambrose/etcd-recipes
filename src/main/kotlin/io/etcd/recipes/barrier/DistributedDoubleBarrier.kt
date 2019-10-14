@@ -20,11 +20,7 @@ package io.etcd.recipes.barrier
 
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
-import io.etcd.jetcd.Client
-import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.delete
-import io.etcd.recipes.common.getKeys
-import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.*
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -73,13 +69,12 @@ class DistributedDoubleBarrier(val urls: List<String>,
         @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withKvClient { kvClient ->
-                        // Delete all children
-                        kvClient.getKeys(barrierPath).forEach { kvClient.delete(it) }
-                    }
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient ->
+                    // Delete all children
+                    kvClient.getKeys(barrierPath).forEach { kvClient.delete(it) }
                 }
+            }
         }
     }
 }

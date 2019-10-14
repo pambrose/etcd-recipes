@@ -19,12 +19,8 @@
 package io.etcd.recipes.basics
 
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Client
 import io.etcd.jetcd.Observers
-import io.etcd.recipes.common.asPutOption
-import io.etcd.recipes.common.putValue
-import io.etcd.recipes.common.withKvClient
-import io.etcd.recipes.common.withLeaseClient
+import io.etcd.recipes.common.*
 import kotlin.time.seconds
 
 fun main() {
@@ -32,28 +28,27 @@ fun main() {
     val path = "/foo"
     val keyval = "foobar"
 
-    Client.builder().endpoints(*urls.toTypedArray()).build()
-        .use { client ->
-            client.withLeaseClient { leaseClient ->
-                client.withKvClient { kvClient ->
-                    val lease = leaseClient.grant(1).get()
-                    println("Assigning $path = $keyval")
-                    kvClient.putValue(path, keyval, lease.asPutOption)
-                    leaseClient.keepAlive(lease.id,
-                                          Observers.observer({ next ->
-                                                                 println("KeepAlive next resp: $next")
-                                                             },
-                                                             { err ->
-                                                                 println("KeepAlive err resp: $err")
-                                                             })
-                    ).use {
-                        println("Starting sleep")
-                        sleep(10.seconds)
-                        println("Finished sleep")
-                    }
-                    println("Keep-alive is now terminated")
-                    sleep(5.seconds)
+    connectToEtcd(urls) { client ->
+        client.withLeaseClient { leaseClient ->
+            client.withKvClient { kvClient ->
+                val lease = leaseClient.grant(1).get()
+                println("Assigning $path = $keyval")
+                kvClient.putValue(path, keyval, lease.asPutOption)
+                leaseClient.keepAlive(lease.id,
+                                      Observers.observer({ next ->
+                                                             println("KeepAlive next resp: $next")
+                                                         },
+                                                         { err ->
+                                                             println("KeepAlive err resp: $err")
+                                                         })
+                                     ).use {
+                    println("Starting sleep")
+                    sleep(10.seconds)
+                    println("Finished sleep")
                 }
+                println("Keep-alive is now terminated")
+                sleep(5.seconds)
             }
         }
+    }
 }

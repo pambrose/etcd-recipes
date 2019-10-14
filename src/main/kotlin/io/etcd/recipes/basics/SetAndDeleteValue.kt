@@ -20,11 +20,7 @@ package io.etcd.recipes.basics
 
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Client
-import io.etcd.recipes.common.delete
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.putValue
-import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -39,18 +35,17 @@ fun main() {
         try {
             sleep(3.seconds)
 
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withKvClient { kvClient ->
-                        println("Assigning $path = $keyval")
-                        kvClient.putValue(path, keyval)
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient ->
+                    println("Assigning $path = $keyval")
+                    kvClient.putValue(path, keyval)
 
-                        sleep(5.seconds)
+                    sleep(5.seconds)
 
-                        println("Deleting $path")
-                        kvClient.delete(path)
-                    }
+                    println("Deleting $path")
+                    kvClient.delete(path)
                 }
+            }
         } finally {
             countdown.countDown()
         }
@@ -58,15 +53,14 @@ fun main() {
 
     thread {
         try {
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withKvClient { kvClient ->
-                        repeatWithSleep(12) { _, start ->
-                            val respval = kvClient.getValue(path, "unset")
-                            println("Key $path = $respval after ${System.currentTimeMillis() - start}ms")
-                        }
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient ->
+                    repeatWithSleep(12) { _, start ->
+                        val respval = kvClient.getValue(path, "unset")
+                        println("Key $path = $respval after ${System.currentTimeMillis() - start}ms")
                     }
                 }
+            }
 
         } finally {
             countdown.countDown()

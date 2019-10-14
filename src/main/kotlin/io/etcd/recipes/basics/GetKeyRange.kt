@@ -19,7 +19,6 @@
 package io.etcd.recipes.basics
 
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.recipes.common.*
 import kotlin.time.seconds
@@ -28,66 +27,65 @@ fun main() {
     val urls = listOf("http://localhost:2379")
     val path = "/keyrangetest"
 
-    Client.builder().endpoints(*urls.toTypedArray()).build()
-        .use { client ->
-            client.withWatchClient { watchClient ->
-                client.withKvClient { kvClient ->
-                    kvClient.apply {
+    connectToEtcd(urls) { client ->
+        client.withWatchClient { watchClient ->
+            client.withKvClient { kvClient ->
+                kvClient.apply {
 
-                        val option = WatchOption.newBuilder().withPrefix("/".asByteSequence).build()
-                        watchClient.watcher(path, option) { watchResponse ->
-                            watchResponse.events
-                                .forEach { watchEvent ->
-                                    println("${watchEvent.eventType} for ${watchEvent.keyValue.asPair.asString}")
-                                }
-                        }.use {
-                            // Create empty root
-                            putValue(path, "root")
-
-                            println("After creation:")
-                            println(getKeyValues(path))
-                            println(count(path))
-
-                            sleep(5.seconds)
-
-                            // Add children
-                            putValue("$path/election/a", "a")
-                            putValue("$path/election/b", "bb")
-                            putValue("$path/waiting/c", "ccc")
-                            putValue("$path/waiting/d", "dddd")
-
-                            println("\nAfter addition:")
-                            println(getKeyValues(path).asString)
-                            println(count(path))
-
-                            println("\nElections only:")
-                            println(getKeyValues("$path/election").asString)
-                            println(count("$path/election"))
-
-                            println("\nWaitings only:")
-                            println(getKeyValues("$path/waiting").asString)
-                            println(count("$path/waiting"))
-
-                            sleep(5.seconds)
-
-                            // Delete root
-                            delete(path)
-
-                            // Delete children
-                            getKeys(path).forEach {
-                                println("Deleting key: $it")
-                                delete(it)
+                    val option = WatchOption.newBuilder().withPrefix("/".asByteSequence).build()
+                    watchClient.watcher(path, option) { watchResponse ->
+                        watchResponse.events
+                            .forEach { watchEvent ->
+                                println("${watchEvent.eventType} for ${watchEvent.keyValue.asPair.asString}")
                             }
+                    }.use {
+                        // Create empty root
+                        putValue(path, "root")
 
+                        println("After creation:")
+                        println(getKeyValues(path))
+                        println(count(path))
 
-                            println("\nAfter removal:")
-                            println(getKeyValues(path).asString)
-                            println(count(path))
+                        sleep(5.seconds)
 
-                            sleep(5.seconds)
+                        // Add children
+                        putValue("$path/election/a", "a")
+                        putValue("$path/election/b", "bb")
+                        putValue("$path/waiting/c", "ccc")
+                        putValue("$path/waiting/d", "dddd")
+
+                        println("\nAfter addition:")
+                        println(getKeyValues(path).asString)
+                        println(count(path))
+
+                        println("\nElections only:")
+                        println(getKeyValues("$path/election").asString)
+                        println(count("$path/election"))
+
+                        println("\nWaitings only:")
+                        println(getKeyValues("$path/waiting").asString)
+                        println(count("$path/waiting"))
+
+                        sleep(5.seconds)
+
+                        // Delete root
+                        delete(path)
+
+                        // Delete children
+                        getKeys(path).forEach {
+                            println("Deleting key: $it")
+                            delete(it)
                         }
+
+
+                        println("\nAfter removal:")
+                        println(getKeyValues(path).asString)
+                        println(count(path))
+
+                        sleep(5.seconds)
                     }
                 }
             }
         }
+    }
 }

@@ -22,7 +22,6 @@ import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
-import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
@@ -181,8 +180,8 @@ class DistributedBarrierWithCount(val urls: List<String>,
         @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
+
+            connectToEtcd(urls) { client ->
                     client.withKvClient { kvClient ->
                         // Delete all children
                         kvClient.getKeys(barrierPath).forEach { kvClient.delete(it) }

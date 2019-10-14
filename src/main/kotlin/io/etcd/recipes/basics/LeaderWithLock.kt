@@ -20,7 +20,6 @@ package io.etcd.recipes.basics
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Client
 import io.etcd.recipes.common.*
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -39,8 +38,7 @@ fun main() {
         thread {
             println("Started Thread $i")
 
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
+            connectToEtcd(urls) { client ->
                     val keyval = "client$i"
 
                     sleep(3_000.random.milliseconds)

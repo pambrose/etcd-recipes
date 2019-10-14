@@ -21,7 +21,6 @@ package io.etcd.recipes.counter
 import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
@@ -112,10 +111,9 @@ class DistributedAtomicLong(val urls: List<String>,
         @JvmStatic
         fun delete(urls: List<String>, counterPath: String) {
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
-            Client.builder().endpoints(*urls.toTypedArray()).build()
-                .use { client ->
-                    client.withKvClient { kvClient -> kvClient.delete(counterPath) }
-                }
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient -> kvClient.delete(counterPath) }
+            }
         }
     }
 }
