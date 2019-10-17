@@ -21,12 +21,10 @@ package io.etcd.recipes.counter
 import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.recipes.common.*
 import java.io.Closeable
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.milliseconds
 
 class DistributedAtomicLong(val urls: List<String>,
@@ -49,9 +47,9 @@ class DistributedAtomicLong(val urls: List<String>,
         kvClient.getValue(counterPath, -1L)
     }
 
-    fun increment(): Long = modifyCounterValue(1)
+    fun increment(): Long = modifyCounterValue(1L)
 
-    fun decrement(): Long = modifyCounterValue(-1)
+    fun decrement(): Long = modifyCounterValue(-1L)
 
     fun add(value: Long): Long = modifyCounterValue(value)
 
@@ -67,7 +65,7 @@ class DistributedAtomicLong(val urls: List<String>,
         checkCloseNotCalled()
         return semaphore.withLock {
             var count = 1
-            totalCount.incrementAndGet()
+            //totalCount.incrementAndGet()
             do {
                 val txnResponse = applyCounterTransaction(value)
                 if (!txnResponse.isSucceeded) {
@@ -78,6 +76,7 @@ class DistributedAtomicLong(val urls: List<String>,
                 }
             } while (!txnResponse.isSucceeded)
 
+            // Return the latest value
             kvClient.getValue(counterPath, -1L)
         }
     }
@@ -97,16 +96,15 @@ class DistributedAtomicLong(val urls: List<String>,
 
     private fun applyCounterTransaction(amount: Long): TxnResponse =
         kvClient.transaction {
-            val kvlist: MutableList<KeyValue> = kvClient.getResponse(counterPath).kvs
-            val kv: KeyValue =
-                if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
+            val kvlist = kvClient.getResponse(counterPath).kvs
+            val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
             If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
-            Then(counterPath setTo kv.asLong + amount)
+            Then(counterPath setTo kv.value.asLong + amount)
         }
 
     companion object {
         //val collisionCount = AtomicLong()
-        val totalCount = AtomicLong()
+        //val totalCount = AtomicLong()
 
         @JvmStatic
         fun delete(urls: List<String>, counterPath: String) {

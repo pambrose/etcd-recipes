@@ -279,10 +279,11 @@ class LeaderSelector(val urls: List<String>,
                 Then(path.setTo(clientId, lease.asPutOption))
             }
 
-        if (!txn.isSucceeded) throw EtcdRecipeException("Participation registration failed [$path]")
-
         // Run keep-alive until closed
-        leaseClient.keepAliveWith(lease) { terminateKeepAlive.waitUntilTrue() }
+        if (txn.isSucceeded)
+            leaseClient.keepAliveWith(lease) { terminateKeepAlive.waitUntilTrue() }
+        else
+            throw EtcdRecipeException("Participation registration failed [$path]")
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected

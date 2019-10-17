@@ -45,15 +45,13 @@ Jars are available at [jitpack.io](https://jitpack.io/#pambrose/etcd-recipes).
 ### Gradle
 
 ```
+# Add jitpack.io to the repositories
 repositories {
-    maven { url "https://kotlin.bintray.com/kotlinx" }
-    mavenCentral()
-    jcenter()
     maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    implementation "com.github.pambrose:etcd-recipes:8fafb9b12a"
+    implementation "com.github.pambrose:etcd-recipes:0.9.0"
 }
 ```
 
@@ -63,7 +61,7 @@ dependencies {
 <dependency>
   <groupId>com.github.pambrose</groupId>
   <artifactId>etcd-recipes</artifactId>
-  <version>8fafb9b12a</version>
+  <version>0.9.0</version>
 </dependency>
 ```
 

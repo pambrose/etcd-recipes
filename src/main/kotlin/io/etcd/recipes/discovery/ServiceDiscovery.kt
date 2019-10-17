@@ -77,10 +77,11 @@ data class ServiceDiscovery(val urls: List<String>,
                     Then(instancePath.setTo(service.toJson(), context.lease.asPutOption))
                 }
 
-            if (!txn.isSucceeded) throw EtcdRecipeException("Service registration failed for $instancePath")
-
             // Run keep-alive until closed
-            context.keepAlive = leaseClient.keepAlive(context.lease)
+            if (txn.isSucceeded)
+                context.keepAlive = leaseClient.keepAlive(context.lease)
+            else
+                throw EtcdRecipeException("Service registration failed for $instancePath")
         }
     }
 

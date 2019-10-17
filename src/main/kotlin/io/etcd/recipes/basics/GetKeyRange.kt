@@ -19,7 +19,6 @@
 package io.etcd.recipes.basics
 
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.options.WatchOption
 import io.etcd.recipes.common.*
 import kotlin.time.seconds
 
@@ -28,12 +27,11 @@ fun main() {
     val path = "/keyrangetest"
 
     connectToEtcd(urls) { client ->
-        client.withWatchClient { watchClient ->
-            client.withKvClient { kvClient ->
-                kvClient.apply {
+        client.withKvClient { kvClient ->
+            kvClient.apply {
 
-                    val option = WatchOption.newBuilder().withPrefix("/".asByteSequence).build()
-                    watchClient.watcher(path, option) { watchResponse ->
+                client.withWatchClient { watchClient ->
+                    watchClient.watcher(path, "/".asPrefixWatchOption) { watchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
                                 println("${watchEvent.eventType} for ${watchEvent.keyValue.asPair.asString}")

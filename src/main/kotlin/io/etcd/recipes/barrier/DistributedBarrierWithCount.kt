@@ -23,7 +23,6 @@ import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
-import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.common.*
@@ -141,9 +140,8 @@ class DistributedBarrierWithCount(val urls: List<String>,
 
                 // Watch for DELETE of /ready and PUTS on /waiters/*
                 val adjustedKey = barrierPath.ensureTrailing("/")
-                val watchOption = WatchOption.newBuilder().withPrefix(adjustedKey.asByteSequence).build()
 
-                return watchClient.watcher(adjustedKey, watchOption) { watchResponse ->
+                return watchClient.watcher(adjustedKey, adjustedKey.asPrefixWatchOption) { watchResponse ->
                     watchResponse.events
                         .forEach { watchEvent ->
                             val key = watchEvent.keyValue.key.asString

@@ -19,6 +19,7 @@
 package io.etcd.recipes.common
 
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
@@ -44,6 +45,22 @@ fun Lazy<KV>.putValue(keyname: String, keyval: Int, option: PutOption = PutOptio
 
 fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
+
+// Put values with lease
+fun KV.putValueWithKeepAlive(keyname: String,
+                             keyval: String,
+                             client: Client,
+                             ttl: Long = 2,
+                             block: () -> Unit): Unit {
+    client.withLeaseClient { leaseClient ->
+        val lease = leaseClient.grant(ttl).get()
+        putValue(keyname, keyval, lease.asPutOption)
+        leaseClient.keepAliveWith(lease) {
+            block()
+        }
+    }
+}
+
 
 // Delete keys
 fun KV.delete(vararg keynames: String) = keynames.forEach { delete(it) }

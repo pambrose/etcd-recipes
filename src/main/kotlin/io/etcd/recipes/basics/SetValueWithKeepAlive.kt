@@ -19,36 +19,49 @@
 package io.etcd.recipes.basics
 
 import com.sudothought.common.util.sleep
-import io.etcd.jetcd.Observers
 import io.etcd.recipes.common.*
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
     val path = "/foo"
     val keyval = "foobar"
+    val latch = CountDownLatch(1)
 
-    connectToEtcd(urls) { client ->
-        client.withLeaseClient { leaseClient ->
+    thread {
+        connectToEtcd(urls) { client ->
             client.withKvClient { kvClient ->
-                val lease = leaseClient.grant(1).get()
                 println("Assigning $path = $keyval")
-                kvClient.putValue(path, keyval, lease.asPutOption)
-                leaseClient.keepAlive(lease.id,
-                                      Observers.observer({ next ->
-                                                             println("KeepAlive next resp: $next")
-                                                         },
-                                                         { err ->
-                                                             println("KeepAlive err resp: $err")
-                                                         })
-                                     ).use {
+                kvClient.putValueWithKeepAlive(path, keyval, client) {
                     println("Starting sleep")
-                    sleep(10.seconds)
+                    sleep(5.seconds)
                     println("Finished sleep")
                 }
                 println("Keep-alive is now terminated")
                 sleep(5.seconds)
             }
         }
+        println("Releasing latch")
+        latch.countDown()
     }
+
+    val endWatchLatch = CountDownLatch(1)
+
+    thread {
+        connectToEtcd(urls) { client ->
+            client.withWatchClient { watchClient ->
+                watchClient.watcher(path,
+                                    endWatchLatch,
+                                    { event -> println("Updated key ${event.keyAsString}") },
+                                    { event -> println("Deleted key ${event.keyAsString}") })
+            }
+        }
+    }
+
+    latch.await()
+    println("Releasing endWatchLatch")
+    endWatchLatch.countDown()
+
 }

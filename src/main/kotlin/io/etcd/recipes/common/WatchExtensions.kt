@@ -22,9 +22,20 @@ import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.options.WatchOption
+import io.etcd.jetcd.watch.WatchEvent
+import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.jetcd.watch.WatchResponse
+import java.util.concurrent.CountDownLatch
 
 val KeyValue.asPair: Pair<String, ByteSequence> get() = Pair(key.asString, value)
+
+val WatchEvent.keyAsString get() = keyValue.key.asString
+val WatchEvent.keyAsInt get() = keyValue.key.asInt
+val WatchEvent.keyAsLong get() = keyValue.key.asLong
+
+val WatchEvent.valueAsString get() = keyValue.value.asString
+val WatchEvent.valueAsInt get() = keyValue.value.asInt
+val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
 val String.asPrefixWatchOption: WatchOption
     get() = WatchOption.newBuilder().withPrefix(asByteSequence).build()
@@ -36,5 +47,28 @@ fun Lazy<Watch>.watcher(keyname: String,
 fun Watch.watcher(keyname: String,
                   option: WatchOption = WatchOption.DEFAULT,
                   block: (WatchResponse) -> Unit): Watch.Watcher = watch(keyname.asByteSequence, option) { block(it) }
+
+fun Watch.watcher(keyname: String,
+                  endWatchLatch: CountDownLatch,
+                  onPut: (WatchEvent) -> Unit,
+                  onDelete: (WatchEvent) -> Unit,
+                  option: WatchOption = WatchOption.DEFAULT): CountDownLatch {
+    watch(keyname.asByteSequence, option) { watchResponse ->
+        watchResponse.events
+            .forEach { event ->
+                when (event.eventType) {
+                    EventType.PUT          -> onPut(event)
+                    EventType.DELETE       -> onDelete(event)
+                    EventType.UNRECOGNIZED -> { // Ignore
+                    }
+                    else                   -> { // Ignore
+                    }
+                }
+            }
+    }.use {
+        endWatchLatch.await()
+    }
+    return endWatchLatch
+}
 
 private val nullWatchOption: WatchOption = WatchOption.newBuilder().withRange(ByteSequence.from(ByteArray(1))).build()
