@@ -16,7 +16,7 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package io.etcd.recipes.basics
+package io.etcd.recipes.examples.basics
 
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep

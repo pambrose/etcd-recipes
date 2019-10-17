@@ -16,7 +16,7 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package io.etcd.recipes.basics
+package io.etcd.recipes.examples.basics
 
 import io.etcd.jetcd.KV
 import io.etcd.recipes.common.*

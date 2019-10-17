@@ -16,7 +16,7 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package io.etcd.recipes.basics
+package io.etcd.recipes.examples.basics
 
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
@@ -37,13 +37,16 @@ fun main() {
 
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
-                    println("Assigning $path = $keyval")
-                    kvClient.putValue(path, keyval)
+                    repeatWithSleep(10) { i, _ ->
+                        val kv = keyval + i
+                        println("Assigning $path = $kv")
+                        kvClient.putValue(path, kv)
 
-                    sleep(5.seconds)
+                        sleep(1.seconds)
 
-                    println("Deleting $path")
-                    kvClient.delete(path)
+                        println("Deleting $path")
+                        kvClient.delete(path)
+                    }
                 }
             }
         } finally {
@@ -54,14 +57,20 @@ fun main() {
     thread {
         try {
             connectToEtcd(urls) { client ->
-                client.withKvClient { kvClient ->
-                    repeatWithSleep(12) { _, start ->
-                        val respval = kvClient.getValue(path, "unset")
-                        println("Key $path = $respval after ${System.currentTimeMillis() - start}ms")
+                client.withWatchClient { watchClient ->
+                    println("Starting watch")
+                    watchClient.watcher(path) { watchResponse ->
+                        watchResponse.events
+                            .forEach { watchEvent ->
+                                println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asPair.asString}")
+                            }
+                    }.use {
+                        sleep(5.seconds)
+                        println("Closing watch")
                     }
+                    println("Closed watch")
                 }
             }
-
         } finally {
             countdown.countDown()
         }

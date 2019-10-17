@@ -27,22 +27,24 @@ import io.etcd.jetcd.kv.PutResponse
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 
-// Put values
-fun KV.putValue(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): PutResponse =
+// Put values -- these do not use default values to improve the Java calls
+fun KV.putValue(keyname: String, keyval: String, option: PutOption): PutResponse =
     put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
-fun KV.putValue(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): PutResponse =
+fun KV.putValue(keyname: String, keyval: Int, option: PutOption): PutResponse =
     put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
-fun KV.putValue(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
+fun KV.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
     put(keyname.asByteSequence, keyval.asByteSequence, option).get()
+
+fun KV.putValue(keyname: String, keyval: String): PutResponse = putValue(keyname, keyval, PutOption.DEFAULT)
+fun KV.putValue(keyname: String, keyval: Int): PutResponse = putValue(keyname, keyval, PutOption.DEFAULT)
+fun KV.putValue(keyname: String, keyval: Long): PutResponse = putValue(keyname, keyval, PutOption.DEFAULT)
 
 fun Lazy<KV>.putValue(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
-
 fun Lazy<KV>.putValue(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
-
 fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
 
