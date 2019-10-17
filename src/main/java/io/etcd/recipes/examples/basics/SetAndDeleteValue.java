@@ -41,30 +41,28 @@ public class SetAndDeleteValue {
         executor.execute(() -> {
             sleepMillis(3_000);
 
-            try (Client client = ClientExtensionsKt.connectToEtcd(urls)) {
-                try (KV kvClient = client.getKVClient()) {
-                    System.out.println(format("Assigning %s = %s", path, keyval));
-                    putValue(kvClient, path, keyval);
+            try (Client client = ClientExtensionsKt.connectToEtcd(urls);
+                 KV kvClient = client.getKVClient()) {
+                System.out.println(format("Assigning %s = %s", path, keyval));
+                putValue(kvClient, path, keyval);
 
-                    sleepMillis(5_000);
+                sleepMillis(5_000);
 
-                    System.out.println(format("Deleting %s", path));
-                    delete(kvClient, path);
-                }
+                System.out.println(format("Deleting %s", path));
+                delete(kvClient, path);
             }
             latch.countDown();
         });
 
         executor.execute(() -> {
-            try (Client client = ClientExtensionsKt.connectToEtcd(urls)) {
-                try (KV kvClient = client.getKVClient()) {
-                    long start = System.currentTimeMillis();
-                    for (int i = 0; i < 12; i++) {
-                        long elapsed = System.currentTimeMillis() - start;
-                        System.out.println(format("Key %s = %s after %dms",
-                                path, getValue(kvClient, path, "unset"), elapsed));
-                        sleepMillis(1_000);
-                    }
+            try (Client client = ClientExtensionsKt.connectToEtcd(urls);
+                 KV kvClient = client.getKVClient()) {
+                long start = System.currentTimeMillis();
+                for (int i = 0; i < 12; i++) {
+                    long elapsed = System.currentTimeMillis() - start;
+                    System.out.println(format("Key %s = %s after %dms",
+                            path, getValue(kvClient, path, "unset"), elapsed));
+                    sleepMillis(1_000);
                 }
             }
             latch.countDown();
