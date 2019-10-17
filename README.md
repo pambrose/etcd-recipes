@@ -15,6 +15,22 @@ for [etcd](https://etcd.io) v3, a distributed, reliable key-value store. It atte
 kind of support for [etcd](https://etcd.io) that 
 [Curator](https://curator.apache.org) does for [ZooKeeper](https://zookeeper.apache.org).
 
+## Examples
+
+[Java](https://github.com/pambrose/etcd-recipes/tree/master/src/main/java/io/etcd/recipes/examples) 
+and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/src/main/kotlin/io/etcd/recipes/examples) 
+examples are included in the repo.
+
+## Usage
+```kotlin
+connectToEtcd(urls) { client ->
+    client.withKvClient { kvClient ->
+        kvClient.putValue("test_key", "test_value")
+        sleep(5.seconds)
+        kvClient.delete("test_key")
+    }
+}
+```
 
 ## Compatability
 etcd-recipes is built on top of [jetcd](https://github.com/etcd-io/jetcd), which works with etcd v3.
@@ -22,3 +38,37 @@ etcd-recipes is built on top of [jetcd](https://github.com/etcd-io/jetcd), which
 etcd-recipies is written in Kotlin, but is usable by Java and any other JVM clients.
 
 
+## Download
+
+Jars are available at [jitpack.io](https://jitpack.io/#pambrose/etcd-recipes).
+
+### Gradle
+
+```
+repositories {
+    maven { url "https://kotlin.bintray.com/kotlinx" }
+    mavenCentral()
+    jcenter()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation "com.github.pambrose:etcd-recipes:8fafb9b12a"
+}
+```
+
+### Maven
+
+``` 
+<dependency>
+  <groupId>com.github.pambrose</groupId>
+  <artifactId>etcd-recipes</artifactId>
+  <version>8fafb9b12a</version>
+</dependency>
+```
+
+## Running tests
+   
+```nashorn js
+make tests
+```

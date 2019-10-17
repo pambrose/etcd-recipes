@@ -14,4 +14,3 @@ refresh:
 
 versioncheck:
 	./gradlew dependencyUpdates
-
