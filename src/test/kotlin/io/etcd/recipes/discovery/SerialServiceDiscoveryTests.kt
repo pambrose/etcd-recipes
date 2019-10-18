@@ -33,6 +33,12 @@ class SerialServiceDiscoveryTests {
     val path = "/discovery/${javaClass.simpleName}"
 
     @Test
+    fun badArgsTest() {
+        invoking { ServiceDiscovery(urls, "") } shouldThrow IllegalArgumentException::class
+        invoking { ServiceDiscovery(emptyList(), "something") } shouldThrow IllegalArgumentException::class
+    }
+
+    @Test
     fun discoveryTest() {
         ServiceDiscovery(urls, path).use { sd ->
 

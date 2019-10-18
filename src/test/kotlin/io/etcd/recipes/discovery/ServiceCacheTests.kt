@@ -33,9 +33,10 @@ import kotlin.time.seconds
 
 class ServiceCacheTests {
 
+    val urls = listOf("http://localhost:2379")
+
     @Test
     fun serviceCacheTest() {
-        val urls = listOf("http://localhost:2379")
         val path = "/discovery/${javaClass.simpleName}"
         val threadCount = 10
         val serviceCount = 10

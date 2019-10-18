@@ -23,10 +23,7 @@ import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
 import mu.KLogging
-import org.amshove.kluent.shouldBeFalse
-import org.amshove.kluent.shouldBeLessThan
-import org.amshove.kluent.shouldBeTrue
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.*
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -37,9 +34,16 @@ import kotlin.time.seconds
 
 class DistributedBarrierTests {
 
+    val urls = listOf("http://localhost:2379")
+
+    @Test
+    fun badArgsTest() {
+        invoking { DistributedBarrier(urls, "") } shouldThrow IllegalArgumentException::class
+        invoking { DistributedBarrier(emptyList(), "something") } shouldThrow IllegalArgumentException::class
+    }
+
     @Test
     fun barrierTest() {
-        val urls = listOf("http://localhost:2379")
         val path = "/barriers/${javaClass.simpleName}"
         val count = 10
         val setBarrierLatch = CountDownLatch(1)
@@ -113,7 +117,6 @@ class DistributedBarrierTests {
 
     @Test
     fun earlySetBarrierTest() {
-        val urls = listOf("http://localhost:2379")
         val path = "/barriers/early${javaClass.simpleName}"
         val count = 10
         val removeBarrierTime = AtomicLong(0)

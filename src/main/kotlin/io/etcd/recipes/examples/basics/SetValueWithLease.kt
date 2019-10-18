@@ -29,7 +29,7 @@ fun main() {
     val urls = listOf("http://localhost:2379")
     val path = "/foo"
     val keyval = "foobar"
-    val countdown = CountDownLatch(2)
+    val latch = CountDownLatch(2)
 
     thread {
         try {
@@ -45,7 +45,7 @@ fun main() {
                 }
             }
         } finally {
-            countdown.countDown()
+            latch.countDown()
         }
     }
 
@@ -61,9 +61,9 @@ fun main() {
             }
 
         } finally {
-            countdown.countDown()
+            latch.countDown()
         }
     }
 
-    countdown.await()
+    latch.await()
 }

@@ -42,7 +42,6 @@ class ThreadedServiceDiscoveryTests {
 
     @Test
     fun discoveryTest() {
-
         // Create services
         blockingThreads(threadCount) {
             // Close ServiceDiscovery objects at end

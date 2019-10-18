@@ -21,7 +21,9 @@ package io.etcd.recipes.election
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import mu.KLogging
+import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
@@ -29,6 +31,12 @@ import kotlin.time.seconds
 class SerialLeaderSelectorTests {
     val urls = listOf("http://localhost:2379")
     val path = "/election/${javaClass.simpleName}"
+
+    @Test
+    fun badArgsTest() {
+        invoking { LeaderSelector(urls, "") } shouldThrow IllegalArgumentException::class
+        invoking { LeaderSelector(emptyList(), "something") } shouldThrow IllegalArgumentException::class
+    }
 
     @Test
     fun serialElectionTest() {

@@ -23,7 +23,9 @@ import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
 import mu.KLogging
+import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -33,9 +35,17 @@ import kotlin.time.seconds
 
 class DistributedDoubleBarrierTests {
 
+    val urls = listOf("http://localhost:2379")
+
+    @Test
+    fun badArgsTest() {
+        invoking { DistributedDoubleBarrier(urls, "something", 0) } shouldThrow IllegalArgumentException::class
+        invoking { DistributedDoubleBarrier(urls, "", 1) } shouldThrow IllegalArgumentException::class
+        invoking { DistributedDoubleBarrier(emptyList(), "something", 1) } shouldThrow IllegalArgumentException::class
+    }
+
     @Test
     fun main() {
-        val urls = listOf("http://localhost:2379")
         val path = "/barriers/${javaClass.simpleName}"
         val count = 10
         val retryAttempts = 5

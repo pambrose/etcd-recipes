@@ -25,7 +25,9 @@ import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.threadWithExceptionCheck
 import io.etcd.recipes.common.throwExceptionFromList
 import mu.KLogging
+import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
@@ -37,6 +39,12 @@ class DistributedAtomicLongTests {
 
     @BeforeEach
     fun deleteCounter() = DistributedAtomicLong.delete(urls, path)
+
+    @Test
+    fun badArgsTest() {
+        invoking { DistributedAtomicLong(urls, "") } shouldThrow IllegalArgumentException::class
+        invoking { DistributedAtomicLong(emptyList(), "something") } shouldThrow IllegalArgumentException::class
+    }
 
     @Test
     fun defaultInitialValueTest() {
