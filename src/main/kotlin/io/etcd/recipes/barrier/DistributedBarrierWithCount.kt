@@ -103,7 +103,7 @@ constructor(val urls: List<String>,
                     // Delete /ready key
                     kvClient.transaction {
                         If(readyPath.doesExist)
-                        Then(deleteOp(readyPath))
+                        Then(deleteKey(readyPath))
                     }
                 }
             }

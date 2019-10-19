@@ -19,7 +19,6 @@
 
 package io.etcd.recipes.common
 
-import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.kv.TxnResponse
@@ -29,10 +28,6 @@ import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.PutOption
 
-fun <T> equalTo(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, target)
-fun <T> lessThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.LESS, target)
-fun <T> greaterThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.GREATER, target)
-
 fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
     txn().run {
         block()
@@ -41,33 +36,26 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
 
 fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
 
-@JvmOverloads
-fun deleteOp(keyname: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
-    Op.delete(keyname.asByteSequence, option)
-
-@JvmOverloads
-fun putOp(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): Op.PutOp =
-    putOp(keyname, keyval.asByteSequence, option)
-
-@JvmOverloads
-fun putOp(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): Op.PutOp =
-    putOp(keyname, keyval.asByteSequence, option)
-
-@JvmOverloads
-fun putOp(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): Op.PutOp =
-    putOp(keyname, keyval.asByteSequence, option)
-
-@JvmOverloads
-fun putOp(keyname: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): Op.PutOp =
-    Op.put(keyname.asByteSequence, keyval, option)
+fun <T> equalTo(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, target)
+fun <T> lessThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.LESS, target)
+fun <T> greaterThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.GREATER, target)
 
 val String.doesNotExist: Cmp get() = equalTo(this, CmpTarget.version(0))
 val String.doesExist: Cmp get() = greaterThan(this, CmpTarget.version(0))
 
-infix fun String.setTo(keyval: String): Op.PutOp = putOp(this, keyval)
-infix fun String.setTo(keyval: Int): Op.PutOp = putOp(this, keyval)
-infix fun String.setTo(keyval: Long): Op.PutOp = putOp(this, keyval)
+@JvmOverloads
+fun deleteKey(keyname: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
+    Op.delete(keyname.asByteSequence, option)
 
-fun String.setTo(keyval: String, putOption: PutOption): Op.PutOp = putOp(this, keyval, putOption)
-fun String.setTo(keyval: Int, putOption: PutOption): Op.PutOp = putOp(this, keyval, putOption)
-fun String.setTo(keyval: Long, putOption: PutOption): Op.PutOp = putOp(this, keyval, putOption)
+fun String.setTo(keyval: String, putOption: PutOption): Op.PutOp =
+    Op.put(this.asByteSequence, keyval.asByteSequence, putOption)
+
+fun String.setTo(keyval: Int, putOption: PutOption): Op.PutOp =
+    Op.put(this.asByteSequence, keyval.asByteSequence, putOption)
+
+fun String.setTo(keyval: Long, putOption: PutOption): Op.PutOp =
+    Op.put(this.asByteSequence, keyval.asByteSequence, putOption)
+
+infix fun String.setTo(keyval: String): Op.PutOp = setTo(keyval, PutOption.DEFAULT)
+infix fun String.setTo(keyval: Int): Op.PutOp = setTo(keyval, PutOption.DEFAULT)
+infix fun String.setTo(keyval: Long): Op.PutOp = setTo(keyval, PutOption.DEFAULT)
