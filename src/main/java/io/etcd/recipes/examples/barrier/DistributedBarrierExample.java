@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
+import static java.lang.String.format;
 
 public class DistributedBarrierExample {
 
@@ -57,13 +58,13 @@ public class DistributedBarrierExample {
                         try {
                             goLatch.await();
                             try (DistributedBarrier barrier = new DistributedBarrier(urls, path, true)) {
-                                System.out.println(String.format("%d Waiting on Barrier", id));
+                                System.out.println(format("%d Waiting on Barrier", id));
                                 barrier.waitOnBarrier(1, TimeUnit.SECONDS);
 
-                                System.out.println(String.format("%d Timed out waiting on barrier, waiting again", id));
+                                System.out.println(format("%d Timed out waiting on barrier, waiting again", id));
                                 barrier.waitOnBarrier();
 
-                                System.out.println(String.format("%d Done Waiting on Barrier", id));
+                                System.out.println(format("%d Done Waiting on Barrier", id));
                                 waitLatch.countDown();
                             }
                         } catch (InterruptedException e) {

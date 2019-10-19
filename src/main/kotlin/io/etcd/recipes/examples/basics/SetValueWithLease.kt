@@ -32,37 +32,29 @@ fun main() {
     val latch = CountDownLatch(2)
 
     thread {
-        try {
-            sleep(3.seconds)
-
-            connectToEtcd(urls) { client ->
-                client.withLeaseClient { leaseClient ->
-                    client.withKvClient { kvClient ->
-                        println("Assigning $path = $keyval")
-                        val lease = leaseClient.grant(5).get()
-                        kvClient.putValue(path, keyval, lease.asPutOption)
-                    }
+        sleep(3.seconds)
+        connectToEtcd(urls) { client ->
+            client.withLeaseClient { leaseClient ->
+                client.withKvClient { kvClient ->
+                    println("Assigning $path = $keyval")
+                    val lease = leaseClient.grant(5).get()
+                    kvClient.putValue(path, keyval, lease.asPutOption)
                 }
             }
-        } finally {
-            latch.countDown()
         }
+        latch.countDown()
     }
 
     thread {
-        try {
-            connectToEtcd(urls) { client ->
-                client.withKvClient { kvClient ->
-                    repeatWithSleep(12) { _, start ->
-                        val kval = kvClient.getValue(path, "unset")
-                        println("Key $path = $kval after ${System.currentTimeMillis() - start}ms")
-                    }
+        connectToEtcd(urls) { client ->
+            client.withKvClient { kvClient ->
+                repeatWithSleep(12) { _, start ->
+                    val kval = kvClient.getValue(path, "unset")
+                    println("Key $path = $kval after ${System.currentTimeMillis() - start}ms")
                 }
             }
-
-        } finally {
-            latch.countDown()
         }
+        latch.countDown()
     }
 
     latch.await()

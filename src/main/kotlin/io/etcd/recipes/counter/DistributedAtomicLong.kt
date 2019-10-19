@@ -27,12 +27,11 @@ import io.etcd.recipes.common.*
 import java.io.Closeable
 import kotlin.time.milliseconds
 
-class DistributedAtomicLong(val urls: List<String>,
-                            val counterPath: String,
-                            private val defaultValue: Long) : EtcdConnector(urls), Closeable {
-
-    // For Java clients
-    constructor(urls: List<String>, counterPath: String) : this(urls, counterPath, 0L)
+class DistributedAtomicLong
+@JvmOverloads
+constructor(val urls: List<String>,
+            val counterPath: String,
+            private val defaultValue: Long = 0L) : EtcdConnector(urls), Closeable {
 
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }

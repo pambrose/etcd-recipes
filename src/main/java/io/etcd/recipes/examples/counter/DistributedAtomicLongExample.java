@@ -25,6 +25,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static java.lang.String.format;
+
 public class DistributedAtomicLongExample {
 
     public static void main(String[] args) throws InterruptedException {
@@ -41,7 +43,7 @@ public class DistributedAtomicLongExample {
             final int id = i;
             executor.execute(() -> {
                 try (DistributedAtomicLong counter = new DistributedAtomicLong(urls, path)) {
-                    System.out.println("Creating counter #" + id);
+                    System.out.println(format("Creating counter #%d", id));
                     for (int j = 0; j < repeatCount; j++) counter.increment();
                     for (int j = 0; j < repeatCount; j++) counter.decrement();
                     for (int j = 0; j < repeatCount; j++) counter.add(5);
@@ -55,7 +57,7 @@ public class DistributedAtomicLongExample {
         latch.await();
 
         try (DistributedAtomicLong counter = new DistributedAtomicLong(urls, path)) {
-            System.out.println(String.format("Counter value = %d", counter.get()));
+            System.out.println(format("Counter value = %d", counter.get()));
         }
 
         executor.shutdown();

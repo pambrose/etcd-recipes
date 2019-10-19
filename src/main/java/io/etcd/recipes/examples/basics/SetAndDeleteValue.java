@@ -19,7 +19,6 @@ package io.etcd.recipes.examples.basics;
 import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
-import io.etcd.recipes.common.ClientExtensionsKt;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -27,7 +26,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static com.sudothought.common.util.Misc.sleepMillis;
-import static io.etcd.recipes.common.KVExtensionsKt.*;
+import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
+import static io.etcd.recipes.common.KVUtils.*;
 import static java.lang.String.format;
 
 public class SetAndDeleteValue {
@@ -41,7 +41,7 @@ public class SetAndDeleteValue {
         executor.execute(() -> {
             sleepMillis(3_000);
 
-            try (Client client = ClientExtensionsKt.connectToEtcd(urls);
+            try (Client client = connectToEtcd(urls);
                  KV kvClient = client.getKVClient()) {
                 System.out.println(format("Assigning %s = %s", path, keyval));
                 putValue(kvClient, path, keyval);
@@ -55,7 +55,7 @@ public class SetAndDeleteValue {
         });
 
         executor.execute(() -> {
-            try (Client client = ClientExtensionsKt.connectToEtcd(urls);
+            try (Client client = connectToEtcd(urls);
                  KV kvClient = client.getKVClient()) {
                 long start = System.currentTimeMillis();
                 for (int i = 0; i < 12; i++) {

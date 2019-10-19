@@ -38,14 +38,12 @@ import kotlin.time.days
     Query the number of children after each PUT on waiter and DELETE /ready if memberCount seen
     Leave if DELETE of /ready is seen
 */
-class DistributedBarrierWithCount(val urls: List<String>,
-                                  val barrierPath: String,
-                                  val memberCount: Int,
-                                  val clientId: String) : EtcdConnector(urls), Closeable {
-
-    constructor(urls: List<String>,
-                barrierPath: String,
-                memberCount: Int) : this(urls, barrierPath, memberCount, "Client:${randomId(7)}")
+class DistributedBarrierWithCount
+@JvmOverloads
+constructor(val urls: List<String>,
+            val barrierPath: String,
+            val memberCount: Int,
+            val clientId: String = "Client:${randomId(7)}") : EtcdConnector(urls), Closeable {
 
     private val readyPath = barrierPath.appendToPath("ready")
     private val waitingPath = barrierPath.appendToPath("waiting")

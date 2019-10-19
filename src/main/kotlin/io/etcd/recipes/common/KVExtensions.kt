@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+@file:JvmName("KVUtils")
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
 package io.etcd.recipes.common
@@ -49,6 +50,7 @@ fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption = PutOpti
     value.putValue(keyname, keyval, option)
 
 // Put values with lease
+@JvmOverloads
 fun KV.putValueWithKeepAlive(keyname: String,
                              keyval: String,
                              client: Client,
@@ -72,9 +74,11 @@ fun Lazy<KV>.delete(keyname: String): DeleteResponse = value.delete(keyname)
 fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).get()
 
 // Get responses
+@JvmOverloads
 fun KV.getResponse(keyname: String, option: GetOption = GetOption.DEFAULT): GetResponse =
     get(keyname.asByteSequence, option).get()
 
+@JvmOverloads
 fun Lazy<KV>.getResponse(keyname: String, option: GetOption = GetOption.DEFAULT): GetResponse =
     value.getResponse(keyname, option)
 

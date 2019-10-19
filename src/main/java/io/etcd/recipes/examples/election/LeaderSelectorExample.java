@@ -24,6 +24,7 @@ import java.util.List;
 
 import static com.sudothought.common.util.Misc.random;
 import static com.sudothought.common.util.Misc.sleepSecs;
+import static java.lang.String.format;
 
 public class LeaderSelectorExample {
 
@@ -39,12 +40,12 @@ public class LeaderSelectorExample {
                         System.out.println(selector.getClientId() + " elected leader");
                         long pause = random(5);
                         sleepSecs(pause);
-                        System.out.println(String.format("%s surrendering after %s seconds", selector.getClientId(), pause));
+                        System.out.println(format("%s surrendering after %s seconds", selector.getClientId(), pause));
                     }
 
                     @Override
                     public void relinquishLeadership(LeaderSelector selector) {
-                        System.out.println(String.format("%s relinquished leadership", selector.getClientId()));
+                        System.out.println(format("%s relinquished leadership", selector.getClientId()));
                     }
                 };
 
@@ -65,7 +66,7 @@ public class LeaderSelectorExample {
         for (LeaderSelector selector : selectors)
             selector.start();
 
-        System.out.println(String.format("Participants: %s", LeaderSelector.getParticipants(urls, electionPath)));
+        System.out.println(format("Participants: %s", LeaderSelector.getParticipants(urls, electionPath)));
 
         for (LeaderSelector selector : selectors)
             selector.waitOnLeadershipComplete();

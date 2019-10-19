@@ -32,17 +32,14 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 
-class DistributedBarrier(val urls: List<String>,
-                         val barrierPath: String,
-                         private val waitOnMissingBarriers: Boolean,
-                         val clientId: String) : EtcdConnector(urls), Closeable {
 
-    constructor(urls: List<String>,
-                barrierPath: String,
-                waitOnMissingBarrier: Boolean = true) : this(urls,
-                                                             barrierPath,
-                                                             waitOnMissingBarrier,
-                                                             "Client:${randomId(7)}")
+class DistributedBarrier
+@JvmOverloads
+constructor(val urls: List<String>,
+            val barrierPath: String,
+            private val waitOnMissingBarriers: Boolean = true,
+            val clientId: String = "Client:${randomId(7)}") : EtcdConnector(urls), Closeable {
+
 
     private var keepAliveLease by nullableReference<CloseableClient?>(null)
     private var barrierRemoved by atomicBoolean(false)

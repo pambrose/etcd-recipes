@@ -29,12 +29,11 @@ import io.etcd.recipes.common.*
 import java.io.Closeable
 import java.util.*
 
-data class ServiceDiscovery(val urls: List<String>,
-                            private val basePath: String,
-                            val clientId: String) : EtcdConnector(urls), Closeable {
-
-    // For Java clients
-    constructor(urls: List<String>, basePath: String) : this(urls, basePath, "Client:${randomId(7)}")
+data class ServiceDiscovery
+@JvmOverloads
+constructor(val urls: List<String>,
+            private val basePath: String,
+            val clientId: String = "Client:${randomId(7)}") : EtcdConnector(urls), Closeable {
 
     private val namesPath = basePath.appendToPath("/names")
     private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()

@@ -26,14 +26,12 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 
-class DistributedDoubleBarrier(val urls: List<String>,
-                               barrierPath: String,
-                               memberCount: Int,
-                               val clientId: String) : Closeable {
-
-    constructor(urls: List<String>,
-                barrierPath: String,
-                memberCount: Int) : this(urls, barrierPath, memberCount, "Client:${randomId(7)}")
+class DistributedDoubleBarrier
+@JvmOverloads
+constructor(val urls: List<String>,
+            barrierPath: String,
+            memberCount: Int,
+            val clientId: String = "Client:${randomId(7)}") : Closeable {
 
     private val enterBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("enter"), memberCount)
     private val leaveBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("leave"), memberCount)

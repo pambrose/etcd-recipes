@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+@file:JvmName("PathUtils")
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
 package io.etcd.recipes.common
@@ -40,18 +41,23 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
 
 fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
 
+@JvmOverloads
 fun deleteOp(keyname: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
     Op.delete(keyname.asByteSequence, option)
 
+@JvmOverloads
 fun putOp(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): Op.PutOp =
     putOp(keyname, keyval.asByteSequence, option)
 
+@JvmOverloads
 fun putOp(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): Op.PutOp =
     putOp(keyname, keyval.asByteSequence, option)
 
+@JvmOverloads
 fun putOp(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): Op.PutOp =
     putOp(keyname, keyval.asByteSequence, option)
 
+@JvmOverloads
 fun putOp(keyname: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): Op.PutOp =
     Op.put(keyname.asByteSequence, keyval, option)
 

@@ -53,7 +53,7 @@ class ThreadedLeaderSelectorTests {
                     logger.info { "${selector.clientId} relinquished leadership" }
                 }
 
-            LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, "Thread$it")
+            LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, clientId = "Thread$it")
                 .use { election ->
                     election.start()
                     election.waitOnLeadershipComplete()
@@ -87,7 +87,7 @@ class ThreadedLeaderSelectorTests {
 
             logger.info { "Creating Thread$it" }
             val election =
-                LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, "Thread$it")
+                LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, clientId = "Thread$it")
             electionList += election
             election.start()
         }

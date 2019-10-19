@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+@file:JvmName("WatchUtils")
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
 package io.etcd.recipes.common
@@ -44,10 +45,12 @@ fun Lazy<Watch>.watcher(keyname: String,
                         option: WatchOption = WatchOption.DEFAULT,
                         block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyname, option, block)
 
+@JvmOverloads
 fun Watch.watcher(keyname: String,
                   option: WatchOption = WatchOption.DEFAULT,
                   block: (WatchResponse) -> Unit): Watch.Watcher = watch(keyname.asByteSequence, option) { block(it) }
 
+@JvmOverloads
 fun Watch.watcher(keyname: String,
                   endWatchLatch: CountDownLatch,
                   onPut: (WatchEvent) -> Unit,

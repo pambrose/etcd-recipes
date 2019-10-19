@@ -39,48 +39,22 @@ import kotlin.time.seconds
 
 
 // For Java clients
-class LeaderSelector(val urls: List<String>,
-                     val electionPath: String,
-                     private val listener: LeaderSelectorListener,
-                     val clientId: String,
-                     private val userExecutor: ExecutorService?) : Closeable {
-
-    // For Java clients
-    constructor(urls: List<String>,
-                electionPath: String,
-                listener: LeaderSelectorListener) : this(urls,
-                                                         electionPath,
-                                                         listener,
-                                                         "Client:${randomId(7)}",
-                                                         null)
-
-    // For Java clients
-    constructor(urls: List<String>,
-                electionPath: String,
-                listener: LeaderSelectorListener,
-                clientId: String) : this(urls,
-                                         electionPath,
-                                         listener,
-                                         clientId,
-                                         null)
-
-    // For Java clients
-    constructor(urls: List<String>,
-                electionPath: String,
-                listener: LeaderSelectorListener,
-                executorService: ExecutorService) : this(urls,
-                                                         electionPath,
-                                                         listener,
-                                                         "Client:${randomId(7)}",
-                                                         executorService)
+class LeaderSelector
+@JvmOverloads
+constructor(val urls: List<String>,
+            val electionPath: String,
+            private val listener: LeaderSelectorListener,
+            private val userExecutor: ExecutorService? = null,
+            val clientId: String = "Client:${randomId(7)}") : Closeable {
 
     // For Kotlin clients
+    @JvmOverloads
     constructor(urls: List<String>,
                 electionPath: String,
                 takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
                 relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-                clientId: String = "Client:${randomId(7)}",
-                executorService: ExecutorService? = null) :
+                executorService: ExecutorService? = null,
+                clientId: String = "Client:${randomId(7)}") :
             this(urls,
                  electionPath,
                  object : LeaderSelectorListener {
@@ -92,8 +66,8 @@ class LeaderSelector(val urls: List<String>,
                          relinquishLeadershipBlock.invoke(selector)
                      }
                  },
-                 clientId,
-                 executorService)
+                 executorService,
+                 clientId)
 
     private val closeSemaphore = Semaphore(1, true)
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)

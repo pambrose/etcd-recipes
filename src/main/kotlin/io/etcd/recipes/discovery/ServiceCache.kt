@@ -30,8 +30,7 @@ import java.util.*
 
 class ServiceCache internal constructor(val urls: List<String>,
                                         namesPath: String,
-                                        val serviceName: String
-                                       ) : EtcdConnector(urls), Closeable {
+                                        val serviceName: String) : EtcdConnector(urls), Closeable {
 
     private var startCalled by atomicBoolean(false)
     private val servicePath = namesPath.appendToPath(serviceName)

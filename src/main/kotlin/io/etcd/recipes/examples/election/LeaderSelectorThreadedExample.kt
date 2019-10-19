@@ -47,7 +47,7 @@ fun main() {
                     println("${selector.clientId} relinquished leadership")
                 }
 
-            LeaderSelector(urls, electionPath, takeLeadershipAction, relinquishLeadershipAction, "Thread$it")
+            LeaderSelector(urls, electionPath, takeLeadershipAction, relinquishLeadershipAction, clientId = "Thread$it")
                 .use { election ->
                     election.start()
                     election.waitOnLeadershipComplete()

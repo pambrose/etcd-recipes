@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
+import static java.lang.String.format;
 
 public class ServiceCacheExample {
 
@@ -38,7 +39,7 @@ public class ServiceCacheExample {
                     cache.addListenerForChanges(
                             (eventType, isNew, name, serviceInstance) -> {
                                 String action = isNew ? "added" : "updated";
-                                System.out.println(String.format("Change %s %s %s", eventType, action, name));
+                                System.out.println(format("Change %s %s %s", eventType, action, name));
                                 if (serviceInstance != null)
                                     System.out.println("Payload = " + IntPayload.toObject(serviceInstance.getJsonPayload()));
                                 //System.out.println(cache.getInstances());
