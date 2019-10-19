@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.examples.barrier
 
+import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedBarrierWithCount
@@ -35,20 +36,21 @@ fun main() {
     DistributedBarrierWithCount.delete(urls, barrierPath)
 
     fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
-        sleep(10.random.seconds)
-        println("#$id Waiting on barrier")
+        waitLatch.countDown {
+            sleep(10.random.seconds)
+            println("#$id Waiting on barrier")
 
-        repeat(retryCount) {
-            barrier.waitOnBarrier(2.seconds)
-            println("#$id Timed out waiting on barrier, waiting again")
+            repeat(retryCount) {
+                barrier.waitOnBarrier(2.seconds)
+                println("#$id Timed out waiting on barrier, waiting again")
+            }
+
+            retryLatch.countDown()
+
+            println("#$id Waiter count = ${barrier.waiterCount}")
+            barrier.waitOnBarrier()
+            println("#$id Done waiting on barrier")
         }
-
-        retryLatch.countDown()
-        println("#$id Waiter count = ${barrier.waiterCount}")
-        barrier.waitOnBarrier()
-
-        println("#$id Done waiting on barrier")
-        waitLatch.countDown()
     }
 
     repeat(count - 1) { i ->

@@ -19,6 +19,9 @@ package io.etcd.recipes.examples.basics;
 import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
+import io.etcd.jetcd.Watch;
+import io.etcd.recipes.common.WatchUtils;
+import kotlin.Unit;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -27,46 +30,61 @@ import java.util.concurrent.Executors;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.*;
+import static io.etcd.recipes.common.KVUtils.putValueWithKeepAlive;
+import static io.etcd.recipes.common.WatchUtils.watcher;
 import static java.lang.String.format;
 
-public class SetAndDeleteValue {
+public class SetValueWithKeepAlive {
+
     public static void main(String[] args) throws InterruptedException {
         List<String> urls = Lists.newArrayList("http://localhost:2379");
         String path = "/foo";
         String keyval = "foobar";
         ExecutorService executor = Executors.newCachedThreadPool();
-        CountDownLatch latch = new CountDownLatch(2);
+        CountDownLatch latch = new CountDownLatch(1);
 
         executor.execute(() -> {
-            sleepSecs(3);
-
             try (Client client = connectToEtcd(urls);
                  KV kvClient = client.getKVClient()) {
                 System.out.println(format("Assigning %s = %s", path, keyval));
-                putValue(kvClient, path, keyval);
+                putValueWithKeepAlive(kvClient, path, keyval, client,
+                        () -> {
+                            System.out.println("Starting sleep");
+                            sleepSecs(5);
+                            System.out.println("Finished sleep");
+                            return Unit.INSTANCE;
+                        });
+                System.out.println("Keep-alive is now terminated");
                 sleepSecs(5);
-                System.out.println(format("Deleting %s", path));
-                delete(kvClient, path);
             }
+            System.out.println("Releasing latch");
             latch.countDown();
         });
+
+        CountDownLatch endWatchLatch = new CountDownLatch(1);
 
         executor.execute(() -> {
             try (Client client = connectToEtcd(urls);
-                 KV kvClient = client.getKVClient()) {
-                long start = System.currentTimeMillis();
-                for (int i = 0; i < 12; i++) {
-                    long elapsed = System.currentTimeMillis() - start;
-                    System.out.println(format("Key %s = %s after %dms",
-                            path, getValue(kvClient, path, "unset"), elapsed));
-                    sleepSecs(1);
-                }
+                 Watch watchClient = client.getWatchClient()) {
+                watcher(watchClient,
+                        path,
+                        endWatchLatch,
+                        (event) -> {
+                            System.out.println(format("Updated key: %s", WatchUtils.getKeyAsString(event)));
+                            return Unit.INSTANCE;
+                        },
+                        (event) -> {
+                            System.out.println(format("Deleted key: %s", WatchUtils.getKeyAsString(event)));
+                            return Unit.INSTANCE;
+                        }
+                );
             }
-            latch.countDown();
         });
 
         latch.await();
+        System.out.println("Releasing endWatchLatch");
+        endWatchLatch.countDown();
+
         executor.shutdown();
     }
 }

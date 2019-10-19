@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.examples.counter
 
+import com.sudothought.common.concurrent.countDown
 import io.etcd.recipes.counter.DistributedAtomicLong
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -36,15 +37,16 @@ fun main() {
         measureTimedValue {
             repeat(threadCount) { i ->
                 thread {
-                    println("Creating counter #$i")
-                    DistributedAtomicLong(urls, path)
-                        .use { counter ->
-                            repeat(repeatCount) { counter.increment() }
-                            repeat(repeatCount) { counter.decrement() }
-                            repeat(repeatCount) { counter.add(5) }
-                            repeat(repeatCount) { counter.subtract(5) }
-                        }
-                    latch.countDown()
+                    latch.countDown {
+                        println("Creating counter #$i")
+                        DistributedAtomicLong(urls, path)
+                            .use { counter ->
+                                repeat(repeatCount) { counter.increment() }
+                                repeat(repeatCount) { counter.decrement() }
+                                repeat(repeatCount) { counter.add(5) }
+                                repeat(repeatCount) { counter.subtract(5) }
+                            }
+                    }
                 }
             }
             latch.await()

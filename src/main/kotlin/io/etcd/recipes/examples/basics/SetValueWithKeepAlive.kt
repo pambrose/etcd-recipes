@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.examples.basics
 
+import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.*
 import java.util.concurrent.CountDownLatch
@@ -31,20 +32,21 @@ fun main() {
     val latch = CountDownLatch(1)
 
     thread {
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                println("Assigning $path = $keyval")
-                kvClient.putValueWithKeepAlive(path, keyval, client) {
-                    println("Starting sleep")
+        latch.countDown {
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient ->
+                    println("Assigning $path = $keyval")
+                    kvClient.putValueWithKeepAlive(path, keyval, client) {
+                        println("Starting sleep")
+                        sleep(5.seconds)
+                        println("Finished sleep")
+                    }
+                    println("Keep-alive is now terminated")
                     sleep(5.seconds)
-                    println("Finished sleep")
                 }
-                println("Keep-alive is now terminated")
-                sleep(5.seconds)
             }
+            println("Releasing latch")
         }
-        println("Releasing latch")
-        latch.countDown()
     }
 
     val endWatchLatch = CountDownLatch(1)
@@ -63,5 +65,4 @@ fun main() {
     latch.await()
     println("Releasing endWatchLatch")
     endWatchLatch.countDown()
-
 }

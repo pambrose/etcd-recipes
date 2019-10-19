@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.examples.basics
 
+import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.watch.WatchResponse
@@ -33,42 +34,42 @@ fun main() {
     val latch = CountDownLatch(2)
 
     thread {
-        sleep(3.seconds)
+        latch.countDown {
+            sleep(3.seconds)
 
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                repeatWithSleep(10) { i, _ ->
-                    val kv = keyval + i
-                    println("Assigning $path = $kv")
-                    kvClient.putValue(path, kv)
-
-                    sleep(2.seconds)
-
-                    println("Deleting $path")
-                    kvClient.delete(path)
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient ->
+                    repeatWithSleep(10) { i, _ ->
+                        val kv = keyval + i
+                        println("Assigning $path = $kv")
+                        kvClient.putValue(path, kv)
+                        sleep(2.seconds)
+                        println("Deleting $path")
+                        kvClient.delete(path)
+                    }
                 }
             }
         }
-        latch.countDown()
     }
 
     thread {
-        connectToEtcd(urls) { client ->
-            client.withWatchClient { watchClient ->
-                watchClient.watcher(path) { watchResponse: WatchResponse ->
-                    watchResponse.events
-                        .forEach { watchEvent ->
-                            println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asPair.asString}")
-                        }
-                }.use {
-                    println("Started watch")
-                    sleep(10.seconds)
-                    println("Closing watch")
+        latch.countDown {
+            connectToEtcd(urls) { client ->
+                client.withWatchClient { watchClient ->
+                    watchClient.watcher(path) { watchResponse: WatchResponse ->
+                        watchResponse.events
+                            .forEach { watchEvent ->
+                                println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asPair.asString}")
+                            }
+                    }.use {
+                        println("Started watch")
+                        sleep(10.seconds)
+                        println("Closing watch")
+                    }
+                    println("Closed watch")
                 }
-                println("Closed watch")
             }
         }
-        latch.countDown()
     }
 
     latch.await()

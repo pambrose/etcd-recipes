@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.examples.barrier
 
+import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedDoubleBarrier
@@ -45,26 +46,28 @@ fun main() {
         }
 
         enterLatch.countDown()
+
         println("#$id Waiting to enter barrier")
         barrier.enter()
         println("#$id Entered barrier")
     }
 
     fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-        sleep(10.random.seconds)
+        doneLatch.countDown {
+            sleep(10.random.seconds)
 
-        repeat(retryCount) {
+            repeat(retryCount) {
+                println("#$id Waiting to leave barrier")
+                barrier.leave(2.seconds)
+                println("#$id Timed out leaving barrier")
+            }
+
+            leaveLatch.countDown()
+
             println("#$id Waiting to leave barrier")
-            barrier.leave(2.seconds)
-            println("#$id Timed out leaving barrier")
+            barrier.leave()
+            println("#$id Left barrier")
         }
-
-        leaveLatch.countDown()
-        println("#$id Waiting to leave barrier")
-        barrier.leave()
-        println("#$id Left barrier")
-
-        doneLatch.countDown()
     }
 
     repeat(count - 1) { i ->

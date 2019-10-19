@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.barrier
 
+import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
@@ -82,25 +83,25 @@ class DistributedDoubleBarrierTests {
         }
 
         fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-            sleep(10.random.seconds)
+            doneLatch.countDown {
+                sleep(10.random.seconds)
 
-            repeat(retryCount) {
+                repeat(retryCount) {
+                    logger.info { "#$id Waiting to leave barrier" }
+                    if (it % 2 == 0)
+                        barrier.leave(1000.random.milliseconds)
+                    else
+                        barrier.leave(1000, TimeUnit.MILLISECONDS)
+                    leaveRetryCounter.incrementAndGet()
+                    logger.info { "#$id Timed out leaving barrier" }
+                }
+
+                leaveLatch.countDown()
                 logger.info { "#$id Waiting to leave barrier" }
-                if (it % 2 == 0)
-                    barrier.leave(1000.random.milliseconds)
-                else
-                    barrier.leave(1000, TimeUnit.MILLISECONDS)
-                leaveRetryCounter.incrementAndGet()
-                logger.info { "#$id Timed out leaving barrier" }
+                barrier.leave()
+                leaveCounter.incrementAndGet()
+                logger.info { "#$id Left barrier" }
             }
-
-            leaveLatch.countDown()
-            logger.info { "#$id Waiting to leave barrier" }
-            barrier.leave()
-            leaveCounter.incrementAndGet()
-            logger.info { "#$id Left barrier" }
-
-            doneLatch.countDown()
         }
 
         val (finishedLatch, holder) =

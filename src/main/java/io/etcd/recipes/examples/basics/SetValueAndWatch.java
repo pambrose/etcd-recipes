@@ -53,12 +53,9 @@ public class SetValueAndWatch {
                     String kv = keyval + i;
                     System.out.println(format("Assigning %s = %s", path, kv));
                     putValue(kvClient, path, kv);
-
                     sleepSecs(2);
-
                     System.out.println(format("Deleting %s", path));
                     delete(kvClient, path);
-
                     sleepSecs(1);
                 }
             }

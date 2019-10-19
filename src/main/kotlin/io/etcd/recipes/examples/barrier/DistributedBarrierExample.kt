@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.examples.barrier
 
+import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedBarrier
 import java.util.concurrent.CountDownLatch
@@ -49,14 +50,15 @@ fun main() {
             goLatch.await()
             DistributedBarrier(urls, barrierPath)
                 .use { barrier ->
-                    println("$i Waiting on Barrier")
-                    barrier.waitOnBarrier(1.seconds)
+                    waitLatch.countDown {
+                        println("$i Waiting on Barrier")
+                        barrier.waitOnBarrier(1.seconds)
 
-                    println("$i Timed out waiting on barrier, waiting again")
-                    barrier.waitOnBarrier()
+                        println("$i Timed out waiting on barrier, waiting again")
+                        barrier.waitOnBarrier()
 
-                    println("$i Done Waiting on Barrier")
-                    waitLatch.countDown()
+                        println("$i Done Waiting on Barrier")
+                    }
                 }
         }
     }

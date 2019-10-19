@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.examples.basics
 
+import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.*
@@ -32,29 +33,31 @@ fun main() {
     val latch = CountDownLatch(2)
 
     thread {
-        sleep(3.seconds)
-        connectToEtcd(urls) { client ->
-            client.withLeaseClient { leaseClient ->
-                client.withKvClient { kvClient ->
-                    println("Assigning $path = $keyval")
-                    val lease = leaseClient.grant(5).get()
-                    kvClient.putValue(path, keyval, lease.asPutOption)
+        latch.countDown {
+            sleep(3.seconds)
+            connectToEtcd(urls) { client ->
+                client.withLeaseClient { leaseClient ->
+                    client.withKvClient { kvClient ->
+                        println("Assigning $path = $keyval")
+                        val lease = leaseClient.grant(5).get()
+                        kvClient.putValue(path, keyval, lease.asPutOption)
+                    }
                 }
             }
         }
-        latch.countDown()
     }
 
     thread {
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                repeatWithSleep(12) { _, start ->
-                    val kval = kvClient.getValue(path, "unset")
-                    println("Key $path = $kval after ${System.currentTimeMillis() - start}ms")
+        latch.countDown {
+            connectToEtcd(urls) { client ->
+                client.withKvClient { kvClient ->
+                    repeatWithSleep(12) { _, start ->
+                        val kval = kvClient.getValue(path, "unset")
+                        println("Key $path = $kval after ${System.currentTimeMillis() - start}ms")
+                    }
                 }
             }
         }
-        latch.countDown()
     }
 
     latch.await()

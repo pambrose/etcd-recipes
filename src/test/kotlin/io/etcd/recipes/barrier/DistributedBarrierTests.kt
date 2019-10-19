@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.barrier
 
+import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.checkForException
@@ -53,38 +54,37 @@ class DistributedBarrierTests {
         val advancedCount = AtomicInteger()
 
         thread {
-            DistributedBarrier(urls, path)
-                .use { barrier ->
+            completeLatch.countDown {
+                DistributedBarrier(urls, path)
+                    .use { barrier ->
 
-                    barrier.isBarrierSet shouldEqual false
+                        barrier.isBarrierSet shouldEqual false
 
-                    logger.info { "Setting Barrier" }
-                    val isSet = barrier.setBarrier()
-                    isSet.shouldBeTrue()
-                    barrier.isBarrierSet.shouldBeTrue()
-                    setBarrierLatch.countDown()
+                        logger.info { "Setting Barrier" }
+                        val isSet = barrier.setBarrier()
+                        isSet.shouldBeTrue()
+                        barrier.isBarrierSet.shouldBeTrue()
+                        setBarrierLatch.countDown()
 
-                    // This should return false because barrier is already set
-                    val isSet2 = barrier.setBarrier()
-                    isSet2.shouldBeFalse()
+                        // This should return false because barrier is already set
+                        val isSet2 = barrier.setBarrier()
+                        isSet2.shouldBeFalse()
 
-                    // Pause to give time-outs a chance
-                    sleep(6.seconds)
+                        // Pause to give time-outs a chance
+                        sleep(6.seconds)
 
-                    logger.info { "Removing Barrier" }
-                    removeBarrierTime.set(System.currentTimeMillis())
-                    val isRemoved = barrier.removeBarrier()
-                    isRemoved.shouldBeTrue()
+                        logger.info { "Removing Barrier" }
+                        removeBarrierTime.set(System.currentTimeMillis())
+                        val isRemoved = barrier.removeBarrier()
+                        isRemoved.shouldBeTrue()
 
-                    // This should return false because remove already called
-                    val isRemoved2 = barrier.removeBarrier()
-                    isRemoved2.shouldBeFalse()
+                        // This should return false because remove already called
+                        val isRemoved2 = barrier.removeBarrier()
+                        isRemoved2.shouldBeFalse()
 
-
-
-                    sleep(3.seconds)
-                }
-            completeLatch.countDown()
+                        sleep(3.seconds)
+                    }
+            }
         }
 
         blockingThreads(count) { i ->

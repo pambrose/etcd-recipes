@@ -22,7 +22,7 @@ jacocoTestReport {
 def kotlinVersion = '1.3.50'
 def serializationVersion = '0.13.0'
 def jetcdVersion = '0.3.0'
-def utilsVersion = '11faaa0'
+def utilsVersion = '4cd0c69'
 def loggingVersion = '1.7.6'
 def slf4jVersion = '1.7.28'
 def kluentVersion = '1.56'

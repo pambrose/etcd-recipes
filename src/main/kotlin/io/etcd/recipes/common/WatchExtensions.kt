@@ -55,7 +55,7 @@ fun Watch.watcher(keyname: String,
                   endWatchLatch: CountDownLatch,
                   onPut: (WatchEvent) -> Unit,
                   onDelete: (WatchEvent) -> Unit,
-                  option: WatchOption = WatchOption.DEFAULT): CountDownLatch {
+                  option: WatchOption = WatchOption.DEFAULT): Unit {
     watch(keyname.asByteSequence, option) { watchResponse ->
         watchResponse.events
             .forEach { event ->
@@ -71,7 +71,6 @@ fun Watch.watcher(keyname: String,
     }.use {
         endWatchLatch.await()
     }
-    return endWatchLatch
 }
 
 private val nullWatchOption: WatchOption = WatchOption.newBuilder().withRange(ByteSequence.from(ByteArray(1))).build()

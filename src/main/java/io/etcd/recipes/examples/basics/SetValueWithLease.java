@@ -19,51 +19,56 @@ package io.etcd.recipes.examples.basics;
 import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
+import io.etcd.jetcd.Lease;
+import io.etcd.jetcd.lease.LeaseGrantResponse;
+import io.etcd.recipes.common.KVUtils;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.*;
+import static io.etcd.recipes.common.KVUtils.putValue;
+import static io.etcd.recipes.common.LeaseUtils.getAsPutOption;
 import static java.lang.String.format;
 
-public class SetAndDeleteValue {
+public class SetValueWithLease {
+
     public static void main(String[] args) throws InterruptedException {
         List<String> urls = Lists.newArrayList("http://localhost:2379");
         String path = "/foo";
         String keyval = "foobar";
         ExecutorService executor = Executors.newCachedThreadPool();
-        CountDownLatch latch = new CountDownLatch(2);
+        CountDownLatch latch = new CountDownLatch(1);
 
         executor.execute(() -> {
-            sleepSecs(3);
-
             try (Client client = connectToEtcd(urls);
+                 Lease leaseClient = client.getLeaseClient();
                  KV kvClient = client.getKVClient()) {
                 System.out.println(format("Assigning %s = %s", path, keyval));
-                putValue(kvClient, path, keyval);
-                sleepSecs(5);
-                System.out.println(format("Deleting %s", path));
-                delete(kvClient, path);
+                LeaseGrantResponse lease = leaseClient.grant(5).get();
+                putValue(kvClient, path, keyval, getAsPutOption(lease));
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
             }
             latch.countDown();
         });
+
 
         executor.execute(() -> {
             try (Client client = connectToEtcd(urls);
                  KV kvClient = client.getKVClient()) {
                 long start = System.currentTimeMillis();
                 for (int i = 0; i < 12; i++) {
-                    long elapsed = System.currentTimeMillis() - start;
-                    System.out.println(format("Key %s = %s after %dms",
-                            path, getValue(kvClient, path, "unset"), elapsed));
+                    String kval = KVUtils.getValue(kvClient, path, "unset");
+                    System.out.println(String.format("Key %s = %s after %s ms",
+                            path, kval, System.currentTimeMillis() - start));
                     sleepSecs(1);
                 }
             }
-            latch.countDown();
         });
 
         latch.await();
