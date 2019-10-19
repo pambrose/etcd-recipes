@@ -133,34 +133,34 @@ constructor(val urls: List<String>,
                 checkWaiterCount()
 
                 // Do not bother starting watcher if latch is already done
-                if (keepAliveClosed.get())
-                    return true
-
-                // Watch for DELETE of /ready and PUTS on /waiters/*
-                val adjustedKey = barrierPath.ensureTrailing("/")
-
-                return watchClient.watcher(adjustedKey, adjustedKey.asPrefixWatchOption) { watchResponse ->
-                    watchResponse.events
-                        .forEach { watchEvent ->
-                            val key = watchEvent.keyValue.key.asString
-                            when {
-                                key.startsWith(this.waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
-                                key.startsWith(readyPath) && watchEvent.eventType == DELETE     -> closeKeepAlive()
+                return if (keepAliveClosed.get()) {
+                    true
+                } else {
+                    // Watch for DELETE of /ready and PUTS on /waiters/*
+                    val adjustedKey = barrierPath.ensureTrailing("/")
+                    watchClient.watcher(adjustedKey, adjustedKey.asPrefixWatchOption) { watchResponse ->
+                        watchResponse.events
+                            .forEach { watchEvent ->
+                                val key = watchEvent.keyValue.key.asString
+                                when {
+                                    key.startsWith(this.waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
+                                    key.startsWith(readyPath) && watchEvent.eventType == DELETE     -> closeKeepAlive()
+                                }
                             }
+
+                    }.use {
+                        // Check one more time in case watch missed the delete just after last check
+                        checkWaiterCount()
+
+                        val success = keepAliveClosed.waitUntilTrue(timeout)
+                        // Cleanup if a time-out occurred
+                        if (!success) {
+                            closeKeepAlive()
+                            kvClient.delete(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
                         }
 
-                }.use {
-                    // Check one more time in case watch missed the delete just after last check
-                    checkWaiterCount()
-
-                    val success = keepAliveClosed.waitUntilTrue(timeout)
-                    // Cleanup if a time-out occurred
-                    if (!success) {
-                        closeKeepAlive()
-                        kvClient.delete(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
+                        success
                     }
-
-                    success
                 }
             }
         }

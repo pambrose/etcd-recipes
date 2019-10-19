@@ -27,7 +27,9 @@ import java.util.concurrent.Executors;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.*;
+import static io.etcd.recipes.common.KVUtils.delete;
+import static io.etcd.recipes.common.KVUtils.getValue;
+import static io.etcd.recipes.common.KVUtils.putValue;
 import static java.lang.String.format;
 
 public class SetAndDeleteValue {

@@ -64,7 +64,7 @@ public class SetValueWithLease {
                 long start = System.currentTimeMillis();
                 for (int i = 0; i < 12; i++) {
                     String kval = KVUtils.getValue(kvClient, path, "unset");
-                    System.out.println(String.format("Key %s = %s after %s ms",
+                    System.out.println(format("Key %s = %s after %sms",
                             path, kval, System.currentTimeMillis() - start));
                     sleepSecs(1);
                 }

@@ -19,20 +19,22 @@ package io.etcd.recipes.examples.basics;
 import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
-import io.etcd.recipes.common.KVUtils;
 import io.etcd.recipes.common.TxnUtils;
 
 import java.util.List;
 
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.*;
+import static io.etcd.recipes.common.KVUtils.delete;
+import static io.etcd.recipes.common.KVUtils.getValue;
+import static io.etcd.recipes.common.KVUtils.isKeyPresent;
+import static io.etcd.recipes.common.KVUtils.putValue;
 import static io.etcd.recipes.common.TxnUtils.getDoesExist;
 import static java.lang.String.format;
 
 public class SetValueWithTxn {
-    private static List<String> urls = Lists.newArrayList("http://localhost:2379");
-    private static String path = "/txnexample";
-    private static String keyval = "foobar";
+    private static final List<String> urls = Lists.newArrayList("http://localhost:2379");
+    private static final String path = "/txnexample";
+    private static final String keyval = "foobar";
 
     public static void main(String[] args) {
         try (Client client = connectToEtcd(urls);
@@ -44,7 +46,7 @@ public class SetValueWithTxn {
             System.out.println(format("Key present: %s", isKeyPresent(kvClient, keyval)));
             checkForKey(kvClient);
             System.out.println(format("Key present: %s", isKeyPresent(kvClient, keyval)));
-            KVUtils.putValue(kvClient, path, "Something");
+            putValue(kvClient, path, "Something");
             checkForKey(kvClient);
         }
     }

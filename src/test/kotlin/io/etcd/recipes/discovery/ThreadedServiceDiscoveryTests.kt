@@ -27,6 +27,7 @@ import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
+import java.util.concurrent.ConcurrentMap
 import kotlin.time.seconds
 
 class ThreadedServiceDiscoveryTests {
@@ -34,10 +35,10 @@ class ThreadedServiceDiscoveryTests {
     val path = "/discovery/${javaClass.simpleName}"
     val threadCount = 10
     val serviceCount = 10
-    val contextMap = Maps.newConcurrentMap<Int, ServiceDiscoveryContext>()
+    val contextMap: ConcurrentMap<Int, ServiceDiscoveryContext> = Maps.newConcurrentMap()
 
     class ServiceDiscoveryContext(val serviceDiscovery: ServiceDiscovery) {
-        val serviceMap = Maps.newConcurrentMap<String, ServiceInstance>()
+        val serviceMap: ConcurrentMap<String, ServiceInstance> = Maps.newConcurrentMap()
     }
 
     @Test

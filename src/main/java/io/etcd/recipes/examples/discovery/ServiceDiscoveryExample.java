@@ -27,9 +27,9 @@ import static com.sudothought.common.util.Misc.sleepSecs;
 
 public class ServiceDiscoveryExample {
 
-    public static List<String> urls = Lists.newArrayList("http://localhost:2379");
-    public static String path = "/services/ServiceDiscoveryExample";
-    public static String serviceName = "ExampleService";
+    public static final List<String> urls = Lists.newArrayList("http://localhost:2379");
+    public static final String path = "/services/ServiceDiscoveryExample";
+    public static final String serviceName = "ExampleService";
 
     public static void main(String[] args) throws EtcdRecipeException {
         serviceExample(true);
