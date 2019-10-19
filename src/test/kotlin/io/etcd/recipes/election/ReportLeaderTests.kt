@@ -65,6 +65,7 @@ class ReportLeaderTests {
                                    sleep(pause)
                                }
                            },
+                           null,
                            "Thread$it")
                 .use { election ->
                     election.start()

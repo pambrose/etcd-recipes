@@ -57,6 +57,7 @@ class ParticipantTests {
                                        leaderNames += selector.clientId
                                    }
                                },
+                               null,
                                "Thread$it")
                     .use { election ->
                         election.start()
