@@ -27,7 +27,7 @@ class ServiceProvider internal constructor(urls: List<String>,
 
     val serviceDiscovery = lazy { ServiceDiscovery(urls, namesPath) }
 
-    fun getInstance(): ServiceInstance = getAllInstances().get(Random.nextInt(0, getAllInstances().size))
+    fun getInstance(): ServiceInstance = getAllInstances()[Random.nextInt(0, getAllInstances().size)]
 
     fun getAllInstances(): List<ServiceInstance> {
         return serviceDiscovery.value.queryForInstances(serviceName)

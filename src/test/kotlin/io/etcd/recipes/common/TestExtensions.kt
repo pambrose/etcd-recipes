@@ -54,7 +54,7 @@ fun ExceptionHolder.checkForException() {
 }
 
 fun List<ExceptionHolder>.throwExceptionFromList() {
-    val e = filter { it.exception != null }.firstOrNull()?.exception
+    val e = firstOrNull { it.exception != null }?.exception
     if (e != null)
         throw e
 }

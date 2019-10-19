@@ -23,8 +23,8 @@ import io.etcd.recipes.common.*
 
 fun main() {
     val urls = listOf("http://localhost:2379")
-    val path = "/txntest"
-    val keyval = "/debug"
+    val path = "/txnexample"
+    val keyval = "debug"
 
     fun checkForKey(kvClient: KV) {
         kvClient.transaction {

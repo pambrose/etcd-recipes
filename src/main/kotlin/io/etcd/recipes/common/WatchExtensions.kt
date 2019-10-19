@@ -55,7 +55,7 @@ fun Watch.watcher(keyname: String,
                   endWatchLatch: CountDownLatch,
                   onPut: (WatchEvent) -> Unit,
                   onDelete: (WatchEvent) -> Unit,
-                  option: WatchOption = WatchOption.DEFAULT): Unit {
+                  option: WatchOption = WatchOption.DEFAULT) {
     watch(keyname.asByteSequence, option) { watchResponse ->
         watchResponse.events
             .forEach { event ->

@@ -55,7 +55,7 @@ fun KV.putValueWithKeepAlive(keyname: String,
                              keyval: String,
                              client: Client,
                              ttl: Long = 2,
-                             block: () -> Unit): Unit {
+                             block: () -> Unit) {
     client.withLeaseClient { leaseClient ->
         val lease = leaseClient.grant(ttl).get()
         putValue(keyname, keyval, lease.asPutOption)

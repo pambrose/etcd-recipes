@@ -75,7 +75,6 @@ fun main() {
                             delete(it)
                         }
 
-
                         println("\nAfter removal:")
                         println(getKeyValues(path).asString)
                         println(count(path))

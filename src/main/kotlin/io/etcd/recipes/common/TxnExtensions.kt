@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:JvmName("TrasactionUtils")
+@file:JvmName("TxnUtils")
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
 package io.etcd.recipes.common

@@ -48,8 +48,8 @@ constructor(val urls: List<String>,
     private class ServiceInstanceContext(val service: ServiceInstance,
                                          val kvClient: KV,
                                          val instancePath: String) : Closeable {
-        var lease: LeaseGrantResponse by nonNullableReference<LeaseGrantResponse>()
-        var keepAlive: CloseableClient by nonNullableReference<CloseableClient>()
+        var lease: LeaseGrantResponse by nonNullableReference()
+        var keepAlive: CloseableClient by nonNullableReference()
 
         override fun close() {
             keepAlive.close()
