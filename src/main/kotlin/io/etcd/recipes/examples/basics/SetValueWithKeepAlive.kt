@@ -54,10 +54,10 @@ fun main() {
     thread {
         connectToEtcd(urls) { client ->
             client.withWatchClient { watchClient ->
-                watchClient.watcher(path,
-                                    endWatchLatch,
-                                    { event -> println("Updated key ${event.keyAsString}") },
-                                    { event -> println("Deleted key ${event.keyAsString}") })
+                watchClient.watcherWithLatch(path,
+                                             endWatchLatch,
+                                             { event -> println("Updated key ${event.keyAsString}") },
+                                             { event -> println("Deleted key ${event.keyAsString}") })
             }
         }
     }

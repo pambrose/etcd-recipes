@@ -20,7 +20,6 @@ import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Watch;
-import io.etcd.recipes.common.WatchUtils;
 import kotlin.Unit;
 
 import java.util.List;
@@ -31,7 +30,8 @@ import java.util.concurrent.Executors;
 import static com.sudothought.common.util.Misc.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static io.etcd.recipes.common.KVUtils.putValueWithKeepAlive;
-import static io.etcd.recipes.common.WatchUtils.watcher;
+import static io.etcd.recipes.common.WatchUtils.getKeyAsString;
+import static io.etcd.recipes.common.WatchUtils.watcherWithLatch;
 import static java.lang.String.format;
 
 public class SetValueWithKeepAlive {
@@ -66,15 +66,15 @@ public class SetValueWithKeepAlive {
         executor.execute(() -> {
             try (Client client = connectToEtcd(urls);
                  Watch watchClient = client.getWatchClient()) {
-                watcher(watchClient,
+                watcherWithLatch(watchClient,
                         path,
                         endWatchLatch,
                         (event) -> {
-                            System.out.println(format("Updated key: %s", WatchUtils.getKeyAsString(event)));
+                            System.out.println(format("Updated key: %s", getKeyAsString(event)));
                             return Unit.INSTANCE;
                         },
                         (event) -> {
-                            System.out.println(format("Deleted key: %s", WatchUtils.getKeyAsString(event)));
+                            System.out.println(format("Deleted key: %s", getKeyAsString(event)));
                             return Unit.INSTANCE;
                         }
                 );

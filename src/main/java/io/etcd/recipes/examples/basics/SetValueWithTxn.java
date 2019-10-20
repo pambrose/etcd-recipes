@@ -19,7 +19,6 @@ package io.etcd.recipes.examples.basics;
 import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
-import io.etcd.recipes.common.TxnUtils;
 
 import java.util.List;
 
@@ -29,6 +28,8 @@ import static io.etcd.recipes.common.KVUtils.getValue;
 import static io.etcd.recipes.common.KVUtils.isKeyPresent;
 import static io.etcd.recipes.common.KVUtils.putValue;
 import static io.etcd.recipes.common.TxnUtils.getDoesExist;
+import static io.etcd.recipes.common.TxnUtils.setTo;
+import static io.etcd.recipes.common.TxnUtils.transaction;
 import static java.lang.String.format;
 
 public class SetValueWithTxn {
@@ -52,10 +53,10 @@ public class SetValueWithTxn {
     }
 
     private static void checkForKey(KV kvClient) {
-        TxnUtils.transaction(kvClient, (txn) -> {
+        transaction(kvClient, (txn) -> {
             txn.If(getDoesExist(path));
-            txn.Then(TxnUtils.setTo(keyval, format("Key %s found", path)));
-            txn.Else(TxnUtils.setTo(keyval, format("Key %s not found", path)));
+            txn.Then(setTo(keyval, format("Key %s found", path)));
+            txn.Else(setTo(keyval, format("Key %s not found", path)));
             return txn;
         });
 

@@ -143,8 +143,8 @@ constructor(val urls: List<String>,
                             .forEach { watchEvent ->
                                 val key = watchEvent.keyValue.key.asString
                                 when {
-                                    key.startsWith(this.waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
-                                    key.startsWith(readyPath) && watchEvent.eventType == DELETE     -> closeKeepAlive()
+                                    key.startsWith(waitingPath) && watchEvent.eventType == PUT  -> checkWaiterCount()
+                                    key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
                                 }
                             }
 

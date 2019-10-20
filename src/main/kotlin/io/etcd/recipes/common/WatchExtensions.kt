@@ -20,15 +20,12 @@
 package io.etcd.recipes.common
 
 import io.etcd.jetcd.ByteSequence
-import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.jetcd.watch.WatchResponse
 import java.util.concurrent.CountDownLatch
-
-val KeyValue.asPair: Pair<String, ByteSequence> get() = Pair(key.asString, value)
 
 val WatchEvent.keyAsString get() = keyValue.key.asString
 val WatchEvent.keyAsInt get() = keyValue.key.asInt
@@ -51,11 +48,11 @@ fun Watch.watcher(keyname: String,
                   block: (WatchResponse) -> Unit): Watch.Watcher = watch(keyname.asByteSequence, option) { block(it) }
 
 @JvmOverloads
-fun Watch.watcher(keyname: String,
-                  endWatchLatch: CountDownLatch,
-                  onPut: (WatchEvent) -> Unit,
-                  onDelete: (WatchEvent) -> Unit,
-                  option: WatchOption = WatchOption.DEFAULT) {
+fun Watch.watcherWithLatch(keyname: String,
+                           endWatchLatch: CountDownLatch,
+                           onPut: (WatchEvent) -> Unit,
+                           onDelete: (WatchEvent) -> Unit,
+                           option: WatchOption = WatchOption.DEFAULT) {
     watch(keyname.asByteSequence, option) { watchResponse ->
         watchResponse.events
             .forEach { event ->

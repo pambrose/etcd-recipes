@@ -59,7 +59,7 @@ fun main() {
                     watchClient.watcher(path) { watchResponse: WatchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
-                                println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asPair.asString}")
+                                println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asString}")
                             }
                     }.use {
                         println("Started watch")

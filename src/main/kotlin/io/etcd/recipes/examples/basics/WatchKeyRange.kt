@@ -24,7 +24,7 @@ import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
-    val path = "/keyrangetest"
+    val path = "/watchkeyrange"
 
     connectToEtcd(urls) { client ->
         client.withKvClient { kvClient ->
@@ -34,7 +34,7 @@ fun main() {
                     watchClient.watcher(path, "/".asPrefixWatchOption) { watchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
-                                println("${watchEvent.eventType} for ${watchEvent.keyValue.asPair.asString}")
+                                println("${watchEvent.eventType} for ${watchEvent.keyValue.asString}")
                             }
                     }.use {
                         // Create empty root

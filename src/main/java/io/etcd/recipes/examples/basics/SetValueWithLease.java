@@ -21,7 +21,6 @@ import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Lease;
 import io.etcd.jetcd.lease.LeaseGrantResponse;
-import io.etcd.recipes.common.KVUtils;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -31,6 +30,7 @@ import java.util.concurrent.Executors;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
+import static io.etcd.recipes.common.KVUtils.getValue;
 import static io.etcd.recipes.common.KVUtils.putValue;
 import static io.etcd.recipes.common.LeaseUtils.getAsPutOption;
 import static java.lang.String.format;
@@ -63,7 +63,7 @@ public class SetValueWithLease {
                  KV kvClient = client.getKVClient()) {
                 long start = System.currentTimeMillis();
                 for (int i = 0; i < 12; i++) {
-                    String kval = KVUtils.getValue(kvClient, path, "unset");
+                    String kval = getValue(kvClient, path, "unset");
                     System.out.println(format("Key %s = %s after %sms",
                             path, kval, System.currentTimeMillis() - start));
                     sleepSecs(1);

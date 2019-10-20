@@ -34,7 +34,7 @@ fun main() {
                                           isNew,
                                           serviceName,
                                           serviceInstance ->
-                println("Change $eventType $serviceName $serviceInstance")
+                println("Change $isNew $eventType $serviceName $serviceInstance")
                 serviceInstance?.let {
                     println("Payload: ${IntPayload.toObject(
                         it.jsonPayload)}")
