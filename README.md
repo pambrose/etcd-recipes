@@ -45,9 +45,10 @@ Jars are available at [jitpack.io](https://jitpack.io/#pambrose/etcd-recipes).
 ### Gradle
 
 ```
-# Add jitpack.io to repositories
+# Add kotlinx and jitpack.io to repositories
 repositories {
     mavenCentral()
+    maven { url "https://kotlin.bintray.com/kotlinx" }
     maven { url 'https://jitpack.io' }
 }
 
@@ -59,11 +60,26 @@ dependencies {
 ### Maven
 
 ``` 
-<dependency>
-  <groupId>com.github.pambrose</groupId>
-  <artifactId>etcd-recipes</artifactId>
-  <version>0.9.1</version>
-</dependency>
+<repositories>
+    <repository>
+        <id>kotlinx</id>
+        <name>kotlinkx Releases</name>
+        <url>https://kotlin.bintray.com/kotlinx</url>
+    </repository>
+    <repository>
+        <id>jitpack.io</id>
+        <name>jitpack.io Releases</name>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+      <groupId>com.github.pambrose</groupId>
+      <artifactId>etcd-recipes</artifactId>
+      <version>0.9.1</version>
+    </dependency>
+</dependencies>
 ```
 
 ## Running tests

@@ -3,8 +3,8 @@ default: versioncheck
 clean:
 	./gradlew clean
 
-build:
-	./gradlew build
+compile:
+	./gradlew build -x test
 
 tests:
 	./gradlew check
