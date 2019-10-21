@@ -44,7 +44,6 @@ public class WatchKeyRange {
         List<String> urls = Lists.newArrayList("http://localhost:2379");
         String path = "/watchkeyrange";
 
-
         try (Client client = connectToEtcd(urls);
              KV kvClient = client.getKVClient();
              Watch watchClient = client.getWatchClient();
@@ -61,6 +60,7 @@ public class WatchKeyRange {
                          });
                          return Unit.INSTANCE;
                      })) {
+
             // Create empty root
             putValue(kvClient, path, "root");
 
