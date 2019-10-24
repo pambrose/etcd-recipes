@@ -28,6 +28,7 @@ import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.recipes.common.*
 import java.io.Closeable
 import java.util.*
+import java.util.concurrent.ConcurrentMap
 
 data class ServiceDiscovery
 @JvmOverloads
@@ -36,9 +37,9 @@ constructor(val urls: List<String>,
             val clientId: String = "Client:${randomId(7)}") : EtcdConnector(urls), Closeable {
 
     private val namesPath = basePath.appendToPath("/names")
-    private val serviceContextMap = Maps.newConcurrentMap<String, ServiceInstanceContext>()
-    private val serviceCacheList = Collections.synchronizedList(mutableListOf<ServiceCache>())
-    private val serviceProviderList = Collections.synchronizedList(mutableListOf<ServiceProvider>())
+    private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = Maps.newConcurrentMap()
+    private val serviceCacheList: MutableList<ServiceCache> = Collections.synchronizedList(mutableListOf())
+    private val serviceProviderList: MutableList<ServiceProvider> = Collections.synchronizedList(mutableListOf())
 
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }

@@ -26,25 +26,26 @@ fun main() {
     val urls = listOf("http://localhost:2379")
     val servicePath = "/services/test"
 
-    ServiceDiscovery(urls, servicePath).use { sd ->
+    ServiceDiscovery(urls, servicePath)
+        .use { sd ->
 
-        sd.serviceCache("TestName").use { cache ->
+            sd.serviceCache("TestName")
+                .use { cache ->
+                    cache.addListenerForChanges { eventType,
+                                                  isNew,
+                                                  serviceName,
+                                                  serviceInstance ->
+                        println("Change $isNew $eventType $serviceName $serviceInstance")
+                        serviceInstance?.let {
+                            println("Payload: ${IntPayload.toObject(
+                                it.jsonPayload)}")
+                        }
+                        println("Instances: ${cache.instances}")
+                    }
 
-            cache.addListenerForChanges { eventType,
-                                          isNew,
-                                          serviceName,
-                                          serviceInstance ->
-                println("Change $isNew $eventType $serviceName $serviceInstance")
-                serviceInstance?.let {
-                    println("Payload: ${IntPayload.toObject(
-                        it.jsonPayload)}")
+                    cache.start()
+
+                    sleep(1.days)
                 }
-                println("Instances: ${cache.instances}")
-            }
-
-            cache.start()
-
-            sleep(10.days)
         }
-    }
 }

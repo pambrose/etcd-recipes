@@ -60,15 +60,16 @@ class ThreadedServiceDiscoveryTests {
 
         // Query services
         blockingThreads(threadCount) {
-            ServiceDiscovery(urls, path).use { sd ->
-                contextMap.values.forEach { context ->
-                    context.serviceMap.forEach { (_, service) ->
-                        println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-                        sd.queryForInstance(service.name, service.id) shouldEqual service
-                    }
+            ServiceDiscovery(urls, path)
+                .use { sd ->
+                    contextMap.values.forEach { context ->
+                        context.serviceMap.forEach { (_, service) ->
+                            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+                            sd.queryForInstance(service.name, service.id) shouldEqual service
+                        }
 
+                    }
                 }
-            }
         }
 
         // Update services
@@ -84,21 +85,23 @@ class ThreadedServiceDiscoveryTests {
 
         // Query updated services
         blockingThreads(threadCount) {
-            ServiceDiscovery(urls, path).use { sd ->
-                contextMap.values.forEach { context ->
-                    context.serviceMap.forEach { (_, service) ->
-                        println("Retrieved updated value: ${sd.queryForInstance(service.name, service.id)}")
-                        sd.queryForInstance(service.name, service.id) shouldEqual service
+            ServiceDiscovery(urls, path)
+                .use { sd ->
+                    contextMap.values.forEach { context ->
+                        context.serviceMap.forEach { (_, service) ->
+                            println("Retrieved updated value: ${sd.queryForInstance(service.name, service.id)}")
+                            sd.queryForInstance(service.name, service.id) shouldEqual service
+                        }
+
                     }
-
                 }
-            }
         }
 
-        ServiceDiscovery(urls, path).use { sd ->
-            println("Retrieved all names: ${sd.queryForNames().size}")
-            sd.queryForNames().size shouldEqual threadCount * serviceCount
-        }
+        ServiceDiscovery(urls, path)
+            .use { sd ->
+                println("Retrieved all names: ${sd.queryForNames().size}")
+                sd.queryForNames().size shouldEqual threadCount * serviceCount
+            }
 
         // Delete services
         contextMap.forEach { (_, context) ->
@@ -116,16 +119,17 @@ class ThreadedServiceDiscoveryTests {
 
         // Query deleted services
         blockingThreads(threadCount) {
-            ServiceDiscovery(urls, path).use { sd ->
-                contextMap.values.forEach { context ->
-                    context.serviceMap.forEach { (_, service) ->
-                        println("Query deleted service: ${service.name}  ${service.id}")
-                        invoking {
-                            sd.queryForInstance(service.name, service.id)
-                        } shouldThrow EtcdRecipeException::class
+            ServiceDiscovery(urls, path)
+                .use { sd ->
+                    contextMap.values.forEach { context ->
+                        context.serviceMap.forEach { (_, service) ->
+                            println("Query deleted service: ${service.name}  ${service.id}")
+                            invoking {
+                                sd.queryForInstance(service.name, service.id)
+                            } shouldThrow EtcdRecipeException::class
+                        }
                     }
                 }
-            }
         }
 
         // Close ServiceDiscovery objects

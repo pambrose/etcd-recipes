@@ -31,7 +31,7 @@ fun main() {
             kvClient.apply {
 
                 client.withWatchClient { watchClient ->
-                    watchClient.watcher(path, "/".asPrefixWatchOption) { watchResponse ->
+                    watchClient.watcher(path, path.asPrefixWatchOption) { watchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
                                 println("${watchEvent.eventType} for ${watchEvent.keyValue.asString}")
@@ -52,15 +52,15 @@ fun main() {
                         putValue("$path/waiting/c", "ccc")
                         putValue("$path/waiting/d", "dddd")
 
-                        println("\nAfter addition:")
+                        println("\nAfter putValues:")
                         println(getKeyValues(path).asString)
                         println(count(path))
 
-                        println("\nElections only:")
+                        println("\nElection only:")
                         println(getKeyValues("$path/election").asString)
                         println(count("$path/election"))
 
-                        println("\nWaitings only:")
+                        println("\nWaiting only:")
                         println(getKeyValues("$path/waiting").asString)
                         println(count("$path/waiting"))
 

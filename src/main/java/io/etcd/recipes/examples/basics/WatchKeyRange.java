@@ -49,7 +49,7 @@ public class WatchKeyRange {
              Watch watchClient = client.getWatchClient();
              Watcher watcher = watcher(watchClient,
                      path,
-                     getAsPrefixWatchOption("/"),
+                     getAsPrefixWatchOption(path),
                      (watchResponse) -> {
                          watchResponse.getEvents().forEach((watchEvent) -> {
                              System.out.println(format("%s for %s",
@@ -76,7 +76,7 @@ public class WatchKeyRange {
             putValue(kvClient, path + "/waiting/c", "ccc");
             putValue(kvClient, path + "/waiting/d", "dddd");
 
-            System.out.println("\nAfter addition:");
+            System.out.println("\nAfter putValues:");
             System.out.println(getAsString(getKeyValues(kvClient, path)));
             System.out.println(count(kvClient, path));
 
@@ -99,7 +99,7 @@ public class WatchKeyRange {
                 delete(kvClient, keyname);
             });
 
-            System.out.println("\nAfter removal:");
+            System.out.println("\nAfter delete:");
             System.out.println(getAsString(getKeyValues(kvClient, path)));
             System.out.println(count(kvClient, path));
 

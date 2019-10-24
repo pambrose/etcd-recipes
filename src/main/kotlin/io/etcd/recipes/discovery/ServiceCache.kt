@@ -19,6 +19,7 @@
 package io.etcd.recipes.discovery
 
 import com.google.common.collect.Maps
+import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.watch.WatchEvent
@@ -27,15 +28,17 @@ import io.etcd.recipes.common.*
 import mu.KLogging
 import java.io.Closeable
 import java.util.*
+import java.util.concurrent.ConcurrentMap
 
 class ServiceCache internal constructor(val urls: List<String>,
                                         namesPath: String,
                                         val serviceName: String) : EtcdConnector(urls), Closeable {
 
     private var startCalled by atomicBoolean(false)
+    private var dataPreloaded = BooleanMonitor(false)
     private val servicePath = namesPath.appendToPath(serviceName)
-    private val serviceMap = Maps.newConcurrentMap<String, String>()
-    private val listeners = Collections.synchronizedList(mutableListOf<ServiceCacheListener>())
+    private val serviceMap: ConcurrentMap<String, String> = Maps.newConcurrentMap()
+    private val listeners: MutableList<ServiceCacheListener> = Collections.synchronizedList(mutableListOf())
 
     val exceptionHolder = ExceptionHolder()
 
@@ -50,6 +53,9 @@ class ServiceCache internal constructor(val urls: List<String>,
             checkCloseNotCalled()
 
             watchClient.watcher(servicePath, servicePath.asPrefixWatchOption) { watchResponse ->
+                // Wait for data to be loaded
+                dataPreloaded.waitUntilTrue()
+
                 watchResponse.events
                     .forEach { event ->
                         when (event.eventType) {
@@ -58,9 +64,9 @@ class ServiceCache internal constructor(val urls: List<String>,
                                 val isNew = !serviceMap.containsKey(k)
                                 serviceMap[k] = v
                                 //println("$k ${if (newKey) "added" else "updated"}")
-                                listeners.forEach {
+                                listeners.forEach { listener ->
                                     try {
-                                        it.cacheChanged(PUT, isNew, k, ServiceInstance.toObject(v))
+                                        listener.cacheChanged(PUT, isNew, k, ServiceInstance.toObject(v))
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
                                         exceptionHolder.exception = e
@@ -71,9 +77,9 @@ class ServiceCache internal constructor(val urls: List<String>,
                             DELETE       -> {
                                 val k = event.keyValue.key.asString
                                 val prevValue = serviceMap.remove(k)?.let { ServiceInstance.toObject(it) }
-                                listeners.forEach {
+                                listeners.forEach { listener ->
                                     try {
-                                        it.cacheChanged(DELETE, false, k, prevValue)
+                                        listener.cacheChanged(DELETE, false, k, prevValue)
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
                                         exceptionHolder.exception = e
@@ -87,6 +93,14 @@ class ServiceCache internal constructor(val urls: List<String>,
                     }
             }
 
+            // Preload with initial data
+            val kvs = kvClient.getKeyValues(servicePath)
+            for (kv in kvs) {
+                val (k, v) = kv
+                serviceMap[k] = v.asString
+            }
+
+            dataPreloaded.set(true)
             startCalled = true
         }
     }
