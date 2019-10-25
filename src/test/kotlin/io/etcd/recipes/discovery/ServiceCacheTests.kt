@@ -61,14 +61,14 @@ class ServiceCacheTests {
 
                     addListenerForChanges(object : ServiceCacheListener {
                         override fun cacheChanged(eventType: EventType,
-                                                  isNew: Boolean,
+                                                  isAdd: Boolean,
                                                   serviceName: String,
                                                   serviceInstance: ServiceInstance?) {
                             captureException(holder) {
                                 serviceName.split("/").dropLast(1).last() shouldEqual name
 
                                 if (eventType == EventType.PUT) {
-                                    if (isNew) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
+                                    if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
 
                                     serviceInstance?.name shouldEqual name
                                 }

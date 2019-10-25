@@ -16,18 +16,15 @@
 
 package io.etcd.recipes.examples.cache
 
-import com.sudothought.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCache
+import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.withKvClient
-import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
     val cachePath = "/cache/test"
-
-    val cache = PathChildrenCache(urls, cachePath, true, null)
 
     connectToEtcd(urls) { client ->
         client.withKvClient { kvClient ->
@@ -39,11 +36,12 @@ fun main() {
         }
     }
 
-    cache.start()
+    val cache = PathChildrenCache(urls, cachePath, true, null)
 
-    sleep(2.seconds)
+    cache.start(true)
+    cache.waitOnStartComplete()
 
-    cache.getCurrentData().forEach {
+    cache.currentData.forEach {
         println("${it.key} ${it.value.asString}")
     }
 

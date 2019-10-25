@@ -25,7 +25,18 @@ import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.asPutOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.grant
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watcher
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -136,12 +147,10 @@ constructor(val urls: List<String>,
 
     override fun close() {
         semaphore.withLock {
-            if (!closeCalled) {
-                keepAliveLease?.close()
-                keepAliveLease = null
+            keepAliveLease?.close()
+            keepAliveLease = null
 
-                super.close()
-            }
+            super.close()
         }
     }
 }

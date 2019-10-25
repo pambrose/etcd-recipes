@@ -22,7 +22,7 @@ import io.etcd.jetcd.watch.WatchEvent
 
 interface ServiceCacheListener {
     fun cacheChanged(eventType: WatchEvent.EventType,
-                     isNew: Boolean,
+                     isAdd: Boolean,
                      serviceName: String,
                      serviceInstance: ServiceInstance?)
 }

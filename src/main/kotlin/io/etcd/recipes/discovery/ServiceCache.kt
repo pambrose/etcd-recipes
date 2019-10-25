@@ -69,11 +69,11 @@ class ServiceCache internal constructor(val urls: List<String>,
                             PUT          -> {
                                 val (k, v) = event.keyValue.asPair.asString
                                 val stripped = k.substring(servicePath.length)
-                                val isNew = !serviceMap.containsKey(stripped)
+                                val isAdd = !serviceMap.containsKey(stripped)
                                 serviceMap[stripped] = v
                                 listeners.forEach { listener ->
                                     try {
-                                        listener.cacheChanged(PUT, isNew, stripped, ServiceInstance.toObject(v))
+                                        listener.cacheChanged(PUT, isAdd, stripped, ServiceInstance.toObject(v))
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
                                         exceptionList.value += e
@@ -121,16 +121,16 @@ class ServiceCache internal constructor(val urls: List<String>,
         }
 
     fun addListenerForChanges(listener: (eventType: WatchEvent.EventType,
-                                         isNew: Boolean,
+                                         isAdd: Boolean,
                                          serviceName: String,
                                          serviceInstance: ServiceInstance?) -> Unit) {
         addListenerForChanges(
             object : ServiceCacheListener {
                 override fun cacheChanged(eventType: WatchEvent.EventType,
-                                          isNew: Boolean,
+                                          isAdd: Boolean,
                                           serviceName: String,
                                           serviceInstance: ServiceInstance?) {
-                    listener.invoke(eventType, isNew, serviceName, serviceInstance)
+                    listener.invoke(eventType, isAdd, serviceName, serviceInstance)
                 }
             })
     }

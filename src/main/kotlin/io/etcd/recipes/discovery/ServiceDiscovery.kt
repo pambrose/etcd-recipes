@@ -25,7 +25,21 @@ import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.lease.LeaseGrantResponse
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asPutOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.doesExist
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getKeys
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.getValues
+import io.etcd.recipes.common.grant
+import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
 import java.io.Closeable
 import java.util.*
 import java.util.concurrent.ConcurrentMap
@@ -154,13 +168,12 @@ constructor(val urls: List<String>,
 
     override fun close() {
         semaphore.withLock {
-            if (!closeCalled) {
-                // Close all service caches
-                serviceCacheList.forEach { it.close() }
-                serviceContextMap.forEach { (_, v) -> internalUnregisterService(v.service) }
 
-                super.close()
-            }
+            // Close all service caches
+            serviceCacheList.forEach { it.close() }
+            serviceContextMap.forEach { (_, v) -> internalUnregisterService(v.service) }
+
+            super.close()
         }
     }
 

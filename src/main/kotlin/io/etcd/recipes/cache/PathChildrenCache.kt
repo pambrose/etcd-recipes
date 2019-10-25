@@ -22,6 +22,7 @@ import com.google.common.collect.Maps
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates
+import com.sudothought.common.time.Conversions
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
@@ -47,6 +48,9 @@ import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.days
 
 class PathChildrenCache(val urls: List<String>,
                         val cachePath: String,
@@ -56,9 +60,9 @@ class PathChildrenCache(val urls: List<String>,
     private var startCalled by AtomicDelegates.atomicBoolean(false)
     private val startThreadComplete = BooleanMonitor(false)
     private val closeSemaphore = Semaphore(1, true)
-    private var dataPreloaded = BooleanMonitor(false)
     private val cacheMap: ConcurrentMap<String, ByteSequence> = Maps.newConcurrentMap()
     private val listeners: List<PathChildrenCacheListener> = emptyList()
+    // Use a single threaded executor to maintain order
     private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
 
     enum class StartMode {
@@ -83,7 +87,7 @@ class PathChildrenCache(val urls: List<String>,
         start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL)
     }
 
-    fun start(mode: StartMode = NORMAL) {
+    fun start(mode: StartMode) {
         semaphore.withLock {
             if (startCalled)
                 throw EtcdRecipeRuntimeException("start() already called")
@@ -109,17 +113,30 @@ class PathChildrenCache(val urls: List<String>,
                                 }
                             }
                         setupWatcher()
+                        startThreadComplete.set(true)
                     }
                 }
             } else {
                 setupWatcher()
+                startThreadComplete.set(true)
             }
 
-            dataPreloaded.set(true)
             startCalled = true
-
-            startThreadComplete.set(true)
         }
+    }
+
+    @Throws(InterruptedException::class)
+    fun waitOnStartComplete(): Boolean = waitOnStartComplete(Long.MAX_VALUE.days)
+
+    @Throws(InterruptedException::class)
+    fun waitOnStartComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
+        waitOnStartComplete(Conversions.timeUnitToDuration(timeout, timeUnit))
+
+    @Throws(InterruptedException::class)
+    fun waitOnStartComplete(timeout: Duration): Boolean {
+        checkStartCalled()
+        checkCloseNotCalled()
+        return startThreadComplete.waitUntilTrue(timeout)
     }
 
     private fun setupWatcher() {
@@ -130,9 +147,9 @@ class PathChildrenCache(val urls: List<String>,
                         PUT          -> {
                             val (k, v) = event.keyValue.asPair
                             val s = k.substring(cachePath.length + 1)
-                            val isNew = !cacheMap.containsKey(s)
+                            val isAdd = !cacheMap.containsKey(s)
                             cacheMap[s] = v
-                            val cacheEvent = PathChildrenCacheEvent(s, if (isNew) CHILD_ADDED else CHILD_UPDATED, v)
+                            val cacheEvent = PathChildrenCacheEvent(s, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
                             listeners.forEach { listener ->
                                 try {
                                     listener.childEvent(cacheEvent)
@@ -141,7 +158,7 @@ class PathChildrenCache(val urls: List<String>,
                                     exceptionList.value += e
                                 }
                             }
-                            println("$s ${if (isNew) "added" else "updated"}")
+                            println("$s ${if (isAdd) "added" else "updated"}")
                         }
                         DELETE       -> {
                             val k = event.keyValue.key.asString
@@ -200,11 +217,11 @@ class PathChildrenCache(val urls: List<String>,
         closeSemaphore.withLock {
             checkStartCalled()
 
-            if (!closeCalled) {
-                closeCalled = true
-                startThreadComplete.waitUntilTrue()
-                if (userExecutor == null) (executor as ExecutorService).shutdown()
-            }
+            startThreadComplete.waitUntilTrue()
+
+            // Close waiter before shutting down executor
+            super.close()
+            if (userExecutor == null) (executor as ExecutorService).shutdown()
         }
     }
 
