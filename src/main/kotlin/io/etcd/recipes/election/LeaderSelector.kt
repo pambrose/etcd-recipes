@@ -27,12 +27,35 @@ import com.sudothought.common.util.sleep
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.common.*
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asPutOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.getValues
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAliveWith
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.withLeaseClient
+import io.etcd.recipes.common.withWatchClient
 import mu.KLogging
 import java.io.Closeable
 import java.util.*
-import java.util.concurrent.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 import kotlin.time.seconds
@@ -44,7 +67,7 @@ class LeaderSelector
 constructor(val urls: List<String>,
             val electionPath: String,
             private val listener: LeaderSelectorListener,
-            private val userExecutor: ExecutorService? = null,
+            private val userExecutor: Executor? = null,
             val clientId: String = "Client:${randomId(7)}") : Closeable {
 
     // For Kotlin clients
@@ -69,7 +92,6 @@ constructor(val urls: List<String>,
                  executorService,
                  clientId)
 
-    private val closeSemaphore = Semaphore(1, true)
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
     private val terminateWatch = BooleanMonitor(false)
     private val terminateKeepAlive = BooleanMonitor(false)
@@ -78,10 +100,11 @@ constructor(val urls: List<String>,
     private val attemptLeadership = BooleanMonitor(true)
     private var startCalled by atomicBoolean(false)
     private var closeCalled by atomicBoolean(false)
+    private val closeSemaphore = Semaphore(1, true)
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
     private val leaderPath = leaderPath(electionPath)
-    private val exceptionList = Collections.synchronizedList(mutableListOf<Throwable>())
+    private val exceptionList: MutableList<Throwable> = Collections.synchronizedList(mutableListOf())
 
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }
@@ -207,7 +230,7 @@ constructor(val urls: List<String>,
     }
 
     private fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
     }
 
     override fun close() {
@@ -218,7 +241,7 @@ constructor(val urls: List<String>,
                 closeCalled = true
                 markLeadershipComplete()
                 startThreadComplete.waitUntilTrue()
-                if (userExecutor == null) executor.shutdown()
+                if (userExecutor == null) (executor as ExecutorService).shutdown()
             }
         }
     }

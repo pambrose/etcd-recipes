@@ -44,7 +44,7 @@ public class SetValueWithLease {
         ExecutorService executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(1);
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (Client client = connectToEtcd(urls);
                  Lease leaseClient = client.getLeaseClient();
                  KV kvClient = client.getKVClient()) {
@@ -58,7 +58,7 @@ public class SetValueWithLease {
         });
 
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (Client client = connectToEtcd(urls);
                  KV kvClient = client.getKVClient()) {
                 long start = System.currentTimeMillis();

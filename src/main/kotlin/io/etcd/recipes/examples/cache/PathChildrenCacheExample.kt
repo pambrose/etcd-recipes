@@ -21,7 +21,6 @@ import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.withKvClient
-import kotlin.time.days
 import kotlin.time.seconds
 
 fun main() {
@@ -30,11 +29,9 @@ fun main() {
 
     val cache = PathChildrenCache(urls, cachePath, true, null)
 
-    cache.start()
-
     connectToEtcd(urls) { client ->
         client.withKvClient { kvClient ->
-            kvClient.putValue(cachePath, "a value")
+            //kvClient.putValue(cachePath, "a value")
             kvClient.putValue("${cachePath}/child1", "a child 1 value")
             kvClient.putValue("${cachePath}/child2", "a child 2 value")
             kvClient.putValue("${cachePath}/child1/subchild1", "a sub child 1 value")
@@ -42,11 +39,13 @@ fun main() {
         }
     }
 
-    sleep(5.seconds)
+    cache.start()
 
-    val c = cache.getCurrentData()
-    sleep(1.days)
+    sleep(2.seconds)
+
+    cache.getCurrentData().forEach {
+        println("${it.key} ${it.value.asString}")
+    }
 
     cache.close()
-
 }

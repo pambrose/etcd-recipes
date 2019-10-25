@@ -18,7 +18,7 @@ package io.etcd.recipes.cache
 
 import io.etcd.jetcd.ByteSequence
 
-class PathChildrenCacheEvent(val type: Type, val data: ChildData) {
+class PathChildrenCacheEvent(val name: String, val type: Type, val data: ByteSequence?) {
 
     enum class Type {
         CHILD_ADDED,
@@ -27,6 +27,8 @@ class PathChildrenCacheEvent(val type: Type, val data: ChildData) {
         INITIALIZED
     }
 
+    internal var initialDataVal: List<ChildData> = mutableListOf()
+
     /**
      * Special purpose method. When an [Type.INITIALIZED]
      * event is received, you can call this method to
@@ -34,9 +36,7 @@ class PathChildrenCacheEvent(val type: Type, val data: ChildData) {
      *
      * @return initial state of cache for [Type.INITIALIZED] events. Otherwise, `null`.
      */
-    val initialData: List<ByteSequence>?
-        get() = null
+    val initialData: List<ChildData> get() = initialDataVal
 
     override fun toString() = "PathChildrenCacheEvent{type=$type, data=$data}"
-
 }

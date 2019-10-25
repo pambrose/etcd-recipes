@@ -23,8 +23,17 @@ import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.watch.WatchEvent
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.common.*
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asPair
+import io.etcd.recipes.common.asPrefixWatchOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.getKeyValues
+import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
 import java.util.*
@@ -39,8 +48,6 @@ class ServiceCache internal constructor(val urls: List<String>,
     private val servicePath = namesPath.appendToPath(serviceName)
     private val serviceMap: ConcurrentMap<String, String> = Maps.newConcurrentMap()
     private val listeners: MutableList<ServiceCacheListener> = Collections.synchronizedList(mutableListOf())
-
-    val exceptionHolder = ExceptionHolder()
 
     init {
         require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }
@@ -61,31 +68,32 @@ class ServiceCache internal constructor(val urls: List<String>,
                         when (event.eventType) {
                             PUT          -> {
                                 val (k, v) = event.keyValue.asPair.asString
-                                val isNew = !serviceMap.containsKey(k)
-                                serviceMap[k] = v
-                                //println("$k ${if (newKey) "added" else "updated"}")
+                                val stripped = k.substring(servicePath.length)
+                                val isNew = !serviceMap.containsKey(stripped)
+                                serviceMap[stripped] = v
                                 listeners.forEach { listener ->
                                     try {
-                                        listener.cacheChanged(PUT, isNew, k, ServiceInstance.toObject(v))
+                                        listener.cacheChanged(PUT, isNew, stripped, ServiceInstance.toObject(v))
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
-                                        exceptionHolder.exception = e
+                                        exceptionList.value += e
                                     }
                                 }
                                 //println("$k $v ${if (newKey) "added" else "updated"}")
                             }
                             DELETE       -> {
                                 val k = event.keyValue.key.asString
-                                val prevValue = serviceMap.remove(k)?.let { ServiceInstance.toObject(it) }
+                                val stripped = k.substring(servicePath.length)
+                                val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
                                 listeners.forEach { listener ->
                                     try {
-                                        listener.cacheChanged(DELETE, false, k, prevValue)
+                                        listener.cacheChanged(DELETE, false, stripped, prevValue)
                                     } catch (e: Throwable) {
                                         logger.error(e) { "Exception in cacheChanged()" }
-                                        exceptionHolder.exception = e
+                                        exceptionList.value += e
                                     }
                                 }
-                                println("$k deleted")
+                                //println("$stripped deleted")
                             }
                             UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
                             else         -> logger.error { "Unknown error with $servicePath watch" }
@@ -97,7 +105,8 @@ class ServiceCache internal constructor(val urls: List<String>,
             val kvs = kvClient.getKeyValues(servicePath)
             for (kv in kvs) {
                 val (k, v) = kv
-                serviceMap[k] = v.asString
+                val stripped = k.substring(servicePath.length)
+                serviceMap[stripped] = v.asString
             }
 
             dataPreloaded.set(true)

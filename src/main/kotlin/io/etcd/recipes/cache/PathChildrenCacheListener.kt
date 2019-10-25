@@ -17,6 +17,6 @@
 package io.etcd.recipes.cache
 
 interface PathChildrenCacheListener {
-    @Throws(Exception::class)
+    //@Throws(Exception::class)
     fun childEvent(event: PathChildrenCacheEvent)
 }

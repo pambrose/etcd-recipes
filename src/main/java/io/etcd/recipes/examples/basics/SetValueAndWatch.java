@@ -46,7 +46,7 @@ public class SetValueAndWatch {
         ExecutorService executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(2);
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (Client client = connectToEtcd(urls);
                  KV kvClient = client.getKVClient()) {
                 for (int i = 0; i < 10; i++) {
@@ -62,7 +62,7 @@ public class SetValueAndWatch {
             latch.countDown();
         });
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (Client client = connectToEtcd(urls);
                  Watch watchClient = client.getWatchClient();
                  Watcher watcher =

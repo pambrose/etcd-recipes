@@ -16,13 +16,6 @@
 
 package io.etcd.recipes.cache
 
-import io.etcd.recipes.cache.PathUtils.Companion.validatePath
+import io.etcd.jetcd.ByteSequence
 
-class ChildData(path: String, val data: ByteArray) {
-
-    val path: String
-
-    init {
-        this.path = validatePath(path)
-    }
-}
+data class ChildData(val key: String, val value: ByteSequence)

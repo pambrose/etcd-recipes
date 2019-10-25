@@ -23,6 +23,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
+import java.util.*
 import java.util.concurrent.Semaphore
 
 open class EtcdConnector(urls: List<String>) {
@@ -33,9 +34,19 @@ open class EtcdConnector(urls: List<String>) {
     protected val leaseClient: Lazy<Lease> = lazy { client.value.leaseClient }
     protected val watchClient: Lazy<Watch> = lazy { client.value.watchClient }
     protected var closeCalled: Boolean by AtomicDelegates.atomicBoolean(false)
+    protected val exceptionList: Lazy<MutableList<Throwable>> =
+        lazy { Collections.synchronizedList(mutableListOf<Throwable>()) }
 
     protected fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
+    }
+
+    val exceptions get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList<Throwable>()
+
+    val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.size > 0
+
+    fun clearExceptions() {
+        if (exceptionList.isInitialized()) exceptionList.value.clear()
     }
 
     open fun close() {

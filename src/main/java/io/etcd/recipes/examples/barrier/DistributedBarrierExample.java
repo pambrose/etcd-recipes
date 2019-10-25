@@ -38,7 +38,7 @@ public class DistributedBarrierExample {
         CountDownLatch goLatch = new CountDownLatch(1);
         ExecutorService executor = Executors.newCachedThreadPool();
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (DistributedBarrier barrier = new DistributedBarrier(urls, path, true)) {
                 System.out.println("Setting Barrier");
                 barrier.setBarrier();
@@ -54,7 +54,7 @@ public class DistributedBarrierExample {
 
         for (int i = 0; i < threadCount; i++) {
             final int id = i;
-            executor.execute(() -> {
+            executor.submit(() -> {
                         try {
                             goLatch.await();
                             try (DistributedBarrier barrier = new DistributedBarrier(urls, path, true)) {

@@ -33,7 +33,7 @@ public class ServiceCacheExample {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         CountDownLatch latch = new CountDownLatch(1);
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (ServiceDiscovery sd = new ServiceDiscovery(ServiceDiscoveryExample.urls, ServiceDiscoveryExample.path)) {
                 try (ServiceCache cache = sd.serviceCache(ServiceDiscoveryExample.serviceName)) {
                     cache.addListenerForChanges(

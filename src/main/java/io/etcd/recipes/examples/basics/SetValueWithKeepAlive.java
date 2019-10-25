@@ -43,7 +43,7 @@ public class SetValueWithKeepAlive {
         ExecutorService executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(1);
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (Client client = connectToEtcd(urls);
                  KV kvClient = client.getKVClient()) {
                 System.out.println(format("Assigning %s = %s", path, keyval));
@@ -63,7 +63,7 @@ public class SetValueWithKeepAlive {
 
         CountDownLatch endWatchLatch = new CountDownLatch(1);
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (Client client = connectToEtcd(urls);
                  Watch watchClient = client.getWatchClient()) {
                 watcherWithLatch(watchClient,

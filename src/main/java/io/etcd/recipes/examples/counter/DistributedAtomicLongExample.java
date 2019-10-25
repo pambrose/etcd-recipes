@@ -41,7 +41,7 @@ public class DistributedAtomicLongExample {
 
         for (int i = 0; i < threadCount; i++) {
             final int id = i;
-            executor.execute(() -> {
+            executor.submit(() -> {
                 try (DistributedAtomicLong counter = new DistributedAtomicLong(urls, path)) {
                     System.out.println(format("Creating counter #%d", id));
                     for (int j = 0; j < repeatCount; j++) counter.increment();
