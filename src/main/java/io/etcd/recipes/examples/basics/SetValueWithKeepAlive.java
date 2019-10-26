@@ -47,7 +47,7 @@ public class SetValueWithKeepAlive {
             try (Client client = connectToEtcd(urls);
                  KV kvClient = client.getKVClient()) {
                 System.out.println(format("Assigning %s = %s", path, keyval));
-                putValueWithKeepAlive(kvClient, path, keyval, client,
+                putValueWithKeepAlive(kvClient, client, path, keyval, 2,
                         () -> {
                             System.out.println("Starting sleep");
                             sleepSecs(5);

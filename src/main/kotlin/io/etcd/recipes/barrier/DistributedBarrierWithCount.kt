@@ -19,13 +19,33 @@
 package io.etcd.recipes.barrier
 
 import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asPrefixWatchOption
+import io.etcd.recipes.common.asPutOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.count
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.doesExist
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.getChildrenKeys
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.grant
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withKvClient
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -166,12 +186,6 @@ constructor(val urls: List<String>,
         }
     }
 
-    override fun close() {
-        semaphore.withLock {
-            super.close()
-        }
-    }
-
     companion object {
         @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
@@ -182,7 +196,7 @@ constructor(val urls: List<String>,
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
                     // Delete all children
-                    kvClient.getKeys(barrierPath).forEach { kvClient.delete(it) }
+                    kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
                 }
             }
         }

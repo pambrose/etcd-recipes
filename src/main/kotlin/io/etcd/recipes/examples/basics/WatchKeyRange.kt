@@ -24,8 +24,8 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.count
 import io.etcd.recipes.common.delete
-import io.etcd.recipes.common.getKeyValueChildren
-import io.etcd.recipes.common.getKeys
+import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.watcher
 import io.etcd.recipes.common.withKvClient
@@ -51,7 +51,7 @@ fun main() {
                         putValue(path, "root")
 
                         println("After creation:")
-                        println(getKeyValueChildren(path))
+                        println(getChildren(path))
                         println(count(path))
 
                         sleep(5.seconds)
@@ -63,15 +63,15 @@ fun main() {
                         putValue("$path/waiting/d", "dddd")
 
                         println("\nAfter putValues:")
-                        println(getKeyValueChildren(path).asString)
+                        println(getChildren(path).asString)
                         println(count(path))
 
                         println("\nElection only:")
-                        println(getKeyValueChildren("$path/election").asString)
+                        println(getChildren("$path/election").asString)
                         println(count("$path/election"))
 
                         println("\nWaiting only:")
-                        println(getKeyValueChildren("$path/waiting").asString)
+                        println(getChildren("$path/waiting").asString)
                         println(count("$path/waiting"))
 
                         sleep(5.seconds)
@@ -80,13 +80,13 @@ fun main() {
                         delete(path)
 
                         // Delete children
-                        getKeys(path).forEach {
+                        getChildrenKeys(path).forEach {
                             println("Deleting key: $it")
                             delete(it)
                         }
 
                         println("\nAfter removal:")
-                        println(getKeyValueChildren(path).asString)
+                        println(getChildren(path).asString)
                         println(count(path))
 
                         sleep(5.seconds)

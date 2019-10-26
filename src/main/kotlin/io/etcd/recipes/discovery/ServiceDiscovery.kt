@@ -19,7 +19,6 @@
 package io.etcd.recipes.discovery
 
 import com.google.common.collect.Maps
-import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
@@ -33,9 +32,9 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.getKeys
+import io.etcd.recipes.common.getChildrenKeys
+import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.getValues
 import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.keepAlive
 import io.etcd.recipes.common.setTo
@@ -72,56 +71,53 @@ constructor(val urls: List<String>,
         }
     }
 
+    @Synchronized
     @Throws(EtcdRecipeException::class)
     fun registerService(service: ServiceInstance) {
-        semaphore.withLock {
-            checkCloseNotCalled()
+        checkCloseNotCalled()
 
-            val instancePath = getNamesPath(service)
-            val context = ServiceInstanceContext(service, kvClient.value, instancePath)
+        val instancePath = getNamesPath(service)
+        val context = ServiceInstanceContext(service, kvClient.value, instancePath)
 
-            serviceContextMap[service.id] = context
+        serviceContextMap[service.id] = context
 
-            // Prime lease with 2 seconds to give keepAlive a chance to get started
-            context.lease = leaseClient.grant(2).get()
+        // Prime lease with 2 seconds to give keepAlive a chance to get started
+        context.lease = leaseClient.grant(2).get()
 
-            val txn =
-                kvClient.transaction {
-                    If(instancePath.doesNotExist)
-                    Then(instancePath.setTo(service.toJson(), context.lease.asPutOption))
-                }
+        val txn =
+            kvClient.transaction {
+                If(instancePath.doesNotExist)
+                Then(instancePath.setTo(service.toJson(), context.lease.asPutOption))
+            }
 
-            // Run keep-alive until closed
-            if (txn.isSucceeded)
-                context.keepAlive = leaseClient.keepAlive(context.lease)
-            else
-                throw EtcdRecipeException("Service registration failed for $instancePath")
-        }
+        // Run keep-alive until closed
+        if (txn.isSucceeded)
+            context.keepAlive = leaseClient.keepAlive(context.lease)
+        else
+            throw EtcdRecipeException("Service registration failed for $instancePath")
     }
 
+    @Synchronized
     @Throws(EtcdRecipeException::class)
     fun updateService(service: ServiceInstance) {
-        semaphore.withLock {
-            checkCloseNotCalled()
-            val instancePath = getNamesPath(service)
-            val context = serviceContextMap[service.id]
-                ?: throw EtcdRecipeException("ServiceInstance ${service.name} was not first registered with registerService()")
-            val txn =
-                kvClient.transaction {
-                    If(instancePath.doesExist)
-                    Then(instancePath.setTo(service.toJson(), context.lease.asPutOption))
-                }
-            if (!txn.isSucceeded) throw EtcdRecipeException("Service update failed for $instancePath")
-        }
+        checkCloseNotCalled()
+        val instancePath = getNamesPath(service)
+        val context = serviceContextMap[service.id]
+            ?: throw EtcdRecipeException("ServiceInstance ${service.name} was not first registered with registerService()")
+        val txn =
+            kvClient.transaction {
+                If(instancePath.doesExist)
+                Then(instancePath.setTo(service.toJson(), context.lease.asPutOption))
+            }
+        if (!txn.isSucceeded) throw EtcdRecipeException("Service update failed for $instancePath")
     }
 
+    @Synchronized
     @Throws(EtcdRecipeException::class)
     fun unregisterService(service: ServiceInstance) {
-        semaphore.withLock {
-            checkCloseNotCalled()
-            val found = internalUnregisterService(service)
-            if (!found) throw EtcdRecipeException("ServiceInstance not published with registerService()")
-        }
+        checkCloseNotCalled()
+        val found = internalUnregisterService(service)
+        if (!found) throw EtcdRecipeException("ServiceInstance not published with registerService()")
     }
 
     private fun internalUnregisterService(service: ServiceInstance): Boolean {
@@ -144,37 +140,35 @@ constructor(val urls: List<String>,
         return provider
     }
 
-    fun queryForNames(): List<String> =
-        semaphore.withLock {
-            checkCloseNotCalled()
-            kvClient.getKeys(namesPath)
-        }
+    @Synchronized
+    fun queryForNames(): List<String> {
+        checkCloseNotCalled()
+        return kvClient.getChildrenKeys(namesPath)
+    }
 
-    fun queryForInstances(name: String): List<ServiceInstance> =
-        semaphore.withLock {
-            checkCloseNotCalled()
-            kvClient.getValues(getNamesPath(name)).asString.map { ServiceInstance.toObject(it) }
-        }
+    @Synchronized
+    fun queryForInstances(name: String): List<ServiceInstance> {
+        checkCloseNotCalled()
+        return kvClient.getChildrenValues(getNamesPath(name)).asString.map { ServiceInstance.toObject(it) }
+    }
 
+    @Synchronized
     @Throws(EtcdRecipeException::class)
-    fun queryForInstance(name: String, id: String): ServiceInstance =
-        semaphore.withLock {
-            checkCloseNotCalled()
-            val path = getNamesPath(name, id)
-            val json = kvClient.getValue(path)?.asString
-                ?: throw EtcdRecipeException("ServiceInstance $path not present")
-            ServiceInstance.toObject(json)
-        }
+    fun queryForInstance(name: String, id: String): ServiceInstance {
+        checkCloseNotCalled()
+        val path = getNamesPath(name, id)
+        val json = kvClient.getValue(path)?.asString
+            ?: throw EtcdRecipeException("ServiceInstance $path not present")
+        return ServiceInstance.toObject(json)
+    }
 
+    @Synchronized
     override fun close() {
-        semaphore.withLock {
+        // Close all service caches
+        serviceCacheList.forEach { it.close() }
+        serviceContextMap.forEach { (_, v) -> internalUnregisterService(v.service) }
 
-            // Close all service caches
-            serviceCacheList.forEach { it.close() }
-            serviceContextMap.forEach { (_, v) -> internalUnregisterService(v.service) }
-
-            super.close()
-        }
+        super.close()
     }
 
     private fun getNamesPath(service: ServiceInstance) = getNamesPath(service.name, service.id)

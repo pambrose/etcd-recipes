@@ -19,7 +19,6 @@
 package io.etcd.recipes.election
 
 import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
@@ -37,8 +36,8 @@ import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.getValues
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAliveWith
 import io.etcd.recipes.common.setTo
@@ -54,7 +53,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
@@ -100,7 +98,6 @@ constructor(val urls: List<String>,
     private val attemptLeadership = BooleanMonitor(true)
     private var startCalled by atomicBoolean(false)
     private var closeCalled by atomicBoolean(false)
-    private val closeSemaphore = Semaphore(1, true)
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
     private val leaderPath = leaderPath(electionPath)
@@ -140,7 +137,6 @@ constructor(val urls: List<String>,
                     client.withLeaseClient { leaseClient ->
                         client.withKvClient { kvClient ->
 
-                            val leaderSemaphore = Semaphore(1, true)
                             val watchStarted = BooleanMonitor(false)
                             val watchStopped = BooleanMonitor(false)
                             val advertiseComplete = BooleanMonitor(false)
@@ -152,7 +148,7 @@ constructor(val urls: List<String>,
                                     client.withWatchClient { watchClient ->
                                         // Run for leader whenever leader key is deleted
                                         watchForDeleteEvents(watchClient, watchStarted) {
-                                            leaderSemaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
+                                            synchronized(this) { attemptToBecomeLeader(leaseClient, kvClient) }
                                         }.use {
                                             terminateWatch.waitUntilTrue()
                                         }
@@ -179,7 +175,7 @@ constructor(val urls: List<String>,
                             watchStarted.waitUntilTrue()
 
                             // Clients should run for leader in case they are the first to run
-                            leaderSemaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
+                            synchronized(this) { attemptToBecomeLeader(leaseClient, kvClient) }
 
                             leadershipComplete.waitUntilTrue()
                             watchStopped.waitUntilTrue()
@@ -233,16 +229,15 @@ constructor(val urls: List<String>,
         if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
     }
 
+    @Synchronized
     override fun close() {
-        closeSemaphore.withLock {
-            checkStartCalled()
+        checkStartCalled()
 
-            if (!closeCalled) {
-                closeCalled = true
-                markLeadershipComplete()
-                startThreadComplete.waitUntilTrue()
-                if (userExecutor == null) (executor as ExecutorService).shutdown()
-            }
+        if (!closeCalled) {
+            closeCalled = true
+            markLeadershipComplete()
+            startThreadComplete.waitUntilTrue()
+            if (userExecutor == null) (executor as ExecutorService).shutdown()
         }
     }
 
@@ -343,7 +338,7 @@ constructor(val urls: List<String>,
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
                     val leader = kvClient.getValue(electionPath)?.asString?.stripUniqueSuffix
-                    kvClient.getValues(participationPath(electionPath)).asString
+                    kvClient.getChildrenValues(participationPath(electionPath)).asString
                         .forEach { participants += Participant(it, leader == it) }
                 }
             }

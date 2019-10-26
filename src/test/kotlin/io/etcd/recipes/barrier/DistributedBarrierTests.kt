@@ -24,7 +24,12 @@ import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
 import mu.KLogging
-import org.amshove.kluent.*
+import org.amshove.kluent.invoking
+import org.amshove.kluent.shouldBeFalse
+import org.amshove.kluent.shouldBeLessThan
+import org.amshove.kluent.shouldBeTrue
+import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -58,12 +63,12 @@ class DistributedBarrierTests {
                 DistributedBarrier(urls, path)
                     .use { barrier ->
 
-                        barrier.isBarrierSet shouldEqual false
+                        barrier.isBarrierSet() shouldEqual false
 
                         logger.info { "Setting Barrier" }
                         val isSet = barrier.setBarrier()
                         isSet.shouldBeTrue()
-                        barrier.isBarrierSet.shouldBeTrue()
+                        barrier.isBarrierSet().shouldBeTrue()
                         setBarrierLatch.countDown()
 
                         // This should return false because barrier is already set
@@ -147,12 +152,12 @@ class DistributedBarrierTests {
         DistributedBarrier(urls, path)
             .use { barrier ->
 
-                barrier.isBarrierSet shouldEqual false
+                barrier.isBarrierSet() shouldEqual false
 
                 logger.info { "Setting Barrier" }
                 val isSet = barrier.setBarrier()
                 isSet.shouldBeTrue()
-                barrier.isBarrierSet.shouldBeTrue()
+                barrier.isBarrierSet().shouldBeTrue()
 
                 // This sould return false because barrier is already set
                 val isSet2 = barrier.setBarrier()

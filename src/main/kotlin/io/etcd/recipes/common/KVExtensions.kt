@@ -28,43 +28,63 @@ import io.etcd.jetcd.kv.PutResponse
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 
-// Put values -- these do not use default values to improve the Java calls
-fun KV.putValue(keyname: String, keyval: String, option: PutOption): PutResponse =
+@JvmOverloads
+fun KV.putValue(keyname: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): PutResponse =
+    put(keyname.asByteSequence, keyval, option).get()
+
+@JvmOverloads
+fun KV.putValue(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): PutResponse =
     put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
-fun KV.putValue(keyname: String, keyval: Int, option: PutOption): PutResponse =
+@JvmOverloads
+fun KV.putValue(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): PutResponse =
     put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
-fun KV.putValue(keyname: String, keyval: Long, option: PutOption): PutResponse =
+@JvmOverloads
+fun KV.putValue(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
     put(keyname.asByteSequence, keyval.asByteSequence, option).get()
 
-fun KV.putValue(keyname: String, keyval: String): PutResponse = putValue(keyname, keyval, PutOption.DEFAULT)
-fun KV.putValue(keyname: String, keyval: Int): PutResponse = putValue(keyname, keyval, PutOption.DEFAULT)
-fun KV.putValue(keyname: String, keyval: Long): PutResponse = putValue(keyname, keyval, PutOption.DEFAULT)
+fun Lazy<KV>.putValue(keyname: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): PutResponse =
+    value.putValue(keyname, keyval, option)
 
 fun Lazy<KV>.putValue(keyname: String, keyval: String, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
+
 fun Lazy<KV>.putValue(keyname: String, keyval: Int, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
+
 fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
 
-// Put values with lease
-@JvmOverloads
-fun KV.putValueWithKeepAlive(keyname: String,
-                             keyval: String,
-                             client: Client,
-                             ttl: Long = 2,
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: ByteSequence, ttl: Long, block: () -> Unit) {
+    putValueWithKeepAlive(client, listOf(keyname to keyval), ttl, block)
+}
+
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: String, ttl: Long, block: () -> Unit) {
+    putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
+}
+
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Int, ttl: Long, block: () -> Unit) {
+    putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
+}
+
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Long, ttl: Long, block: () -> Unit) {
+    putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
+}
+
+fun KV.putValueWithKeepAlive(client: Client,
+                             kvs: Collection<Pair<String, ByteSequence>>,
+                             ttl: Long,
                              block: () -> Unit) {
     client.withLeaseClient { leaseClient ->
         val lease = leaseClient.grant(ttl).get()
-        putValue(keyname, keyval, lease.asPutOption)
+        for (kv in kvs)
+            putValue(kv.first, kv.second, lease.asPutOption)
         leaseClient.keepAliveWith(lease) {
             block()
         }
     }
 }
-
 
 // Delete keys
 fun KV.delete(vararg keynames: String) = keynames.forEach { delete(it) }
@@ -72,6 +92,13 @@ fun KV.delete(vararg keynames: String) = keynames.forEach { delete(it) }
 fun Lazy<KV>.delete(keyname: String): DeleteResponse = value.delete(keyname)
 
 fun KV.delete(keyname: String): DeleteResponse = delete(keyname.asByteSequence).get()
+
+fun KV.deleteChildren(parentKeyName: String): List<String> {
+    val keys = getChildrenKeys(parentKeyName)
+    for (key in keys)
+        delete(key)
+    return keys
+}
 
 // Get responses
 @JvmOverloads
@@ -88,20 +115,20 @@ private val String.asPrefixGetOption get() = GetOption.newBuilder().withPrefix(a
 fun KV.getKeyValuePairs(keyname: String, getOption: GetOption): List<Pair<String, ByteSequence>> =
     getResponse(keyname, getOption).kvs.map { it.key.asString to it.value }
 
-fun KV.getKeyValueChildren(keyname: String): List<Pair<String, ByteSequence>> {
-    val adjustedKey = keyname.ensureTrailing("/")
+fun KV.getChildren(parentKeyName: String): List<Pair<String, ByteSequence>> {
+    val adjustedKey = parentKeyName.ensureTrailing("/")
     return getKeyValuePairs(adjustedKey, adjustedKey.asPrefixGetOption)
 }
 
-fun Lazy<KV>.getKeyValueChildren(keyname: String): List<Pair<String, ByteSequence>> = value.getKeyValueChildren(keyname)
+fun Lazy<KV>.getChildren(parentKeyName: String): List<Pair<String, ByteSequence>> = value.getChildren(parentKeyName)
 
-fun KV.getKeys(keyname: String): List<String> = getKeyValueChildren(keyname).keys
+fun KV.getChildrenKeys(parentKeyName: String): List<String> = getChildren(parentKeyName).keys
 
-fun KV.getValues(keyname: String): List<ByteSequence> = getKeyValueChildren(keyname).values
+fun KV.getChildrenValues(parentKeyName: String): List<ByteSequence> = getChildren(parentKeyName).values
 
-fun Lazy<KV>.getKeys(keyname: String): List<String> = value.getKeys(keyname)
+fun Lazy<KV>.getChildrenKeys(parentKeyName: String): List<String> = value.getChildrenKeys(parentKeyName)
 
-fun Lazy<KV>.getValues(keyname: String): List<ByteSequence> = value.getValues(keyname)
+fun Lazy<KV>.getChildrenValues(parentKeyName: String): List<ByteSequence> = value.getChildrenValues(parentKeyName)
 
 // Get single key value
 fun KV.getValue(keyname: String): ByteSequence? =
@@ -132,8 +159,8 @@ fun Lazy<KV>.isKeyPresent(keyname: String) = value.isKeyPresent(keyname)
 fun Lazy<KV>.isKeyNotPresent(keyname: String) = value.isKeyNotPresent(keyname)
 
 // Count children keys
-fun KV.count(keyname: String): Long {
-    val adjustedKey = keyname.ensureTrailing("/")
+fun KV.count(parentKeyName: String): Long {
+    val adjustedKey = parentKeyName.ensureTrailing("/")
     val option = GetOption.newBuilder().withPrefix(adjustedKey.asByteSequence).withCountOnly(true).build()
     return getResponse(adjustedKey, option).count
 }

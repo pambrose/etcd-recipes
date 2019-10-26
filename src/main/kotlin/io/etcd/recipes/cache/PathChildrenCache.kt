@@ -20,7 +20,6 @@ package io.etcd.recipes.cache
 
 import com.google.common.collect.Maps
 import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates
 import com.sudothought.common.time.Conversions
 import io.etcd.jetcd.ByteSequence
@@ -39,7 +38,7 @@ import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.ensureTrailing
-import io.etcd.recipes.common.getKeyValueChildren
+import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
@@ -47,7 +46,6 @@ import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
@@ -58,7 +56,6 @@ class PathChildrenCache(val urls: List<String>,
 
     private var startCalled by AtomicDelegates.atomicBoolean(false)
     private val startThreadComplete = BooleanMonitor(false)
-    private val closeSemaphore = Semaphore(1, true)
     private val cacheMap: ConcurrentMap<String, ByteSequence> = Maps.newConcurrentMap()
     private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
     // Use a single threaded executor to maintain order
@@ -86,42 +83,41 @@ class PathChildrenCache(val urls: List<String>,
         start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL)
     }
 
+    @Synchronized
     fun start(mode: StartMode) {
-        semaphore.withLock {
-            if (startCalled)
-                throw EtcdRecipeRuntimeException("start() already called")
-            checkCloseNotCalled()
+        if (startCalled)
+            throw EtcdRecipeRuntimeException("start() already called")
+        checkCloseNotCalled()
 
-            // Preload with initial data
-            if (mode == BUILD_INITIAL_CACHE || mode == POST_INITIALIZED_EVENT) {
-                executor.execute {
-                    try {
-                        loadData()
-                    } finally {
-                        if (mode == POST_INITIALIZED_EVENT)
-                            listeners.forEach { listener ->
-                                try {
-                                    val cacheEvent =
-                                        PathChildrenCacheEvent("", INITIALIZED, null).apply {
-                                            initialDataVal = currentData
-                                        }
-                                    listener.childEvent(cacheEvent)
-                                } catch (e: Throwable) {
-                                    logger.error(e) { "Exception in cacheChanged()" }
-                                    exceptionList.value += e
-                                }
+        // Preload with initial data
+        if (mode == BUILD_INITIAL_CACHE || mode == POST_INITIALIZED_EVENT) {
+            executor.execute {
+                try {
+                    loadData()
+                } finally {
+                    if (mode == POST_INITIALIZED_EVENT)
+                        listeners.forEach { listener ->
+                            try {
+                                val cacheEvent =
+                                    PathChildrenCacheEvent("", INITIALIZED, null).apply {
+                                        initialDataVal = currentData
+                                    }
+                                listener.childEvent(cacheEvent)
+                            } catch (e: Throwable) {
+                                logger.error(e) { "Exception in cacheChanged()" }
+                                exceptionList.value += e
                             }
-                        setupWatcher()
-                        startThreadComplete.set(true)
-                    }
+                        }
+                    setupWatcher()
+                    startThreadComplete.set(true)
                 }
-            } else {
-                setupWatcher()
-                startThreadComplete.set(true)
             }
-
-            startCalled = true
+        } else {
+            setupWatcher()
+            startThreadComplete.set(true)
         }
+
+        startCalled = true
     }
 
     fun addListener(listener: PathChildrenCacheListener) {
@@ -141,7 +137,7 @@ class PathChildrenCache(val urls: List<String>,
 
     private fun loadData() {
         try {
-            val kvs = kvClient.getKeyValueChildren(cachePath)
+            val kvs = kvClient.getChildren(cachePath)
             for (kv in kvs) {
                 val (k, v) = kv
                 val s = k.substring(cachePath.length + 1)
@@ -225,17 +221,16 @@ class PathChildrenCache(val urls: List<String>,
         if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
     }
 
+    @Synchronized
     override fun close() {
-        closeSemaphore.withLock {
-            checkStartCalled()
+        checkStartCalled()
 
-            listeners.clear()
-            startThreadComplete.waitUntilTrue()
+        listeners.clear()
+        startThreadComplete.waitUntilTrue()
 
-            // Close waiter before shutting down executor
-            super.close()
-            if (userExecutor == null) (executor as ExecutorService).shutdown()
-        }
+        // Close waiter before shutting down executor
+        super.close()
+        if (userExecutor == null) (executor as ExecutorService).shutdown()
     }
 
     companion object : KLogging()

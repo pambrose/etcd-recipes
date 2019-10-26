@@ -24,11 +24,9 @@ import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
 import java.util.*
-import java.util.concurrent.Semaphore
 
 open class EtcdConnector(urls: List<String>) {
 
-    protected val semaphore: Semaphore = Semaphore(1, true)
     protected val client: Lazy<Client> = lazy { connectToEtcd(urls) }
     protected val kvClient: Lazy<KV> = lazy { client.value.kvClient }
     protected val leaseClient: Lazy<Lease> = lazy { client.value.leaseClient }
@@ -49,6 +47,7 @@ open class EtcdConnector(urls: List<String>) {
         if (exceptionList.isInitialized()) exceptionList.value.clear()
     }
 
+    @Synchronized
     open fun close() {
         if (!closeCalled) {
             if (watchClient.isInitialized())

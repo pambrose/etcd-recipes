@@ -18,12 +18,21 @@
 
 package io.etcd.recipes.counter
 
-import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.asLong
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.equalTo
+import io.etcd.recipes.common.getResponse
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.withKvClient
 import java.io.Closeable
 import kotlin.time.milliseconds
 
@@ -41,9 +50,10 @@ constructor(val urls: List<String>,
         createCounterIfNotPresent()
     }
 
-    fun get(): Long = semaphore.withLock {
+    @Synchronized
+    fun get(): Long {
         checkCloseNotCalled()
-        kvClient.getValue(counterPath, -1L)
+        return kvClient.getValue(counterPath, -1L)
     }
 
     fun increment(): Long = modifyCounterValue(1L)
@@ -54,30 +64,23 @@ constructor(val urls: List<String>,
 
     fun subtract(value: Long): Long = modifyCounterValue(-value)
 
-    override fun close() {
-        semaphore.withLock {
-            super.close()
-        }
-    }
-
+    @Synchronized
     private fun modifyCounterValue(value: Long): Long {
         checkCloseNotCalled()
-        return semaphore.withLock {
-            var count = 1
-            //totalCount.incrementAndGet()
-            do {
-                val txnResponse = applyCounterTransaction(value)
-                if (!txnResponse.isSucceeded) {
-                    //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
-                    // Crude backoff for retry
-                    sleep((count * 100).random.milliseconds)
-                    count++
-                }
-            } while (!txnResponse.isSucceeded)
+        var count = 1
+        //totalCount.incrementAndGet()
+        do {
+            val txnResponse = applyCounterTransaction(value)
+            if (!txnResponse.isSucceeded) {
+                //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
+                // Crude backoff for retry
+                sleep((count * 100).random.milliseconds)
+                count++
+            }
+        } while (!txnResponse.isSucceeded)
 
-            // Return the latest value
-            kvClient.getValue(counterPath, -1L)
-        }
+        // Return the latest value
+        return kvClient.getValue(counterPath, -1L)
     }
 
     private fun createCounterIfNotPresent(): Boolean =

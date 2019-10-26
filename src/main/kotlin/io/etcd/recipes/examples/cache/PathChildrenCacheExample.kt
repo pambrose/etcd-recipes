@@ -21,7 +21,7 @@ import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.withKvClient
 import kotlin.time.seconds
@@ -51,14 +51,11 @@ fun main() {
 
         connectToEtcd(urls) { client ->
             client.withKvClient { kvClient ->
-                kvClient.delete("${cachePath}/child1")
-                kvClient.delete("${cachePath}/child2")
+                println("Deleted: ${kvClient.deleteChildren(cachePath)}")
             }
         }
 
         sleep(4.seconds)
         close()
     }
-
-
 }
