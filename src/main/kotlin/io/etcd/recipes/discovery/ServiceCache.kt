@@ -32,6 +32,7 @@ import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.ensureTrailing
 import io.etcd.recipes.common.getKeyValueChildren
 import io.etcd.recipes.common.watcher
 import mu.KLogging
@@ -40,7 +41,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentMap
 
 class ServiceCache internal constructor(val urls: List<String>,
-                                        namesPath: String,
+                                        val namesPath: String,
                                         val serviceName: String) : EtcdConnector(urls), Closeable {
 
     private var startCalled by atomicBoolean(false)
@@ -59,16 +60,19 @@ class ServiceCache internal constructor(val urls: List<String>,
                 throw EtcdRecipeRuntimeException("start() already called")
             checkCloseNotCalled()
 
-            watchClient.watcher(servicePath, servicePath.asPrefixWatchOption) { watchResponse ->
+            val adjustedServicePath = servicePath.ensureTrailing("/")
+            val adjustedNamesPath = namesPath.ensureTrailing("/")
+
+            watchClient.watcher(adjustedServicePath, adjustedServicePath.asPrefixWatchOption) { watchResponse ->
                 // Wait for data to be loaded
                 dataPreloaded.waitUntilTrue()
 
                 watchResponse.events
                     .forEach { event ->
+                        val (k, v) = event.keyValue.asPair.asString
+                        val stripped = k.substring(adjustedNamesPath.length)
                         when (event.eventType) {
                             PUT          -> {
-                                val (k, v) = event.keyValue.asPair.asString
-                                val stripped = k.substring(servicePath.length)
                                 val isAdd = !serviceMap.containsKey(stripped)
                                 serviceMap[stripped] = v
                                 listeners.forEach { listener ->
@@ -82,8 +86,6 @@ class ServiceCache internal constructor(val urls: List<String>,
                                 //println("$k $v ${if (newKey) "added" else "updated"}")
                             }
                             DELETE       -> {
-                                val k = event.keyValue.key.asString
-                                val stripped = k.substring(servicePath.length)
                                 val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
                                 listeners.forEach { listener ->
                                     try {
@@ -102,10 +104,10 @@ class ServiceCache internal constructor(val urls: List<String>,
             }
 
             // Preload with initial data
-            val kvs = kvClient.getKeyValueChildren(servicePath)
+            val kvs = kvClient.getKeyValueChildren(adjustedServicePath)
             for (kv in kvs) {
                 val (k, v) = kv
-                val stripped = k.substring(servicePath.length)
+                val stripped = k.substring(adjustedNamesPath.length)
                 serviceMap[stripped] = v.asString
             }
 

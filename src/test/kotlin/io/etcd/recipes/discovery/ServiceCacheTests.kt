@@ -65,7 +65,8 @@ class ServiceCacheTests {
                                                   serviceName: String,
                                                   serviceInstance: ServiceInstance?) {
                             captureException(holder) {
-                                serviceName.split("/").dropLast(1).last() shouldEqual name
+                                //println("Comparing $serviceName and $name")
+                                serviceName.split("/").first() shouldEqual name
 
                                 if (eventType == EventType.PUT) {
                                     if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()

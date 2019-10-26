@@ -38,7 +38,6 @@ import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asPrefixWatchOption
-import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.ensureTrailing
 import io.etcd.recipes.common.getKeyValueChildren
 import io.etcd.recipes.common.watcher
@@ -155,17 +154,18 @@ class PathChildrenCache(val urls: List<String>,
     }
 
     private fun setupWatcher() {
-        val adjustedPath = cachePath.ensureTrailing("/")
-        watchClient.watcher(adjustedPath, adjustedPath.asPrefixWatchOption) { watchResponse ->
+        val adjustedCachePath = cachePath.ensureTrailing("/")
+        watchClient.watcher(adjustedCachePath, adjustedCachePath.asPrefixWatchOption) { watchResponse ->
             watchResponse.events
                 .forEach { event ->
+                    val (k, v) = event.keyValue.asPair
+                    val stripped = k.substring(adjustedCachePath.length)
                     when (event.eventType) {
                         PUT          -> {
-                            val (k, v) = event.keyValue.asPair
-                            val s = k.substring(adjustedPath.length)
-                            val isAdd = !cacheMap.containsKey(s)
-                            cacheMap[s] = v
-                            val cacheEvent = PathChildrenCacheEvent(s, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
+                            val isAdd = !cacheMap.containsKey(stripped)
+                            cacheMap[stripped] = v
+                            val cacheEvent =
+                                PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
                             listeners.forEach { listener ->
                                 try {
                                     listener.childEvent(cacheEvent)
@@ -177,10 +177,8 @@ class PathChildrenCache(val urls: List<String>,
                             //println("$s ${if (isAdd) "added" else "updated"}")
                         }
                         DELETE       -> {
-                            val k = event.keyValue.key.asString
-                            val s = k.substring(adjustedPath.length)
-                            val prevValue = cacheMap.remove(k)?.let { it }
-                            val cacheEvent = PathChildrenCacheEvent(s, CHILD_REMOVED, prevValue)
+                            val prevValue = cacheMap.remove(stripped)?.let { it }
+                            val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
                             listeners.forEach { listener ->
                                 try {
                                     listener.childEvent(cacheEvent)
