@@ -18,7 +18,7 @@ package io.etcd.recipes.cache
 
 import io.etcd.jetcd.ByteSequence
 
-class PathChildrenCacheEvent(val name: String, val type: Type, val data: ByteSequence?) {
+class PathChildrenCacheEvent(val childName: String, val type: Type, val data: ByteSequence?) {
 
     enum class Type {
         CHILD_ADDED,

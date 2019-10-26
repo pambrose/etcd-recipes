@@ -16,11 +16,15 @@
 
 package io.etcd.recipes.examples.cache
 
+import com.sudothought.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCache
+import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.withKvClient
+import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
@@ -28,22 +32,33 @@ fun main() {
 
     connectToEtcd(urls) { client ->
         client.withKvClient { kvClient ->
-            //kvClient.putValue(cachePath, "a value")
             kvClient.putValue("${cachePath}/child1", "a child 1 value")
             kvClient.putValue("${cachePath}/child2", "a child 2 value")
-            kvClient.putValue("${cachePath}/child1/subchild1", "a sub child 1 value")
-            kvClient.putValue("${cachePath}/child2/subchild2", "a sub child 2 value")
         }
     }
 
-    val cache = PathChildrenCache(urls, cachePath, true, null)
+    sleep(1.seconds)
 
-    cache.start(true)
-    cache.waitOnStartComplete()
+    val cache = PathChildrenCache(urls, cachePath)
+    cache.apply {
+        start(true)
+        waitOnStartComplete()
+        currentData.forEach { println("${it.key} ${it.value.asString}") }
 
-    cache.currentData.forEach {
-        println("${it.key} ${it.value.asString}")
+        addListener { event: PathChildrenCacheEvent ->
+            println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+        }
+
+        connectToEtcd(urls) { client ->
+            client.withKvClient { kvClient ->
+                kvClient.delete("${cachePath}/child1")
+                kvClient.delete("${cachePath}/child2")
+            }
+        }
+
+        sleep(4.seconds)
+        close()
     }
 
-    cache.close()
+
 }

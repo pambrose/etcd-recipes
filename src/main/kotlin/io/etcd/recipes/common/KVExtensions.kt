@@ -85,19 +85,19 @@ fun Lazy<KV>.getResponse(keyname: String, option: GetOption = GetOption.DEFAULT)
 // Get children key value pairs
 private val String.asPrefixGetOption get() = GetOption.newBuilder().withPrefix(asByteSequence).build()
 
-fun KV.getKeyValues(keyname: String, getOption: GetOption): List<Pair<String, ByteSequence>> =
+fun KV.getKeyValuePairs(keyname: String, getOption: GetOption): List<Pair<String, ByteSequence>> =
     getResponse(keyname, getOption).kvs.map { it.key.asString to it.value }
 
-fun KV.getKeyValues(keyname: String): List<Pair<String, ByteSequence>> {
+fun KV.getKeyValueChildren(keyname: String): List<Pair<String, ByteSequence>> {
     val adjustedKey = keyname.ensureTrailing("/")
-    return getKeyValues(adjustedKey, adjustedKey.asPrefixGetOption)
+    return getKeyValuePairs(adjustedKey, adjustedKey.asPrefixGetOption)
 }
 
-fun Lazy<KV>.getKeyValues(keyname: String): List<Pair<String, ByteSequence>> = value.getKeyValues(keyname)
+fun Lazy<KV>.getKeyValueChildren(keyname: String): List<Pair<String, ByteSequence>> = value.getKeyValueChildren(keyname)
 
-fun KV.getKeys(keyname: String): List<String> = getKeyValues(keyname).keys
+fun KV.getKeys(keyname: String): List<String> = getKeyValueChildren(keyname).keys
 
-fun KV.getValues(keyname: String): List<ByteSequence> = getKeyValues(keyname).values
+fun KV.getValues(keyname: String): List<ByteSequence> = getKeyValueChildren(keyname).values
 
 fun Lazy<KV>.getKeys(keyname: String): List<String> = value.getKeys(keyname)
 

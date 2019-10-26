@@ -32,7 +32,7 @@ import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.getKeyValues
+import io.etcd.recipes.common.getKeyValueChildren
 import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
@@ -102,7 +102,7 @@ class ServiceCache internal constructor(val urls: List<String>,
             }
 
             // Preload with initial data
-            val kvs = kvClient.getKeyValues(servicePath)
+            val kvs = kvClient.getKeyValueChildren(servicePath)
             for (kv in kvs) {
                 val (k, v) = kv
                 val stripped = k.substring(servicePath.length)

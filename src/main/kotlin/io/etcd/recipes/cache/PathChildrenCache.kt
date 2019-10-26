@@ -39,7 +39,8 @@ import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.getKeyValues
+import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.getKeyValueChildren
 import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
@@ -54,14 +55,13 @@ import kotlin.time.days
 
 class PathChildrenCache(val urls: List<String>,
                         val cachePath: String,
-                        val cacheData: Boolean,
                         private val userExecutor: Executor? = null) : EtcdConnector(urls), Closeable {
 
     private var startCalled by AtomicDelegates.atomicBoolean(false)
     private val startThreadComplete = BooleanMonitor(false)
     private val closeSemaphore = Semaphore(1, true)
     private val cacheMap: ConcurrentMap<String, ByteSequence> = Maps.newConcurrentMap()
-    private val listeners: List<PathChildrenCacheListener> = emptyList()
+    private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
     // Use a single threaded executor to maintain order
     private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
 
@@ -125,6 +125,79 @@ class PathChildrenCache(val urls: List<String>,
         }
     }
 
+    fun addListener(listener: PathChildrenCacheListener) {
+        listeners += listener
+    }
+
+    fun addListener(block: (PathChildrenCacheEvent) -> Unit) {
+        addListener(
+            object : PathChildrenCacheListener {
+                override fun childEvent(event: PathChildrenCacheEvent) {
+                    block(event)
+                }
+            })
+    }
+
+    fun clearListeners() = listeners.clear()
+
+    private fun loadData() {
+        try {
+            val kvs = kvClient.getKeyValueChildren(cachePath)
+            for (kv in kvs) {
+                val (k, v) = kv
+                val s = k.substring(cachePath.length + 1)
+                cacheMap[s] = v
+            }
+        } catch (e: Throwable) {
+            logger.error(e) { "Exception in loadData()" }
+            exceptionList.value += e
+        }
+    }
+
+    private fun setupWatcher() {
+        val adjustedPath = cachePath.ensureTrailing("/")
+        watchClient.watcher(adjustedPath, adjustedPath.asPrefixWatchOption) { watchResponse ->
+            watchResponse.events
+                .forEach { event ->
+                    when (event.eventType) {
+                        PUT          -> {
+                            val (k, v) = event.keyValue.asPair
+                            val s = k.substring(adjustedPath.length)
+                            val isAdd = !cacheMap.containsKey(s)
+                            cacheMap[s] = v
+                            val cacheEvent = PathChildrenCacheEvent(s, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
+                            listeners.forEach { listener ->
+                                try {
+                                    listener.childEvent(cacheEvent)
+                                } catch (e: Throwable) {
+                                    logger.error(e) { "Exception in cacheChanged()" }
+                                    exceptionList.value += e
+                                }
+                            }
+                            //println("$s ${if (isAdd) "added" else "updated"}")
+                        }
+                        DELETE       -> {
+                            val k = event.keyValue.key.asString
+                            val s = k.substring(adjustedPath.length)
+                            val prevValue = cacheMap.remove(k)?.let { it }
+                            val cacheEvent = PathChildrenCacheEvent(s, CHILD_REMOVED, prevValue)
+                            listeners.forEach { listener ->
+                                try {
+                                    listener.childEvent(cacheEvent)
+                                } catch (e: Throwable) {
+                                    logger.error(e) { "Exception in cacheChanged()" }
+                                    exceptionList.value += e
+                                }
+                            }
+                            //println("$k deleted")
+                        }
+                        UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
+                        else         -> logger.error { "Unknown error with $cachePath watch" }
+                    }
+                }
+        }
+    }
+
     @Throws(InterruptedException::class)
     fun waitOnStartComplete(): Boolean = waitOnStartComplete(Long.MAX_VALUE.days)
 
@@ -139,75 +212,16 @@ class PathChildrenCache(val urls: List<String>,
         return startThreadComplete.waitUntilTrue(timeout)
     }
 
-    private fun setupWatcher() {
-        watchClient.watcher(cachePath, cachePath.asPrefixWatchOption) { watchResponse ->
-            watchResponse.events
-                .forEach { event ->
-                    when (event.eventType) {
-                        PUT          -> {
-                            val (k, v) = event.keyValue.asPair
-                            val s = k.substring(cachePath.length + 1)
-                            val isAdd = !cacheMap.containsKey(s)
-                            cacheMap[s] = v
-                            val cacheEvent = PathChildrenCacheEvent(s, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
-                            listeners.forEach { listener ->
-                                try {
-                                    listener.childEvent(cacheEvent)
-                                } catch (e: Throwable) {
-                                    logger.error(e) { "Exception in cacheChanged()" }
-                                    exceptionList.value += e
-                                }
-                            }
-                            println("$s ${if (isAdd) "added" else "updated"}")
-                        }
-                        DELETE       -> {
-                            val k = event.keyValue.key.asString
-                            val s = k.substring(cachePath.length + 1)
-                            val prevValue = cacheMap.remove(k)?.let { it }
-                            val cacheEvent = PathChildrenCacheEvent(s, CHILD_REMOVED, prevValue)
-                            listeners.forEach { listener ->
-                                try {
-                                    listener.childEvent(cacheEvent)
-                                } catch (e: Throwable) {
-                                    logger.error(e) { "Exception in cacheChanged()" }
-                                    exceptionList.value += e
-                                }
-                            }
-                            println("$k deleted")
-                        }
-                        UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
-                        else         -> logger.error { "Unknown error with $cachePath watch" }
-                    }
-                }
-        }
-    }
-
-    private fun loadData() {
-        try {
-            val kvs = kvClient.getKeyValues(cachePath)
-            for (kv in kvs) {
-                val (k, v) = kv
-                val s = k.substring(cachePath.length + 1)
-                cacheMap[s] = v
-            }
-        } catch (e: Throwable) {
-            logger.error(e) { "Exception in loadData()" }
-            exceptionList.value += e
-        }
-    }
-
     fun rebuild() {
         clear()
         loadData()
     }
 
-    val currentData: List<ChildData> = cacheMap.toSortedMap().map { (k, v) -> ChildData(k, v) }
+    val currentData: List<ChildData> get() = cacheMap.toSortedMap().map { (k, v) -> ChildData(k, v) }
 
     fun getCurrentData(path: String) = cacheMap.get(path)
 
-    fun clear() {
-        cacheMap.clear()
-    }
+    fun clear() = cacheMap.clear()
 
     private fun checkStartCalled() {
         if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
@@ -217,6 +231,7 @@ class PathChildrenCache(val urls: List<String>,
         closeSemaphore.withLock {
             checkStartCalled()
 
+            listeners.clear()
             startThreadComplete.waitUntilTrue()
 
             // Close waiter before shutting down executor

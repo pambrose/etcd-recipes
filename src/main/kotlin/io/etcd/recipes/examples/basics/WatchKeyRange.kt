@@ -19,7 +19,17 @@
 package io.etcd.recipes.examples.basics
 
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.asPrefixWatchOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.count
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.getKeyValueChildren
+import io.etcd.recipes.common.getKeys
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.withWatchClient
 import kotlin.time.seconds
 
 fun main() {
@@ -41,7 +51,7 @@ fun main() {
                         putValue(path, "root")
 
                         println("After creation:")
-                        println(getKeyValues(path))
+                        println(getKeyValueChildren(path))
                         println(count(path))
 
                         sleep(5.seconds)
@@ -53,15 +63,15 @@ fun main() {
                         putValue("$path/waiting/d", "dddd")
 
                         println("\nAfter putValues:")
-                        println(getKeyValues(path).asString)
+                        println(getKeyValueChildren(path).asString)
                         println(count(path))
 
                         println("\nElection only:")
-                        println(getKeyValues("$path/election").asString)
+                        println(getKeyValueChildren("$path/election").asString)
                         println(count("$path/election"))
 
                         println("\nWaiting only:")
-                        println(getKeyValues("$path/waiting").asString)
+                        println(getKeyValueChildren("$path/waiting").asString)
                         println(count("$path/waiting"))
 
                         sleep(5.seconds)
@@ -76,7 +86,7 @@ fun main() {
                         }
 
                         println("\nAfter removal:")
-                        println(getKeyValues(path).asString)
+                        println(getKeyValueChildren(path).asString)
                         println(count(path))
 
                         sleep(5.seconds)
