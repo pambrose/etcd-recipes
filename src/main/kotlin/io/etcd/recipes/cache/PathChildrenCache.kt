@@ -20,7 +20,7 @@ package io.etcd.recipes.cache
 
 import com.google.common.collect.Maps
 import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.delegate.AtomicDelegates
+import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.time.Conversions
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
@@ -54,7 +54,7 @@ class PathChildrenCache(val urls: List<String>,
                         val cachePath: String,
                         private val userExecutor: Executor? = null) : EtcdConnector(urls), Closeable {
 
-    private var startCalled by AtomicDelegates.atomicBoolean(false)
+    private var startCalled by atomicBoolean(false)
     private val startThreadComplete = BooleanMonitor(false)
     private val cacheMap: ConcurrentMap<String, ByteSequence> = Maps.newConcurrentMap()
     private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
@@ -211,9 +211,14 @@ class PathChildrenCache(val urls: List<String>,
         loadData()
     }
 
+    // For consistency with Curator
     val currentData: List<ChildData> get() = cacheMap.map { (k, v) -> ChildData(k, v) }.sortedBy { it.key }
 
+    // For consistency with Curator
     fun getCurrentData(path: String) = cacheMap.get(path)
+
+    val currentDataAsMap: Map<String, ByteSequence> get() = cacheMap.toMap()
+
 
     fun clear() = cacheMap.clear()
 

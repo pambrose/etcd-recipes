@@ -69,48 +69,51 @@ class PathChildrenCacheTests {
             }
         }
 
-        val cache = PathChildrenCache(urls, path)
-        cache.apply {
-            addListener { event: PathChildrenCacheEvent ->
-                //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                when (event.type) {
-                    CHILD_ADDED   -> addCount.incrementAndGet()
-                    CHILD_UPDATED -> updateCount.incrementAndGet()
-                    CHILD_REMOVED -> deleteCount.incrementAndGet()
-                    INITIALIZED   -> initCount.incrementAndGet()
+        PathChildrenCache(urls, path)
+            .use { cache ->
+                cache.apply {
+
+                    addListener { event: PathChildrenCacheEvent ->
+                        //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+                        when (event.type) {
+                            CHILD_ADDED   -> addCount.incrementAndGet()
+                            CHILD_UPDATED -> updateCount.incrementAndGet()
+                            CHILD_REMOVED -> deleteCount.incrementAndGet()
+                            INITIALIZED   -> initCount.incrementAndGet()
+                        }
+                    }
+
+                    start(true)
+                    waitOnStartComplete()
+                    currentData shouldEqual emptyList()
+
+                    addCount.get() shouldEqual 0
+                    updateCount.get() shouldEqual 0
+                    deleteCount.get() shouldEqual 0
+                    initCount.get() shouldEqual 0
+
+                    val kvs = generateTestData(count)
+
+                    connectToEtcd(urls) { client ->
+                        client.withKvClient { kvClient ->
+                            kvs.forEach { kv ->
+                                kvClient.putValue("${path}/${kv.first}", kv.second)
+                                kvClient.putValue("${path}/${kv.first}", kv.second + "update")
+                            }
+                        }
+                    }
+
+                    compareData(count, currentData, kvs)
+
+                    connectToEtcd(urls) { client ->
+                        client.withKvClient { kvClient ->
+                            kvClient.deleteChildren(path)
+                        }
+                    }
+
+                    currentData shouldEqual emptyList()
                 }
             }
-
-            start(true)
-            waitOnStartComplete()
-            currentData shouldEqual emptyList()
-
-            addCount.get() shouldEqual 0
-            updateCount.get() shouldEqual 0
-            deleteCount.get() shouldEqual 0
-            initCount.get() shouldEqual 0
-        }
-
-        val kvs = generateTestData(count)
-
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvs.forEach { kv ->
-                    kvClient.putValue("${path}/${kv.first}", kv.second)
-                    kvClient.putValue("${path}/${kv.first}", kv.second + "update")
-                }
-            }
-        }
-
-        compareData(count, cache.currentData, kvs)
-
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvClient.deleteChildren(path)
-            }
-        }
-
-        cache.currentData shouldEqual emptyList()
 
         sleep(1.seconds)
 
@@ -147,35 +150,38 @@ class PathChildrenCacheTests {
             }
         }
 
-        val cache = PathChildrenCache(urls, path)
-        cache.apply {
-            addListener { event: PathChildrenCacheEvent ->
-                //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                when (event.type) {
-                    CHILD_ADDED   -> addCount.incrementAndGet()
-                    CHILD_UPDATED -> updateCount.incrementAndGet()
-                    CHILD_REMOVED -> deleteCount.incrementAndGet()
-                    INITIALIZED   -> initCount.incrementAndGet()
+        PathChildrenCache(urls, path)
+            .use { cache ->
+                cache.apply {
+
+                    addListener { event: PathChildrenCacheEvent ->
+                        //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+                        when (event.type) {
+                            CHILD_ADDED   -> addCount.incrementAndGet()
+                            CHILD_UPDATED -> updateCount.incrementAndGet()
+                            CHILD_REMOVED -> deleteCount.incrementAndGet()
+                            INITIALIZED   -> initCount.incrementAndGet()
+                        }
+                    }
+
+                    start(true)
+                    waitOnStartComplete()
+                    compareData(count, currentData, kvs)
+
+                    addCount.get() shouldEqual 0
+                    updateCount.get() shouldEqual 0
+                    deleteCount.get() shouldEqual 0
+                    initCount.get() shouldEqual 0
+
+                    connectToEtcd(urls) { client ->
+                        client.withKvClient { kvClient ->
+                            kvClient.deleteChildren(path)
+                        }
+                    }
+
+                    currentData shouldEqual emptyList()
                 }
             }
-
-            start(true)
-            waitOnStartComplete()
-            compareData(count, currentData, kvs)
-
-            addCount.get() shouldEqual 0
-            updateCount.get() shouldEqual 0
-            deleteCount.get() shouldEqual 0
-            initCount.get() shouldEqual 0
-        }
-
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvClient.deleteChildren(path)
-            }
-        }
-
-        cache.currentData shouldEqual emptyList()
 
         addCount.get() shouldEqual 0
         updateCount.get() shouldEqual 0
@@ -211,34 +217,36 @@ class PathChildrenCacheTests {
 
         var initData: List<ChildData>? = null
 
-        val cache = PathChildrenCache(urls, path)
-        cache.apply {
+        PathChildrenCache(urls, path)
+            .use { cache ->
+                cache.apply {
 
-            addListener { event: PathChildrenCacheEvent ->
-                //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                when (event.type) {
-                    CHILD_ADDED   -> addCount.incrementAndGet()
-                    CHILD_UPDATED -> updateCount.incrementAndGet()
-                    CHILD_REMOVED -> deleteCount.incrementAndGet()
-                    INITIALIZED   -> {
-                        initCount.incrementAndGet()
-                        initData = event.initialData
+                    addListener { event: PathChildrenCacheEvent ->
+                        //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+                        when (event.type) {
+                            CHILD_ADDED   -> addCount.incrementAndGet()
+                            CHILD_UPDATED -> updateCount.incrementAndGet()
+                            CHILD_REMOVED -> deleteCount.incrementAndGet()
+                            INITIALIZED   -> {
+                                initCount.incrementAndGet()
+                                initData = event.initialData
+                            }
+                        }
                     }
+
+                    start(POST_INITIALIZED_EVENT)
+                    waitOnStartComplete()
+                    compareData(count, currentData, kvs)
+
+                    connectToEtcd(urls) { client ->
+                        client.withKvClient { kvClient ->
+                            kvClient.deleteChildren(path)
+                        }
+                    }
+
+                    currentData shouldEqual emptyList()
                 }
             }
-
-            start(POST_INITIALIZED_EVENT)
-            waitOnStartComplete()
-            compareData(count, currentData, kvs)
-        }
-
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvClient.deleteChildren(path)
-            }
-        }
-
-        cache.currentData shouldEqual emptyList()
 
         compareData(count, initData!!, kvs)
 

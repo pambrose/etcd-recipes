@@ -39,23 +39,24 @@ fun main() {
 
     sleep(1.seconds)
 
-    val cache = PathChildrenCache(urls, cachePath)
-    cache.apply {
-        start(true)
-        waitOnStartComplete()
-        currentData.forEach { println("${it.key} ${it.value.asString}") }
+    PathChildrenCache(urls, cachePath)
+        .use { cache ->
+            cache.apply {
+                addListener { event: PathChildrenCacheEvent ->
+                    println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+                }
 
-        addListener { event: PathChildrenCacheEvent ->
-            println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-        }
+                start(true)
+                waitOnStartComplete()
+                currentData.forEach { println("${it.key} ${it.value.asString}") }
 
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                println("Deleted: ${kvClient.deleteChildren(cachePath)}")
+                connectToEtcd(urls) { client ->
+                    client.withKvClient { kvClient ->
+                        println("Deleted: ${kvClient.deleteChildren(cachePath)}")
+                    }
+                }
+
+                sleep(1.seconds)
             }
         }
-
-        sleep(4.seconds)
-        close()
-    }
 }

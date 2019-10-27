@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.common
 
-import com.sudothought.common.delegate.AtomicDelegates
+import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
@@ -31,7 +31,7 @@ open class EtcdConnector(urls: List<String>) {
     protected val kvClient: Lazy<KV> = lazy { client.value.kvClient }
     protected val leaseClient: Lazy<Lease> = lazy { client.value.leaseClient }
     protected val watchClient: Lazy<Watch> = lazy { client.value.watchClient }
-    private var closeCalled: Boolean by AtomicDelegates.atomicBoolean(false)
+    private var closeCalled: Boolean by atomicBoolean(false)
     protected val exceptionList: Lazy<MutableList<Throwable>> =
         lazy { Collections.synchronizedList(mutableListOf<Throwable>()) }
 
