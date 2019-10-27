@@ -23,8 +23,9 @@ import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.INITIALIZED
+import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.withKvClient
 import org.amshove.kluent.shouldEqual
@@ -50,12 +51,18 @@ class PathChildrenCacheTests {
         var deleteCount = 0
         var initCount = 0
 
+        connectToEtcd(urls) { client ->
+            client.withKvClient { kvClient ->
+                kvClient.deleteChildren(cachePath)
+            }
+        }
+
         val cache = PathChildrenCache(urls, cachePath)
         cache.apply {
             start(true)
             waitOnStartComplete()
 
-            currentData shouldEqual emptyList()
+            //currentData shouldEqual emptyList()
 
             addListener { event: PathChildrenCacheEvent ->
                 //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
@@ -84,17 +91,17 @@ class PathChildrenCacheTests {
 
         val data0 = cache.currentData
         data0.size shouldEqual count
+        val currData = data0.map { it.key to it.value.asString }.sortedBy { it.first }
+        val updatedOrigData = kvs.map { it.first to (it.second + "update") }.sortedBy { it.first }
+        currData shouldEqual updatedOrigData
 
         connectToEtcd(urls) { client ->
             client.withKvClient { kvClient ->
-                kvs.forEach { kv ->
-                    kvClient.delete("${cachePath}/${kv.first}")
-                }
+                kvClient.deleteChildren(cachePath)
             }
         }
 
-        val data1 = cache.currentData
-        data1.size shouldEqual 0
+        cache.currentData shouldEqual emptyList()
 
         addCount shouldEqual count
         updateCount shouldEqual count
