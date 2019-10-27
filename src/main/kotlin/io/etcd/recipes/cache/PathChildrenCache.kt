@@ -211,7 +211,7 @@ class PathChildrenCache(val urls: List<String>,
         loadData()
     }
 
-    val currentData: List<ChildData> get() = cacheMap.toSortedMap().map { (k, v) -> ChildData(k, v) }
+    val currentData: List<ChildData> get() = cacheMap.map { (k, v) -> ChildData(k, v) }.sortedBy { it.key }
 
     fun getCurrentData(path: String) = cacheMap.get(path)
 
