@@ -54,7 +54,7 @@ class ServiceCache internal constructor(val urls: List<String>,
     }
 
     @Synchronized
-    fun start() {
+    fun start(): ServiceCache {
         if (startCalled)
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
@@ -112,6 +112,8 @@ class ServiceCache internal constructor(val urls: List<String>,
 
         dataPreloaded.set(true)
         startCalled = true
+
+        return this
     }
 
     val instances: List<ServiceInstance>

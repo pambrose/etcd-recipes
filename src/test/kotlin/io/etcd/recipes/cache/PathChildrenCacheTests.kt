@@ -46,10 +46,13 @@ class PathChildrenCacheTests {
         return names.zip(vals)
     }
 
-    fun compareData(count: Int, data: List<ChildData>, origData: List<Pair<String, String>>) {
+    fun compareData(count: Int,
+                    data: List<ChildData>,
+                    origData: List<Pair<String, String>>,
+                    suffix: String = "") {
         data.size shouldEqual count
         val currData = data.map { it.key to it.value.asString }.sortedBy { it.first }
-        val updatedOrigData = origData.map { it.first to (it.second + "update") }.sortedBy { it.first }
+        val updatedOrigData = origData.map { it.first to (it.second + suffix) }.sortedBy { it.first }
         currData shouldEqual updatedOrigData
     }
 
@@ -103,7 +106,7 @@ class PathChildrenCacheTests {
                         }
                     }
 
-                    compareData(count, currentData, kvs)
+                    compareData(count, currentData, kvs, "update")
 
                     connectToEtcd(urls) { client ->
                         client.withKvClient { kvClient ->
@@ -166,7 +169,7 @@ class PathChildrenCacheTests {
 
                     start(true)
                     waitOnStartComplete()
-                    compareData(count, currentData, kvs)
+                    compareData(count, currentData, kvs, "update")
 
                     addCount.get() shouldEqual 0
                     updateCount.get() shouldEqual 0
@@ -236,7 +239,7 @@ class PathChildrenCacheTests {
 
                     start(POST_INITIALIZED_EVENT)
                     waitOnStartComplete()
-                    compareData(count, currentData, kvs)
+                    compareData(count, currentData, kvs, "update")
 
                     connectToEtcd(urls) { client ->
                         client.withKvClient { kvClient ->
@@ -248,11 +251,53 @@ class PathChildrenCacheTests {
                 }
             }
 
-        compareData(count, initData!!, kvs)
+        compareData(count, initData!!, kvs, "update")
 
         addCount.get() shouldEqual 0
         updateCount.get() shouldEqual 0
         deleteCount.get() shouldEqual count
         initCount.get() shouldEqual 1
+    }
+
+    @Test
+    fun cacheTest() {
+        val count = 25
+        val path = "/cache/cacheTest"
+        val kvs = generateTestData(count)
+
+        connectToEtcd(urls) { client ->
+            client.withKvClient { kvClient ->
+                kvClient.deleteChildren(path)
+            }
+        }
+
+        PathChildrenCache(urls, path)
+            .use { cache ->
+                cache.start(true)
+
+                connectToEtcd(urls) { client ->
+                    client.withKvClient { kvClient ->
+                        for (kv in kvs)
+                            kvClient.putValue("${path}/${kv.first}", kv.second)
+                    }
+                }
+
+                sleep(1.seconds)
+                val data = cache.currentData
+
+                //println("KVs:  ${kvs.map { it.first }.sorted()}")
+                //println("Data: ${data.map { it.key }.sorted()}")
+                data.size shouldEqual kvs.size
+                compareData(count, data, kvs)
+            }
+
+        connectToEtcd(urls) { client ->
+            client.withKvClient { kvClient ->
+                kvClient.deleteChildren(path)
+            }
+        }
+
+        sleep(1.seconds)
+
     }
 }

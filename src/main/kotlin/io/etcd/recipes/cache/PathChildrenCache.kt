@@ -79,12 +79,12 @@ class PathChildrenCache(val urls: List<String>,
         POST_INITIALIZED_EVENT
     }
 
-    fun start(buildInitial: Boolean = false) {
-        start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL)
+    fun start(buildInitial: Boolean = false, waitOnStartComplete: Boolean = true) {
+        start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL, waitOnStartComplete)
     }
 
     @Synchronized
-    fun start(mode: StartMode) {
+    fun start(mode: StartMode, waitOnStartComplete: Boolean = true): PathChildrenCache {
         if (startCalled)
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
@@ -118,6 +118,11 @@ class PathChildrenCache(val urls: List<String>,
         }
 
         startCalled = true
+
+        if (waitOnStartComplete)
+            waitOnStartComplete()
+
+        return this
     }
 
     fun addListener(listener: PathChildrenCacheListener) {

@@ -20,6 +20,7 @@ package io.etcd.recipes.election
 
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.sudothought.common.time.Conversions
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
@@ -112,7 +113,8 @@ constructor(val urls: List<String>,
 
     val isFinished get() = leadershipComplete.get()
 
-    fun start(): LeaderSelector {
+    @JvmOverloads
+    fun start(waitOnStartComplete: Boolean = true): LeaderSelector {
 
         if (!startCallAllowed)
             throw EtcdRecipeRuntimeException("Previous call to start() not complete")
@@ -192,6 +194,10 @@ constructor(val urls: List<String>,
         }
 
         connectedToEtcd.waitUntilTrue()
+
+        if (waitOnStartComplete)
+            waitOnStartComplete()
+
         return this
     }
 
@@ -200,6 +206,20 @@ constructor(val urls: List<String>,
     val hasStartExceptions get() = exceptionList.size > 0
 
     fun clearStartExceptions() = exceptionList.clear()
+
+    @Throws(InterruptedException::class)
+    fun waitOnStartComplete(): Boolean = waitOnStartComplete(Long.MAX_VALUE.days)
+
+    @Throws(InterruptedException::class)
+    fun waitOnStartComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
+        waitOnStartComplete(Conversions.timeUnitToDuration(timeout, timeUnit))
+
+    @Throws(InterruptedException::class)
+    fun waitOnStartComplete(timeout: Duration): Boolean {
+        checkStartCalled()
+        checkCloseNotCalled()
+        return startThreadComplete.waitUntilTrue(timeout)
+    }
 
     @Throws(InterruptedException::class)
     fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Long.MAX_VALUE.days)
