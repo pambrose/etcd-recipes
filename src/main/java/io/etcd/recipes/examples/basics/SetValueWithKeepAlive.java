@@ -42,25 +42,6 @@ public class SetValueWithKeepAlive {
         String keyval = "foobar";
         ExecutorService executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(1);
-
-        executor.submit(() -> {
-            try (Client client = connectToEtcd(urls);
-                 KV kvClient = client.getKVClient()) {
-                System.out.println(format("Assigning %s = %s", path, keyval));
-                putValueWithKeepAlive(kvClient, client, path, keyval, 2,
-                        () -> {
-                            System.out.println("Starting sleep");
-                            sleepSecs(5);
-                            System.out.println("Finished sleep");
-                            return Unit.INSTANCE;
-                        });
-                System.out.println("Keep-alive is now terminated");
-                sleepSecs(5);
-            }
-            System.out.println("Releasing latch");
-            latch.countDown();
-        });
-
         CountDownLatch endWatchLatch = new CountDownLatch(1);
 
         executor.submit(() -> {
@@ -79,6 +60,24 @@ public class SetValueWithKeepAlive {
                         }
                 );
             }
+        });
+
+        executor.submit(() -> {
+            try (Client client = connectToEtcd(urls);
+                 KV kvClient = client.getKVClient()) {
+                System.out.println(format("Assigning %s = %s", path, keyval));
+                putValueWithKeepAlive(kvClient, client, path, keyval, 2,
+                        () -> {
+                            System.out.println("Starting sleep");
+                            sleepSecs(5);
+                            System.out.println("Finished sleep");
+                            return Unit.INSTANCE;
+                        });
+                System.out.println("Keep-alive is now terminated");
+                sleepSecs(5);
+            }
+            System.out.println("Releasing latch");
+            latch.countDown();
         });
 
         latch.await();

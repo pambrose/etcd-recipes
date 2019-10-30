@@ -56,35 +56,31 @@ fun Lazy<KV>.putValue(keyname: String, keyval: Int, option: PutOption = PutOptio
 fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: ByteSequence, ttl: Long, block: () -> Unit) {
-    putValueWithKeepAlive(client, listOf(keyname to keyval), ttl, block)
-}
-
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: String, ttl: Long, block: () -> Unit) {
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: String, ttl: Long, block: () -> Unit) =
     putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
-}
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Int, ttl: Long, block: () -> Unit) {
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Int, ttl: Long, block: () -> Unit) =
     putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
-}
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Long, ttl: Long, block: () -> Unit) {
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Long, ttl: Long, block: () -> Unit) =
     putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
-}
 
-fun KV.putValueWithKeepAlive(client: Client,
-                             kvs: Collection<Pair<String, ByteSequence>>,
-                             ttl: Long,
-                             block: () -> Unit) {
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: ByteSequence, ttl: Long, block: () -> Unit) =
+    putValuesWithKeepAlive(client, listOf(keyname to keyval), ttl, block)
+
+fun KV.putValuesWithKeepAlive(client: Client,
+                              kvs: Collection<Pair<String, ByteSequence>>,
+                              ttl: Long,
+                              block: () -> Unit) =
     client.withLeaseClient { leaseClient ->
         val lease = leaseClient.grant(ttl).get()
-        for (kv in kvs)
+        for (kv in kvs) {
             putValue(kv.first, kv.second, lease.asPutOption)
+        }
         leaseClient.keepAliveWith(lease) {
             block()
         }
     }
-}
 
 // Delete keys
 fun KV.delete(vararg keynames: String) = keynames.forEach { delete(it) }

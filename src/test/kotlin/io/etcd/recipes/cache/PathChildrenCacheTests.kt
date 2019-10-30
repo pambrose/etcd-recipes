@@ -25,10 +25,12 @@ import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.INITIALIZED
+import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.putValuesWithKeepAlive
 import io.etcd.recipes.common.withKvClient
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
@@ -113,6 +115,8 @@ class PathChildrenCacheTests {
                             kvClient.deleteChildren(path)
                         }
                     }
+
+                    sleep(1.seconds)
 
                     currentData shouldEqual emptyList()
                 }
@@ -260,44 +264,34 @@ class PathChildrenCacheTests {
     }
 
     @Test
-    fun cacheTest() {
+    fun leasedValuesTest() {
         val count = 25
-        val path = "/cache/cacheTest"
+        val path = "/cache/leasedValuesTest"
         val kvs = generateTestData(count)
-
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvClient.deleteChildren(path)
-            }
-        }
 
         PathChildrenCache(urls, path)
             .use { cache ->
-                cache.start(true)
+                cache.start(false)
 
                 connectToEtcd(urls) { client ->
                     client.withKvClient { kvClient ->
-                        for (kv in kvs)
-                            kvClient.putValue("${path}/${kv.first}", kv.second)
+                        val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
+                        kvClient.putValuesWithKeepAlive(client, bsvals, 2) {
+
+                            sleep(5.seconds)
+
+                            val data = cache.currentData
+
+                            //println("KVs:  ${kvs.map { it.first }.sorted()}")
+                            //println("Data: ${data.map { it.key }.sorted()}")
+
+                            compareData(count, data, kvs)
+                        }
                     }
                 }
 
-                sleep(1.seconds)
-                val data = cache.currentData
-
-                //println("KVs:  ${kvs.map { it.first }.sorted()}")
-                //println("Data: ${data.map { it.key }.sorted()}")
-                data.size shouldEqual kvs.size
-                compareData(count, data, kvs)
+                sleep(5.seconds)
+                cache.currentData shouldEqual emptyList()
             }
-
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvClient.deleteChildren(path)
-            }
-        }
-
-        sleep(1.seconds)
-
     }
 }

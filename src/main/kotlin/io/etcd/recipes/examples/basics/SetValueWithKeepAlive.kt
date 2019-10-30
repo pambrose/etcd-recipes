@@ -35,6 +35,18 @@ fun main() {
     val path = "/foo"
     val keyval = "foobar"
     val latch = CountDownLatch(1)
+    val endWatchLatch = CountDownLatch(1)
+
+    thread {
+        connectToEtcd(urls) { client ->
+            client.withWatchClient { watchClient ->
+                watchClient.watcherWithLatch(path,
+                                             endWatchLatch,
+                                             { event -> println("Updated key: ${event.keyAsString}") },
+                                             { event -> println("Deleted key: ${event.keyAsString}") })
+            }
+        }
+    }
 
     thread {
         latch.countDown {
@@ -51,19 +63,6 @@ fun main() {
                 }
             }
             println("Releasing latch")
-        }
-    }
-
-    val endWatchLatch = CountDownLatch(1)
-
-    thread {
-        connectToEtcd(urls) { client ->
-            client.withWatchClient { watchClient ->
-                watchClient.watcherWithLatch(path,
-                                             endWatchLatch,
-                                             { event -> println("Updated key ${event.keyAsString}") },
-                                             { event -> println("Deleted key ${event.keyAsString}") })
-            }
         }
     }
 

@@ -79,10 +79,12 @@ class PathChildrenCache(val urls: List<String>,
         POST_INITIALIZED_EVENT
     }
 
+    @JvmOverloads
     fun start(buildInitial: Boolean = false, waitOnStartComplete: Boolean = true) {
         start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL, waitOnStartComplete)
     }
 
+    @JvmOverloads
     @Synchronized
     fun start(mode: StartMode, waitOnStartComplete: Boolean = true): PathChildrenCache {
         if (startCalled)
@@ -156,6 +158,7 @@ class PathChildrenCache(val urls: List<String>,
 
     private fun setupWatcher() {
         val adjustedCachePath = cachePath.ensureTrailing("/")
+        logger.debug { "Setting up watch for $adjustedCachePath" }
         watchClient.watcher(adjustedCachePath, adjustedCachePath.asPrefixWatchOption) { watchResponse ->
             watchResponse.events
                 .forEach { event ->
@@ -164,7 +167,9 @@ class PathChildrenCache(val urls: List<String>,
                     when (event.eventType) {
                         PUT          -> {
                             val isAdd = !cacheMap.containsKey(stripped)
+                            logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
                             cacheMap[stripped] = v
+
                             val cacheEvent =
                                 PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
                             listeners.forEach { listener ->
@@ -175,9 +180,9 @@ class PathChildrenCache(val urls: List<String>,
                                     exceptionList.value += e
                                 }
                             }
-                            //println("$s ${if (isAdd) "added" else "updated"}")
                         }
                         DELETE       -> {
+                            logger.debug { "$stripped deleted" }
                             val prevValue = cacheMap.remove(stripped)?.let { it }
                             val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
                             listeners.forEach { listener ->
@@ -188,7 +193,6 @@ class PathChildrenCache(val urls: List<String>,
                                     exceptionList.value += e
                                 }
                             }
-                            //println("$k deleted")
                         }
                         UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
                         else         -> logger.error { "Unknown error with $cachePath watch" }
