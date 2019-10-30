@@ -14,15 +14,8 @@
  * limitations under the License.
  */
 
-@file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
+package io.etcd.recipes.cache
 
-package io.etcd.recipes.discovery
+import io.etcd.jetcd.ByteSequence
 
-import io.etcd.jetcd.watch.WatchEvent
-
-interface ServiceCacheListener {
-    fun cacheChanged(eventType: WatchEvent.EventType,
-                     isAdd: Boolean,
-                     serviceName: String,
-                     serviceInstance: ServiceInstance?)
-}
+data class ChildData(val key: String, val value: ByteSequence)

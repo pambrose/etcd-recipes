@@ -18,26 +18,36 @@
 
 package io.etcd.recipes.common
 
-import com.sudothought.common.delegate.AtomicDelegates
+import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
-import java.util.concurrent.Semaphore
+import java.util.*
 
 open class EtcdConnector(urls: List<String>) {
 
-    protected val semaphore: Semaphore = Semaphore(1, true)
     protected val client: Lazy<Client> = lazy { connectToEtcd(urls) }
     protected val kvClient: Lazy<KV> = lazy { client.value.kvClient }
     protected val leaseClient: Lazy<Lease> = lazy { client.value.leaseClient }
     protected val watchClient: Lazy<Watch> = lazy { client.value.watchClient }
-    protected var closeCalled: Boolean by AtomicDelegates.atomicBoolean(false)
+    private var closeCalled: Boolean by atomicBoolean(false)
+    protected val exceptionList: Lazy<MutableList<Throwable>> =
+        lazy { Collections.synchronizedList(mutableListOf<Throwable>()) }
 
     protected fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
     }
 
+    val exceptions get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList<Throwable>()
+
+    val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.size > 0
+
+    fun clearExceptions() {
+        if (exceptionList.isInitialized()) exceptionList.value.clear()
+    }
+
+    @Synchronized
     open fun close() {
         if (!closeCalled) {
             if (watchClient.isInitialized())

@@ -27,40 +27,41 @@ fun main() {
     val urls = listOf("http://localhost:2379")
     val servicePath = "/services/test"
 
-    ServiceDiscovery(urls, servicePath).use { sd ->
+    ServiceDiscovery(urls, servicePath)
+        .use { sd ->
 
-        val payload = IntPayload(-999)
-        val service = ServiceInstance("TestName", payload.toJson())
+            val payload = IntPayload(-999)
+            val service = ServiceInstance("TestName", payload.toJson())
 
-        println(service.toJson())
+            println(service.toJson())
 
-        println("Registering")
-        sd.registerService(service)
-        println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-        println("Retrieved values: ${sd.queryForInstances(service.name)}")
-        println("Retrieved names: ${sd.queryForNames()}")
-
-
-        sleep(2.seconds)
-        println("Updating")
-        payload.intval = -888
-        service.jsonPayload = payload.toJson()
-        sd.updateService(service)
-        println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-        println("Retrieved values: ${sd.queryForInstances(service.name)}")
-        println("Retrieved names: ${sd.queryForNames()}")
-
-        sleep(2.seconds)
-        println("Unregistering")
-        sd.unregisterService(service)
-        sleep(3.seconds)
-
-        try {
+            println("Registering")
+            sd.registerService(service)
             println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-        } catch (e: Throwable) {
-            println("Exception: $e")
-        }
+            println("Retrieved values: ${sd.queryForInstances(service.name)}")
+            println("Retrieved names: ${sd.queryForNames()}")
 
-        sleep(2.seconds)
-    }
+
+            sleep(2.seconds)
+            println("Updating")
+            payload.intval = -888
+            service.jsonPayload = payload.toJson()
+            sd.updateService(service)
+            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+            println("Retrieved values: ${sd.queryForInstances(service.name)}")
+            println("Retrieved names: ${sd.queryForNames()}")
+
+            sleep(2.seconds)
+            println("Unregistering")
+            sd.unregisterService(service)
+            sleep(3.seconds)
+
+            try {
+                println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+            } catch (e: Throwable) {
+                println("Exception: $e")
+            }
+
+            sleep(2.seconds)
+        }
 }

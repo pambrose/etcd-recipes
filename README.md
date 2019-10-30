@@ -53,7 +53,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.pambrose:etcd-recipes:0.9.1"
+    implementation "com.github.pambrose:etcd-recipes:0.9.3"
 }
 ```
 
@@ -77,13 +77,13 @@ dependencies {
     <dependency>
       <groupId>com.github.pambrose</groupId>
       <artifactId>etcd-recipes</artifactId>
-      <version>0.9.1</version>
+      <version>0.9.3</version>
     </dependency>
 </dependencies>
 ```
 
 ## Running tests
    
-```nashorn js
+```bash
 ./gradlew check
 ```

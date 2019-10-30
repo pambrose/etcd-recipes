@@ -68,7 +68,7 @@ class ThreadedLeaderSelectorTests {
     fun threadedElection2Test() {
         val takeLeadershiptCounter = AtomicInteger(0)
         val relinquishLeadershiptCounter = AtomicInteger(0)
-        val electionList = Collections.synchronizedList(mutableListOf<LeaderSelector>())
+        val electionList: MutableList<LeaderSelector> = Collections.synchronizedList(mutableListOf())
 
         blockingThreads(count) {
             val takeLeadershipAction =

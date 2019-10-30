@@ -33,12 +33,12 @@ public class ServiceCacheExample {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         CountDownLatch latch = new CountDownLatch(1);
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (ServiceDiscovery sd = new ServiceDiscovery(ServiceDiscoveryExample.urls, ServiceDiscoveryExample.path)) {
                 try (ServiceCache cache = sd.serviceCache(ServiceDiscoveryExample.serviceName)) {
                     cache.addListenerForChanges(
-                            (eventType, isNew, name, serviceInstance) -> {
-                                String action = isNew ? "added" : "updated";
+                            (eventType, isAdd, name, serviceInstance) -> {
+                                String action = isAdd ? "added" : "updated";
                                 System.out.println(format("Change %s %s %s", eventType, action, name));
                                 if (serviceInstance != null)
                                     System.out.println("Payload = " + IntPayload.toObject(serviceInstance.getJsonPayload()));

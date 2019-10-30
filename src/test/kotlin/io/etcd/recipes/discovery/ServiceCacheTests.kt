@@ -47,71 +47,74 @@ class ServiceCacheTests {
         val holder = ExceptionHolder()
         val totalCounter = AtomicInteger(0)
 
-        ServiceDiscovery(urls, path).use { cachesd ->
+        ServiceDiscovery(urls, path)
+            .use { cachesd ->
 
-            cachesd.serviceCache(name).apply {
+                cachesd.serviceCache(name).apply {
 
-                start()
-                sleep(2.seconds)
+                    start()
+                    sleep(2.seconds)
 
-                instances.size shouldEqualTo 0
-                serviceName shouldEqual name
-                urls shouldEqual urls
+                    instances.size shouldEqualTo 0
+                    serviceName shouldEqual name
+                    urls shouldEqual urls
 
-                addListenerForChanges(object : ServiceCacheListener {
-                    override fun cacheChanged(eventType: EventType,
-                                              isNew: Boolean,
-                                              serviceName: String,
-                                              serviceInstance: ServiceInstance?) {
-                        captureException(holder) {
-                            serviceName.split("/").dropLast(1).last() shouldEqual name
+                    addListenerForChanges(object : ServiceCacheListener {
+                        override fun cacheChanged(eventType: EventType,
+                                                  isAdd: Boolean,
+                                                  serviceName: String,
+                                                  serviceInstance: ServiceInstance?) {
+                            captureException(holder) {
+                                //println("Comparing $serviceName and $name")
+                                serviceName.split("/").first() shouldEqual name
 
-                            if (eventType == EventType.PUT) {
-                                if (isNew) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
+                                if (eventType == EventType.PUT) {
+                                    if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
 
-                                serviceInstance?.name shouldEqual name
-                            }
+                                    serviceInstance?.name shouldEqual name
+                                }
 
-                            if (eventType == EventType.DELETE) {
-                                unregisterCounter.incrementAndGet()
-                                serviceInstance?.name shouldEqual name
+                                if (eventType == EventType.DELETE) {
+                                    unregisterCounter.incrementAndGet()
+                                    serviceInstance?.name shouldEqual name
+                                }
                             }
                         }
-                    }
-                })
+                    })
 
-                addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
-            }
-
-            val (finishedLatch, holder2) =
-                nonblockingThreads(threadCount) {
-                    ServiceDiscovery(urls, path).use { sd ->
-                        repeat(serviceCount) {
-                            val service = ServiceInstance(name, TestPayload(it).toJson())
-                            println("Registering: ${service.name} ${service.id}")
-                            sd.registerService(service)
-
-                            sleep(1.seconds)
-
-                            val payload = TestPayload.toObject(service.jsonPayload)
-                            payload.testval = payload.testval * -1
-                            service.jsonPayload = payload.toJson()
-                            println("Updating: ${service.name} ${service.id}")
-                            sd.updateService(service)
-
-                            sleep(1.seconds)
-
-                            println("Unregistering: ${service.name} ${service.id}")
-                            sd.unregisterService(service)
-
-                            sleep(1.seconds)
-                        }
-                    }
+                    addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
                 }
 
-            finishedLatch.await()
-            holder2.checkForException()
-        }
+                val (finishedLatch, holder2) =
+                    nonblockingThreads(threadCount) {
+                        ServiceDiscovery(urls, path)
+                            .use { sd ->
+                                repeat(serviceCount) {
+                                    val service = ServiceInstance(name, TestPayload(it).toJson())
+                                    println("Registering: ${service.name} ${service.id}")
+                                    sd.registerService(service)
+
+                                    sleep(1.seconds)
+
+                                    val payload = TestPayload.toObject(service.jsonPayload)
+                                    payload.testval = payload.testval * -1
+                                    service.jsonPayload = payload.toJson()
+                                    println("Updating: ${service.name} ${service.id}")
+                                    sd.updateService(service)
+
+                                    sleep(1.seconds)
+
+                                    println("Unregistering: ${service.name} ${service.id}")
+                                    sd.unregisterService(service)
+
+                                    sleep(1.seconds)
+                                }
+                            }
+                    }
+
+                finishedLatch.await()
+                holder2.checkForException()
+            }
 
         // Wait for deletes to propagate
         sleep(5.seconds)

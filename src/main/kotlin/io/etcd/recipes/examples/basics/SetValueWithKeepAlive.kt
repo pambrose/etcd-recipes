@@ -20,7 +20,12 @@ package io.etcd.recipes.examples.basics
 
 import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.keyAsString
+import io.etcd.recipes.common.putValueWithKeepAlive
+import io.etcd.recipes.common.watcherWithLatch
+import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.withWatchClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -30,13 +35,25 @@ fun main() {
     val path = "/foo"
     val keyval = "foobar"
     val latch = CountDownLatch(1)
+    val endWatchLatch = CountDownLatch(1)
+
+    thread {
+        connectToEtcd(urls) { client ->
+            client.withWatchClient { watchClient ->
+                watchClient.watcherWithLatch(path,
+                                             endWatchLatch,
+                                             { event -> println("Updated key: ${event.keyAsString}") },
+                                             { event -> println("Deleted key: ${event.keyAsString}") })
+            }
+        }
+    }
 
     thread {
         latch.countDown {
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
                     println("Assigning $path = $keyval")
-                    kvClient.putValueWithKeepAlive(path, keyval, client) {
+                    kvClient.putValueWithKeepAlive(client, path, keyval, 2) {
                         println("Starting sleep")
                         sleep(5.seconds)
                         println("Finished sleep")
@@ -46,19 +63,6 @@ fun main() {
                 }
             }
             println("Releasing latch")
-        }
-    }
-
-    val endWatchLatch = CountDownLatch(1)
-
-    thread {
-        connectToEtcd(urls) { client ->
-            client.withWatchClient { watchClient ->
-                watchClient.watcherWithLatch(path,
-                                             endWatchLatch,
-                                             { event -> println("Updated key ${event.keyAsString}") },
-                                             { event -> println("Deleted key ${event.keyAsString}") })
-            }
         }
     }
 

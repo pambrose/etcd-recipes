@@ -18,14 +18,24 @@
 
 package io.etcd.recipes.barrier
 
-import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.delegate.AtomicDelegates.nullableReference
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.asPutOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.grant
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watcher
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -49,71 +59,71 @@ constructor(val urls: List<String>,
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
     }
 
-    val isBarrierSet: Boolean
-        get() = semaphore.withLock {
-            checkCloseNotCalled()
-            kvClient.isKeyPresent(barrierPath)
-        }
+    fun isBarrierSet(): Boolean {
+        checkCloseNotCalled()
+        return kvClient.isKeyPresent(barrierPath)
+    }
 
-    fun setBarrier(): Boolean =
-        semaphore.withLock {
-            checkCloseNotCalled()
+    @Synchronized
+    fun setBarrier(): Boolean {
+        checkCloseNotCalled()
 
-            // Create unique token to avoid collision from clients with same id
-            val uniqueToken = "$clientId:${randomId(7)}"
+        // Create unique token to avoid collision from clients with same id
+        val uniqueToken = "$clientId:${randomId(7)}"
 
-            if (kvClient.isKeyPresent(barrierPath))
-                false
-            else {
-                // Prime lease with 2 seconds to give keepAlive a chance to get started
-                val lease = leaseClient.grant(2).get()
+        return if (kvClient.isKeyPresent(barrierPath))
+            false
+        else {
+            // Prime lease with 2 seconds to give keepAlive a chance to get started
+            val lease = leaseClient.grant(2).get()
 
-                // Do a CAS on the key name. If it is not found, then set it
-                val txn =
-                    kvClient.transaction {
-                        If(barrierPath.doesNotExist)
-                        Then(barrierPath.setTo(uniqueToken, lease.asPutOption))
-                    }
-
-                // Check to see if unique value was successfully set in the CAS step
-                if (txn.isSucceeded && kvClient.getValue(barrierPath)?.asString == uniqueToken) {
-                    keepAliveLease = leaseClient.keepAlive(lease)
-                    true
-                } else {
-                    false
+            // Do a CAS on the key name. If it is not found, then set it
+            val txn =
+                kvClient.transaction {
+                    If(barrierPath.doesNotExist)
+                    Then(barrierPath.setTo(uniqueToken, lease.asPutOption))
                 }
-            }
-        }
 
-    fun removeBarrier(): Boolean =
-        semaphore.withLock {
-            checkCloseNotCalled()
-            if (barrierRemoved) {
-                false
-            } else {
-                keepAliveLease?.close()
-                keepAliveLease = null
-
-                kvClient.delete(barrierPath)
-
-                barrierRemoved = true
-
+            // Check to see if unique value was successfully set in the CAS step
+            if (txn.isSucceeded && kvClient.getValue(barrierPath)?.asString == uniqueToken) {
+                keepAliveLease = leaseClient.keepAlive(lease)
                 true
+            } else {
+                false
             }
         }
+    }
+
+    @Synchronized
+    fun removeBarrier(): Boolean {
+        checkCloseNotCalled()
+        return if (barrierRemoved) {
+            false
+        } else {
+            keepAliveLease?.close()
+            keepAliveLease = null
+
+            kvClient.delete(barrierPath)
+
+            barrierRemoved = true
+
+            true
+        }
+    }
 
     @Throws(InterruptedException::class)
     fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
     @Throws(InterruptedException::class)
-    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
+    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
+        waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
     @Throws(InterruptedException::class)
     fun waitOnBarrier(timeout: Duration): Boolean {
         checkCloseNotCalled()
 
         // Check if barrier is present before using watcher
-        if (!waitOnMissingBarriers && !isBarrierSet)
+        if (!waitOnMissingBarriers && !isBarrierSet())
             return true
 
         val waitLatch = CountDownLatch(1)
@@ -127,21 +137,18 @@ constructor(val urls: List<String>,
 
         }.use {
             // Check one more time in case watch missed the delete just after last check
-            if (!waitOnMissingBarriers && !isBarrierSet)
+            if (!waitOnMissingBarriers && !isBarrierSet())
                 waitLatch.countDown()
 
             waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
         }
     }
 
+    @Synchronized
     override fun close() {
-        semaphore.withLock {
-            if (!closeCalled) {
-                keepAliveLease?.close()
-                keepAliveLease = null
+        keepAliveLease?.close()
+        keepAliveLease = null
 
-                super.close()
-            }
-        }
+        super.close()
     }
 }

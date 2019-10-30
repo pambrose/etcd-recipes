@@ -20,7 +20,12 @@ package io.etcd.recipes.barrier
 
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.getChildrenKeys
+import io.etcd.recipes.common.withKvClient
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -79,7 +84,7 @@ constructor(val urls: List<String>,
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
                     // Delete all children
-                    kvClient.getKeys(barrierPath).forEach { kvClient.delete(it) }
+                    kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
                 }
             }
         }

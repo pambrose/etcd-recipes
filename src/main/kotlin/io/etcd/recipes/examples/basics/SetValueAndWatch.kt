@@ -22,7 +22,13 @@ import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.watch.WatchResponse
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.withWatchClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds

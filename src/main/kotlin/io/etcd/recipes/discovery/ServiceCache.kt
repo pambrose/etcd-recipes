@@ -19,76 +19,101 @@
 package io.etcd.recipes.discovery
 
 import com.google.common.collect.Maps
-import com.sudothought.common.concurrent.withLock
+import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.watch.WatchEvent
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.common.*
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asPair
+import io.etcd.recipes.common.asPrefixWatchOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
 import java.util.*
+import java.util.concurrent.ConcurrentMap
 
 class ServiceCache internal constructor(val urls: List<String>,
-                                        namesPath: String,
+                                        val namesPath: String,
                                         val serviceName: String) : EtcdConnector(urls), Closeable {
 
     private var startCalled by atomicBoolean(false)
+    private var dataPreloaded = BooleanMonitor(false)
     private val servicePath = namesPath.appendToPath(serviceName)
-    private val serviceMap = Maps.newConcurrentMap<String, String>()
-    private val listeners = Collections.synchronizedList(mutableListOf<ServiceCacheListener>())
-
-    val exceptionHolder = ExceptionHolder()
+    private val serviceMap: ConcurrentMap<String, String> = Maps.newConcurrentMap()
+    private val listeners: MutableList<ServiceCacheListener> = Collections.synchronizedList(mutableListOf())
 
     init {
         require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }
     }
 
-    fun start() {
-        semaphore.withLock {
-            if (startCalled)
-                throw EtcdRecipeRuntimeException("start() already called")
-            checkCloseNotCalled()
+    @Synchronized
+    fun start(): ServiceCache {
+        if (startCalled)
+            throw EtcdRecipeRuntimeException("start() already called")
+        checkCloseNotCalled()
 
-            watchClient.watcher(servicePath, servicePath.asPrefixWatchOption) { watchResponse ->
-                watchResponse.events
-                    .forEach { event ->
-                        when (event.eventType) {
-                            PUT          -> {
-                                val (k, v) = event.keyValue.asPair.asString
-                                val isNew = !serviceMap.containsKey(k)
-                                serviceMap[k] = v
-                                //println("$k ${if (newKey) "added" else "updated"}")
-                                listeners.forEach {
-                                    try {
-                                        it.cacheChanged(PUT, isNew, k, ServiceInstance.toObject(v))
-                                    } catch (e: Throwable) {
-                                        logger.error(e) { "Exception in cacheChanged()" }
-                                        exceptionHolder.exception = e
-                                    }
+        val adjustedServicePath = servicePath.ensureTrailing("/")
+        val adjustedNamesPath = namesPath.ensureTrailing("/")
+
+        watchClient.watcher(adjustedServicePath, adjustedServicePath.asPrefixWatchOption) { watchResponse ->
+            // Wait for data to be loaded
+            dataPreloaded.waitUntilTrue()
+
+            watchResponse.events
+                .forEach { event ->
+                    val (k, v) = event.keyValue.asPair.asString
+                    val stripped = k.substring(adjustedNamesPath.length)
+                    when (event.eventType) {
+                        PUT          -> {
+                            val isAdd = !serviceMap.containsKey(stripped)
+                            serviceMap[stripped] = v
+                            listeners.forEach { listener ->
+                                try {
+                                    listener.cacheChanged(PUT, isAdd, stripped, ServiceInstance.toObject(v))
+                                } catch (e: Throwable) {
+                                    logger.error(e) { "Exception in cacheChanged()" }
+                                    exceptionList.value += e
                                 }
-                                //println("$k $v ${if (newKey) "added" else "updated"}")
                             }
-                            DELETE       -> {
-                                val k = event.keyValue.key.asString
-                                val prevValue = serviceMap.remove(k)?.let { ServiceInstance.toObject(it) }
-                                listeners.forEach {
-                                    try {
-                                        it.cacheChanged(DELETE, false, k, prevValue)
-                                    } catch (e: Throwable) {
-                                        logger.error(e) { "Exception in cacheChanged()" }
-                                        exceptionHolder.exception = e
-                                    }
-                                }
-                                println("$k deleted")
-                            }
-                            UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
-                            else         -> logger.error { "Unknown error with $servicePath watch" }
+                            //println("$k $v ${if (newKey) "added" else "updated"}")
                         }
+                        DELETE       -> {
+                            val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
+                            listeners.forEach { listener ->
+                                try {
+                                    listener.cacheChanged(DELETE, false, stripped, prevValue)
+                                } catch (e: Throwable) {
+                                    logger.error(e) { "Exception in cacheChanged()" }
+                                    exceptionList.value += e
+                                }
+                            }
+                            //println("$stripped deleted")
+                        }
+                        UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
+                        else         -> logger.error { "Unknown error with $servicePath watch" }
                     }
-            }
-
-            startCalled = true
+                }
         }
+
+        // Preload with initial data
+        val kvs = kvClient.getChildren(adjustedServicePath)
+        for (kv in kvs) {
+            val (k, v) = kv
+            val stripped = k.substring(adjustedNamesPath.length)
+            serviceMap[stripped] = v.asString
+        }
+
+        dataPreloaded.set(true)
+        startCalled = true
+
+        return this
     }
 
     val instances: List<ServiceInstance>
@@ -98,16 +123,16 @@ class ServiceCache internal constructor(val urls: List<String>,
         }
 
     fun addListenerForChanges(listener: (eventType: WatchEvent.EventType,
-                                         isNew: Boolean,
+                                         isAdd: Boolean,
                                          serviceName: String,
                                          serviceInstance: ServiceInstance?) -> Unit) {
         addListenerForChanges(
             object : ServiceCacheListener {
                 override fun cacheChanged(eventType: WatchEvent.EventType,
-                                          isNew: Boolean,
+                                          isAdd: Boolean,
                                           serviceName: String,
                                           serviceInstance: ServiceInstance?) {
-                    listener.invoke(eventType, isNew, serviceName, serviceInstance)
+                    listener.invoke(eventType, isAdd, serviceName, serviceInstance)
                 }
             })
     }
@@ -115,12 +140,6 @@ class ServiceCache internal constructor(val urls: List<String>,
     fun addListenerForChanges(listener: ServiceCacheListener) {
         checkCloseNotCalled()
         listeners += listener
-    }
-
-    override fun close() {
-        semaphore.withLock {
-            super.close()
-        }
     }
 
     companion object : KLogging()

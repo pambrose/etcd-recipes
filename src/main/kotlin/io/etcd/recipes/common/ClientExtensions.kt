@@ -19,7 +19,23 @@
 
 package io.etcd.recipes.common
 
-import io.etcd.jetcd.*
+import io.etcd.jetcd.Auth
+import io.etcd.jetcd.Client
+import io.etcd.jetcd.Cluster
+import io.etcd.jetcd.KV
+import io.etcd.jetcd.Lease
+import io.etcd.jetcd.Lock
+import io.etcd.jetcd.Maintenance
+import io.etcd.jetcd.Watch
+
+fun connectToEtcd(urls: List<String>): Client = Client.builder().endpoints(*urls.toTypedArray()).build()
+
+fun connectToEtcd(urls: List<String>, block: (client: Client) -> Unit) {
+    connectToEtcd(urls)
+        .use {
+            block(it)
+        }
+}
 
 fun Client.withWatchClient(block: (watchClient: Watch) -> Unit) = watchClient.use { block(it) }
 
@@ -34,12 +50,3 @@ fun Client.withClusterClient(block: (clusterClient: Cluster) -> Unit) = clusterC
 fun Client.withAuthrClient(block: (authClient: Auth) -> Unit) = authClient.use { block(it) }
 
 fun Client.withKvClient(block: (kvClient: KV) -> Unit) = kvClient.use { block(it) }
-
-fun connectToEtcd(urls: List<String>): Client = Client.builder().endpoints(*urls.toTypedArray()).build()
-
-fun connectToEtcd(urls: List<String>, block: (client: Client) -> Unit) {
-    connectToEtcd(urls)
-        .use {
-            block(it)
-        }
-}

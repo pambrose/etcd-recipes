@@ -19,7 +19,17 @@
 package io.etcd.recipes.examples.basics
 
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.asPrefixWatchOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.count
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.getChildrenKeys
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.withWatchClient
 import kotlin.time.seconds
 
 fun main() {
@@ -31,7 +41,7 @@ fun main() {
             kvClient.apply {
 
                 client.withWatchClient { watchClient ->
-                    watchClient.watcher(path, "/".asPrefixWatchOption) { watchResponse ->
+                    watchClient.watcher(path, path.asPrefixWatchOption) { watchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
                                 println("${watchEvent.eventType} for ${watchEvent.keyValue.asString}")
@@ -41,7 +51,7 @@ fun main() {
                         putValue(path, "root")
 
                         println("After creation:")
-                        println(getKeyValues(path))
+                        println(getChildren(path))
                         println(count(path))
 
                         sleep(5.seconds)
@@ -52,16 +62,16 @@ fun main() {
                         putValue("$path/waiting/c", "ccc")
                         putValue("$path/waiting/d", "dddd")
 
-                        println("\nAfter addition:")
-                        println(getKeyValues(path).asString)
+                        println("\nAfter putValues:")
+                        println(getChildren(path).asString)
                         println(count(path))
 
-                        println("\nElections only:")
-                        println(getKeyValues("$path/election").asString)
+                        println("\nElection only:")
+                        println(getChildren("$path/election").asString)
                         println(count("$path/election"))
 
-                        println("\nWaitings only:")
-                        println(getKeyValues("$path/waiting").asString)
+                        println("\nWaiting only:")
+                        println(getChildren("$path/waiting").asString)
                         println(count("$path/waiting"))
 
                         sleep(5.seconds)
@@ -70,13 +80,13 @@ fun main() {
                         delete(path)
 
                         // Delete children
-                        getKeys(path).forEach {
+                        getChildrenKeys(path).forEach {
                             println("Deleting key: $it")
                             delete(it)
                         }
 
                         println("\nAfter removal:")
-                        println(getKeyValues(path).asString)
+                        println(getChildren(path).asString)
                         println(count(path))
 
                         sleep(5.seconds)

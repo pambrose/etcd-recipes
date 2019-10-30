@@ -40,7 +40,7 @@ public class SetAndDeleteValue {
         ExecutorService executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(2);
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             sleepSecs(3);
 
             try (Client client = connectToEtcd(urls);
@@ -54,7 +54,7 @@ public class SetAndDeleteValue {
             latch.countDown();
         });
 
-        executor.execute(() -> {
+        executor.submit(() -> {
             try (Client client = connectToEtcd(urls);
                  KV kvClient = client.getKVClient()) {
                 long start = System.currentTimeMillis();

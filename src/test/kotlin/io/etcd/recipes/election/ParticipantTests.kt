@@ -38,8 +38,8 @@ class ParticipantTests {
         val startedLatch = CountDownLatch(count)
         val finishedLatch = CountDownLatch(count)
         val holdLatch = CountDownLatch(1)
-        val participantCounts = Collections.synchronizedList(mutableListOf<Int>())
-        val leaderNames = Collections.synchronizedList(mutableListOf<String>())
+        val participantCounts: MutableList<Int> = Collections.synchronizedList(mutableListOf())
+        val leaderNames: MutableList<String> = Collections.synchronizedList(mutableListOf())
 
         blockingThreads(count) {
             thread {

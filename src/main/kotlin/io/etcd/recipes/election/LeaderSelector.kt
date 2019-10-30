@@ -19,20 +19,42 @@
 package io.etcd.recipes.election
 
 import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.sudothought.common.time.Conversions
 import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.common.*
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asPutOption
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getChildrenValues
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAliveWith
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.withLeaseClient
+import io.etcd.recipes.common.withWatchClient
 import mu.KLogging
 import java.io.Closeable
 import java.util.*
-import java.util.concurrent.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 import kotlin.time.seconds
@@ -44,7 +66,7 @@ class LeaderSelector
 constructor(val urls: List<String>,
             val electionPath: String,
             private val listener: LeaderSelectorListener,
-            private val userExecutor: ExecutorService? = null,
+            private val userExecutor: Executor? = null,
             val clientId: String = "Client:${randomId(7)}") : Closeable {
 
     // For Kotlin clients
@@ -69,7 +91,6 @@ constructor(val urls: List<String>,
                  executorService,
                  clientId)
 
-    private val closeSemaphore = Semaphore(1, true)
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
     private val terminateWatch = BooleanMonitor(false)
     private val terminateKeepAlive = BooleanMonitor(false)
@@ -81,7 +102,7 @@ constructor(val urls: List<String>,
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
     private val leaderPath = leaderPath(electionPath)
-    private val exceptionList = Collections.synchronizedList(mutableListOf<Throwable>())
+    private val exceptionList: MutableList<Throwable> = Collections.synchronizedList(mutableListOf())
 
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }
@@ -92,7 +113,8 @@ constructor(val urls: List<String>,
 
     val isFinished get() = leadershipComplete.get()
 
-    fun start(): LeaderSelector {
+    @JvmOverloads
+    fun start(waitOnStartComplete: Boolean = true): LeaderSelector {
 
         if (!startCallAllowed)
             throw EtcdRecipeRuntimeException("Previous call to start() not complete")
@@ -117,7 +139,6 @@ constructor(val urls: List<String>,
                     client.withLeaseClient { leaseClient ->
                         client.withKvClient { kvClient ->
 
-                            val leaderSemaphore = Semaphore(1, true)
                             val watchStarted = BooleanMonitor(false)
                             val watchStopped = BooleanMonitor(false)
                             val advertiseComplete = BooleanMonitor(false)
@@ -129,7 +150,7 @@ constructor(val urls: List<String>,
                                     client.withWatchClient { watchClient ->
                                         // Run for leader whenever leader key is deleted
                                         watchForDeleteEvents(watchClient, watchStarted) {
-                                            leaderSemaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
+                                            synchronized(this) { attemptToBecomeLeader(leaseClient, kvClient) }
                                         }.use {
                                             terminateWatch.waitUntilTrue()
                                         }
@@ -156,7 +177,7 @@ constructor(val urls: List<String>,
                             watchStarted.waitUntilTrue()
 
                             // Clients should run for leader in case they are the first to run
-                            leaderSemaphore.withLock { attemptToBecomeLeader(leaseClient, kvClient) }
+                            synchronized(this) { attemptToBecomeLeader(leaseClient, kvClient) }
 
                             leadershipComplete.waitUntilTrue()
                             watchStopped.waitUntilTrue()
@@ -173,6 +194,10 @@ constructor(val urls: List<String>,
         }
 
         connectedToEtcd.waitUntilTrue()
+
+        if (waitOnStartComplete)
+            waitOnStartComplete()
+
         return this
     }
 
@@ -181,6 +206,20 @@ constructor(val urls: List<String>,
     val hasStartExceptions get() = exceptionList.size > 0
 
     fun clearStartExceptions() = exceptionList.clear()
+
+    @Throws(InterruptedException::class)
+    fun waitOnStartComplete(): Boolean = waitOnStartComplete(Long.MAX_VALUE.days)
+
+    @Throws(InterruptedException::class)
+    fun waitOnStartComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
+        waitOnStartComplete(Conversions.timeUnitToDuration(timeout, timeUnit))
+
+    @Throws(InterruptedException::class)
+    fun waitOnStartComplete(timeout: Duration): Boolean {
+        checkStartCalled()
+        checkCloseNotCalled()
+        return startThreadComplete.waitUntilTrue(timeout)
+    }
 
     @Throws(InterruptedException::class)
     fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Long.MAX_VALUE.days)
@@ -207,19 +246,18 @@ constructor(val urls: List<String>,
     }
 
     private fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already closed")
+        if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
     }
 
+    @Synchronized
     override fun close() {
-        closeSemaphore.withLock {
-            checkStartCalled()
+        checkStartCalled()
 
-            if (!closeCalled) {
-                closeCalled = true
-                markLeadershipComplete()
-                startThreadComplete.waitUntilTrue()
-                if (userExecutor == null) executor.shutdown()
-            }
+        if (!closeCalled) {
+            closeCalled = true
+            markLeadershipComplete()
+            startThreadComplete.waitUntilTrue()
+            if (userExecutor == null) (executor as ExecutorService).shutdown()
         }
     }
 
@@ -320,7 +358,7 @@ constructor(val urls: List<String>,
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
                     val leader = kvClient.getValue(electionPath)?.asString?.stripUniqueSuffix
-                    kvClient.getValues(participationPath(electionPath)).asString
+                    kvClient.getChildrenValues(participationPath(electionPath)).asString
                         .forEach { participants += Participant(it, leader == it) }
                 }
             }
