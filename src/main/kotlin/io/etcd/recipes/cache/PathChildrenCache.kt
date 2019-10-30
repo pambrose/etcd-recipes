@@ -80,9 +80,8 @@ class PathChildrenCache(val urls: List<String>,
     }
 
     @JvmOverloads
-    fun start(buildInitial: Boolean = false, waitOnStartComplete: Boolean = true) {
+    fun start(buildInitial: Boolean = false, waitOnStartComplete: Boolean = true): PathChildrenCache =
         start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL, waitOnStartComplete)
-    }
 
     @JvmOverloads
     @Synchronized
