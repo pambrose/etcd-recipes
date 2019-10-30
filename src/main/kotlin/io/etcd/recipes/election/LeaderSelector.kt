@@ -100,7 +100,7 @@ constructor(val urls: List<String>,
     private var closeCalled by atomicBoolean(false)
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
-    private val leaderPath = leaderPath(electionPath)
+    private val leaderPath = electionPath.asLeaderPath
     private val exceptionList: MutableList<Throwable> = Collections.synchronizedList(mutableListOf())
 
     init {
@@ -114,20 +114,22 @@ constructor(val urls: List<String>,
 
     fun start(): LeaderSelector {
 
-        if (!startCallAllowed)
-            throw EtcdRecipeRuntimeException("Previous call to start() not complete")
+        synchronized(startCallAllowed) {
+            if (!startCallAllowed)
+                throw EtcdRecipeRuntimeException("Previous call to start() not complete")
 
-        checkCloseNotCalled()
+            checkCloseNotCalled()
 
-        terminateWatch.set(false)
-        terminateKeepAlive.set(false)
-        leadershipComplete.set(false)
-        startThreadComplete.set(false)
-        attemptLeadership.set(true)
-        startCalled = true
-        closeCalled = false
-        electedLeader = false
-        startCallAllowed = false
+            terminateWatch.set(false)
+            terminateKeepAlive.set(false)
+            leadershipComplete.set(false)
+            startThreadComplete.set(false)
+            attemptLeadership.set(true)
+            startCalled = true
+            closeCalled = false
+            electedLeader = false
+            startCallAllowed = false
+        }
 
         val connectedToEtcd = BooleanMonitor(false)
 
@@ -137,22 +139,25 @@ constructor(val urls: List<String>,
                     client.withLeaseClient { leaseClient ->
                         client.withKvClient { kvClient ->
 
-                            val watchStarted = BooleanMonitor(false)
-                            val watchStopped = BooleanMonitor(false)
-                            val advertiseComplete = BooleanMonitor(false)
-
                             connectedToEtcd.set(true)
+
+                            val watchStarted = BooleanMonitor(false)
+                            val watchComplete = BooleanMonitor(false)
+                            val advertiseComplete = BooleanMonitor(false)
 
                             executor.execute {
                                 try {
                                     client.withWatchClient { watchClient ->
-                                        // Run for leader whenever leader key is deleted
-                                        watchForDeleteEvents(watchClient, watchStarted) {
-                                            synchronized(this) { attemptToBecomeLeader(leaseClient, kvClient) }
-                                        }.use {
-                                            terminateWatch.waitUntilTrue()
+                                        try {
+                                            // Run for leader whenever leader key is deleted
+                                            watchForDeleteEvents(watchClient, watchStarted) {
+                                                attemptToBecomeLeader(leaseClient, kvClient)
+                                            }.use {
+                                                terminateWatch.waitUntilTrue()
+                                            }
+                                        } finally {
+                                            watchComplete.set(true)
                                         }
-                                        watchStopped.set(true)
                                     }
                                 } catch (e: Throwable) {
                                     logger.error(e) { "In withWatchClient()" }
@@ -175,10 +180,10 @@ constructor(val urls: List<String>,
                             watchStarted.waitUntilTrue()
 
                             // Clients should run for leader in case they are the first to run
-                            synchronized(this) { attemptToBecomeLeader(leaseClient, kvClient) }
+                            attemptToBecomeLeader(leaseClient, kvClient)
 
                             leadershipComplete.waitUntilTrue()
-                            watchStopped.waitUntilTrue()
+                            watchComplete.waitUntilTrue()
                             advertiseComplete.waitUntilTrue()
                         }
                     }
@@ -213,6 +218,8 @@ constructor(val urls: List<String>,
     fun waitOnLeadershipComplete(timeout: Duration): Boolean {
         checkStartCalled()
         checkCloseNotCalled()
+        // Check startThreadComplete here in case start() was re-used without a call to close()
+        startThreadComplete.waitUntilTrue()
         return leadershipComplete.waitUntilTrue(timeout)
     }
 
@@ -255,12 +262,16 @@ constructor(val urls: List<String>,
 
     @Throws(EtcdRecipeException::class)
     private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
-        val path = participationPath(electionPath).appendToPath(clientId)
+        val path = electionPath.asParticipationPath.appendToPath(clientId)
 
         // Wait until key goes away when previous keep alive finishes
-        for (i in (0..10)) {
+        for (i in 0 until 10) {
             if (!kvClient.isKeyPresent(path))
                 break
+
+            if (i == 9)
+                logger.error { "Exhausted wait for deletion of participation key $path" }
+
             sleep(1.seconds)
         }
 
@@ -280,8 +291,10 @@ constructor(val urls: List<String>,
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
+    @Synchronized
     private fun attemptToBecomeLeader(leaseClient: Lease, kvClient: KV): Boolean {
-        if (isLeader || !attemptLeadership.get()) return false
+        if (isLeader || !attemptLeadership.get())
+            return false
 
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$clientId:${randomId(uniqueSuffixLength)}"
@@ -289,7 +302,7 @@ constructor(val urls: List<String>,
         // Prime lease with 2 seconds to give keepAlive a chance to get started
         val lease = leaseClient.grant(2).get()
 
-        // Do a CAS on the key name. If it is not found, then set it
+        // Check the key name. If it is not found, then set it
         val txn =
             kvClient.transaction {
                 If(leaderPath.doesNotExist)
@@ -298,6 +311,7 @@ constructor(val urls: List<String>,
 
         // Check to see if unique value was successfully set in the CAS step
         return if (!isLeader && txn.isSucceeded && kvClient.getValue(leaderPath)?.asString == uniqueToken) {
+
             // Selected as leader. This will exit when leadership is relinquished
             leaseClient.keepAliveWith(lease) {
                 electedLeader = true
@@ -323,9 +337,9 @@ constructor(val urls: List<String>,
 
         private const val uniqueSuffixLength = 7
 
-        private fun participationPath(path: String) = path.appendToPath("participants")
+        private val String.asParticipationPath get() = appendToPath("participants")
 
-        private fun leaderPath(electionPath: String) = electionPath.appendToPath("LEADER")
+        private val String.asLeaderPath get() = appendToPath("LEADER")
 
         internal val String.stripUniqueSuffix get() = dropLast(uniqueSuffixLength + 1)
 
@@ -339,7 +353,7 @@ constructor(val urls: List<String>,
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
                     val leader = kvClient.getValue(electionPath)?.asString?.stripUniqueSuffix
-                    kvClient.getChildrenValues(participationPath(electionPath)).asString
+                    kvClient.getChildrenValues(electionPath.asParticipationPath).asString
                         .forEach { participants += Participant(it, leader == it) }
                 }
             }
@@ -359,7 +373,7 @@ constructor(val urls: List<String>,
             executor.execute {
                 connectToEtcd(urls) { client ->
                     client.withWatchClient { watchClient ->
-                        watchClient.watcher(leaderPath(electionPath)) { watchResponse ->
+                        watchClient.watcher(electionPath.asLeaderPath) { watchResponse ->
                             watchResponse.events
                                 .forEach { event ->
                                     try {
