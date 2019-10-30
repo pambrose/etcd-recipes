@@ -33,7 +33,7 @@ class ParticipantTests {
     val path = "/election/${javaClass.simpleName}"
 
     @Test
-    fun reportLeaderTest() {
+    fun participantTest() {
         val count = 20
         val startedLatch = CountDownLatch(count)
         val finishedLatch = CountDownLatch(count)
@@ -72,7 +72,6 @@ class ParticipantTests {
 
         // Wait for participants to register
         sleep(3.seconds)
-
         var particpants = LeaderSelector.getParticipants(urls, path)
         logger.info { "Found ${particpants.size} participants" }
         particpants.size shouldEqual count
