@@ -31,7 +31,7 @@ import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.count
+import io.etcd.recipes.common.countChildren
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesExist
@@ -83,7 +83,7 @@ constructor(val urls: List<String>,
     val waiterCount: Long
         get() {
             checkCloseNotCalled()
-            return kvClient.count(waitingPath)
+            return kvClient.countChildren(waitingPath)
         }
 
     @Throws(InterruptedException::class, EtcdRecipeException::class)

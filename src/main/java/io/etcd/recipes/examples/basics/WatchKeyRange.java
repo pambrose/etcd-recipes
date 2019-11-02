@@ -28,7 +28,6 @@ import java.util.List;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.count;
 import static io.etcd.recipes.common.KVUtils.delete;
 import static io.etcd.recipes.common.KVUtils.getChildren;
 import static io.etcd.recipes.common.KVUtils.putValue;
@@ -66,7 +65,7 @@ public class WatchKeyRange {
 
             System.out.println("After creation:");
             System.out.println(getAsString(getChildren(kvClient, path)));
-            System.out.println(count(kvClient, path));
+            System.out.println(KVUtils.countChildren(kvClient, path));
 
             sleepSecs(5);
 
@@ -78,15 +77,15 @@ public class WatchKeyRange {
 
             System.out.println("\nAfter putValues:");
             System.out.println(getAsString(getChildren(kvClient, path)));
-            System.out.println(count(kvClient, path));
+            System.out.println(KVUtils.countChildren(kvClient, path));
 
             System.out.println("\nElections only:");
             System.out.println(getAsString(getChildren(kvClient, path + "/election")));
-            System.out.println(count(kvClient, path + "/election"));
+            System.out.println(KVUtils.countChildren(kvClient, path + "/election"));
 
             System.out.println("\nWaitings only:");
             System.out.println(getAsString(getChildren(kvClient, path + "/waiting")));
-            System.out.println(count(kvClient, path + "/waiting"));
+            System.out.println(KVUtils.countChildren(kvClient, path + "/waiting"));
 
             sleepSecs(5);
 
@@ -101,7 +100,7 @@ public class WatchKeyRange {
 
             System.out.println("\nAfter delete:");
             System.out.println(getAsString(getChildren(kvClient, path)));
-            System.out.println(count(kvClient, path));
+            System.out.println(KVUtils.countChildren(kvClient, path));
 
             sleepSecs(5);
         }

@@ -114,6 +114,8 @@ constructor(val urls: List<String>,
 
     fun start(): LeaderSelector {
 
+        val connectedToEtcd = BooleanMonitor(false)
+
         synchronized(startCallAllowed) {
             if (!startCallAllowed)
                 throw EtcdRecipeRuntimeException("Previous call to start() not complete")
@@ -130,8 +132,6 @@ constructor(val urls: List<String>,
             electedLeader = false
             startCallAllowed = false
         }
-
-        val connectedToEtcd = BooleanMonitor(false)
 
         executor.execute {
             try {

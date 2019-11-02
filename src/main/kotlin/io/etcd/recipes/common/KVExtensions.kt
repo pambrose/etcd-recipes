@@ -155,10 +155,10 @@ fun Lazy<KV>.isKeyPresent(keyname: String) = value.isKeyPresent(keyname)
 fun Lazy<KV>.isKeyNotPresent(keyname: String) = value.isKeyNotPresent(keyname)
 
 // Count children keys
-fun KV.count(parentKeyName: String): Long {
+fun KV.countChildren(parentKeyName: String): Long {
     val adjustedKey = parentKeyName.ensureTrailing("/")
     val option = GetOption.newBuilder().withPrefix(adjustedKey.asByteSequence).withCountOnly(true).build()
     return getResponse(adjustedKey, option).count
 }
 
-fun Lazy<KV>.count(keyname: String): Long = value.count(keyname)
+fun Lazy<KV>.countChildren(keyname: String): Long = value.countChildren(keyname)
