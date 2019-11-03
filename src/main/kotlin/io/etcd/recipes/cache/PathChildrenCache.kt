@@ -94,6 +94,7 @@ class PathChildrenCache(val urls: List<String>,
         if (mode == BUILD_INITIAL_CACHE || mode == POST_INITIALIZED_EVENT) {
             executor.execute {
                 try {
+                    setupWatcher()
                     loadData()
                 } finally {
                     if (mode == POST_INITIALIZED_EVENT)
@@ -109,7 +110,6 @@ class PathChildrenCache(val urls: List<String>,
                                 exceptionList.value += e
                             }
                         }
-                    setupWatcher()
                     startThreadComplete.set(true)
                 }
             }
