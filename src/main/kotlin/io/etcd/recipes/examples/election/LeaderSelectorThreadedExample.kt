@@ -30,7 +30,7 @@ import kotlin.time.seconds
 fun main() {
     val urls = listOf("http://localhost:2379")
     val electionPath = "/election/threaded"
-    val count = 50
+    val count = 5
     val latch = CountDownLatch(count)
 
     repeat(count) {
