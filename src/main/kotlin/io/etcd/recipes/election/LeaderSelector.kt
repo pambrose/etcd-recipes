@@ -100,7 +100,7 @@ constructor(val urls: List<String>,
     private var closeCalled by atomicBoolean(false)
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
-    private val leaderPath = electionPath.asLeaderPath
+    private val leaderPath = electionPath.withLeaderSuffix
     private val exceptionList: MutableList<Throwable> = Collections.synchronizedList(mutableListOf())
 
     init {
@@ -113,6 +113,8 @@ constructor(val urls: List<String>,
     val isFinished get() = leadershipComplete.get()
 
     fun start(): LeaderSelector {
+
+        val connectedToEtcd = BooleanMonitor(false)
 
         synchronized(startCallAllowed) {
             if (!startCallAllowed)
@@ -130,8 +132,6 @@ constructor(val urls: List<String>,
             electedLeader = false
             startCallAllowed = false
         }
-
-        val connectedToEtcd = BooleanMonitor(false)
 
         executor.execute {
             try {
@@ -262,7 +262,7 @@ constructor(val urls: List<String>,
 
     @Throws(EtcdRecipeException::class)
     private fun advertiseParticipation(leaseClient: Lease, kvClient: KV) {
-        val path = electionPath.asParticipationPath.appendToPath(clientId)
+        val path = electionPath.withParticipationSuffix.appendToPath(clientId)
 
         // Wait until key goes away when previous keep alive finishes
         for (i in 0 until 10) {
@@ -337,9 +337,9 @@ constructor(val urls: List<String>,
 
         private const val uniqueSuffixLength = 7
 
-        private val String.asParticipationPath get() = appendToPath("participants")
+        private val String.withParticipationSuffix get() = appendToPath("participants")
 
-        private val String.asLeaderPath get() = appendToPath("LEADER")
+        private val String.withLeaderSuffix get() = appendToPath("LEADER")
 
         internal val String.stripUniqueSuffix get() = dropLast(uniqueSuffixLength + 1)
 
@@ -352,8 +352,8 @@ constructor(val urls: List<String>,
             val participants = mutableListOf<Participant>()
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
-                    val leader = kvClient.getValue(electionPath)?.asString?.stripUniqueSuffix
-                    kvClient.getChildrenValues(electionPath.asParticipationPath).asString
+                    val leader = kvClient.getValue(electionPath.withLeaderSuffix)?.asString?.stripUniqueSuffix
+                    kvClient.getChildrenValues(electionPath.withParticipationSuffix).asString
                         .forEach { participants += Participant(it, leader == it) }
                 }
             }
@@ -373,7 +373,7 @@ constructor(val urls: List<String>,
             executor.execute {
                 connectToEtcd(urls) { client ->
                     client.withWatchClient { watchClient ->
-                        watchClient.watcher(electionPath.asLeaderPath) { watchResponse ->
+                        watchClient.watcher(electionPath.withLeaderSuffix) { watchResponse ->
                             watchResponse.events
                                 .forEach { event ->
                                     try {

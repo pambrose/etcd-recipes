@@ -22,7 +22,7 @@ import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.count
+import io.etcd.recipes.common.countChildren
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.getChildrenKeys
@@ -52,7 +52,7 @@ fun main() {
 
                         println("After creation:")
                         println(getChildren(path))
-                        println(count(path))
+                        println(countChildren(path))
 
                         sleep(5.seconds)
 
@@ -64,15 +64,15 @@ fun main() {
 
                         println("\nAfter putValues:")
                         println(getChildren(path).asString)
-                        println(count(path))
+                        println(countChildren(path))
 
                         println("\nElection only:")
                         println(getChildren("$path/election").asString)
-                        println(count("$path/election"))
+                        println(countChildren("$path/election"))
 
                         println("\nWaiting only:")
                         println(getChildren("$path/waiting").asString)
-                        println(count("$path/waiting"))
+                        println(countChildren("$path/waiting"))
 
                         sleep(5.seconds)
 
@@ -87,7 +87,7 @@ fun main() {
 
                         println("\nAfter removal:")
                         println(getChildren(path).asString)
-                        println(count(path))
+                        println(countChildren(path))
 
                         sleep(5.seconds)
                     }
