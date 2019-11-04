@@ -50,6 +50,7 @@ import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
+import kotlin.time.seconds
 
 /*
     First node creates subnode /ready
@@ -135,7 +136,7 @@ constructor(val urls: List<String>,
             Then(readyPath setTo uniqueToken)
         }
 
-        val lease = leaseClient.grant(2).get()
+        val lease = leaseClient.grant(leaseTtl).get()
 
         val txn =
             kvClient.transaction {
@@ -187,6 +188,8 @@ constructor(val urls: List<String>,
     }
 
     companion object {
+        private val leaseTtl = 5.seconds
+
         @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
 

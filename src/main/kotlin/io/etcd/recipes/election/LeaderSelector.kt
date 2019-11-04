@@ -275,8 +275,8 @@ constructor(val urls: List<String>,
             sleep(1.seconds)
         }
 
-        // Prime lease with 2 seconds to give keepAlive a chance to get started
-        val lease = leaseClient.grant(2).get()
+        // Prime lease with 5 seconds to give keepAlive a chance to get started
+        val lease = leaseClient.grant(leaseTtl.inSeconds.toLong()).get()
         val txn =
             kvClient.transaction {
                 If(path.doesNotExist)
@@ -299,8 +299,8 @@ constructor(val urls: List<String>,
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$clientId:${randomId(uniqueSuffixLength)}"
 
-        // Prime lease with 2 seconds to give keepAlive a chance to get started
-        val lease = leaseClient.grant(2).get()
+        // Prime lease to give keepAliveWith a chance to get started
+        val lease = leaseClient.grant(leaseTtl.inSeconds.toLong()).get()
 
         // Check the key name. If it is not found, then set it
         val txn =
@@ -336,6 +336,8 @@ constructor(val urls: List<String>,
     companion object : KLogging() {
 
         private const val uniqueSuffixLength = 7
+
+        private val leaseTtl = 5.seconds
 
         private val String.withParticipationSuffix get() = appendToPath("participants")
 

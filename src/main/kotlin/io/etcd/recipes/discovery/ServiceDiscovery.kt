@@ -39,9 +39,11 @@ import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.keepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
+import mu.KLogging
 import java.io.Closeable
 import java.util.*
 import java.util.concurrent.ConcurrentMap
+import kotlin.time.seconds
 
 data class ServiceDiscovery
 @JvmOverloads
@@ -82,7 +84,7 @@ constructor(val urls: List<String>,
         serviceContextMap[service.id] = context
 
         // Prime lease with 2 seconds to give keepAlive a chance to get started
-        context.lease = leaseClient.grant(2).get()
+        context.lease = leaseClient.grant(leaseTtl).get()
 
         val txn =
             kvClient.transaction {
@@ -174,4 +176,8 @@ constructor(val urls: List<String>,
     private fun getNamesPath(service: ServiceInstance) = getNamesPath(service.name, service.id)
 
     private fun getNamesPath(vararg elems: String) = namesPath.appendToPath(elems.joinToString("/"))
+
+    companion object : KLogging() {
+        private val leaseTtl = 5.seconds
+    }
 }
