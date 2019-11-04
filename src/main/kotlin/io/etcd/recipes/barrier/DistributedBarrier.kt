@@ -36,12 +36,13 @@ import io.etcd.recipes.common.keepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watcher
+import mu.KLogging
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
-
+import kotlin.time.seconds
 
 class DistributedBarrier
 @JvmOverloads
@@ -75,7 +76,7 @@ constructor(val urls: List<String>,
             false
         else {
             // Prime lease with 2 seconds to give keepAlive a chance to get started
-            val lease = leaseClient.grant(2).get()
+            val lease = leaseClient.grant(leaseTtl).get()
 
             // Do a CAS on the key name. If it is not found, then set it
             val txn =
@@ -150,5 +151,9 @@ constructor(val urls: List<String>,
         keepAliveLease = null
 
         super.close()
+    }
+
+    companion object : KLogging() {
+        private val leaseTtl = 5.seconds
     }
 }
