@@ -74,7 +74,7 @@ class ReportLeaderTests {
         }
 
         // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
-        sleep(3.seconds)
+        sleep(5.seconds)
 
         executor.shutdown()
 
