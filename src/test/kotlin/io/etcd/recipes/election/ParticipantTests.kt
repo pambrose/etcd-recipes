@@ -80,7 +80,8 @@ class ParticipantTests {
 
         finishedLatch.await()
 
-        sleep(3.seconds)
+        sleep(5.seconds)
+
         particpants = LeaderSelector.getParticipants(urls, path)
         logger.info { "Found ${particpants.size} participants" }
         particpants.size shouldEqual 0
