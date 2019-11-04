@@ -28,6 +28,7 @@ import io.etcd.jetcd.kv.PutResponse
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 import kotlin.time.Duration
+import kotlin.time.seconds
 
 @JvmOverloads
 fun KV.putValue(keyname: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): PutResponse =
@@ -57,6 +58,18 @@ fun Lazy<KV>.putValue(keyname: String, keyval: Int, option: PutOption = PutOptio
 fun Lazy<KV>.putValue(keyname: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
     value.putValue(keyname, keyval, option)
 
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: String, ttlSecs: Long, block: () -> Unit) =
+    putValueWithKeepAlive(client, keyname, keyval, ttlSecs.seconds, block)
+
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Int, ttlSecs: Long, block: () -> Unit) =
+    putValueWithKeepAlive(client, keyname, keyval, ttlSecs.seconds, block)
+
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Long, ttlSecs: Long, block: () -> Unit) =
+    putValueWithKeepAlive(client, keyname, keyval, ttlSecs.seconds, block)
+
+fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: ByteSequence, ttlSecs: Long, block: () -> Unit) =
+    putValuesWithKeepAlive(client, listOf(keyname to keyval), ttlSecs, block)
+
 fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: String, ttl: Duration, block: () -> Unit) =
     putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
 
@@ -68,6 +81,12 @@ fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Long, ttl:
 
 fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: ByteSequence, ttl: Duration, block: () -> Unit) =
     putValuesWithKeepAlive(client, listOf(keyname to keyval), ttl, block)
+
+fun KV.putValuesWithKeepAlive(client: Client,
+                              kvs: Collection<Pair<String, ByteSequence>>,
+                              ttlSecs: Long,
+                              block: () -> Unit) =
+    putValuesWithKeepAlive(client, kvs, ttlSecs.seconds, block)
 
 fun KV.putValuesWithKeepAlive(client: Client,
                               kvs: Collection<Pair<String, ByteSequence>>,

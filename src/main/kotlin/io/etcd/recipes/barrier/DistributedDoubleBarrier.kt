@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.barrier
 
-import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
+import com.sudothought.common.time.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath

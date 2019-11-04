@@ -21,7 +21,7 @@ package io.etcd.recipes.cache
 import com.google.common.collect.Maps
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
-import com.sudothought.common.time.Conversions
+import com.sudothought.common.time.timeUnitToDuration
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
@@ -205,7 +205,7 @@ class PathChildrenCache(val urls: List<String>,
 
     @Throws(InterruptedException::class)
     fun waitOnStartComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
-        waitOnStartComplete(Conversions.timeUnitToDuration(timeout, timeUnit))
+        waitOnStartComplete(timeUnitToDuration(timeout, timeUnit))
 
     @Throws(InterruptedException::class)
     fun waitOnStartComplete(timeout: Duration): Boolean {
