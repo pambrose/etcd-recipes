@@ -276,7 +276,7 @@ class PathChildrenCacheTests {
                 connectToEtcd(urls) { client ->
                     client.withKvClient { kvClient ->
                         val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
-                        kvClient.putValuesWithKeepAlive(client, bsvals, 2) {
+                        kvClient.putValuesWithKeepAlive(client, bsvals, 2.seconds) {
 
                             sleep(5.seconds)
 

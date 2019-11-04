@@ -20,7 +20,7 @@ package io.etcd.recipes.barrier
 
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.delegate.AtomicDelegates.nullableReference
-import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
+import com.sudothought.common.time.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE

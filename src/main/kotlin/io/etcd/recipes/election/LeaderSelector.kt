@@ -20,7 +20,7 @@ package io.etcd.recipes.election
 
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
-import com.sudothought.common.time.Conversions.Companion.timeUnitToDuration
+import com.sudothought.common.time.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.KV

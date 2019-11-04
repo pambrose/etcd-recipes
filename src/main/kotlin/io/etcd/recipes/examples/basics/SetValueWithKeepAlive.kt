@@ -53,7 +53,7 @@ fun main() {
             connectToEtcd(urls) { client ->
                 client.withKvClient { kvClient ->
                     println("Assigning $path = $keyval")
-                    kvClient.putValueWithKeepAlive(client, path, keyval, 2) {
+                    kvClient.putValueWithKeepAlive(client, path, keyval, 2.seconds) {
                         println("Starting sleep")
                         sleep(5.seconds)
                         println("Finished sleep")
