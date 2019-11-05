@@ -27,11 +27,11 @@ import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.INITIALIZED
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.putValuesWithKeepAlive
-import io.etcd.recipes.common.withKvClient
+import io.etcd.recipes.common.urls
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
@@ -39,8 +39,6 @@ import kotlin.random.Random
 import kotlin.time.seconds
 
 class PathChildrenCacheTests {
-
-    val urls = listOf("http://localhost:2379")
 
     fun generateTestData(count: Int): List<Pair<String, String>> {
         val names = List(count) { randomId(10) }
@@ -68,11 +66,7 @@ class PathChildrenCacheTests {
         val initCount = AtomicInteger(0)
 
         // Clear leftover data
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvClient.deleteChildren(path)
-            }
-        }
+        etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
         PathChildrenCache(urls, path)
             .use { cache ->
@@ -99,22 +93,16 @@ class PathChildrenCacheTests {
 
                     val kvs = generateTestData(count)
 
-                    connectToEtcd(urls) { client ->
-                        client.withKvClient { kvClient ->
-                            kvs.forEach { kv ->
-                                kvClient.putValue("${path}/${kv.first}", kv.second)
-                                kvClient.putValue("${path}/${kv.first}", kv.second + "update")
-                            }
+                    etcdExec(urls) { _, kvClient ->
+                        kvs.forEach { kv ->
+                            kvClient.putValue("${path}/${kv.first}", kv.second)
+                            kvClient.putValue("${path}/${kv.first}", kv.second + "update")
                         }
                     }
 
                     compareData(count, currentData, kvs, "update")
 
-                    connectToEtcd(urls) { client ->
-                        client.withKvClient { kvClient ->
-                            kvClient.deleteChildren(path)
-                        }
-                    }
+                    etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
                     sleep(1.seconds)
 
@@ -140,20 +128,14 @@ class PathChildrenCacheTests {
         val initCount = AtomicInteger(0)
 
         // Clear leftover data
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvClient.deleteChildren(path)
-            }
-        }
+        etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
         val kvs = generateTestData(count)
 
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvs.forEach { kv ->
-                    kvClient.putValue("${path}/${kv.first}", kv.second)
-                    kvClient.putValue("${path}/${kv.first}", kv.second + "update")
-                }
+        etcdExec(urls) { _, kvClient ->
+            kvs.forEach { kv ->
+                kvClient.putValue("${path}/${kv.first}", kv.second)
+                kvClient.putValue("${path}/${kv.first}", kv.second + "update")
             }
         }
 
@@ -180,11 +162,7 @@ class PathChildrenCacheTests {
                     deleteCount.get() shouldEqual 0
                     initCount.get() shouldEqual 0
 
-                    connectToEtcd(urls) { client ->
-                        client.withKvClient { kvClient ->
-                            kvClient.deleteChildren(path)
-                        }
-                    }
+                    etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
                     currentData shouldEqual emptyList()
                 }
@@ -205,20 +183,14 @@ class PathChildrenCacheTests {
         val deleteCount = AtomicInteger(0)
         val initCount = AtomicInteger(0)
 
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvClient.deleteChildren(path)
-            }
-        }
+        etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
         val kvs = generateTestData(count)
 
-        connectToEtcd(urls) { client ->
-            client.withKvClient { kvClient ->
-                kvs.forEach { kv ->
-                    kvClient.putValue("${path}/${kv.first}", kv.second)
-                    kvClient.putValue("${path}/${kv.first}", kv.second + "update")
-                }
+        etcdExec(urls) { _, kvClient ->
+            kvs.forEach { kv ->
+                kvClient.putValue("${path}/${kv.first}", kv.second)
+                kvClient.putValue("${path}/${kv.first}", kv.second + "update")
             }
         }
 
@@ -245,11 +217,7 @@ class PathChildrenCacheTests {
                     waitOnStartComplete()
                     compareData(count, currentData, kvs, "update")
 
-                    connectToEtcd(urls) { client ->
-                        client.withKvClient { kvClient ->
-                            kvClient.deleteChildren(path)
-                        }
-                    }
+                    etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
                     currentData shouldEqual emptyList()
                 }
@@ -273,20 +241,18 @@ class PathChildrenCacheTests {
             .use { cache ->
                 cache.start(false)
 
-                connectToEtcd(urls) { client ->
-                    client.withKvClient { kvClient ->
-                        val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
-                        kvClient.putValuesWithKeepAlive(client, bsvals, 2.seconds) {
+                etcdExec(urls) { client, kvClient ->
+                    val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
+                    kvClient.putValuesWithKeepAlive(client, bsvals, 2.seconds) {
 
-                            sleep(5.seconds)
+                        sleep(5.seconds)
 
-                            val data = cache.currentData
+                        val data = cache.currentData
 
-                            //println("KVs:  ${kvs.map { it.first }.sorted()}")
-                            //println("Data: ${data.map { it.key }.sorted()}")
+                        //println("KVs:  ${kvs.map { it.first }.sorted()}")
+                        //println("Data: ${data.map { it.key }.sorted()}")
 
-                            compareData(count, data, kvs)
-                        }
+                        compareData(count, data, kvs)
                     }
                 }
 

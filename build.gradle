@@ -8,7 +8,7 @@ plugins {
 }
 
 group 'io.etcd'
-version '0.9.7'
+version '0.9.8'
 
 sourceCompatibility = 1.8
 
@@ -38,16 +38,17 @@ repositories {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinVersion}"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-runtime:$serializationVersion"
+    implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-runtime:${serializationVersion}"
     implementation "io.etcd:jetcd-all:${jetcdVersion}"
     implementation "com.google.guava:guava:${guavaVersion}"
     implementation "com.github.pambrose:common-utils:${utilsVersion}"
-    implementation "io.github.microutils:kotlin-logging:$loggingVersion"
+    implementation "io.github.microutils:kotlin-logging:${loggingVersion}"
     implementation "org.slf4j:slf4j-simple:${slf4jVersion}"
 
-    testImplementation "org.amshove.kluent:kluent:$kluentVersion"
-    testImplementation "org.junit.jupiter:junit-jupiter-api:$junitVersion"
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
+    testImplementation "org.amshove.kluent:kluent:${kluentVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
 }
 
 sourceSets {

@@ -236,6 +236,9 @@ class PathChildrenCache(val urls: List<String>,
 
     @Synchronized
     override fun close() {
+        if (closeCalled)
+            return
+
         checkStartCalled()
 
         listeners.clear()
@@ -243,6 +246,7 @@ class PathChildrenCache(val urls: List<String>,
 
         // Close waiter before shutting down executor
         super.close()
+
         if (userExecutor == null) (executor as ExecutorService).shutdown()
     }
 

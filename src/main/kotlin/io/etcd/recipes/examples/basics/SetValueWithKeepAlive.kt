@@ -21,10 +21,10 @@ package io.etcd.recipes.examples.basics
 import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.keyAsString
 import io.etcd.recipes.common.putValueWithKeepAlive
 import io.etcd.recipes.common.watcherWithLatch
-import io.etcd.recipes.common.withKvClient
 import io.etcd.recipes.common.withWatchClient
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -50,17 +50,15 @@ fun main() {
 
     thread {
         latch.countDown {
-            connectToEtcd(urls) { client ->
-                client.withKvClient { kvClient ->
-                    println("Assigning $path = $keyval")
-                    kvClient.putValueWithKeepAlive(client, path, keyval, 2.seconds) {
-                        println("Starting sleep")
-                        sleep(5.seconds)
-                        println("Finished sleep")
-                    }
-                    println("Keep-alive is now terminated")
+            etcdExec(urls) { client, kvClient ->
+                println("Assigning $path = $keyval")
+                kvClient.putValueWithKeepAlive(client, path, keyval, 2.seconds) {
+                    println("Starting sleep")
                     sleep(5.seconds)
+                    println("Finished sleep")
                 }
+                println("Keep-alive is now terminated")
+                sleep(5.seconds)
             }
             println("Releasing latch")
         }

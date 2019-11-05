@@ -20,12 +20,12 @@ package io.etcd.recipes.barrier
 
 import com.sudothought.common.time.timeUnitToDuration
 import com.sudothought.common.util.randomId
+import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenKeys
-import io.etcd.recipes.common.withKvClient
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -36,7 +36,8 @@ class DistributedDoubleBarrier
 constructor(val urls: List<String>,
             barrierPath: String,
             memberCount: Int,
-            val clientId: String = "Client:${randomId(7)}") : Closeable {
+            val clientId: String = "${DistributedDoubleBarrier::class.simpleName}:${randomId(tokenLength)}") :
+    Closeable {
 
     private val enterBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("enter"), memberCount)
     private val leaveBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("leave"), memberCount)
@@ -81,11 +82,9 @@ constructor(val urls: List<String>,
             require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
 
-            connectToEtcd(urls) { client ->
-                client.withKvClient { kvClient ->
-                    // Delete all children
-                    kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
-                }
+            etcdExec(urls) { _, kvClient ->
+                // Delete all children
+                kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
             }
         }
     }

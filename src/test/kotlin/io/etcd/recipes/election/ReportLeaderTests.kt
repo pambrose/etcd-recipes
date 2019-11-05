@@ -21,6 +21,7 @@ package io.etcd.recipes.election
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
@@ -29,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
 class ReportLeaderTests {
-    val urls = listOf("http://localhost:2379")
+
     val path = "/election/${javaClass.simpleName}"
 
     @Test
@@ -74,12 +75,12 @@ class ReportLeaderTests {
         }
 
         // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
-        sleep(5.seconds)
-
-        executor.shutdown()
+        sleep(10.seconds)
 
         takeLeadershiptCounter.get() shouldEqual count
         relinquishLeadershiptCounter.get() shouldEqual count
+
+        executor.shutdown()
     }
 
     companion object : KLogging()

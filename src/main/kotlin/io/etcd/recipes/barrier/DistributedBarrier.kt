@@ -49,7 +49,8 @@ class DistributedBarrier
 constructor(val urls: List<String>,
             val barrierPath: String,
             private val waitOnMissingBarriers: Boolean = true,
-            val clientId: String = "Client:${randomId(7)}") : EtcdConnector(urls), Closeable {
+            val clientId: String = "${DistributedBarrier::class.simpleName}:${randomId(tokenLength)}") :
+    EtcdConnector(urls), Closeable {
 
 
     private var keepAliveLease by nullableReference<CloseableClient?>(null)
@@ -70,7 +71,7 @@ constructor(val urls: List<String>,
         checkCloseNotCalled()
 
         // Create unique token to avoid collision from clients with same id
-        val uniqueToken = "$clientId:${randomId(7)}"
+        val uniqueToken = "$clientId:${randomId(tokenLength)}"
 
         return if (kvClient.isKeyPresent(barrierPath))
             false
@@ -147,6 +148,9 @@ constructor(val urls: List<String>,
 
     @Synchronized
     override fun close() {
+        if (closeCalled)
+            return
+
         keepAliveLease?.close()
         keepAliveLease = null
 

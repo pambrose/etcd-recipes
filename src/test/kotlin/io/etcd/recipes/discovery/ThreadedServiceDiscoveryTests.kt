@@ -22,6 +22,7 @@ import com.google.common.collect.Maps
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.blockingThreads
+import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual
@@ -31,7 +32,6 @@ import java.util.concurrent.ConcurrentMap
 import kotlin.time.seconds
 
 class ThreadedServiceDiscoveryTests {
-    val urls = listOf("http://localhost:2379")
     val path = "/discovery/${javaClass.simpleName}"
     val threadCount = 5
     val serviceCount = 10

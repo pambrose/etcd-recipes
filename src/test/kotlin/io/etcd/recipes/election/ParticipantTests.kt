@@ -20,6 +20,7 @@ package io.etcd.recipes.election
 
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
@@ -29,7 +30,6 @@ import kotlin.concurrent.thread
 import kotlin.time.seconds
 
 class ParticipantTests {
-    val urls = listOf("http://localhost:2379")
     val path = "/election/${javaClass.simpleName}"
 
     @Test

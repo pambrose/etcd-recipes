@@ -29,6 +29,7 @@ import io.etcd.jetcd.Watch
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.appendToPath
@@ -36,6 +37,7 @@ import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyPresent
@@ -66,7 +68,7 @@ constructor(val urls: List<String>,
             val electionPath: String,
             private val listener: LeaderSelectorListener,
             private val userExecutor: Executor? = null,
-            val clientId: String = "Client:${randomId(7)}") : Closeable {
+            val clientId: String = "${LeaderSelector::class.simpleName}:${randomId(tokenLength)}") : Closeable {
 
     // For Kotlin clients
     @JvmOverloads
@@ -75,7 +77,7 @@ constructor(val urls: List<String>,
                 takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
                 relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
                 executorService: ExecutorService? = null,
-                clientId: String = "Client:${randomId(7)}") :
+                clientId: String = "${LeaderSelector::class.simpleName}:${randomId(tokenLength)}") :
             this(urls,
                  electionPath,
                  object : LeaderSelectorListener {
@@ -101,7 +103,8 @@ constructor(val urls: List<String>,
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
     private val leaderPath = electionPath.withLeaderSuffix
-    private val exceptionList: MutableList<Throwable> = Collections.synchronizedList(mutableListOf())
+    private val exceptionList: Lazy<MutableList<Throwable>> =
+        lazy { Collections.synchronizedList(mutableListOf<Throwable>()) }
 
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }
@@ -111,6 +114,14 @@ constructor(val urls: List<String>,
     val isLeader get() = electedLeader
 
     val isFinished get() = leadershipComplete.get()
+
+    val exceptions get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList<Throwable>()
+
+    val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.size > 0
+
+    fun clearExceptions() {
+        if (exceptionList.isInitialized()) exceptionList.value.clear()
+    }
 
     fun start(): LeaderSelector {
 
@@ -136,8 +147,8 @@ constructor(val urls: List<String>,
         executor.execute {
             try {
                 connectToEtcd(urls) { client ->
-                    client.withLeaseClient { leaseClient ->
-                        client.withKvClient { kvClient ->
+                    client.withKvClient { kvClient ->
+                        client.withLeaseClient { leaseClient ->
 
                             connectedToEtcd.set(true)
 
@@ -161,7 +172,7 @@ constructor(val urls: List<String>,
                                     }
                                 } catch (e: Throwable) {
                                     logger.error(e) { "In withWatchClient()" }
-                                    exceptionList += e
+                                    exceptionList.value += e
                                 }
                             }
 
@@ -170,7 +181,7 @@ constructor(val urls: List<String>,
                                     advertiseParticipation(leaseClient, kvClient)
                                 } catch (e: Throwable) {
                                     logger.error(e) { "In advertiseParticipation()" }
-                                    exceptionList += e
+                                    exceptionList.value += e
                                 } finally {
                                     advertiseComplete.set(true)
                                 }
@@ -190,7 +201,7 @@ constructor(val urls: List<String>,
                 }
             } catch (e: Throwable) {
                 logger.error(e) { "In start()" }
-                exceptionList += e
+                exceptionList.value += e
             } finally {
                 startThreadComplete.set(true)
             }
@@ -200,12 +211,6 @@ constructor(val urls: List<String>,
 
         return this
     }
-
-    val startExceptions get() = exceptionList
-
-    val hasStartExceptions get() = exceptionList.size > 0
-
-    fun clearStartExceptions() = exceptionList.clear()
 
     @Throws(InterruptedException::class)
     fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Long.MAX_VALUE.days)
@@ -293,57 +298,60 @@ constructor(val urls: List<String>,
     // This will not return until election failure or leader surrenders leadership after being elected
     @Synchronized
     private fun attemptToBecomeLeader(leaseClient: Lease, kvClient: KV): Boolean {
-        if (isLeader || !attemptLeadership.get())
+        try {
+            if (isLeader || !attemptLeadership.get())
+                return false
+
+            // Create unique token to avoid collision from clients with same id
+            val uniqueToken = "$clientId:${randomId(tokenLength)}"
+
+            // Prime lease to give keepAliveWith a chance to get started
+            val lease = leaseClient.grant(leaseTtl.inSeconds.toLong()).get()
+
+            // Check the key name. If it is not found, then set it
+            val txn =
+                kvClient.transaction {
+                    If(leaderPath.doesNotExist)
+                    Then(leaderPath.setTo(uniqueToken, lease.asPutOption))
+                }
+
+            // Check to see if unique value was successfully set in the CAS step
+            return if (!isLeader && txn.isSucceeded && kvClient.getValue(leaderPath)?.asString == uniqueToken) {
+
+                // Selected as leader. This will exit when leadership is relinquished
+                leaseClient.keepAliveWith(lease) {
+                    electedLeader = true
+                    listener.takeLeadership(this)
+                }
+
+                // Leadership was relinquished
+                listener.relinquishLeadership(this)
+
+                // Do this after leadership is complete so the thread does not terminate
+                attemptLeadership.set(false)
+                startCallAllowed = true
+                electedLeader = false
+                markLeadershipComplete()
+                true
+            } else {
+                // Failed to become leader
+                false
+            }
+        } catch (e: Throwable) {
+            logger.error(e) { "In attemptToBecomeLeader()" }
+            exceptionList.value += e
             return false
-
-        // Create unique token to avoid collision from clients with same id
-        val uniqueToken = "$clientId:${randomId(uniqueSuffixLength)}"
-
-        // Prime lease to give keepAliveWith a chance to get started
-        val lease = leaseClient.grant(leaseTtl.inSeconds.toLong()).get()
-
-        // Check the key name. If it is not found, then set it
-        val txn =
-            kvClient.transaction {
-                If(leaderPath.doesNotExist)
-                Then(leaderPath.setTo(uniqueToken, lease.asPutOption))
-            }
-
-        // Check to see if unique value was successfully set in the CAS step
-        return if (!isLeader && txn.isSucceeded && kvClient.getValue(leaderPath)?.asString == uniqueToken) {
-
-            // Selected as leader. This will exit when leadership is relinquished
-            leaseClient.keepAliveWith(lease) {
-                electedLeader = true
-                listener.takeLeadership(this)
-            }
-
-            // Leadership was relinquished
-            listener.relinquishLeadership(this)
-
-            // Do this after leadership is complete so the thread does not terminate
-            attemptLeadership.set(false)
-            startCallAllowed = true
-            electedLeader = false
-            markLeadershipComplete()
-            true
-        } else {
-            // Failed to become leader
-            false
         }
     }
 
     companion object : KLogging() {
 
-        private const val uniqueSuffixLength = 7
-
         private val leaseTtl = 5.seconds
 
         private val String.withParticipationSuffix get() = appendToPath("participants")
-
         private val String.withLeaderSuffix get() = appendToPath("LEADER")
 
-        internal val String.stripUniqueSuffix get() = dropLast(uniqueSuffixLength + 1)
+        internal val String.stripUniqueSuffix get() = dropLast(tokenLength + 1)
 
         @JvmStatic
         fun getParticipants(urls: List<String>, electionPath: String): List<Participant> {
@@ -352,12 +360,10 @@ constructor(val urls: List<String>,
             require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 
             val participants = mutableListOf<Participant>()
-            connectToEtcd(urls) { client ->
-                client.withKvClient { kvClient ->
-                    val leader = kvClient.getValue(electionPath.withLeaderSuffix)?.asString?.stripUniqueSuffix
-                    kvClient.getChildrenValues(electionPath.withParticipationSuffix).asString
-                        .forEach { participants += Participant(it, leader == it) }
-                }
+            etcdExec(urls) { _, kvClient ->
+                val leader = kvClient.getValue(electionPath.withLeaderSuffix)?.asString?.stripUniqueSuffix
+                kvClient.getChildrenValues(electionPath.withParticipationSuffix).asString
+                    .forEach { participants += Participant(it, leader == it) }
             }
             return participants
         }

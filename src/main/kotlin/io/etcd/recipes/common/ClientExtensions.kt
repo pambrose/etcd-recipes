@@ -37,6 +37,14 @@ fun connectToEtcd(urls: List<String>, block: (client: Client) -> Unit) {
         }
 }
 
+fun etcdExec(urls: List<String>, block: (client: Client, kvClient: KV) -> Unit) {
+    connectToEtcd(urls) { client ->
+        client.withKvClient { kvClient ->
+            block(client, kvClient)
+        }
+    }
+}
+
 fun Client.withWatchClient(block: (watchClient: Watch) -> Unit) = watchClient.use { block(it) }
 
 fun Client.withLeaseClient(block: (leaseClient: Lease) -> Unit) = leaseClient.use { block(it) }

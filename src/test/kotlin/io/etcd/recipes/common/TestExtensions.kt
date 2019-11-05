@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Assertions.fail
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 
+val urls = listOf("http://localhost:2379")
+
 fun nonblockingThreads(threadCount: Int,
                        waitLatch: CountDownLatch? = null,
                        block: (index: Int) -> Unit): Pair<CountDownLatch, ExceptionHolder> {

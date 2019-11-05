@@ -24,15 +24,14 @@ import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.asLong
-import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.equalTo
+import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
-import io.etcd.recipes.common.withKvClient
 import java.io.Closeable
 import kotlin.time.milliseconds
 
@@ -114,9 +113,7 @@ constructor(val urls: List<String>,
             require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
 
-            connectToEtcd(urls) { client ->
-                client.withKvClient { kvClient -> kvClient.delete(counterPath) }
-            }
+            etcdExec(urls) { _, kvClient -> kvClient.delete(counterPath) }
         }
     }
 }
