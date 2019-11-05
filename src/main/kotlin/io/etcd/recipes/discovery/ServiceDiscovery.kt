@@ -49,7 +49,8 @@ data class ServiceDiscovery
 @JvmOverloads
 constructor(val urls: List<String>,
             private val basePath: String,
-            val clientId: String = "Client:${randomId(7)}") : EtcdConnector(urls), Closeable {
+            val clientId: String = "${ServiceDiscovery::class.simpleName}:${randomId(tokenLength)}") :
+    EtcdConnector(urls), Closeable {
 
     private val namesPath = basePath.appendToPath("/names")
     private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = Maps.newConcurrentMap()
@@ -166,6 +167,9 @@ constructor(val urls: List<String>,
 
     @Synchronized
     override fun close() {
+        if (closeCalled)
+            return
+
         // Close all service caches
         serviceCacheList.forEach { it.close() }
         serviceContextMap.forEach { (_, v) -> internalUnregisterService(v.service) }

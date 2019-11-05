@@ -22,6 +22,7 @@ import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.nonblockingThreads
+import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual
@@ -32,8 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
 class DistributedBarrierWithCountTests {
-
-    val urls = listOf("http://localhost:2379")
 
     @Test
     fun badArgsTest() {

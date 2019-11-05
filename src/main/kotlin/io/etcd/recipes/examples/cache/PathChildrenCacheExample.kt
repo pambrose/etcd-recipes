@@ -20,21 +20,18 @@ import com.sudothought.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.putValue
-import io.etcd.recipes.common.withKvClient
 import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
     val cachePath = "/cache/test"
 
-    connectToEtcd(urls) { client ->
-        client.withKvClient { kvClient ->
-            kvClient.putValue("${cachePath}/child1", "a child 1 value")
-            kvClient.putValue("${cachePath}/child2", "a child 2 value")
-        }
+    etcdExec(urls) { _, kvClient ->
+        kvClient.putValue("${cachePath}/child1", "a child 1 value")
+        kvClient.putValue("${cachePath}/child2", "a child 2 value")
     }
 
     sleep(1.seconds)
@@ -50,11 +47,7 @@ fun main() {
                 waitOnStartComplete()
                 currentData.forEach { println("${it.key} ${it.value.asString}") }
 
-                connectToEtcd(urls) { client ->
-                    client.withKvClient { kvClient ->
-                        println("Deleted: ${kvClient.deleteChildren(cachePath)}")
-                    }
-                }
+                etcdExec(urls) { _, kvClient -> println("Deleted: ${kvClient.deleteChildren(cachePath)}") }
 
                 sleep(1.seconds)
             }

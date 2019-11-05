@@ -31,7 +31,7 @@ open class EtcdConnector(urls: List<String>) {
     protected val kvClient: Lazy<KV> = lazy { client.value.kvClient }
     protected val leaseClient: Lazy<Lease> = lazy { client.value.leaseClient }
     protected val watchClient: Lazy<Watch> = lazy { client.value.watchClient }
-    private var closeCalled: Boolean by atomicBoolean(false)
+    protected var closeCalled: Boolean by atomicBoolean(false)
     protected val exceptionList: Lazy<MutableList<Throwable>> =
         lazy { Collections.synchronizedList(mutableListOf<Throwable>()) }
 
@@ -64,5 +64,9 @@ open class EtcdConnector(urls: List<String>) {
 
             closeCalled = true
         }
+    }
+
+    companion object {
+        internal const val tokenLength = 7
     }
 }

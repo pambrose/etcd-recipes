@@ -19,6 +19,7 @@
 package io.etcd.recipes.discovery
 
 import com.sudothought.common.util.randomId
+import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -34,7 +35,7 @@ data class ServiceInstance(val name: String,
                            var uri: String = "",
                            var enabled: Boolean = true) {
 
-    val id: String = randomId(7)
+    val id: String = randomId(tokenLength)
 
     init {
         require(name.isNotEmpty()) { "Name cannot be empty" }

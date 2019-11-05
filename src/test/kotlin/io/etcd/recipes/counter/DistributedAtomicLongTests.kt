@@ -24,6 +24,7 @@ import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.threadWithExceptionCheck
 import io.etcd.recipes.common.throwExceptionFromList
+import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual
@@ -34,7 +35,6 @@ import java.util.concurrent.CountDownLatch
 import kotlin.time.milliseconds
 
 class DistributedAtomicLongTests {
-    val urls = listOf("http://localhost:2379")
     val path = "/counters/${javaClass.simpleName}"
 
     @BeforeEach

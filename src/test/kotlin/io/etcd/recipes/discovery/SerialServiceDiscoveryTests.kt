@@ -20,6 +20,7 @@ package io.etcd.recipes.discovery
 
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEndWith
@@ -29,7 +30,6 @@ import org.junit.jupiter.api.Test
 import kotlin.time.seconds
 
 class SerialServiceDiscoveryTests {
-    val urls = listOf("http://localhost:2379")
     val path = "/discovery/${javaClass.simpleName}"
 
     @Test

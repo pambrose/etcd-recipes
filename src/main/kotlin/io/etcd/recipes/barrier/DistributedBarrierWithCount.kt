@@ -30,13 +30,13 @@ import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.countChildren
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.grant
@@ -45,7 +45,6 @@ import io.etcd.recipes.common.keepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watcher
-import io.etcd.recipes.common.withKvClient
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -64,7 +63,8 @@ class DistributedBarrierWithCount
 constructor(val urls: List<String>,
             val barrierPath: String,
             val memberCount: Int,
-            val clientId: String = "Client:${randomId(7)}") : EtcdConnector(urls), Closeable {
+            val clientId: String = "${DistributedBarrierWithCount::class.simpleName}:${randomId(tokenLength)}") :
+    EtcdConnector(urls), Closeable {
 
     private val readyPath = barrierPath.appendToPath("ready")
     private val waitingPath = barrierPath.appendToPath("waiting")
@@ -98,7 +98,7 @@ constructor(val urls: List<String>,
     fun waitOnBarrier(timeout: Duration): Boolean {
         var keepAliveLease: CloseableClient? = null
         val keepAliveClosed = BooleanMonitor(false)
-        val uniqueToken = "$clientId:${randomId(7)}"
+        val uniqueToken = "$clientId:${randomId(tokenLength)}"
         val waitingPath = waitingPath.appendToPath(uniqueToken)
 
         checkCloseNotCalled()
@@ -196,11 +196,9 @@ constructor(val urls: List<String>,
             require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
 
-            connectToEtcd(urls) { client ->
-                client.withKvClient { kvClient ->
-                    // Delete all children
-                    kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
-                }
+            etcdExec(urls) { _, kvClient ->
+                // Delete all children
+                kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
             }
         }
     }

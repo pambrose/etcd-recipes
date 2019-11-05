@@ -21,7 +21,10 @@ package io.etcd.recipes.examples.basics
 import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.etcdExec
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.putValue
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -35,26 +38,22 @@ fun main() {
     thread {
         latch.countDown {
             sleep(3.seconds)
-            connectToEtcd(urls) { client ->
-                client.withKvClient { kvClient ->
-                    println("Assigning $path = $keyval")
-                    kvClient.putValue(path, keyval)
-                    sleep(5.seconds)
-                    println("Deleting $path")
-                    kvClient.delete(path)
-                }
+            etcdExec(urls) { _, kvClient ->
+                println("Assigning $path = $keyval")
+                kvClient.putValue(path, keyval)
+                sleep(5.seconds)
+                println("Deleting $path")
+                kvClient.delete(path)
             }
         }
     }
 
     thread {
         latch.countDown {
-            connectToEtcd(urls) { client ->
-                client.withKvClient { kvClient ->
-                    repeatWithSleep(12) { _, start ->
-                        val elapsed = System.currentTimeMillis() - start
-                        println("Key $path = ${kvClient.getValue(path, "unset")} after ${elapsed}ms")
-                    }
+            etcdExec(urls) { _, kvClient ->
+                repeatWithSleep(12) { _, start ->
+                    val elapsed = System.currentTimeMillis() - start
+                    println("Key $path = ${kvClient.getValue(path, "unset")} after ${elapsed}ms")
                 }
             }
         }
