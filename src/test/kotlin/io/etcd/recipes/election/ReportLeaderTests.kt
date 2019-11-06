@@ -66,8 +66,7 @@ class ReportLeaderTests {
                                    sleep(pause)
                                }
                            },
-                           null,
-                           "Thread$it")
+                           clientId = "Thread$it")
                 .use { election ->
                     election.start()
                     election.waitOnLeadershipComplete()

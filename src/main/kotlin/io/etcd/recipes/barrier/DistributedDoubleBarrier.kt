@@ -36,8 +36,7 @@ class DistributedDoubleBarrier
 constructor(val urls: List<String>,
             barrierPath: String,
             memberCount: Int,
-            val clientId: String = "${DistributedDoubleBarrier::class.simpleName}:${randomId(tokenLength)}") :
-    Closeable {
+            val clientId: String = defaultClientId()) : Closeable {
 
     private val enterBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("enter"), memberCount)
     private val leaveBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("leave"), memberCount)
@@ -76,6 +75,8 @@ constructor(val urls: List<String>,
     }
 
     companion object {
+        private fun defaultClientId() = "${DistributedDoubleBarrier::class.simpleName}:${randomId(tokenLength)}"
+
         @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
 
@@ -89,3 +90,5 @@ constructor(val urls: List<String>,
         }
     }
 }
+
+

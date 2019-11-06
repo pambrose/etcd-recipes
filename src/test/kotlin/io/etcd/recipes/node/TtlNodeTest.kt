@@ -38,7 +38,7 @@ class TtlNodeTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getValue(path, "nothing") shouldEqual "nothing" }
 
-        TtlNode(urls, path, id, 2.seconds).start().use {
+        TtlNode(urls, path, id).use {
             repeat(10) {
                 etcdExec(urls) { _, kvClient -> kvClient.getValue(path)?.asString shouldEqual id }
                 sleep(1.seconds)
@@ -63,7 +63,7 @@ class TtlNodeTest {
             kvClient.countChildren("/node") shouldEqual 0
         }
 
-        val nodes = List(count) { TtlNode(urls, paths[it], ids[it], 2.seconds).start() }
+        val nodes = List(count) { TtlNode(urls, paths[it], ids[it]) }
 
         etcdExec(urls) { _, kvClient ->
             repeat(10) { _ ->
