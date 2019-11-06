@@ -57,8 +57,7 @@ class ParticipantTests {
                                        leaderNames += selector.clientId
                                    }
                                },
-                               null,
-                               "Thread$it")
+                               clientId = "Thread$it")
                     .use { election ->
                         election.start()
                         startedLatch.countDown()

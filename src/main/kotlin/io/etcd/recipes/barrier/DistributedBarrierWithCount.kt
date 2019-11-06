@@ -63,8 +63,8 @@ class DistributedBarrierWithCount
 constructor(val urls: List<String>,
             val barrierPath: String,
             val memberCount: Int,
-            val clientId: String = "${DistributedBarrierWithCount::class.simpleName}:${randomId(tokenLength)}") :
-    EtcdConnector(urls), Closeable {
+            val leaseTtlSecs: Long = defaultTtlSecs,
+            val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
 
     private val readyPath = barrierPath.appendToPath("ready")
     private val waitingPath = barrierPath.appendToPath("waiting")
@@ -136,7 +136,7 @@ constructor(val urls: List<String>,
             Then(readyPath setTo uniqueToken)
         }
 
-        val lease = leaseClient.grant(leaseTtl).get()
+        val lease = leaseClient.grant(leaseTtlSecs.seconds).get()
 
         val txn =
             kvClient.transaction {
@@ -188,7 +188,7 @@ constructor(val urls: List<String>,
     }
 
     companion object {
-        private val leaseTtl = 5.seconds
+        private fun defaultClientId() = "${DistributedBarrierWithCount::class.simpleName}:${randomId(tokenLength)}"
 
         @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {

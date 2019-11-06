@@ -68,5 +68,6 @@ open class EtcdConnector(urls: List<String>) {
 
     companion object {
         internal const val tokenLength = 7
+        internal const val defaultTtlSecs = 2L
     }
 }

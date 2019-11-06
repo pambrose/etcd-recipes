@@ -49,8 +49,8 @@ data class ServiceDiscovery
 @JvmOverloads
 constructor(val urls: List<String>,
             private val basePath: String,
-            val clientId: String = "${ServiceDiscovery::class.simpleName}:${randomId(tokenLength)}") :
-    EtcdConnector(urls), Closeable {
+            val leaseTtlSecs: Long = defaultTtlSecs,
+            val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
 
     private val namesPath = basePath.appendToPath("/names")
     private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = Maps.newConcurrentMap()
@@ -84,8 +84,8 @@ constructor(val urls: List<String>,
 
         serviceContextMap[service.id] = context
 
-        // Prime lease with 2 seconds to give keepAlive a chance to get started
-        context.lease = leaseClient.grant(leaseTtl).get()
+        // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
+        context.lease = leaseClient.grant(leaseTtlSecs.seconds).get()
 
         val txn =
             kvClient.transaction {
@@ -182,6 +182,6 @@ constructor(val urls: List<String>,
     private fun getNamesPath(vararg elems: String) = namesPath.appendToPath(elems.joinToString("/"))
 
     companion object : KLogging() {
-        private val leaseTtl = 5.seconds
+        private fun defaultClientId() = "${ServiceDiscovery::class.simpleName}:${randomId(tokenLength)}"
     }
 }

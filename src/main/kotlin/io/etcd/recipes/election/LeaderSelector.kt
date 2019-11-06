@@ -29,6 +29,7 @@ import io.etcd.jetcd.Watch
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
 import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
@@ -60,15 +61,15 @@ import kotlin.time.Duration
 import kotlin.time.days
 import kotlin.time.seconds
 
-
 // For Java clients
 class LeaderSelector
 @JvmOverloads
 constructor(val urls: List<String>,
             val electionPath: String,
             private val listener: LeaderSelectorListener,
+            val leaseTtlSecs: Long = defaultTtlSecs,
             private val userExecutor: Executor? = null,
-            val clientId: String = "${LeaderSelector::class.simpleName}:${randomId(tokenLength)}") : Closeable {
+            val clientId: String = defaultClientId()) : Closeable {
 
     // For Kotlin clients
     @JvmOverloads
@@ -76,21 +77,22 @@ constructor(val urls: List<String>,
                 electionPath: String,
                 takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
                 relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+                leaseTtlSecs: Long = defaultTtlSecs,
                 executorService: ExecutorService? = null,
-                clientId: String = "${LeaderSelector::class.simpleName}:${randomId(tokenLength)}") :
-            this(urls,
-                 electionPath,
-                 object : LeaderSelectorListener {
-                     override fun takeLeadership(selector: LeaderSelector) {
-                         takeLeadershipBlock.invoke(selector)
-                     }
+                clientId: String = defaultClientId()) : this(urls,
+                                                             electionPath,
+                                                             object : LeaderSelectorListener {
+                                                                 override fun takeLeadership(selector: LeaderSelector) {
+                                                                     takeLeadershipBlock.invoke(selector)
+                                                                 }
 
-                     override fun relinquishLeadership(selector: LeaderSelector) {
-                         relinquishLeadershipBlock.invoke(selector)
-                     }
-                 },
-                 executorService,
-                 clientId)
+                                                                 override fun relinquishLeadership(selector: LeaderSelector) {
+                                                                     relinquishLeadershipBlock.invoke(selector)
+                                                                 }
+                                                             },
+                                                             leaseTtlSecs,
+                                                             executorService,
+                                                             clientId)
 
     private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
     private val terminateWatch = BooleanMonitor(false)
@@ -109,6 +111,7 @@ constructor(val urls: List<String>,
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
+        require(leaseTtlSecs > 0) { "Lease TTL must be > 0" }
     }
 
     val isLeader get() = electedLeader
@@ -270,18 +273,19 @@ constructor(val urls: List<String>,
         val path = electionPath.withParticipationSuffix.appendToPath(clientId)
 
         // Wait until key goes away when previous keep alive finishes
-        for (i in 0 until 10) {
+        val attemptCount = leaseTtlSecs * 2
+        for (i in 0 until attemptCount) {
             if (!kvClient.isKeyPresent(path))
                 break
 
-            if (i == 9)
+            if (i == attemptCount - 1)
                 logger.error { "Exhausted wait for deletion of participation key $path" }
 
             sleep(1.seconds)
         }
 
-        // Prime lease with 5 seconds to give keepAlive a chance to get started
-        val lease = leaseClient.grant(leaseTtl.inSeconds.toLong()).get()
+        // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
+        val lease = leaseClient.grant(leaseTtlSecs).get()
         val txn =
             kvClient.transaction {
                 If(path.doesNotExist)
@@ -306,7 +310,7 @@ constructor(val urls: List<String>,
             val uniqueToken = "$clientId:${randomId(tokenLength)}"
 
             // Prime lease to give keepAliveWith a chance to get started
-            val lease = leaseClient.grant(leaseTtl.inSeconds.toLong()).get()
+            val lease = leaseClient.grant(leaseTtlSecs).get()
 
             // Check the key name. If it is not found, then set it
             val txn =
@@ -346,12 +350,12 @@ constructor(val urls: List<String>,
 
     companion object : KLogging() {
 
-        private val leaseTtl = 5.seconds
-
         private val String.withParticipationSuffix get() = appendToPath("participants")
         private val String.withLeaderSuffix get() = appendToPath("LEADER")
 
         internal val String.stripUniqueSuffix get() = dropLast(tokenLength + 1)
+
+        private fun defaultClientId() = "${LeaderSelector::class.simpleName}:${randomId(tokenLength)}"
 
         @JvmStatic
         fun getParticipants(urls: List<String>, electionPath: String): List<Participant> {

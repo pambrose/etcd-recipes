@@ -48,10 +48,9 @@ class DistributedBarrier
 @JvmOverloads
 constructor(val urls: List<String>,
             val barrierPath: String,
+            val leaseTtlSecs: Long = defaultTtlSecs,
             private val waitOnMissingBarriers: Boolean = true,
-            val clientId: String = "${DistributedBarrier::class.simpleName}:${randomId(tokenLength)}") :
-    EtcdConnector(urls), Closeable {
-
+            val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
 
     private var keepAliveLease by nullableReference<CloseableClient?>(null)
     private var barrierRemoved by atomicBoolean(false)
@@ -77,7 +76,7 @@ constructor(val urls: List<String>,
             false
         else {
             // Prime lease with 2 seconds to give keepAlive a chance to get started
-            val lease = leaseClient.grant(leaseTtl).get()
+            val lease = leaseClient.grant(leaseTtlSecs.seconds).get()
 
             // Do a CAS on the key name. If it is not found, then set it
             val txn =
@@ -158,6 +157,6 @@ constructor(val urls: List<String>,
     }
 
     companion object : KLogging() {
-        private val leaseTtl = 5.seconds
+        private fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(tokenLength)}"
     }
 }

@@ -30,31 +30,17 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.time.Duration
 import kotlin.time.seconds
 
-// Kotlin client
-class TtlNode(val urls: List<String>,
-              val nodePath: String,
-              val nodeValue: String,
-              val leaseTtl: Duration,
-              private val userExecutor: Executor? = null,
-              val clientId: String = "${TtlNode::class.simpleName}:${randomId(tokenLength)}") : EtcdConnector(urls),
-    Closeable {
-
-    // Java client
-    @JvmOverloads
-    constructor(urls: List<String>,
-                nodePath: String,
-                nodeValue: String,
-                leaseTtlSecs: Long,
-                userExecutor: Executor? = null,
-                clientId: String = "${TtlNode::class.simpleName}:${randomId(tokenLength)}") : this(urls,
-                                                                                                   nodePath,
-                                                                                                   nodeValue,
-                                                                                                   leaseTtlSecs.seconds,
-                                                                                                   userExecutor,
-                                                                                                   clientId)
+class TtlNode
+@JvmOverloads
+constructor(val urls: List<String>,
+            val nodePath: String,
+            val nodeValue: String,
+            val leaseTtlSecs: Long = defaultTtlSecs,
+            val autoStart: Boolean = true,
+            private val userExecutor: Executor? = null,
+            val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
 
     private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
     private val startThreadComplete = BooleanMonitor(false)
@@ -65,6 +51,9 @@ class TtlNode(val urls: List<String>,
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(nodePath.isNotEmpty()) { "Node path cannot be empty" }
+
+        if (autoStart)
+            start()
     }
 
     @Synchronized
@@ -75,6 +64,7 @@ class TtlNode(val urls: List<String>,
 
         executor.execute {
             try {
+                val leaseTtl = leaseTtlSecs.seconds
                 logger.info { "$leaseTtl keep-alive started for $clientId $nodePath" }
                 kvClient.value.putValueWithKeepAlive(client.value, nodePath, nodeValue, leaseTtl) {
                     keepAliveStartedLatch.countDown()
@@ -116,7 +106,6 @@ class TtlNode(val urls: List<String>,
     }
 
     companion object : KLogging() {
-        private const val uniqueSuffixLength = 7
-        private val leaseTtl = 5.seconds
+        private fun defaultClientId() = "${TtlNode::class.simpleName}:${randomId(tokenLength)}"
     }
 }

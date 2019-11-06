@@ -39,7 +39,7 @@ public class DistributedBarrierExample {
         ExecutorService executor = Executors.newCachedThreadPool();
 
         executor.submit(() -> {
-            try (DistributedBarrier barrier = new DistributedBarrier(urls, path, true)) {
+            try (DistributedBarrier barrier = new DistributedBarrier(urls, path)) {
                 System.out.println("Setting Barrier");
                 barrier.setBarrier();
 
@@ -57,7 +57,7 @@ public class DistributedBarrierExample {
             executor.submit(() -> {
                         try {
                             goLatch.await();
-                            try (DistributedBarrier barrier = new DistributedBarrier(urls, path, true)) {
+                            try (DistributedBarrier barrier = new DistributedBarrier(urls, path)) {
                                 System.out.println(format("%d Waiting on Barrier", id));
                                 barrier.waitOnBarrier(1, TimeUnit.SECONDS);
 
