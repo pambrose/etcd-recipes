@@ -223,7 +223,7 @@ class PathChildrenCache(val urls: List<String>,
     val currentData: List<ChildData> get() = cacheMap.map { (k, v) -> ChildData(k, v) }.sortedBy { it.key }
 
     // For consistency with Curator
-    fun getCurrentData(path: String) = cacheMap.get(path)
+    fun getCurrentData(path: String): ByteSequence? = cacheMap[path]
 
     val currentDataAsMap: Map<String, ByteSequence> get() = cacheMap.toMap()
 

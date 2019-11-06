@@ -44,11 +44,15 @@ val String.doesNotExist: Cmp get() = equalTo(this, CmpTarget.version(0))
 val String.doesExist: Cmp get() = greaterThan(this, CmpTarget.version(0))
 
 @JvmOverloads
-fun deleteKey(keyname: String, option: DeleteOption = DeleteOption.DEFAULT) = Op.delete(keyname.asByteSequence, option)
+fun deleteKey(keyname: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
+    Op.delete(keyname.asByteSequence, option)
 
-fun String.setTo(keyval: String, putOption: PutOption) = Op.put(asByteSequence, keyval.asByteSequence, putOption)
-fun String.setTo(keyval: Int, putOption: PutOption) = Op.put(asByteSequence, keyval.asByteSequence, putOption)
-fun String.setTo(keyval: Long, putOption: PutOption) = Op.put(asByteSequence, keyval.asByteSequence, putOption)
+fun String.setTo(keyval: String, putOption: PutOption): Op.PutOp =
+    Op.put(asByteSequence, keyval.asByteSequence, putOption)
+
+fun String.setTo(keyval: Int, putOption: PutOption): Op.PutOp = Op.put(asByteSequence, keyval.asByteSequence, putOption)
+fun String.setTo(keyval: Long, putOption: PutOption): Op.PutOp =
+    Op.put(asByteSequence, keyval.asByteSequence, putOption)
 
 infix fun String.setTo(keyval: String): Op.PutOp = setTo(keyval, PutOption.DEFAULT)
 infix fun String.setTo(keyval: Int): Op.PutOp = setTo(keyval, PutOption.DEFAULT)

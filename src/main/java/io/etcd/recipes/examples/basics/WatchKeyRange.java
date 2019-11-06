@@ -39,7 +39,7 @@ import static java.lang.String.format;
 
 public class WatchKeyRange {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
         List<String> urls = Lists.newArrayList("http://localhost:2379");
         String path = "/watchkeyrange";
 
@@ -50,13 +50,11 @@ public class WatchKeyRange {
                      path,
                      getAsPrefixWatchOption(path),
                      (watchResponse) -> {
-                         watchResponse.getEvents().forEach((watchEvent) -> {
-                             System.out.println(format("%s for %s",
-                                     watchEvent.getEventType(),
-                                     getAsString(watchEvent.getKeyValue())
-                             ));
-
-                         });
+                         watchResponse.getEvents().forEach((watchEvent) ->
+                                 System.out.println(format("%s for %s",
+                                         watchEvent.getEventType(),
+                                         getAsString(watchEvent.getKeyValue())
+                                 )));
                          return Unit.INSTANCE;
                      })) {
 

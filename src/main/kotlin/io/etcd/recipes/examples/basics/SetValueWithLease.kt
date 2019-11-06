@@ -25,6 +25,7 @@ import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.withKvClient
 import io.etcd.recipes.common.withLeaseClient
@@ -45,7 +46,7 @@ fun main() {
                 client.withKvClient { kvClient ->
                     client.withLeaseClient { leaseClient ->
                         println("Assigning $path = $keyval")
-                        val lease = leaseClient.grant(5).get()
+                        val lease = leaseClient.grant(5.seconds).get()
                         kvClient.putValue(path, keyval, lease.asPutOption)
                     }
                 }

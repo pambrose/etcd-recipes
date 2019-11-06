@@ -66,7 +66,7 @@ class TtlNodeTest {
         val nodes = List(count) { TtlNode(urls, paths[it], ids[it]) }
 
         etcdExec(urls) { _, kvClient ->
-            repeat(10) { _ ->
+            repeat(10) {
                 repeat(count) { j ->
                     kvClient.getValue(paths[j])?.asString shouldEqual ids[j]
                 }
