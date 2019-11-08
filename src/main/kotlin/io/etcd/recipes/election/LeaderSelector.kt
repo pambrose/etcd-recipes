@@ -34,7 +34,6 @@ import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.doesNotExist
@@ -43,6 +42,7 @@ import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAliveWith
+import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watcher
@@ -289,7 +289,7 @@ constructor(val urls: List<String>,
         val txn =
             kvClient.transaction {
                 If(path.doesNotExist)
-                Then(path.setTo(clientId, lease.asPutOption))
+                Then(path.setTo(clientId, putOption { withLeaseId(lease.id) }))
             }
 
         // Run keep-alive until closed
@@ -316,7 +316,7 @@ constructor(val urls: List<String>,
             val txn =
                 kvClient.transaction {
                     If(leaderPath.doesNotExist)
-                    Then(leaderPath.setTo(uniqueToken, lease.asPutOption))
+                    Then(leaderPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
                 }
 
             // Check to see if unique value was successfully set in the CAS step

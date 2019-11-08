@@ -21,6 +21,7 @@ import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Lease;
 import io.etcd.jetcd.lease.LeaseGrantResponse;
+import io.etcd.jetcd.options.PutOption;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -32,7 +33,7 @@ import static com.sudothought.common.util.Misc.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static io.etcd.recipes.common.KVUtils.getValue;
 import static io.etcd.recipes.common.KVUtils.putValue;
-import static io.etcd.recipes.common.LeaseUtils.getAsPutOption;
+import static io.etcd.recipes.common.OptionUtils.putOption;
 import static java.lang.String.format;
 
 public class SetValueWithLease {
@@ -50,7 +51,8 @@ public class SetValueWithLease {
                  KV kvClient = client.getKVClient()) {
                 System.out.println(format("Assigning %s = %s", path, keyval));
                 LeaseGrantResponse lease = leaseClient.grant(5).get();
-                putValue(kvClient, path, keyval, getAsPutOption(lease));
+                PutOption putOption = putOption((PutOption.Builder builder) -> builder.withLeaseId(lease.getID()));
+                putValue(kvClient, path, keyval, putOption);
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }

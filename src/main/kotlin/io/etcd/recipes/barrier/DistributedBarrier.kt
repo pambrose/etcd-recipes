@@ -25,7 +25,6 @@ import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.doesNotExist
@@ -33,6 +32,7 @@ import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watcher
@@ -82,7 +82,7 @@ constructor(val urls: List<String>,
             val txn =
                 kvClient.transaction {
                     If(barrierPath.doesNotExist)
-                    Then(barrierPath.setTo(uniqueToken, lease.asPutOption))
+                    Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
                 }
 
             // Check to see if unique value was successfully set in the CAS step

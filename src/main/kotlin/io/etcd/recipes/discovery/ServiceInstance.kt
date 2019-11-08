@@ -20,6 +20,7 @@ package io.etcd.recipes.discovery
 
 import com.sudothought.common.util.randomId
 import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
+import io.etcd.recipes.discovery.ServiceInstance.Companion.ServiceInstanceBuilder
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -73,3 +74,9 @@ data class ServiceInstance(val name: String,
         fun newBuilder(name: String, jsonPayload: String) = ServiceInstanceBuilder(name, jsonPayload)
     }
 }
+
+@JvmOverloads
+fun serviceInstance(name: String,
+                    jsonPayload: String,
+                    block: ServiceInstanceBuilder.() -> ServiceInstanceBuilder = { this }): ServiceInstance =
+    ServiceInstance.newBuilder(name, jsonPayload).block().build()

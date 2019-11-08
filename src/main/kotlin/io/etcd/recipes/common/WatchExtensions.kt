@@ -35,25 +35,31 @@ val WatchEvent.valueAsString get() = keyValue.value.asString
 val WatchEvent.valueAsInt get() = keyValue.value.asInt
 val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
-val String.asPrefixWatchOption: WatchOption
-    get() = WatchOption.newBuilder().withPrefix(asByteSequence).build()
-
-fun Lazy<Watch>.watcher(keyname: String,
+fun Lazy<Watch>.watcher(key: ByteSequence,
                         option: WatchOption = WatchOption.DEFAULT,
-                        block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyname, option, block)
+                        block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(key, option, block)
+
+fun Lazy<Watch>.watcher(keyName: String,
+                        option: WatchOption = WatchOption.DEFAULT,
+                        block: (WatchResponse) -> Unit): Watch.Watcher = watcher(keyName.asByteSequence, option, block)
 
 @JvmOverloads
-fun Watch.watcher(keyname: String,
+fun Watch.watcher(key: ByteSequence,
                   option: WatchOption = WatchOption.DEFAULT,
-                  block: (WatchResponse) -> Unit): Watch.Watcher = watch(keyname.asByteSequence, option) { block(it) }
+                  block: (WatchResponse) -> Unit): Watch.Watcher = watch(key, option) { block(it) }
 
 @JvmOverloads
-fun Watch.watcherWithLatch(keyname: String,
+fun Watch.watcher(keyName: String,
+                  option: WatchOption = WatchOption.DEFAULT,
+                  block: (WatchResponse) -> Unit): Watch.Watcher = watcher(keyName.asByteSequence, option, block)
+
+@JvmOverloads
+fun Watch.watcherWithLatch(keyName: String,
                            endWatchLatch: CountDownLatch,
                            onPut: (WatchEvent) -> Unit,
                            onDelete: (WatchEvent) -> Unit,
                            option: WatchOption = WatchOption.DEFAULT) {
-    watch(keyname.asByteSequence, option) { watchResponse ->
+    watch(keyName.asByteSequence, option) { watchResponse ->
         watchResponse.events
             .forEach { event ->
                 when (event.eventType) {
@@ -70,4 +76,4 @@ fun Watch.watcherWithLatch(keyname: String,
     }
 }
 
-private val nullWatchOption: WatchOption = WatchOption.newBuilder().withRange(ByteSequence.from(ByteArray(1))).build()
+private val nullWatchOption: WatchOption = watchOption { withRange(ByteSequence.from(ByteArray(1))) }

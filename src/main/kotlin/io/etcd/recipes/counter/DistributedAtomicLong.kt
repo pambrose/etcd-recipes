@@ -20,6 +20,7 @@ package io.etcd.recipes.counter
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.recipes.common.EtcdConnector
@@ -32,6 +33,7 @@ import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
+import mu.KLogging
 import java.io.Closeable
 import kotlin.time.milliseconds
 
@@ -39,7 +41,7 @@ class DistributedAtomicLong
 @JvmOverloads
 constructor(val urls: List<String>,
             val counterPath: String,
-            private val defaultValue: Long = 0L) : EtcdConnector(urls), Closeable {
+            private val default: Long = 0L) : EtcdConnector(urls), Closeable {
 
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }
@@ -88,7 +90,7 @@ constructor(val urls: List<String>,
             val txn =
                 kvClient.transaction {
                     If(counterPath.doesNotExist)
-                    Then(counterPath setTo defaultValue)
+                    Then(counterPath setTo default)
                 }
             txn.isSucceeded
         } else {
@@ -97,13 +99,14 @@ constructor(val urls: List<String>,
 
     private fun applyCounterTransaction(amount: Long): TxnResponse =
         kvClient.transaction {
-            val kvlist = kvClient.getResponse(counterPath).kvs
-            val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
+            val kvList: List<KeyValue> = kvClient.getResponse(counterPath).kvs
+            if (kvList.isEmpty()) throw IllegalStateException("Empty KeyValue list")
+            val kv = kvList.first()
             If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
             Then(counterPath setTo kv.value.asLong + amount)
         }
 
-    companion object {
+    companion object : KLogging() {
         //val collisionCount = AtomicLong()
         //val totalCount = AtomicLong()
 

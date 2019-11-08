@@ -23,10 +23,8 @@ import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Observers
 import io.etcd.jetcd.lease.LeaseGrantResponse
-import io.etcd.jetcd.options.PutOption
+import java.util.concurrent.CompletableFuture
 import kotlin.time.Duration
-
-val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(id).build()
 
 fun Lease.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) =
     keepAlive(lease)
@@ -40,6 +38,9 @@ fun Lease.keepAlive(lease: LeaseGrantResponse): CloseableClient =
                   { /*println("KeepAlive next resp: $next")*/ },
                   { /*println("KeepAlive err resp: $err")*/ }))
 
+fun Lease.grant(ttl: Duration): CompletableFuture<LeaseGrantResponse> = grant(ttl.inSeconds.toLong())
+
 fun Lazy<Lease>.keepAlive(lease: LeaseGrantResponse) = value.keepAlive(lease)
 fun Lazy<Lease>.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) = value.keepAliveWith(lease, block)
-fun Lazy<Lease>.grant(ttl: Duration) = value.grant(ttl.inSeconds.toLong())
+fun Lazy<Lease>.grant(ttl: Duration): CompletableFuture<LeaseGrantResponse> = value.grant(ttl)
+fun Lazy<Lease>.grant(ttlSecs: Long): CompletableFuture<LeaseGrantResponse> = value.grant(ttlSecs)

@@ -29,7 +29,7 @@ import java.util.concurrent.Executors;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.putValueWithKeepAlive;
+import static io.etcd.recipes.common.KeepAliveUtils.putValueWithKeepAlive;
 import static io.etcd.recipes.common.WatchUtils.getKeyAsString;
 import static io.etcd.recipes.common.WatchUtils.watcherWithLatch;
 import static java.lang.String.format;

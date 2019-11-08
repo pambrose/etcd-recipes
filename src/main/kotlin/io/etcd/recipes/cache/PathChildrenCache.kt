@@ -35,10 +35,11 @@ import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.INITIALIZED
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asPair
-import io.etcd.recipes.common.asPrefixWatchOption
-import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
@@ -156,13 +157,14 @@ class PathChildrenCache(val urls: List<String>,
     }
 
     private fun setupWatcher() {
-        val adjustedCachePath = cachePath.ensureTrailing("/")
-        logger.debug { "Setting up watch for $adjustedCachePath" }
-        watchClient.watcher(adjustedCachePath, adjustedCachePath.asPrefixWatchOption) { watchResponse ->
+        val trailingPath = cachePath.ensureSuffix("/")
+        logger.debug { "Setting up watch for $trailingPath" }
+        val watchOption = watchOption { withPrefix(trailingPath.asByteSequence) }
+        watchClient.watcher(trailingPath, watchOption) { watchResponse ->
             watchResponse.events
                 .forEach { event ->
                     val (k, v) = event.keyValue.asPair
-                    val stripped = k.substring(adjustedCachePath.length)
+                    val stripped = k.substring(trailingPath.length)
                     when (event.eventType) {
                         PUT          -> {
                             val isAdd = !cacheMap.containsKey(stripped)
@@ -223,7 +225,7 @@ class PathChildrenCache(val urls: List<String>,
     val currentData: List<ChildData> get() = cacheMap.map { (k, v) -> ChildData(k, v) }.sortedBy { it.key }
 
     // For consistency with Curator
-    fun getCurrentData(path: String) = cacheMap.get(path)
+    fun getCurrentData(path: String): ByteSequence? = cacheMap[path]
 
     val currentDataAsMap: Map<String, ByteSequence> get() = cacheMap.toMap()
 

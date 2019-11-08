@@ -20,9 +20,9 @@ package io.etcd.recipes.util
 
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.countChildren
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.getChildrenCount
 import kotlin.time.seconds
 
 fun main() {
@@ -33,7 +33,7 @@ fun main() {
         repeat(600) {
             kvClient.apply {
                 println(getChildren(path).asString)
-                println(countChildren(path))
+                println(getChildrenCount(path))
                 sleep(1.seconds)
             }
         }

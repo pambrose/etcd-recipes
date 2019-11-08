@@ -27,7 +27,6 @@ import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.doesExist
@@ -37,6 +36,7 @@ import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import mu.KLogging
@@ -90,7 +90,7 @@ constructor(val urls: List<String>,
         val txn =
             kvClient.transaction {
                 If(instancePath.doesNotExist)
-                Then(instancePath.setTo(service.toJson(), context.lease.asPutOption))
+                Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.lease.id) }))
             }
 
         // Run keep-alive until closed
@@ -110,7 +110,7 @@ constructor(val urls: List<String>,
         val txn =
             kvClient.transaction {
                 If(instancePath.doesExist)
-                Then(instancePath.setTo(service.toJson(), context.lease.asPutOption))
+                Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.lease.id) }))
             }
         if (!txn.isSucceeded) throw EtcdRecipeException("Service update failed for $instancePath")
     }

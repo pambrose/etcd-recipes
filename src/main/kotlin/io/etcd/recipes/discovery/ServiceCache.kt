@@ -28,11 +28,12 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asPair
-import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
@@ -59,17 +60,17 @@ class ServiceCache internal constructor(val urls: List<String>,
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
 
-        val adjustedServicePath = servicePath.ensureTrailing("/")
-        val adjustedNamesPath = namesPath.ensureTrailing("/")
-
-        watchClient.watcher(adjustedServicePath, adjustedServicePath.asPrefixWatchOption) { watchResponse ->
+        val trailingServicePath = servicePath.ensureSuffix("/").asByteSequence
+        val trailingNamesPath = namesPath.ensureSuffix("/")
+        val watchOption = watchOption { withPrefix(trailingServicePath) }
+        watchClient.watcher(trailingServicePath, watchOption) { watchResponse ->
             // Wait for data to be loaded
             dataPreloaded.waitUntilTrue()
 
             watchResponse.events
                 .forEach { event ->
                     val (k, v) = event.keyValue.asPair.asString
-                    val stripped = k.substring(adjustedNamesPath.length)
+                    val stripped = k.substring(trailingNamesPath.length)
                     when (event.eventType) {
                         PUT          -> {
                             val isAdd = !serviceMap.containsKey(stripped)
@@ -103,10 +104,10 @@ class ServiceCache internal constructor(val urls: List<String>,
         }
 
         // Preload with initial data
-        val kvs = kvClient.getChildren(adjustedServicePath)
+        val kvs = kvClient.getChildren(trailingServicePath)
         for (kv in kvs) {
             val (k, v) = kv
-            val stripped = k.substring(adjustedNamesPath.length)
+            val stripped = k.substring(trailingNamesPath.length)
             serviceMap[stripped] = v.asString
         }
 

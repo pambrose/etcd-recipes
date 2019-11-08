@@ -27,23 +27,24 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asPrefixWatchOption
-import io.etcd.recipes.common.asPutOption
+import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.countChildren
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.etcdExec
+import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
@@ -84,7 +85,7 @@ constructor(val urls: List<String>,
     val waiterCount: Long
         get() {
             checkCloseNotCalled()
-            return kvClient.countChildren(waitingPath)
+            return kvClient.getChildrenCount(waitingPath)
         }
 
     @Throws(InterruptedException::class, EtcdRecipeException::class)
@@ -141,7 +142,7 @@ constructor(val urls: List<String>,
         val txn =
             kvClient.transaction {
                 If(waitingPath.doesNotExist)
-                Then(waitingPath.setTo(uniqueToken, lease.asPutOption))
+                Then(waitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
             }
 
         when {
@@ -158,8 +159,9 @@ constructor(val urls: List<String>,
                     true
                 } else {
                     // Watch for DELETE of /ready and PUTS on /waiters/*
-                    val adjustedKey = barrierPath.ensureTrailing("/")
-                    watchClient.watcher(adjustedKey, adjustedKey.asPrefixWatchOption) { watchResponse ->
+                    val trailingKey = barrierPath.ensureSuffix("/")
+                    val watchOption = watchOption { withPrefix(trailingKey.asByteSequence) }
+                    watchClient.watcher(trailingKey, watchOption) { watchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
                                 val key = watchEvent.keyValue.key.asString

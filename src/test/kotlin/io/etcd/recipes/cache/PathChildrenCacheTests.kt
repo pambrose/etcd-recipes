@@ -130,10 +130,10 @@ class PathChildrenCacheTests {
         // Clear leftover data
         etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
-        val kvs = generateTestData(count)
+        val testKvs = generateTestData(count)
 
         etcdExec(urls) { _, kvClient ->
-            kvs.forEach { kv ->
+            testKvs.forEach { kv ->
                 kvClient.putValue("${path}/${kv.first}", kv.second)
                 kvClient.putValue("${path}/${kv.first}", kv.second + "update")
             }
@@ -155,7 +155,7 @@ class PathChildrenCacheTests {
 
                     start(true)
                     waitOnStartComplete()
-                    compareData(count, currentData, kvs, "update")
+                    compareData(count, currentData, testKvs, "update")
 
                     addCount.get() shouldEqual 0
                     updateCount.get() shouldEqual 0

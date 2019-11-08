@@ -21,10 +21,11 @@ package io.etcd.recipes.examples.basics
 import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.grant
+import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.withKvClient
 import io.etcd.recipes.common.withLeaseClient
@@ -45,8 +46,8 @@ fun main() {
                 client.withKvClient { kvClient ->
                     client.withLeaseClient { leaseClient ->
                         println("Assigning $path = $keyval")
-                        val lease = leaseClient.grant(5).get()
-                        kvClient.putValue(path, keyval, lease.asPutOption)
+                        val lease = leaseClient.grant(5.seconds).get()
+                        kvClient.putValue(path, keyval, putOption { withLeaseId(lease.id) })
                     }
                 }
             }

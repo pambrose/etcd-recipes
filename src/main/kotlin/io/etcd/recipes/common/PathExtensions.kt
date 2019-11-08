@@ -20,14 +20,8 @@
 package io.etcd.recipes.common
 
 @JvmOverloads
-fun String.ensureTrailing(delim: String = "/"): String = "$this${if (endsWith(delim)) "" else delim}"
-
-@JvmOverloads
-fun String.stripLeading(delim: String = "/"): String = if (startsWith(delim)) drop(1) else this
-
-@JvmOverloads
-fun String.stripTrailing(delim: String = "/"): String = if (endsWith(delim)) dropLast(1) else this
+fun String.ensureSuffix(delim: String = "/"): String = if (endsWith(delim)) this else "$this$delim"
 
 @JvmOverloads
 fun String.appendToPath(suffix: String, delim: String = "/") =
-    "${stripTrailing(delim)}$delim${suffix.stripLeading(delim)}"
+    "${removeSuffix(delim)}$delim${suffix.removePrefix(delim)}"
