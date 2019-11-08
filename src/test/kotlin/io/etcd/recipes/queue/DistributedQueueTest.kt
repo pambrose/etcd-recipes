@@ -19,7 +19,6 @@
 package io.etcd.recipes.queue
 
 import com.sudothought.common.concurrent.withLock
-import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenCount
@@ -30,7 +29,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
-import kotlin.time.milliseconds
 
 class DistributedQueueTest {
 
@@ -44,16 +42,18 @@ class DistributedQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        DistributedQueue(urls, queuePath).use { queue ->
-            repeat(count) { i -> queue.enqueue(testData[i]) }
-        }
-
-        DistributedQueue(urls, queuePath).use { queue ->
-            repeat(count) {
-                dequeuedData += queue.dequeue().asString
-                counter.incrementAndGet()
+        DistributedQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { i -> queue.enqueue(testData[i]) }
             }
-        }
+
+        DistributedQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) {
+                    dequeuedData += queue.dequeue().asString
+                    counter.incrementAndGet()
+                }
+            }
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
@@ -78,23 +78,22 @@ class DistributedQueueTest {
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
         thread {
-            DistributedQueue(urls, queuePath).use { queue ->
-                repeat(count) {
-                    semaphore.withLock {
-                        dequeuedData += queue.dequeue().asString
-                        counter.incrementAndGet()
+            DistributedQueue(urls, queuePath)
+                .use { queue ->
+                    repeat(count) {
+                        semaphore.withLock {
+                            dequeuedData += queue.dequeue().asString
+                            counter.incrementAndGet()
+                        }
                     }
                 }
-            }
             latch.countDown()
         }
 
-        DistributedQueue(urls, queuePath).use { queue ->
-            repeat(count) { i ->
-                sleep(1.milliseconds)
-                queue.enqueue(testData[i])
+        DistributedQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { i -> queue.enqueue(testData[i]) }
             }
-        }
 
         latch.await()
 
@@ -137,6 +136,51 @@ class DistributedQueueTest {
                 latch.countDown()
             }
         }
+
+        latch.await()
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        println(dequeuedData)
+
+        counter.get() shouldEqual count
+        dequeuedData.size shouldEqual testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
+        dequeuedData shouldEqual testData
+    }
+
+    @Test
+    fun threadedTestWithWait() {
+        val queuePath = "/queue/threadedTestWithWait"
+        val count = 500
+        val subcount = 10
+        val latch = CountDownLatch(subcount)
+        val testData = List(count) { "Value $it" }
+        val counter = AtomicInteger()
+        val dequeuedData = mutableListOf<String>()
+        val semaphore = Semaphore(1)
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        repeat(subcount) {
+            thread {
+                DistributedQueue(urls, queuePath)
+                    .use { queue ->
+                        repeat(count / subcount) {
+                            semaphore.withLock {
+                                dequeuedData += queue.dequeue().asString
+                                counter.incrementAndGet()
+                            }
+                        }
+                    }
+                latch.countDown()
+            }
+        }
+
+        DistributedQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { i -> queue.enqueue(testData[i]) }
+            }
 
         latch.await()
 

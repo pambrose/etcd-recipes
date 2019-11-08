@@ -37,6 +37,7 @@ fun main() {
         println("Count: ${kvClient.getChildrenCount(queuePath)}")
     }
 
+    // Enqueue some data prior to dequeues
     DistributedQueue(urls, queuePath).use { queue ->
         repeat(count) { i -> queue.enqueue("Value $i") }
     }
@@ -54,6 +55,7 @@ fun main() {
 
     sleep(2.seconds)
 
+    // Now enqueue some data with dequeues waiting
     DistributedQueue(urls, queuePath)
         .use { queue ->
             repeat(count) { i -> queue.enqueue("Value $i") }
