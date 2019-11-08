@@ -19,7 +19,7 @@
 package io.etcd.recipes.examples.basics
 
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.common.asPrefixWatchOption
+import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.etcdExec
@@ -27,6 +27,7 @@ import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import io.etcd.recipes.common.withWatchClient
 import kotlin.time.seconds
@@ -39,7 +40,8 @@ fun main() {
         kvClient.apply {
 
             client.withWatchClient { watchClient ->
-                watchClient.watcher(path, path.asPrefixWatchOption) { watchResponse ->
+                val watchOption = watchOption { withPrefix(path.asByteSequence) }
+                watchClient.watcher(path, watchOption) { watchResponse ->
                     watchResponse.events
                         .forEach { watchEvent ->
                             println("${watchEvent.eventType} for ${watchEvent.keyValue.asString}")

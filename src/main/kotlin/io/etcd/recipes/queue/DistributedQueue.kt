@@ -28,7 +28,6 @@ import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.equalTo
 import io.etcd.recipes.common.getOldestChild
-import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.transaction
 import mu.KLogging
@@ -60,19 +59,19 @@ class DistributedQueue(val urls: List<String>,
             return dequeue()
 
         val child = childList.first()
-        if (deleteRevKey(child.first))
-            return child.second
+        if (deleteRevKey(child))
+            return child.value
         else
             return dequeue()
     }
 
-    private fun deleteRevKey(kvKey: String): Boolean {
+    private fun deleteRevKey(kv: KeyValue): Boolean {
         val txn =
             kvClient.transaction {
-                val kvList: List<KeyValue> = kvClient.getResponse(kvKey).kvs
-                val kv = if (kvList.isNotEmpty()) kvList[0] else throw IllegalStateException("Empty KeyValue list")
-                If(equalTo(kvKey, CmpTarget.modRevision(kv.modRevision)))
-                Then(deleteKey(kvKey))
+                //val kvList: List<KeyValue> = kvClient.getResponse(kvKey).kvs
+                //val kv = if (kvList.isNotEmpty()) kvList[0] else throw IllegalStateException("Empty KeyValue list")
+                If(equalTo(kv.key, CmpTarget.modRevision(kv.modRevision)))
+                Then(deleteKey(kv.key))
             }
         return txn.isSucceeded
     }

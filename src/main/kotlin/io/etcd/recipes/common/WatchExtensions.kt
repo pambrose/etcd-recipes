@@ -35,8 +35,7 @@ val WatchEvent.valueAsString get() = keyValue.value.asString
 val WatchEvent.valueAsInt get() = keyValue.value.asInt
 val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
-val String.asPrefixWatchOption: WatchOption
-    get() = WatchOption.newBuilder().withPrefix(asByteSequence).build()
+fun getPrefixWatchOption(path: String): WatchOption = watchOption { withPrefix(path.asByteSequence) }
 
 fun Lazy<Watch>.watcher(keyName: String,
                         option: WatchOption = WatchOption.DEFAULT,

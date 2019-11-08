@@ -28,11 +28,12 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asPair
-import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
@@ -61,8 +62,8 @@ class ServiceCache internal constructor(val urls: List<String>,
 
         val adjustedServicePath = servicePath.ensureSuffix("/")
         val adjustedNamesPath = namesPath.ensureSuffix("/")
-
-        watchClient.watcher(adjustedServicePath, adjustedServicePath.asPrefixWatchOption) { watchResponse ->
+        val watchOption = watchOption { withPrefix(adjustedServicePath.asByteSequence) }
+        watchClient.watcher(adjustedServicePath, watchOption) { watchResponse ->
             // Wait for data to be loaded
             dataPreloaded.waitUntilTrue()
 

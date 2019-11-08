@@ -19,6 +19,7 @@
 
 package io.etcd.recipes.common
 
+import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.kv.TxnResponse
@@ -36,16 +37,24 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
 
 fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
 
-fun <T> equalTo(keyName: String, target: CmpTarget<T>): Cmp = Cmp(keyName.asByteSequence, Cmp.Op.EQUAL, target)
-fun <T> lessThan(keyName: String, target: CmpTarget<T>): Cmp = Cmp(keyName.asByteSequence, Cmp.Op.LESS, target)
-fun <T> greaterThan(keyName: String, target: CmpTarget<T>): Cmp = Cmp(keyName.asByteSequence, Cmp.Op.GREATER, target)
+fun <T> equalTo(key: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(key, Cmp.Op.EQUAL, target)
+fun <T> lessThan(key: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(key, Cmp.Op.LESS, target)
+fun <T> greaterThan(key: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(key, Cmp.Op.GREATER, target)
+
+fun <T> equalTo(keyName: String, target: CmpTarget<T>): Cmp = equalTo(keyName.asByteSequence, target)
+fun <T> lessThan(keyName: String, target: CmpTarget<T>): Cmp = lessThan(keyName.asByteSequence, target)
+fun <T> greaterThan(keyName: String, target: CmpTarget<T>): Cmp = greaterThan(keyName.asByteSequence, target)
 
 val String.doesNotExist: Cmp get() = equalTo(this, CmpTarget.version(0))
 val String.doesExist: Cmp get() = greaterThan(this, CmpTarget.version(0))
 
 @JvmOverloads
+fun deleteKey(key: ByteSequence, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
+    Op.delete(key, option)
+
+@JvmOverloads
 fun deleteKey(keyName: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
-    Op.delete(keyName.asByteSequence, option)
+    deleteKey(keyName.asByteSequence, option)
 
 fun String.setTo(keyval: String, putOption: PutOption): Op.PutOp =
     Op.put(asByteSequence, keyval.asByteSequence, putOption)

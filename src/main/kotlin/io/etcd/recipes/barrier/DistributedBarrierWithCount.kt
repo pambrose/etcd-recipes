@@ -27,7 +27,7 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asPrefixWatchOption
+import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.delete
@@ -44,6 +44,7 @@ import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
@@ -159,7 +160,8 @@ constructor(val urls: List<String>,
                 } else {
                     // Watch for DELETE of /ready and PUTS on /waiters/*
                     val adjustedKey = barrierPath.ensureSuffix("/")
-                    watchClient.watcher(adjustedKey, adjustedKey.asPrefixWatchOption) { watchResponse ->
+                    val watchOption = watchOption { withPrefix(adjustedKey.asByteSequence) }
+                    watchClient.watcher(adjustedKey, watchOption) { watchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
                                 val key = watchEvent.keyValue.key.asString

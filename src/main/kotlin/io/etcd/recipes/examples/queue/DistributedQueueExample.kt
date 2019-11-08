@@ -44,5 +44,4 @@ fun main() {
     etcdExec(urls) { _, kvClient ->
         println("Count: ${kvClient.getChildrenCount(queuePath)}")
     }
-
 }

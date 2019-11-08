@@ -41,7 +41,7 @@ class DistributedAtomicLong
 @JvmOverloads
 constructor(val urls: List<String>,
             val counterPath: String,
-            private val defaultValue: Long = 0L) : EtcdConnector(urls), Closeable {
+            private val default: Long = 0L) : EtcdConnector(urls), Closeable {
 
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }
@@ -90,7 +90,7 @@ constructor(val urls: List<String>,
             val txn =
                 kvClient.transaction {
                     If(counterPath.doesNotExist)
-                    Then(counterPath setTo defaultValue)
+                    Then(counterPath setTo default)
                 }
             txn.isSucceeded
         } else {

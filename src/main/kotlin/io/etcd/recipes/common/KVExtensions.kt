@@ -21,6 +21,7 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.KV
+import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.kv.PutResponse
@@ -72,41 +73,60 @@ fun KV.deleteChildren(parentKeyName: String): List<String> {
 }
 
 // Get responses
+private fun KV.getResponse(keyName: ByteSequence,
+                           option: GetOption = GetOption.DEFAULT,
+                           iteration: Int = 0): GetResponse {
+    val response = get(keyName, option).get()
+    if (response.kvs.isEmpty() && response.isMore) {
+        if (iteration == 10)
+            throw EtcdRecipeRuntimeException("Unable to fulfill call to getResponse after multiple attempts")
+        return getResponse(keyName, option, iteration + 1)
+    } else {
+        return response
+    }
+}
+
 @JvmOverloads
 fun KV.getResponse(keyName: String, option: GetOption = GetOption.DEFAULT): GetResponse =
-    get(keyName.asByteSequence, option).get()
+    getResponse(keyName.asByteSequence, option)
 
 @JvmOverloads
 fun Lazy<KV>.getResponse(keyName: String, option: GetOption = GetOption.DEFAULT): GetResponse =
     value.getResponse(keyName, option)
 
 // Get children key value pairs
+fun KV.getKeyValuePairs(keyName: ByteSequence, getOption: GetOption): List<Pair<String, ByteSequence>> =
+    getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
+
 fun KV.getKeyValuePairs(keyName: String, getOption: GetOption): List<Pair<String, ByteSequence>> =
     getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
 
 @JvmOverloads
 fun KV.getChildren(parentKeyName: String, keysOnly: Boolean = false): List<Pair<String, ByteSequence>> {
-    val adjustedKey = parentKeyName.ensureSuffix("/")
-    val option = GetOption.newBuilder().withPrefix(adjustedKey.asByteSequence).withKeysOnly(keysOnly).build()
-    return getKeyValuePairs(adjustedKey, option)
+    val adjustedKey = parentKeyName.ensureSuffix("/").asByteSequence
+    val getOption: GetOption =
+        getOption {
+            withPrefix(adjustedKey)
+            withKeysOnly(keysOnly)
+        }
+    return getKeyValuePairs(adjustedKey, getOption)
 }
 
-fun KV.getOldestChild(parentKeyName: String): List<Pair<String, ByteSequence>> {
-    val adjustedKey = parentKeyName.ensureSuffix("/")
-    val option =
-        GetOption
-            .newBuilder()
-            .withPrefix(adjustedKey.asByteSequence)
-            .withSortField(SortTarget.VERSION)
-            .withSortOrder(SortOrder.DESCEND)
-            .withLimit(1)
-            .build()
-    return getKeyValuePairs(adjustedKey, option)
+fun KV.getOldestChild(parentKeyName: String): List<KeyValue> {
+    val adjustedKey = parentKeyName.ensureSuffix("/").asByteSequence
+    val getOption: GetOption =
+        getOption {
+            withPrefix(adjustedKey)
+            withSortField(SortTarget.VERSION)
+            withSortOrder(SortOrder.DESCEND)
+            withLimit(1)
+        }
+    return getResponse(adjustedKey, getOption).kvs
 }
 
 fun Lazy<KV>.getChildren(parentKeyName: String): List<Pair<String, ByteSequence>> = value.getChildren(parentKeyName)
 
-fun Lazy<KV>.getOldestChild(parentKeyName: String): List<Pair<String, ByteSequence>> =
+fun Lazy<KV>.getOldestChild(parentKeyName: String): List<KeyValue> =
     value.getOldestChild(parentKeyName)
 
 fun KV.getChildrenKeys(parentKeyName: String): List<String> = getChildren(parentKeyName, true).keys
@@ -124,17 +144,17 @@ fun KV.getValue(keyName: String): ByteSequence? =
 fun Lazy<KV>.getValue(keyName: String): ByteSequence? = value.getValue(keyName)
 
 // Get single key value with default
-fun KV.getValue(keyName: String, defaultVal: String): String = getValue(keyName)?.asString ?: defaultVal
+fun KV.getValue(keyName: String, default: String): String = getValue(keyName)?.asString ?: default
 
-fun KV.getValue(keyName: String, defaultVal: Int): Int = getValue(keyName)?.asInt ?: defaultVal
+fun KV.getValue(keyName: String, default: Int): Int = getValue(keyName)?.asInt ?: default
 
-fun KV.getValue(keyName: String, defaultVal: Long): Long = getValue(keyName)?.asLong ?: defaultVal
+fun KV.getValue(keyName: String, default: Long): Long = getValue(keyName)?.asLong ?: default
 
-fun Lazy<KV>.getValue(keyName: String, defaultVal: String): String = value.getValue(keyName, defaultVal)
+fun Lazy<KV>.getValue(keyName: String, default: String): String = value.getValue(keyName, default)
 
-fun Lazy<KV>.getValue(keyName: String, defaultVal: Int): Int = value.getValue(keyName, defaultVal)
+fun Lazy<KV>.getValue(keyName: String, default: Int): Int = value.getValue(keyName, default)
 
-fun Lazy<KV>.getValue(keyName: String, defaultVal: Long): Long = value.getValue(keyName, defaultVal)
+fun Lazy<KV>.getValue(keyName: String, default: Long): Long = value.getValue(keyName, default)
 
 // Key checking
 fun KV.isKeyPresent(keyName: String) = transaction { If(keyName.doesExist) }.isSucceeded
@@ -147,9 +167,13 @@ fun Lazy<KV>.isKeyNotPresent(keyName: String) = value.isKeyNotPresent(keyName)
 
 // Count children keys
 fun KV.getChildrenCount(parentKeyName: String): Long {
-    val adjustedKey = parentKeyName.ensureSuffix("/")
-    val option = GetOption.newBuilder().withPrefix(adjustedKey.asByteSequence).withCountOnly(true).build()
-    return getResponse(adjustedKey, option).count
+    val adjustedKey = parentKeyName.ensureSuffix("/").asByteSequence
+    val getOption: GetOption =
+        getOption {
+            withPrefix(adjustedKey)
+            withCountOnly(true)
+        }
+    return getResponse(adjustedKey, getOption).count
 }
 
 fun Lazy<KV>.getChildrenCount(keyName: String): Long = value.getChildrenCount(keyName)
