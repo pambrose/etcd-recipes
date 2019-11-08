@@ -60,17 +60,17 @@ class ServiceCache internal constructor(val urls: List<String>,
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
 
-        val adjustedServicePath = servicePath.ensureSuffix("/")
-        val adjustedNamesPath = namesPath.ensureSuffix("/")
-        val watchOption = watchOption { withPrefix(adjustedServicePath.asByteSequence) }
-        watchClient.watcher(adjustedServicePath, watchOption) { watchResponse ->
+        val trailingServicePath = servicePath.ensureSuffix("/").asByteSequence
+        val trailingNamesPath = namesPath.ensureSuffix("/")
+        val watchOption = watchOption { withPrefix(trailingServicePath) }
+        watchClient.watcher(trailingServicePath, watchOption) { watchResponse ->
             // Wait for data to be loaded
             dataPreloaded.waitUntilTrue()
 
             watchResponse.events
                 .forEach { event ->
                     val (k, v) = event.keyValue.asPair.asString
-                    val stripped = k.substring(adjustedNamesPath.length)
+                    val stripped = k.substring(trailingNamesPath.length)
                     when (event.eventType) {
                         PUT          -> {
                             val isAdd = !serviceMap.containsKey(stripped)
@@ -104,10 +104,10 @@ class ServiceCache internal constructor(val urls: List<String>,
         }
 
         // Preload with initial data
-        val kvs = kvClient.getChildren(adjustedServicePath)
+        val kvs = kvClient.getChildren(trailingServicePath)
         for (kv in kvs) {
             val (k, v) = kv
-            val stripped = k.substring(adjustedNamesPath.length)
+            val stripped = k.substring(trailingNamesPath.length)
             serviceMap[stripped] = v.asString
         }
 

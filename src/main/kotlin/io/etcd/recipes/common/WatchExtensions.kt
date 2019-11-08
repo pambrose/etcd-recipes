@@ -35,16 +35,23 @@ val WatchEvent.valueAsString get() = keyValue.value.asString
 val WatchEvent.valueAsInt get() = keyValue.value.asInt
 val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
-fun getPrefixWatchOption(path: String): WatchOption = watchOption { withPrefix(path.asByteSequence) }
+fun Lazy<Watch>.watcher(key: ByteSequence,
+                        option: WatchOption = WatchOption.DEFAULT,
+                        block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(key, option, block)
 
 fun Lazy<Watch>.watcher(keyName: String,
                         option: WatchOption = WatchOption.DEFAULT,
-                        block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyName, option, block)
+                        block: (WatchResponse) -> Unit): Watch.Watcher = watcher(keyName.asByteSequence, option, block)
+
+@JvmOverloads
+fun Watch.watcher(key: ByteSequence,
+                  option: WatchOption = WatchOption.DEFAULT,
+                  block: (WatchResponse) -> Unit): Watch.Watcher = watch(key, option) { block(it) }
 
 @JvmOverloads
 fun Watch.watcher(keyName: String,
                   option: WatchOption = WatchOption.DEFAULT,
-                  block: (WatchResponse) -> Unit): Watch.Watcher = watch(keyName.asByteSequence, option) { block(it) }
+                  block: (WatchResponse) -> Unit): Watch.Watcher = watcher(keyName.asByteSequence, option, block)
 
 @JvmOverloads
 fun Watch.watcherWithLatch(keyName: String,

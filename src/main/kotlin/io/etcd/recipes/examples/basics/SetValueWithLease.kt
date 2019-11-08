@@ -21,7 +21,6 @@ package io.etcd.recipes.examples.basics
 import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getValue

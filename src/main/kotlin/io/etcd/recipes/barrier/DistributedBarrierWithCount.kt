@@ -28,7 +28,6 @@ import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asByteSequence
-import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.deleteKey
@@ -160,9 +159,9 @@ constructor(val urls: List<String>,
                     true
                 } else {
                     // Watch for DELETE of /ready and PUTS on /waiters/*
-                    val adjustedKey = barrierPath.ensureSuffix("/")
-                    val watchOption = watchOption { withPrefix(adjustedKey.asByteSequence) }
-                    watchClient.watcher(adjustedKey, watchOption) { watchResponse ->
+                    val trailingKey = barrierPath.ensureSuffix("/")
+                    val watchOption = watchOption { withPrefix(trailingKey.asByteSequence) }
+                    watchClient.watcher(trailingKey, watchOption) { watchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
                                 val key = watchEvent.keyValue.key.asString

@@ -103,28 +103,30 @@ fun KV.getKeyValuePairs(keyName: String, getOption: GetOption): List<Pair<String
 
 @JvmOverloads
 fun KV.getChildren(parentKeyName: String, keysOnly: Boolean = false): List<Pair<String, ByteSequence>> {
-    val adjustedKey = parentKeyName.ensureSuffix("/").asByteSequence
+    val trailingKey = parentKeyName.ensureSuffix("/").asByteSequence
     val getOption: GetOption =
         getOption {
-            withPrefix(adjustedKey)
+            withPrefix(trailingKey)
             withKeysOnly(keysOnly)
         }
-    return getKeyValuePairs(adjustedKey, getOption)
+    return getKeyValuePairs(trailingKey, getOption)
 }
 
 fun KV.getOldestChild(parentKeyName: String): List<KeyValue> {
-    val adjustedKey = parentKeyName.ensureSuffix("/").asByteSequence
+    val trailingKey = parentKeyName.ensureSuffix("/").asByteSequence
     val getOption: GetOption =
         getOption {
-            withPrefix(adjustedKey)
+            withPrefix(trailingKey)
             withSortField(SortTarget.VERSION)
             withSortOrder(SortOrder.DESCEND)
             withLimit(1)
         }
-    return getResponse(adjustedKey, getOption).kvs
+    return getResponse(trailingKey, getOption).kvs
 }
 
 fun Lazy<KV>.getChildren(parentKeyName: String): List<Pair<String, ByteSequence>> = value.getChildren(parentKeyName)
+
+fun Lazy<KV>.getChildren(parentKey: ByteSequence): List<Pair<String, ByteSequence>> = getChildren(parentKey.asString)
 
 fun Lazy<KV>.getOldestChild(parentKeyName: String): List<KeyValue> =
     value.getOldestChild(parentKeyName)
@@ -167,13 +169,13 @@ fun Lazy<KV>.isKeyNotPresent(keyName: String) = value.isKeyNotPresent(keyName)
 
 // Count children keys
 fun KV.getChildrenCount(parentKeyName: String): Long {
-    val adjustedKey = parentKeyName.ensureSuffix("/").asByteSequence
+    val trailingKey = parentKeyName.ensureSuffix("/").asByteSequence
     val getOption: GetOption =
         getOption {
-            withPrefix(adjustedKey)
+            withPrefix(trailingKey)
             withCountOnly(true)
         }
-    return getResponse(adjustedKey, getOption).count
+    return getResponse(trailingKey, getOption).count
 }
 
 fun Lazy<KV>.getChildrenCount(keyName: String): Long = value.getChildrenCount(keyName)

@@ -100,7 +100,8 @@ constructor(val urls: List<String>,
     private fun applyCounterTransaction(amount: Long): TxnResponse =
         kvClient.transaction {
             val kvList: List<KeyValue> = kvClient.getResponse(counterPath).kvs
-            val kv = if (kvList.isNotEmpty()) kvList[0] else throw IllegalStateException("Empty KeyValue list")
+            if (kvList.isEmpty()) throw IllegalStateException("Empty KeyValue list")
+            val kv = kvList.first()
             If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
             Then(counterPath setTo kv.value.asLong + amount)
         }
