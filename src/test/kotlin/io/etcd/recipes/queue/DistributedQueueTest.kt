@@ -27,7 +27,6 @@ import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 class DistributedQueueTest {
@@ -37,7 +36,6 @@ class DistributedQueueTest {
         val queuePath = "/queue/serialTestNoWait"
         val count = 500
         val testData = List(count) { "Value $it" }
-        val counter = AtomicInteger()
         val dequeuedData = mutableListOf<String>()
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
@@ -51,7 +49,6 @@ class DistributedQueueTest {
             .use { queue ->
                 repeat(count) {
                     dequeuedData += queue.dequeue().asString
-                    counter.incrementAndGet()
                 }
             }
 
@@ -59,7 +56,6 @@ class DistributedQueueTest {
 
         println(dequeuedData)
 
-        counter.get() shouldEqual count
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
         dequeuedData shouldEqual testData
@@ -70,7 +66,6 @@ class DistributedQueueTest {
         val queuePath = "/queue/serialTestWithWait"
         val count = 500
         val testData = List(count) { "Value $it" }
-        val counter = AtomicInteger()
         val dequeuedData = mutableListOf<String>()
         val latch = CountDownLatch(1)
         val semaphore = Semaphore(1)
@@ -83,7 +78,6 @@ class DistributedQueueTest {
                     repeat(count) {
                         semaphore.withLock {
                             dequeuedData += queue.dequeue().asString
-                            counter.incrementAndGet()
                         }
                     }
                 }
@@ -101,7 +95,6 @@ class DistributedQueueTest {
 
         println(dequeuedData)
 
-        counter.get() shouldEqual count
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
         dequeuedData shouldEqual testData
@@ -114,7 +107,6 @@ class DistributedQueueTest {
         val subcount = 10
         val latch = CountDownLatch(subcount)
         val testData = List(count) { "Value $it" }
-        val counter = AtomicInteger()
         val dequeuedData = mutableListOf<String>()
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
@@ -130,7 +122,6 @@ class DistributedQueueTest {
                     .use { queue ->
                         repeat(count / subcount) {
                             dequeuedData += queue.dequeue().asString
-                            counter.incrementAndGet()
                         }
                     }
                 latch.countDown()
@@ -143,7 +134,6 @@ class DistributedQueueTest {
 
         println(dequeuedData)
 
-        counter.get() shouldEqual count
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
         dequeuedData shouldEqual testData
@@ -156,7 +146,6 @@ class DistributedQueueTest {
         val subcount = 10
         val latch = CountDownLatch(subcount)
         val testData = List(count) { "Value $it" }
-        val counter = AtomicInteger()
         val dequeuedData = mutableListOf<String>()
         val semaphore = Semaphore(1)
 
@@ -169,7 +158,6 @@ class DistributedQueueTest {
                         repeat(count / subcount) {
                             semaphore.withLock {
                                 dequeuedData += queue.dequeue().asString
-                                counter.incrementAndGet()
                             }
                         }
                     }
@@ -188,7 +176,6 @@ class DistributedQueueTest {
 
         println(dequeuedData)
 
-        counter.get() shouldEqual count
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
         dequeuedData shouldEqual testData

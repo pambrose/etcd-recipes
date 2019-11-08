@@ -71,25 +71,26 @@ class DistributedQueue(val urls: List<String>,
         val watchLatch = CountDownLatch(1)
         val trailingPath = queuePath.ensureSuffix("/").asByteSequence
         val watchOption = watchOption { withPrefix(trailingPath) }
-        val keyFound = AtomicReference<KeyValue>()
+        val keyFound = AtomicReference<KeyValue?>()
         watchClient.watcher(queuePath, watchOption) { watchResponse ->
             watchResponse.events.forEach { watchEvent ->
-                if (watchEvent.eventType == PUT)
-                    keyFound.set((watchEvent.keyValue))
-                watchLatch.countDown()
+                if (watchEvent.eventType == PUT) {
+                    keyFound.compareAndSet(null, watchEvent.keyValue)
+                    watchLatch.countDown()
+                }
             }
 
         }.use {
             // Query again in case a value arrived just before watch was created
             val waitingChildList = kvClient.getOldestChild(queuePath)
             if (!waitingChildList.isEmpty()) {
-                keyFound.set(waitingChildList.first())
+                keyFound.compareAndSet(null, waitingChildList.first())
                 watchLatch.countDown()
             }
             watchLatch.await()
         }
 
-        val kv: KeyValue = keyFound.get()
+        val kv: KeyValue = keyFound.get()!!
         // If transactional delete fails, then just call self again
         return if (deleteRevKey(kv)) kv.value else dequeue()
     }
