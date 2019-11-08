@@ -21,8 +21,8 @@ package io.etcd.recipes.node
 import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.countChildren
 import io.etcd.recipes.common.etcdExec
+import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.urls
 import org.amshove.kluent.shouldEqual
@@ -60,7 +60,7 @@ class TtlNodeTest {
             for (path in paths)
                 kvClient.getValue(path, "nothing") shouldEqual "nothing"
 
-            kvClient.countChildren("/node") shouldEqual 0
+            kvClient.getChildrenCount("/node") shouldEqual 0
         }
 
         val nodes = List(count) { TtlNode(urls, paths[it], ids[it]) }
@@ -72,7 +72,7 @@ class TtlNodeTest {
                 }
             }
 
-            kvClient.countChildren("/node") shouldEqual 25
+            kvClient.getChildrenCount("/node") shouldEqual 25
         }
 
         for (node in nodes)
@@ -84,7 +84,7 @@ class TtlNodeTest {
             for (path in paths)
                 kvClient.getValue(path, "nothing") shouldEqual "nothing"
 
-            kvClient.countChildren("/node") shouldEqual 0
+            kvClient.getChildrenCount("/node") shouldEqual 0
         }
     }
 }

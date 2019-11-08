@@ -36,16 +36,16 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
 
 fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
 
-fun <T> equalTo(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.EQUAL, target)
-fun <T> lessThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.LESS, target)
-fun <T> greaterThan(keyname: String, target: CmpTarget<T>): Cmp = Cmp(keyname.asByteSequence, Cmp.Op.GREATER, target)
+fun <T> equalTo(keyName: String, target: CmpTarget<T>): Cmp = Cmp(keyName.asByteSequence, Cmp.Op.EQUAL, target)
+fun <T> lessThan(keyName: String, target: CmpTarget<T>): Cmp = Cmp(keyName.asByteSequence, Cmp.Op.LESS, target)
+fun <T> greaterThan(keyName: String, target: CmpTarget<T>): Cmp = Cmp(keyName.asByteSequence, Cmp.Op.GREATER, target)
 
 val String.doesNotExist: Cmp get() = equalTo(this, CmpTarget.version(0))
 val String.doesExist: Cmp get() = greaterThan(this, CmpTarget.version(0))
 
 @JvmOverloads
-fun deleteKey(keyname: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
-    Op.delete(keyname.asByteSequence, option)
+fun deleteKey(keyName: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
+    Op.delete(keyName.asByteSequence, option)
 
 fun String.setTo(keyval: String, putOption: PutOption): Op.PutOp =
     Op.put(asByteSequence, keyval.asByteSequence, putOption)

@@ -31,7 +31,7 @@ import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.watcher
 import mu.KLogging
@@ -59,8 +59,8 @@ class ServiceCache internal constructor(val urls: List<String>,
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
 
-        val adjustedServicePath = servicePath.ensureTrailing("/")
-        val adjustedNamesPath = namesPath.ensureTrailing("/")
+        val adjustedServicePath = servicePath.ensureSuffix("/")
+        val adjustedNamesPath = namesPath.ensureSuffix("/")
 
         watchClient.watcher(adjustedServicePath, adjustedServicePath.asPrefixWatchOption) { watchResponse ->
             // Wait for data to be loaded

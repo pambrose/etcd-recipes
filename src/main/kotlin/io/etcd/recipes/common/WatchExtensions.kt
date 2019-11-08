@@ -38,22 +38,22 @@ val WatchEvent.valueAsLong get() = keyValue.value.asLong
 val String.asPrefixWatchOption: WatchOption
     get() = WatchOption.newBuilder().withPrefix(asByteSequence).build()
 
-fun Lazy<Watch>.watcher(keyname: String,
+fun Lazy<Watch>.watcher(keyName: String,
                         option: WatchOption = WatchOption.DEFAULT,
-                        block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyname, option, block)
+                        block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(keyName, option, block)
 
 @JvmOverloads
-fun Watch.watcher(keyname: String,
+fun Watch.watcher(keyName: String,
                   option: WatchOption = WatchOption.DEFAULT,
-                  block: (WatchResponse) -> Unit): Watch.Watcher = watch(keyname.asByteSequence, option) { block(it) }
+                  block: (WatchResponse) -> Unit): Watch.Watcher = watch(keyName.asByteSequence, option) { block(it) }
 
 @JvmOverloads
-fun Watch.watcherWithLatch(keyname: String,
+fun Watch.watcherWithLatch(keyName: String,
                            endWatchLatch: CountDownLatch,
                            onPut: (WatchEvent) -> Unit,
                            onDelete: (WatchEvent) -> Unit,
                            option: WatchOption = WatchOption.DEFAULT) {
-    watch(keyname.asByteSequence, option) { watchResponse ->
+    watch(keyName.asByteSequence, option) { watchResponse ->
         watchResponse.events
             .forEach { event ->
                 when (event.eventType) {

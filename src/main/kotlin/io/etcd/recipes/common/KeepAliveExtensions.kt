@@ -25,29 +25,29 @@ import io.etcd.jetcd.KV
 import kotlin.time.Duration
 import kotlin.time.seconds
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: String, ttlSecs: Long, block: () -> Unit) =
-    putValueWithKeepAlive(client, keyname, keyval, ttlSecs.seconds, block)
+fun KV.putValueWithKeepAlive(client: Client, keyName: String, keyval: String, ttlSecs: Long, block: () -> Unit) =
+    putValueWithKeepAlive(client, keyName, keyval, ttlSecs.seconds, block)
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Int, ttlSecs: Long, block: () -> Unit) =
-    putValueWithKeepAlive(client, keyname, keyval, ttlSecs.seconds, block)
+fun KV.putValueWithKeepAlive(client: Client, keyName: String, keyval: Int, ttlSecs: Long, block: () -> Unit) =
+    putValueWithKeepAlive(client, keyName, keyval, ttlSecs.seconds, block)
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Long, ttlSecs: Long, block: () -> Unit) =
-    putValueWithKeepAlive(client, keyname, keyval, ttlSecs.seconds, block)
+fun KV.putValueWithKeepAlive(client: Client, keyName: String, keyval: Long, ttlSecs: Long, block: () -> Unit) =
+    putValueWithKeepAlive(client, keyName, keyval, ttlSecs.seconds, block)
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: ByteSequence, ttlSecs: Long, block: () -> Unit) =
-    putValuesWithKeepAlive(client, listOf(keyname to keyval), ttlSecs, block)
+fun KV.putValueWithKeepAlive(client: Client, keyName: String, keyval: ByteSequence, ttlSecs: Long, block: () -> Unit) =
+    putValuesWithKeepAlive(client, listOf(keyName to keyval), ttlSecs, block)
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: String, ttl: Duration, block: () -> Unit) =
-    putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
+fun KV.putValueWithKeepAlive(client: Client, keyName: String, keyval: String, ttl: Duration, block: () -> Unit) =
+    putValueWithKeepAlive(client, keyName, keyval.asByteSequence, ttl, block)
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Int, ttl: Duration, block: () -> Unit) =
-    putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
+fun KV.putValueWithKeepAlive(client: Client, keyName: String, keyval: Int, ttl: Duration, block: () -> Unit) =
+    putValueWithKeepAlive(client, keyName, keyval.asByteSequence, ttl, block)
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: Long, ttl: Duration, block: () -> Unit) =
-    putValueWithKeepAlive(client, keyname, keyval.asByteSequence, ttl, block)
+fun KV.putValueWithKeepAlive(client: Client, keyName: String, keyval: Long, ttl: Duration, block: () -> Unit) =
+    putValueWithKeepAlive(client, keyName, keyval.asByteSequence, ttl, block)
 
-fun KV.putValueWithKeepAlive(client: Client, keyname: String, keyval: ByteSequence, ttl: Duration, block: () -> Unit) =
-    putValuesWithKeepAlive(client, listOf(keyname to keyval), ttl, block)
+fun KV.putValueWithKeepAlive(client: Client, keyName: String, keyval: ByteSequence, ttl: Duration, block: () -> Unit) =
+    putValuesWithKeepAlive(client, listOf(keyName to keyval), ttl, block)
 
 fun KV.putValuesWithKeepAlive(client: Client,
                               kvs: Collection<Pair<String, ByteSequence>>,

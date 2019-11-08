@@ -16,26 +16,33 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package io.etcd.recipes.util
+package io.etcd.recipes.examples.queue
 
-import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.etcdExec
-import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.getChildrenCount
-import kotlin.time.seconds
+import io.etcd.recipes.queue.DistributedQueue
 
 fun main() {
     val urls = listOf("http://localhost:2379")
-    val path = "/"
+    val queuePath = "/queue/example"
+    val count = 50
 
     etcdExec(urls) { _, kvClient ->
-        repeat(600) {
-            kvClient.apply {
-                println(getChildren(path).asString)
-                println(getChildrenCount(path))
-                sleep(1.seconds)
-            }
-        }
+        println("Count: ${kvClient.getChildrenCount(queuePath)}")
     }
+
+    DistributedQueue(urls, queuePath).use { queue ->
+        repeat(count) { i -> queue.enqueue("Value $i") }
+    }
+
+
+    DistributedQueue(urls, queuePath).use { queue ->
+        repeat(count) { i -> println(queue.dequeue().asString) }
+    }
+
+    etcdExec(urls) { _, kvClient ->
+        println("Count: ${kvClient.getChildrenCount(queuePath)}")
+    }
+
 }

@@ -37,7 +37,7 @@ import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asPrefixWatchOption
-import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.watcher
 import mu.KLogging
@@ -156,7 +156,7 @@ class PathChildrenCache(val urls: List<String>,
     }
 
     private fun setupWatcher() {
-        val adjustedCachePath = cachePath.ensureTrailing("/")
+        val adjustedCachePath = cachePath.ensureSuffix("/")
         logger.debug { "Setting up watch for $adjustedCachePath" }
         watchClient.watcher(adjustedCachePath, adjustedCachePath.asPrefixWatchOption) { watchResponse ->
             watchResponse.events

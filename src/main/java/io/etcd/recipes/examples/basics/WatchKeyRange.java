@@ -63,7 +63,7 @@ public class WatchKeyRange {
 
             System.out.println("After creation:");
             System.out.println(getAsString(getChildren(kvClient, path)));
-            System.out.println(KVUtils.countChildren(kvClient, path));
+            System.out.println(KVUtils.getChildrenCount(kvClient, path));
 
             sleepSecs(5);
 
@@ -75,15 +75,15 @@ public class WatchKeyRange {
 
             System.out.println("\nAfter putValues:");
             System.out.println(getAsString(getChildren(kvClient, path)));
-            System.out.println(KVUtils.countChildren(kvClient, path));
+            System.out.println(KVUtils.getChildrenCount(kvClient, path));
 
             System.out.println("\nElections only:");
             System.out.println(getAsString(getChildren(kvClient, path + "/election")));
-            System.out.println(KVUtils.countChildren(kvClient, path + "/election"));
+            System.out.println(KVUtils.getChildrenCount(kvClient, path + "/election"));
 
             System.out.println("\nWaitings only:");
             System.out.println(getAsString(getChildren(kvClient, path + "/waiting")));
-            System.out.println(KVUtils.countChildren(kvClient, path + "/waiting"));
+            System.out.println(KVUtils.getChildrenCount(kvClient, path + "/waiting"));
 
             sleepSecs(5);
 
@@ -91,14 +91,14 @@ public class WatchKeyRange {
             delete(kvClient, path);
 
             // Delete children
-            KVUtils.getChildrenKeys(kvClient, path).forEach((keyname) -> {
-                System.out.println(format("Deleting key: %s", keyname));
-                delete(kvClient, keyname);
+            KVUtils.getChildrenKeys(kvClient, path).forEach((keyName) -> {
+                System.out.println(format("Deleting key: %s", keyName));
+                delete(kvClient, keyName);
             });
 
             System.out.println("\nAfter delete:");
             System.out.println(getAsString(getChildren(kvClient, path)));
-            System.out.println(KVUtils.countChildren(kvClient, path));
+            System.out.println(KVUtils.getChildrenCount(kvClient, path));
 
             sleepSecs(5);
         }

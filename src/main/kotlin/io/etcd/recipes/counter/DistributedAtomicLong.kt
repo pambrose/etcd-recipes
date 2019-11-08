@@ -20,6 +20,7 @@ package io.etcd.recipes.counter
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.recipes.common.EtcdConnector
@@ -32,6 +33,7 @@ import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
+import mu.KLogging
 import java.io.Closeable
 import kotlin.time.milliseconds
 
@@ -97,13 +99,13 @@ constructor(val urls: List<String>,
 
     private fun applyCounterTransaction(amount: Long): TxnResponse =
         kvClient.transaction {
-            val kvlist = kvClient.getResponse(counterPath).kvs
-            val kv = if (kvlist.isNotEmpty()) kvlist[0] else throw IllegalStateException("KeyValue List was empty")
+            val kvList: List<KeyValue> = kvClient.getResponse(counterPath).kvs
+            val kv = if (kvList.isNotEmpty()) kvList[0] else throw IllegalStateException("Empty KeyValue list")
             If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
             Then(counterPath setTo kv.value.asLong + amount)
         }
 
-    companion object {
+    companion object : KLogging() {
         //val collisionCount = AtomicLong()
         //val totalCount = AtomicLong()
 

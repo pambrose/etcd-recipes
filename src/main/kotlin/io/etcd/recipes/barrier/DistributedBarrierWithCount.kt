@@ -30,13 +30,13 @@ import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asPrefixWatchOption
 import io.etcd.recipes.common.asPutOption
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.countChildren
 import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.ensureTrailing
+import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.etcdExec
+import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.grant
@@ -84,7 +84,7 @@ constructor(val urls: List<String>,
     val waiterCount: Long
         get() {
             checkCloseNotCalled()
-            return kvClient.countChildren(waitingPath)
+            return kvClient.getChildrenCount(waitingPath)
         }
 
     @Throws(InterruptedException::class, EtcdRecipeException::class)
@@ -158,7 +158,7 @@ constructor(val urls: List<String>,
                     true
                 } else {
                     // Watch for DELETE of /ready and PUTS on /waiters/*
-                    val adjustedKey = barrierPath.ensureTrailing("/")
+                    val adjustedKey = barrierPath.ensureSuffix("/")
                     watchClient.watcher(adjustedKey, adjustedKey.asPrefixWatchOption) { watchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
