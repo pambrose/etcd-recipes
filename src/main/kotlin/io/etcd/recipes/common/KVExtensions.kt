@@ -117,8 +117,8 @@ fun KV.getOldestChild(parentKeyName: String): List<KeyValue> {
     val getOption: GetOption =
         getOption {
             withPrefix(trailingKey)
-            withSortField(SortTarget.VERSION)
-            withSortOrder(SortOrder.DESCEND)
+            withSortField(SortTarget.MOD)
+            withSortOrder(SortOrder.ASCEND)
             withLimit(1)
         }
     return getResponse(trailingKey, getOption).kvs
@@ -128,8 +128,7 @@ fun Lazy<KV>.getChildren(parentKeyName: String): List<Pair<String, ByteSequence>
 
 fun Lazy<KV>.getChildren(parentKey: ByteSequence): List<Pair<String, ByteSequence>> = getChildren(parentKey.asString)
 
-fun Lazy<KV>.getOldestChild(parentKeyName: String): List<KeyValue> =
-    value.getOldestChild(parentKeyName)
+fun Lazy<KV>.getOldestChild(parentKeyName: String): List<KeyValue> = value.getOldestChild(parentKeyName)
 
 fun KV.getChildrenKeys(parentKeyName: String): List<String> = getChildren(parentKeyName, true).keys
 

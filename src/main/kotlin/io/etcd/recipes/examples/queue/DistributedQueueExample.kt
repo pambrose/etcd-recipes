@@ -18,12 +18,14 @@
 
 package io.etcd.recipes.examples.queue
 
+import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.queue.DistributedQueue
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
+import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
@@ -42,14 +44,23 @@ fun main() {
     val latch = CountDownLatch(subcount)
     repeat(subcount) { sub ->
         thread {
-            DistributedQueue(urls, queuePath).use { queue ->
-                repeat(count / subcount) { i -> println("$sub ${queue.dequeue().asString}") }
-            }
+            DistributedQueue(urls, queuePath)
+                .use { queue ->
+                    repeat((count / subcount) * 2) { i -> println("$sub ${queue.dequeue().asString}") }
+                }
             latch.countDown()
         }
     }
 
+    sleep(2.seconds)
+
+    DistributedQueue(urls, queuePath)
+        .use { queue ->
+            repeat(count) { i -> queue.enqueue("Value $i") }
+        }
+
     latch.await()
+
     etcdExec(urls) { _, kvClient ->
         println("Count: ${kvClient.getChildrenCount(queuePath)}")
     }
