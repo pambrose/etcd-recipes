@@ -69,4 +69,4 @@ fun Watch.watcherWithLatch(keyName: String,
     }
 }
 
-private val nullWatchOption: WatchOption = WatchOption.newBuilder().withRange(ByteSequence.from(ByteArray(1))).build()
+private val nullWatchOption: WatchOption = watchOption { withRange(ByteSequence.from(ByteArray(1))) }

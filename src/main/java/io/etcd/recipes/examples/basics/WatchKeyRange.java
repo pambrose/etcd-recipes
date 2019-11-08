@@ -35,7 +35,7 @@ import static io.etcd.recipes.common.KVUtils.delete;
 import static io.etcd.recipes.common.KVUtils.getChildren;
 import static io.etcd.recipes.common.KVUtils.putValue;
 import static io.etcd.recipes.common.KeyValueUtils.getAsString;
-import static io.etcd.recipes.common.OptionsUtils.watchOption;
+import static io.etcd.recipes.common.OptionUtils.watchOption;
 import static io.etcd.recipes.common.PairUtils.getAsString;
 import static io.etcd.recipes.common.WatchUtils.watcher;
 import static java.lang.String.format;

@@ -42,6 +42,7 @@ import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
@@ -142,7 +143,7 @@ constructor(val urls: List<String>,
         val txn =
             kvClient.transaction {
                 If(waitingPath.doesNotExist)
-                Then(waitingPath.setTo(uniqueToken, lease.asPutOption))
+                Then(waitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
             }
 
         when {

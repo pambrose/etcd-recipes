@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-@file:JvmName("OptionsUtils")
+@file:JvmName("OptionUtils")
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
 package io.etcd.recipes.common

@@ -23,11 +23,8 @@ import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Observers
 import io.etcd.jetcd.lease.LeaseGrantResponse
-import io.etcd.jetcd.options.PutOption
 import java.util.concurrent.CompletableFuture
 import kotlin.time.Duration
-
-val LeaseGrantResponse.asPutOption: PutOption get() = PutOption.newBuilder().withLeaseId(id).build()
 
 fun Lease.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) =
     keepAlive(lease)
