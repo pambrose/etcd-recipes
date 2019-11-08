@@ -94,14 +94,11 @@ class DistributedQueue(val urls: List<String>,
         return if (deleteRevKey(kv)) kv.value else dequeue()
     }
 
-    private fun deleteRevKey(kv: KeyValue): Boolean {
-        val txn =
-            kvClient.transaction {
-                If(equalTo(kv.key, CmpTarget.modRevision(kv.modRevision)))
-                Then(deleteKey(kv.key))
-            }
-        return txn.isSucceeded
-    }
+    private fun deleteRevKey(kv: KeyValue): Boolean =
+        kvClient.transaction {
+            If(equalTo(kv.key, CmpTarget.modRevision(kv.modRevision)))
+            Then(deleteKey(kv.key))
+        }.isSucceeded
 
     companion object : KLogging()
 }
