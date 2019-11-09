@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.discovery
 
-import com.google.common.collect.Maps
+import com.google.common.collect.Maps.newConcurrentMap
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.watch.WatchEvent
@@ -37,7 +37,7 @@ import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
-import java.util.*
+import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
 
 class ServiceCache internal constructor(val urls: List<String>,
@@ -47,8 +47,8 @@ class ServiceCache internal constructor(val urls: List<String>,
     private var startCalled by atomicBoolean(false)
     private var dataPreloaded = BooleanMonitor(false)
     private val servicePath = namesPath.appendToPath(serviceName)
-    private val serviceMap: ConcurrentMap<String, String> = Maps.newConcurrentMap()
-    private val listeners: MutableList<ServiceCacheListener> = Collections.synchronizedList(mutableListOf())
+    private val serviceMap: ConcurrentMap<String, String> = newConcurrentMap()
+    private val listeners: MutableList<ServiceCacheListener> = synchronizedList(mutableListOf())
 
     init {
         require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }

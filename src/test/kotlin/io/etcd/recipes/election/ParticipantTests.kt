@@ -24,7 +24,7 @@ import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
-import java.util.*
+import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -38,8 +38,8 @@ class ParticipantTests {
         val startedLatch = CountDownLatch(count)
         val finishedLatch = CountDownLatch(count)
         val holdLatch = CountDownLatch(1)
-        val participantCounts: MutableList<Int> = Collections.synchronizedList(mutableListOf())
-        val leaderNames: MutableList<String> = Collections.synchronizedList(mutableListOf())
+        val participantCounts: MutableList<Int> = synchronizedList(mutableListOf())
+        val leaderNames: MutableList<String> = synchronizedList(mutableListOf())
 
         blockingThreads(count) {
             thread {

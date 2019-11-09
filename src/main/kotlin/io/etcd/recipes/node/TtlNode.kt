@@ -49,7 +49,6 @@ constructor(val urls: List<String>,
     private val keepAliveStartedLatch = CountDownLatch(1)
 
     init {
-        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(nodePath.isNotEmpty()) { "Node path cannot be empty" }
 
         if (autoStart)

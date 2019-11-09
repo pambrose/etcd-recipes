@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.cache
 
-import com.google.common.collect.Maps
+import com.google.common.collect.Maps.newConcurrentMap
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.time.timeUnitToDuration
@@ -57,7 +57,7 @@ class PathChildrenCache(val urls: List<String>,
 
     private var startCalled by atomicBoolean(false)
     private val startThreadComplete = BooleanMonitor(false)
-    private val cacheMap: ConcurrentMap<String, ByteSequence> = Maps.newConcurrentMap()
+    private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
     private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
     // Use a single threaded executor to maintain order
     private val executor = userExecutor ?: Executors.newSingleThreadExecutor()

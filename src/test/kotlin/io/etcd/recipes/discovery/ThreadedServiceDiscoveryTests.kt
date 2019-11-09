@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.discovery
 
-import com.google.common.collect.Maps
+import com.google.common.collect.Maps.newConcurrentMap
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.blockingThreads
@@ -35,10 +35,10 @@ class ThreadedServiceDiscoveryTests {
     val path = "/discovery/${javaClass.simpleName}"
     val threadCount = 5
     val serviceCount = 10
-    val contextMap: ConcurrentMap<Int, ServiceDiscoveryContext> = Maps.newConcurrentMap()
+    val contextMap: ConcurrentMap<Int, ServiceDiscoveryContext> = newConcurrentMap()
 
     class ServiceDiscoveryContext(val serviceDiscovery: ServiceDiscovery) {
-        val serviceMap: ConcurrentMap<String, ServiceInstance> = Maps.newConcurrentMap()
+        val serviceMap: ConcurrentMap<String, ServiceInstance> = newConcurrentMap()
     }
 
     @Test

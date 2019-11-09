@@ -42,9 +42,7 @@ constructor(val urls: List<String>,
     private val leaveBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("leave"), memberCount)
 
     init {
-        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-        require(memberCount > 0) { "Member count must be > 0" }
     }
 
     val enterWaiterCount: Long get() = enterBarrier.waiterCount

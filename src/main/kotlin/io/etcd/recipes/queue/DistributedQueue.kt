@@ -39,12 +39,9 @@ import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 
-class DistributedQueue(val urls: List<String>,
-                       val queuePath: String) : EtcdConnector(urls), Closeable {
-
+class DistributedQueue(val urls: List<String>, val queuePath: String) : EtcdConnector(urls), Closeable {
 
     init {
-        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
     }
 

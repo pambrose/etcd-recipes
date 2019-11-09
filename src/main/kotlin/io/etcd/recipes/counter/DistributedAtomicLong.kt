@@ -44,7 +44,6 @@ constructor(val urls: List<String>,
             private val default: Long = 0L) : EtcdConnector(urls), Closeable {
 
     init {
-        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
 
         // Create counter if first time through

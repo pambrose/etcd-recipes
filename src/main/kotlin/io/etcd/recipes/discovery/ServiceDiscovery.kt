@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.discovery
 
-import com.google.common.collect.Maps
+import com.google.common.collect.Maps.newConcurrentMap
 import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.CloseableClient
@@ -41,25 +41,24 @@ import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import mu.KLogging
 import java.io.Closeable
-import java.util.*
+import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
 import kotlin.time.seconds
 
 data class ServiceDiscovery
 @JvmOverloads
 constructor(val urls: List<String>,
-            private val basePath: String,
+            private val servicePath: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
             val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
 
-    private val namesPath = basePath.appendToPath("/names")
-    private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = Maps.newConcurrentMap()
-    private val serviceCacheList: MutableList<ServiceCache> = Collections.synchronizedList(mutableListOf())
-    private val serviceProviderList: MutableList<ServiceProvider> = Collections.synchronizedList(mutableListOf())
+    private val namesPath = servicePath.appendToPath("/names")
+    private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = newConcurrentMap()
+    private val serviceCacheList: MutableList<ServiceCache> = synchronizedList(mutableListOf())
+    private val serviceProviderList: MutableList<ServiceProvider> = synchronizedList(mutableListOf())
 
     init {
-        require(urls.isNotEmpty()) { "URLs cannot be empty" }
-        require(basePath.isNotEmpty()) { "Service base path cannot be empty" }
+        require(servicePath.isNotEmpty()) { "Service base path cannot be empty" }
     }
 
     private class ServiceInstanceContext(val service: ServiceInstance,

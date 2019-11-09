@@ -23,7 +23,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
-import java.util.*
+import java.util.Collections.synchronizedList
 
 open class EtcdConnector(urls: List<String>) {
 
@@ -32,8 +32,11 @@ open class EtcdConnector(urls: List<String>) {
     protected val leaseClient: Lazy<Lease> = lazy { client.value.leaseClient }
     protected val watchClient: Lazy<Watch> = lazy { client.value.watchClient }
     protected var closeCalled: Boolean by atomicBoolean(false)
-    protected val exceptionList: Lazy<MutableList<Throwable>> =
-        lazy { Collections.synchronizedList(mutableListOf<Throwable>()) }
+    protected val exceptionList: Lazy<MutableList<Throwable>> = lazy { synchronizedList(mutableListOf<Throwable>()) }
+
+    init {
+        require(urls.isNotEmpty()) { "URLs cannot be empty" }
+    }
 
     protected fun checkCloseNotCalled() {
         if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")

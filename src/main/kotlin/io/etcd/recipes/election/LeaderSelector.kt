@@ -51,7 +51,7 @@ import io.etcd.recipes.common.withLeaseClient
 import io.etcd.recipes.common.withWatchClient
 import mu.KLogging
 import java.io.Closeable
-import java.util.*
+import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -105,8 +105,7 @@ constructor(val urls: List<String>,
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
     private val leaderPath = electionPath.withLeaderSuffix
-    private val exceptionList: Lazy<MutableList<Throwable>> =
-        lazy { Collections.synchronizedList(mutableListOf<Throwable>()) }
+    private val exceptionList: Lazy<MutableList<Throwable>> = lazy { synchronizedList(mutableListOf<Throwable>()) }
 
     init {
         require(urls.isNotEmpty()) { "URLs cannot be empty" }

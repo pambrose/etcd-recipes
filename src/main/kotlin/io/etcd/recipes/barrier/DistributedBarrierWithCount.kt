@@ -71,7 +71,6 @@ constructor(val urls: List<String>,
     private val waitingPath = barrierPath.appendToPath("waiting")
 
     init {
-        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
         require(memberCount > 0) { "Member count must be > 0" }
     }
@@ -195,7 +194,6 @@ constructor(val urls: List<String>,
         @JvmStatic
         fun delete(urls: List<String>, barrierPath: String) {
 
-            require(urls.isNotEmpty()) { "URLs cannot be empty" }
             require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
 
             etcdExec(urls) { _, kvClient ->

@@ -25,7 +25,7 @@ import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
-import java.util.*
+import java.util.Collections.synchronizedList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
@@ -68,7 +68,7 @@ class ThreadedLeaderSelectorTests {
     fun threadedElection2Test() {
         val takeLeadershiptCounter = AtomicInteger(0)
         val relinquishLeadershiptCounter = AtomicInteger(0)
-        val electionList: MutableList<LeaderSelector> = Collections.synchronizedList(mutableListOf())
+        val electionList: MutableList<LeaderSelector> = synchronizedList(mutableListOf())
 
         blockingThreads(count) {
             val takeLeadershipAction =
