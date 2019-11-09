@@ -21,6 +21,7 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.Auth
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.ClientBuilder
 import io.etcd.jetcd.Cluster
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
@@ -28,17 +29,20 @@ import io.etcd.jetcd.Lock
 import io.etcd.jetcd.Maintenance
 import io.etcd.jetcd.Watch
 
-fun connectToEtcd(urls: List<String>): Client = Client.builder().endpoints(*urls.toTypedArray()).build()
+@JvmOverloads
+fun connectToEtcd(urls: List<String>, initBlock: ClientBuilder.() -> ClientBuilder = { this }): Client =
+    etcdClient { endpoints(*urls.toTypedArray()).initBlock() }
 
-fun connectToEtcd(urls: List<String>, block: (client: Client) -> Unit) {
-    connectToEtcd(urls)
-        .use {
-            block(it)
-        }
-}
+@JvmOverloads
+fun connectToEtcd(urls: List<String>,
+                  initBlock: ClientBuilder.() -> ClientBuilder = { this },
+                  block: (client: Client) -> Unit) = connectToEtcd(urls, initBlock).use { block(it) }
 
-fun etcdExec(urls: List<String>, block: (client: Client, kvClient: KV) -> Unit) {
-    connectToEtcd(urls) { client ->
+@JvmOverloads
+fun etcdExec(urls: List<String>,
+             initBlock: ClientBuilder.() -> ClientBuilder = { this },
+             block: (client: Client, kvClient: KV) -> Unit) {
+    connectToEtcd(urls, initBlock) { client ->
         client.withKvClient { kvClient ->
             block(client, kvClient)
         }

@@ -34,7 +34,7 @@ class DistributedQueueTest {
     @Test
     fun serialTestNoWait() {
         val queuePath = "/queue/serialTestNoWait"
-        val count = 500
+        val count = 2000
         val testData = List(count) { "Value $it" }
         val dequeuedData = mutableListOf<String>()
 
@@ -54,7 +54,8 @@ class DistributedQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        println(dequeuedData)
+        if (count <= 500)
+            println(dequeuedData)
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -64,7 +65,7 @@ class DistributedQueueTest {
     @Test
     fun serialTestWithWait() {
         val queuePath = "/queue/serialTestWithWait"
-        val count = 500
+        val count = 2000
         val testData = List(count) { "Value $it" }
         val dequeuedData = mutableListOf<String>()
         val latch = CountDownLatch(1)
@@ -93,7 +94,8 @@ class DistributedQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        println(dequeuedData)
+        if (count <= 500)
+            println(dequeuedData)
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -103,7 +105,7 @@ class DistributedQueueTest {
     @Test
     fun threadedTestNoWait() {
         val queuePath = "/queue/threadedTestNoWait"
-        val count = 500
+        val count = 2000
         val subcount = 10
         val latch = CountDownLatch(subcount)
         val testData = List(count) { "Value $it" }
@@ -132,7 +134,8 @@ class DistributedQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        println(dequeuedData)
+        if (count <= 500)
+            println(dequeuedData)
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -142,7 +145,7 @@ class DistributedQueueTest {
     @Test
     fun threadedTestWithWait() {
         val queuePath = "/queue/threadedTestWithWait"
-        val count = 500
+        val count = 2000
         val subcount = 10
         val latch = CountDownLatch(subcount)
         val testData = List(count) { "Value $it" }
@@ -174,7 +177,8 @@ class DistributedQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        println(dequeuedData)
+        if (count <= 500)
+            println(dequeuedData)
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }

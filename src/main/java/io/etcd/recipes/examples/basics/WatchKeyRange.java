@@ -29,13 +29,13 @@ import kotlin.Unit;
 import java.util.List;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
+import static io.etcd.recipes.common.BuilderUtils.watchOption;
 import static io.etcd.recipes.common.ByteSequenceUtils.getAsByteSequence;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static io.etcd.recipes.common.KVUtils.delete;
 import static io.etcd.recipes.common.KVUtils.getChildren;
 import static io.etcd.recipes.common.KVUtils.putValue;
 import static io.etcd.recipes.common.KeyValueUtils.getAsString;
-import static io.etcd.recipes.common.OptionUtils.watchOption;
 import static io.etcd.recipes.common.PairUtils.getAsString;
 import static io.etcd.recipes.common.WatchUtils.watcher;
 import static java.lang.String.format;
