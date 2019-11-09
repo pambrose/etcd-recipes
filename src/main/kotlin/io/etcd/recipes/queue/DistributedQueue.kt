@@ -56,7 +56,7 @@ class DistributedQueue(val urls: List<String>, val queuePath: String) : EtcdConn
 
     fun dequeue(): ByteSequence {
         checkCloseNotCalled()
-        val childList = kvClient.getOldestChild(queuePath)
+        val childList = kvClient.getOldestChild(queuePath).kvs
 
         if (!childList.isEmpty()) {
             val child = childList.first()
@@ -79,7 +79,7 @@ class DistributedQueue(val urls: List<String>, val queuePath: String) : EtcdConn
 
         }.use {
             // Query again in case a value arrived just before watch was created
-            val waitingChildList = kvClient.getOldestChild(queuePath)
+            val waitingChildList = kvClient.getOldestChild(queuePath).kvs
             if (!waitingChildList.isEmpty()) {
                 keyFound.compareAndSet(null, waitingChildList.first())
                 watchLatch.countDown()

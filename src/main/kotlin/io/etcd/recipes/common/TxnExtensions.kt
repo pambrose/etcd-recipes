@@ -55,6 +55,9 @@ fun deleteKey(key: ByteSequence, option: DeleteOption = DeleteOption.DEFAULT): O
 fun deleteKey(keyName: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
     deleteKey(keyName.asByteSequence, option)
 
+fun String.setTo(value: ByteSequence, putOption: PutOption): Op.PutOp =
+    Op.put(asByteSequence, value, putOption)
+
 fun String.setTo(keyval: String, putOption: PutOption): Op.PutOp =
     Op.put(asByteSequence, keyval.asByteSequence, putOption)
 
@@ -64,6 +67,7 @@ fun String.setTo(keyval: Int, putOption: PutOption): Op.PutOp =
 fun String.setTo(keyval: Long, putOption: PutOption): Op.PutOp =
     Op.put(asByteSequence, keyval.asByteSequence, putOption)
 
+infix fun String.setTo(value: ByteSequence): Op.PutOp = setTo(value, PutOption.DEFAULT)
 infix fun String.setTo(keyval: String): Op.PutOp = setTo(keyval, PutOption.DEFAULT)
 infix fun String.setTo(keyval: Int): Op.PutOp = setTo(keyval, PutOption.DEFAULT)
 infix fun String.setTo(keyval: Long): Op.PutOp = setTo(keyval, PutOption.DEFAULT)

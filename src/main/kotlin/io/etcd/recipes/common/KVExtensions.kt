@@ -21,7 +21,6 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.KV
-import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.kv.PutResponse
@@ -65,8 +64,8 @@ fun Lazy<KV>.delete(keyName: String): DeleteResponse = value.delete(keyName)
 
 fun KV.delete(keyName: String): DeleteResponse = delete(keyName.asByteSequence).get()
 
-fun KV.deleteChildren(parentKeyName: String): List<String> {
-    val keys = getChildrenKeys(parentKeyName)
+fun KV.deleteChildren(keyName: String): List<String> {
+    val keys = getChildrenKeys(keyName)
     for (key in keys)
         delete(key)
     return keys
@@ -102,8 +101,8 @@ fun KV.getKeyValuePairs(keyName: String, getOption: GetOption): List<Pair<String
     getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
 
 @JvmOverloads
-fun KV.getChildren(parentKeyName: String, keysOnly: Boolean = false): List<Pair<String, ByteSequence>> {
-    val trailingKey = parentKeyName.ensureSuffix("/").asByteSequence
+fun KV.getChildren(keyName: String, keysOnly: Boolean = false): List<Pair<String, ByteSequence>> {
+    val trailingKey = keyName.ensureSuffix("/").asByteSequence
     val getOption: GetOption =
         getOption {
             withPrefix(trailingKey)
@@ -112,8 +111,8 @@ fun KV.getChildren(parentKeyName: String, keysOnly: Boolean = false): List<Pair<
     return getKeyValuePairs(trailingKey, getOption)
 }
 
-fun KV.getOldestChild(parentKeyName: String): List<KeyValue> {
-    val trailingKey = parentKeyName.ensureSuffix("/").asByteSequence
+fun KV.getOldestChild(keyName: String): GetResponse {
+    val trailingKey = keyName.ensureSuffix("/").asByteSequence
     val getOption: GetOption =
         getOption {
             withPrefix(trailingKey)
@@ -121,22 +120,36 @@ fun KV.getOldestChild(parentKeyName: String): List<KeyValue> {
             withSortOrder(SortOrder.ASCEND)
             withLimit(1)
         }
-    return getResponse(trailingKey, getOption).kvs
+    return getResponse(trailingKey, getOption)
 }
 
-fun Lazy<KV>.getChildren(parentKeyName: String): List<Pair<String, ByteSequence>> = value.getChildren(parentKeyName)
+fun KV.getLastChildByKey(keyName: String): GetResponse {
+    val trailingKey = keyName.ensureSuffix("/").asByteSequence
+    val getOption: GetOption =
+        getOption {
+            withPrefix(trailingKey)
+            withSortField(SortTarget.KEY)
+            withSortOrder(SortOrder.DESCEND)
+            withLimit(1)
+        }
+    return getResponse(trailingKey, getOption)
+}
 
-fun Lazy<KV>.getChildren(parentKey: ByteSequence): List<Pair<String, ByteSequence>> = getChildren(parentKey.asString)
+fun Lazy<KV>.getChildren(keyName: String): List<Pair<String, ByteSequence>> = value.getChildren(keyName)
 
-fun Lazy<KV>.getOldestChild(parentKeyName: String): List<KeyValue> = value.getOldestChild(parentKeyName)
+fun Lazy<KV>.getChildren(keyName: ByteSequence): List<Pair<String, ByteSequence>> = getChildren(keyName.asString)
 
-fun KV.getChildrenKeys(parentKeyName: String): List<String> = getChildren(parentKeyName, true).keys
+fun Lazy<KV>.getOldestChild(keyName: String): GetResponse = value.getOldestChild(keyName)
 
-fun KV.getChildrenValues(parentKeyName: String): List<ByteSequence> = getChildren(parentKeyName).values
+fun Lazy<KV>.getLastChildByKey(keyName: String): GetResponse = value.getLastChildByKey(keyName)
 
-fun Lazy<KV>.getChildrenKeys(parentKeyName: String): List<String> = value.getChildrenKeys(parentKeyName)
+fun KV.getChildrenKeys(keyName: String): List<String> = getChildren(keyName, true).keys
 
-fun Lazy<KV>.getChildrenValues(parentKeyName: String): List<ByteSequence> = value.getChildrenValues(parentKeyName)
+fun KV.getChildrenValues(keyName: String): List<ByteSequence> = getChildren(keyName).values
+
+fun Lazy<KV>.getChildrenKeys(keyName: String): List<String> = value.getChildrenKeys(keyName)
+
+fun Lazy<KV>.getChildrenValues(keyName: String): List<ByteSequence> = value.getChildrenValues(keyName)
 
 // Get single key value
 fun KV.getValue(keyName: String): ByteSequence? =
@@ -167,8 +180,8 @@ fun Lazy<KV>.isKeyPresent(keyName: String) = value.isKeyPresent(keyName)
 fun Lazy<KV>.isKeyNotPresent(keyName: String) = value.isKeyNotPresent(keyName)
 
 // Count children keys
-fun KV.getChildrenCount(parentKeyName: String): Long {
-    val trailingKey = parentKeyName.ensureSuffix("/").asByteSequence
+fun KV.getChildrenCount(keyName: String): Long {
+    val trailingKey = keyName.ensureSuffix("/").asByteSequence
     val getOption: GetOption =
         getOption {
             withPrefix(trailingKey)
