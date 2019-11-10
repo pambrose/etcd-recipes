@@ -23,6 +23,7 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.common.urls
+import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
@@ -55,7 +56,7 @@ class DistributedQueueTest {
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
         if (count <= 500)
-            println(dequeuedData)
+            logger.info { dequeuedData }
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -93,7 +94,7 @@ class DistributedQueueTest {
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
         if (count <= 500)
-            println(dequeuedData)
+            logger.info { dequeuedData }
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -128,7 +129,7 @@ class DistributedQueueTest {
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
         if (count <= 500)
-            println(dequeuedData)
+            logger.info { dequeuedData }
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -168,7 +169,7 @@ class DistributedQueueTest {
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
         if (count <= 500)
-            println(dequeuedData)
+            logger.info { dequeuedData }
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -208,4 +209,6 @@ class DistributedQueueTest {
 
         counter.get() shouldEqual subcount * count
     }
+
+    companion object : KLogging()
 }

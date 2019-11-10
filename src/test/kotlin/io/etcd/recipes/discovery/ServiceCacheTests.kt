@@ -90,7 +90,7 @@ class ServiceCacheTests {
                             .use { sd ->
                                 repeat(serviceCount) {
                                     val service = ServiceInstance(name, TestPayload(it).toJson())
-                                    println("Registering: ${service.name} ${service.id}")
+                                    logger.info { "Registering: ${service.name} ${service.id}" }
                                     sd.registerService(service)
 
                                     sleep(1.seconds)
@@ -98,12 +98,12 @@ class ServiceCacheTests {
                                     val payload = TestPayload.toObject(service.jsonPayload)
                                     payload.testval = payload.testval * -1
                                     service.jsonPayload = payload.toJson()
-                                    println("Updating: ${service.name} ${service.id}")
+                                    logger.info { "Updating: ${service.name} ${service.id}" }
                                     sd.updateService(service)
 
                                     sleep(1.seconds)
 
-                                    println("Unregistering: ${service.name} ${service.id}")
+                                    logger.info { "Unregistering: ${service.name} ${service.id}" }
                                     sd.unregisterService(service)
 
                                     sleep(1.seconds)

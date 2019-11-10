@@ -53,7 +53,7 @@ class ThreadedServiceDiscoveryTests {
             repeat(serviceCount) { j ->
                 val service = ServiceInstance("TestInstance$j", TestPayload(j).toJson())
                 context.serviceMap[service.id] = service
-                println("Registering: $service")
+                logger.info { "Registering: $service" }
                 sd.registerService(service)
             }
         }
@@ -64,7 +64,7 @@ class ThreadedServiceDiscoveryTests {
                 .use { sd ->
                     contextMap.values.forEach { context ->
                         context.serviceMap.forEach { (_, service) ->
-                            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+                            logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
                             sd.queryForInstance(service.name, service.id) shouldEqual service
                         }
 
@@ -78,7 +78,7 @@ class ThreadedServiceDiscoveryTests {
                 val payload = TestPayload.toObject(service.jsonPayload)
                 payload.testval = payload.testval * -1
                 service.jsonPayload = payload.toJson()
-                println("Updating service: $service")
+                logger.info { "Updating service: $service" }
                 context.serviceDiscovery.updateService(service)
             }
         }
@@ -89,7 +89,7 @@ class ThreadedServiceDiscoveryTests {
                 .use { sd ->
                     contextMap.values.forEach { context ->
                         context.serviceMap.forEach { (_, service) ->
-                            println("Retrieved updated value: ${sd.queryForInstance(service.name, service.id)}")
+                            logger.info { "Retrieved updated value: ${sd.queryForInstance(service.name, service.id)}" }
                             sd.queryForInstance(service.name, service.id) shouldEqual service
                         }
 
@@ -99,7 +99,7 @@ class ThreadedServiceDiscoveryTests {
 
         ServiceDiscovery(urls, path)
             .use { sd ->
-                println("Retrieved all names: ${sd.queryForNames().size}")
+                logger.info { "Retrieved all names: ${sd.queryForNames().size}" }
                 sd.queryForNames().size shouldEqual threadCount * serviceCount
             }
 
@@ -109,7 +109,7 @@ class ThreadedServiceDiscoveryTests {
                 val payload = TestPayload.toObject(service.jsonPayload)
                 payload.testval = payload.testval * -1
                 service.jsonPayload = payload.toJson()
-                println("Unregistering service: $service")
+                logger.info { "Unregistering service: $service" }
                 context.serviceDiscovery.unregisterService(service)
             }
         }
@@ -119,17 +119,15 @@ class ThreadedServiceDiscoveryTests {
 
         // Query deleted services
         blockingThreads(threadCount) {
-            ServiceDiscovery(urls, path)
-                .use { sd ->
-                    contextMap.values.forEach { context ->
-                        context.serviceMap.forEach { (_, service) ->
-                            println("Query deleted service: ${service.name}  ${service.id}")
-                            invoking {
-                                sd.queryForInstance(service.name, service.id)
-                            } shouldThrow EtcdRecipeException::class
-                        }
+            ServiceDiscovery(urls, path).use { sd ->
+                contextMap.values.forEach { context ->
+                    context.serviceMap.forEach { (_, service) ->
+                        val name = service.name
+                        logger.info { "Query deleted service: $name  ${service.id}" }
+                        invoking { sd.queryForInstance(name, service.id) } shouldThrow EtcdRecipeException::class
                     }
                 }
+            }
         }
 
         // Close ServiceDiscovery objects
