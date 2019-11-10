@@ -33,7 +33,7 @@ import kotlin.concurrent.thread
 class DistributedPriorityQueueTest {
     val count = 500
     val subcount = 10
-    val testData = List(count) { "Value $it" }
+    val testData = List(count) { "Value %04d".format(it) }
 
     @Test
     fun serialTestNoWait() {
@@ -207,5 +207,59 @@ class DistributedPriorityQueueTest {
         }
 
         counter.get() shouldEqual subcount * count
+    }
+
+    @Test
+    fun serialTestNoWaitWithPriorities() {
+        val queuePath = "/queue/serialTestNoWaitWithPriorities"
+        val dequeuedData = mutableListOf<String>()
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        DistributedPriorityQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { i -> queue.enqueue(testData[i], i) }
+            }
+
+        DistributedPriorityQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { dequeuedData += queue.dequeue().asString }
+            }
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        if (count <= 500)
+            println(dequeuedData)
+
+        dequeuedData.size shouldEqual testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
+        dequeuedData shouldEqual testData
+    }
+
+    @Test
+    fun serialTestNoWaitWithReversedPriorities() {
+        val queuePath = "/queue/serialTestNoWaitWithReversedPriorities"
+        val dequeuedData = mutableListOf<String>()
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        DistributedPriorityQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { i -> queue.enqueue(testData[i], (count - i)) }
+            }
+
+        DistributedPriorityQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { dequeuedData += queue.dequeue().asString }
+            }
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        if (count <= 500)
+            println(dequeuedData)
+
+        dequeuedData.size shouldEqual testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[count - i - 1] }
+        dequeuedData shouldEqual testData.reversed()
     }
 }

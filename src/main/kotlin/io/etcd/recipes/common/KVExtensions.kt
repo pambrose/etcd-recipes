@@ -111,24 +111,24 @@ fun KV.getChildren(keyName: String, keysOnly: Boolean = false): List<Pair<String
     return getKeyValuePairs(trailingKey, getOption)
 }
 
-fun KV.getOldestChild(keyName: String): GetResponse {
+fun KV.getFirst(keyName: String, target: SortTarget): GetResponse {
     val trailingKey = keyName.ensureSuffix("/").asByteSequence
     val getOption: GetOption =
         getOption {
             withPrefix(trailingKey)
-            withSortField(SortTarget.MOD)
+            withSortField(target)
             withSortOrder(SortOrder.ASCEND)
             withLimit(1)
         }
     return getResponse(trailingKey, getOption)
 }
 
-fun KV.getLastChildByKey(keyName: String): GetResponse {
+fun KV.getLast(keyName: String, target: SortTarget): GetResponse {
     val trailingKey = keyName.ensureSuffix("/").asByteSequence
     val getOption: GetOption =
         getOption {
             withPrefix(trailingKey)
-            withSortField(SortTarget.KEY)
+            withSortField(target)
             withSortOrder(SortOrder.DESCEND)
             withLimit(1)
         }
@@ -139,9 +139,9 @@ fun Lazy<KV>.getChildren(keyName: String): List<Pair<String, ByteSequence>> = va
 
 fun Lazy<KV>.getChildren(keyName: ByteSequence): List<Pair<String, ByteSequence>> = getChildren(keyName.asString)
 
-fun Lazy<KV>.getOldestChild(keyName: String): GetResponse = value.getOldestChild(keyName)
+fun Lazy<KV>.getFirst(keyName: String, target: SortTarget): GetResponse = value.getFirst(keyName, target)
 
-fun Lazy<KV>.getLastChildByKey(keyName: String): GetResponse = value.getLastChildByKey(keyName)
+fun Lazy<KV>.getLast(keyName: String, target: SortTarget): GetResponse = value.getLast(keyName, target)
 
 fun KV.getChildrenKeys(keyName: String): List<String> = getChildren(keyName, true).keys
 

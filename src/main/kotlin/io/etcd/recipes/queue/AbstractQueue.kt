@@ -21,13 +21,14 @@ package io.etcd.recipes.queue
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.op.CmpTarget
+import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.equalTo
-import io.etcd.recipes.common.getOldestChild
+import io.etcd.recipes.common.getFirst
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
@@ -35,7 +36,9 @@ import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 
-abstract class AbstractQueue(urls: List<String>, val queuePath: String) : EtcdConnector(urls), Closeable {
+abstract class AbstractQueue(urls: List<String>,
+                             val queuePath: String,
+                             private val target: SortTarget) : EtcdConnector(urls), Closeable {
 
     init {
         require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
@@ -43,7 +46,7 @@ abstract class AbstractQueue(urls: List<String>, val queuePath: String) : EtcdCo
 
     fun dequeue(): ByteSequence {
         checkCloseNotCalled()
-        val childList = kvClient.getOldestChild(queuePath).kvs
+        val childList = kvClient.getFirst(queuePath, target).kvs
 
         if (!childList.isEmpty()) {
             val child = childList.first()
@@ -66,7 +69,7 @@ abstract class AbstractQueue(urls: List<String>, val queuePath: String) : EtcdCo
 
         }.use {
             // Query again in case a value arrived just before watch was created
-            val waitingChildList = kvClient.getOldestChild(queuePath).kvs
+            val waitingChildList = kvClient.getFirst(queuePath, target).kvs
             if (!waitingChildList.isEmpty()) {
                 keyFound.compareAndSet(null, waitingChildList.first())
                 watchLatch.countDown()

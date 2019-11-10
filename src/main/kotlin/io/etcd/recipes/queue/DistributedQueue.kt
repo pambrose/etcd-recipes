@@ -20,15 +20,15 @@ package io.etcd.recipes.queue
 
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.putValue
 
-class DistributedQueue(urls: List<String>, queuePath: String) : AbstractQueue(urls, queuePath) {
+class DistributedQueue(urls: List<String>, queuePath: String) : AbstractQueue(urls, queuePath, SortTarget.MOD) {
 
     fun enqueue(value: String) = enqueue(value.asByteSequence)
     fun enqueue(value: Int) = enqueue(value.asByteSequence)
     fun enqueue(value: Long) = enqueue(value.asByteSequence)
-
 
     fun enqueue(value: ByteSequence) {
         checkCloseNotCalled()
@@ -38,6 +38,6 @@ class DistributedQueue(urls: List<String>, queuePath: String) : AbstractQueue(ur
 
     companion object {
         private val maxLongWidth = Long.MAX_VALUE.toString().length
-        val keyFormat = "%s/%0${maxLongWidth}d-%s"
+        private val keyFormat = "%s/%0${maxLongWidth}d-%s"
     }
 }
