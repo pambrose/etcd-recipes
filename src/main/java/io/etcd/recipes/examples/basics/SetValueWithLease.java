@@ -55,8 +55,9 @@ public class SetValueWithLease {
                 putValue(kvClient, path, keyval, putOption);
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
+            } finally {
+                latch.countDown();
             }
-            latch.countDown();
         });
 
 

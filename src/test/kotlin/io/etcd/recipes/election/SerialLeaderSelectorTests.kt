@@ -58,14 +58,13 @@ class SerialLeaderSelectorTests {
             Unit
         }
 
-        LeaderSelector(urls, path, leadershipAction, relinquishAction)
-            .use { selector ->
-                repeat(count) {
-                    logger.info { "First iteration: $it" }
-                    selector.start()
-                    selector.waitOnLeadershipComplete()
-                }
+        LeaderSelector(urls, path, leadershipAction, relinquishAction).use { selector ->
+            repeat(count) {
+                logger.info { "First iteration: $it" }
+                selector.start()
+                selector.waitOnLeadershipComplete()
             }
+        }
 
         takeLeadershiptCounter.get() shouldEqual count
         relinquishLeadershiptCounter.get() shouldEqual count
@@ -76,11 +75,10 @@ class SerialLeaderSelectorTests {
 
         repeat(count) {
             logger.info { "Second iteration: $it" }
-            LeaderSelector(urls, path, leadershipAction, relinquishAction)
-                .use { selector ->
-                    selector.start()
-                    selector.waitOnLeadershipComplete()
-                }
+            LeaderSelector(urls, path, leadershipAction, relinquishAction).use { selector ->
+                selector.start()
+                selector.waitOnLeadershipComplete()
+            }
         }
 
         takeLeadershiptCounter.get() shouldEqual count

@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.sudothought.common.concurrent.countDown
+import com.sudothought.common.concurrent.thread
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.etcdExec
@@ -48,20 +48,18 @@ fun main() {
         }
     }
 
-    thread {
-        latch.countDown {
-            etcdExec(urls) { client, kvClient ->
-                println("Assigning $path = $keyval")
-                kvClient.putValueWithKeepAlive(client, path, keyval, 2.seconds) {
-                    println("Starting sleep")
-                    sleep(5.seconds)
-                    println("Finished sleep")
-                }
-                println("Keep-alive is now terminated")
+    thread(latch) {
+        etcdExec(urls) { client, kvClient ->
+            println("Assigning $path = $keyval")
+            kvClient.putValueWithKeepAlive(client, path, keyval, 2.seconds) {
+                println("Starting sleep")
                 sleep(5.seconds)
+                println("Finished sleep")
             }
-            println("Releasing latch")
+            println("Keep-alive is now terminated")
+            sleep(5.seconds)
         }
+        println("Releasing latch")
     }
 
     latch.await()

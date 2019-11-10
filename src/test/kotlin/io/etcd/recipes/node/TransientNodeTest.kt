@@ -29,7 +29,7 @@ import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import kotlin.time.seconds
 
-class TtlNodeTest {
+class TransientNodeTest {
 
     @Test
     fun singleNodeTest() {
@@ -38,7 +38,7 @@ class TtlNodeTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getValue(path, "nothing") shouldEqual "nothing" }
 
-        TtlNode(urls, path, id).use {
+        TransientNode(urls, path, id).use {
             repeat(10) {
                 etcdExec(urls) { _, kvClient -> kvClient.getValue(path)?.asString shouldEqual id }
                 sleep(1.seconds)
@@ -63,7 +63,7 @@ class TtlNodeTest {
             kvClient.getChildrenCount("/node") shouldEqual 0
         }
 
-        val nodes = List(count) { TtlNode(urls, paths[it], ids[it]) }
+        val nodes = List(count) { TransientNode(urls, paths[it], ids[it]) }
 
         etcdExec(urls) { _, kvClient ->
             repeat(10) {

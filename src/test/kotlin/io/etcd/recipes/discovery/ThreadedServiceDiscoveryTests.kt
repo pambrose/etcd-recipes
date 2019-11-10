@@ -60,16 +60,15 @@ class ThreadedServiceDiscoveryTests {
 
         // Query services
         blockingThreads(threadCount) {
-            ServiceDiscovery(urls, path)
-                .use { sd ->
-                    contextMap.values.forEach { context ->
-                        context.serviceMap.forEach { (_, service) ->
-                            logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
-                            sd.queryForInstance(service.name, service.id) shouldEqual service
-                        }
-
+            ServiceDiscovery(urls, path).use { sd ->
+                contextMap.values.forEach { context ->
+                    context.serviceMap.forEach { (_, service) ->
+                        logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
+                        sd.queryForInstance(service.name, service.id) shouldEqual service
                     }
+
                 }
+            }
         }
 
         // Update services
@@ -85,23 +84,21 @@ class ThreadedServiceDiscoveryTests {
 
         // Query updated services
         blockingThreads(threadCount) {
-            ServiceDiscovery(urls, path)
-                .use { sd ->
-                    contextMap.values.forEach { context ->
-                        context.serviceMap.forEach { (_, service) ->
-                            logger.info { "Retrieved updated value: ${sd.queryForInstance(service.name, service.id)}" }
-                            sd.queryForInstance(service.name, service.id) shouldEqual service
-                        }
-
+            ServiceDiscovery(urls, path).use { sd ->
+                contextMap.values.forEach { context ->
+                    context.serviceMap.forEach { (_, service) ->
+                        logger.info { "Retrieved updated value: ${sd.queryForInstance(service.name, service.id)}" }
+                        sd.queryForInstance(service.name, service.id) shouldEqual service
                     }
+
                 }
+            }
         }
 
-        ServiceDiscovery(urls, path)
-            .use { sd ->
-                logger.info { "Retrieved all names: ${sd.queryForNames().size}" }
-                sd.queryForNames().size shouldEqual threadCount * serviceCount
-            }
+        ServiceDiscovery(urls, path).use { sd ->
+            logger.info { "Retrieved all names: ${sd.queryForNames().size}" }
+            sd.queryForNames().size shouldEqual threadCount * serviceCount
+        }
 
         // Delete services
         contextMap.forEach { (_, context) ->

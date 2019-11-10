@@ -81,19 +81,17 @@ class DistributedBarrierWithCountTests {
 
         val (finishedLatch, holder) =
             nonblockingThreads(count - 1) { i ->
-                DistributedBarrierWithCount(urls, path, count)
-                    .use { barrier ->
-                        waiter(i, barrier, retryAttempts)
-                    }
+                DistributedBarrierWithCount(urls, path, count).use { barrier ->
+                    waiter(i, barrier, retryAttempts)
+                }
             }
 
         retryLatch.await()
         sleep(2.seconds)
 
-        DistributedBarrierWithCount(urls, path, count)
-            .use { barrier ->
-                waiter(99, barrier)
-            }
+        DistributedBarrierWithCount(urls, path, count).use { barrier ->
+            waiter(99, barrier)
+        }
 
         finishedLatch.await()
 

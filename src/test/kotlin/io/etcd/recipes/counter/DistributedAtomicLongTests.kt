@@ -59,27 +59,25 @@ class DistributedAtomicLongTests {
     @Test
     fun incrementDecrementTest() {
         val count = 100
-        DistributedAtomicLong(urls, path)
-            .use { counter ->
-                repeat(count) {
-                    counter.increment()
-                    counter.decrement()
-                }
-                counter.get() shouldEqual 0L
+        DistributedAtomicLong(urls, path).use { counter ->
+            repeat(count) {
+                counter.increment()
+                counter.decrement()
             }
+            counter.get() shouldEqual 0L
+        }
     }
 
     @Test
     fun addSubtractTest() {
         val count = 100
-        DistributedAtomicLong(urls, path)
-            .use { counter ->
-                repeat(count) {
-                    counter.add(5)
-                    counter.subtract(5)
-                }
-                counter.get() shouldEqual 0L
+        DistributedAtomicLong(urls, path).use { counter ->
+            repeat(count) {
+                counter.add(5)
+                counter.subtract(5)
             }
+            counter.get() shouldEqual 0L
+        }
     }
 
     @Test
@@ -103,22 +101,21 @@ class DistributedAtomicLongTests {
 
     @Test
     fun threaded1Test() {
-        DistributedAtomicLong(urls, path)
-            .use { counter ->
-                val threadCount = 10
-                val count = 50
+        DistributedAtomicLong(urls, path).use { counter ->
+            val threadCount = 10
+            val count = 50
 
-                blockingThreads(threadCount) {
-                    repeat(count) {
-                        counter.increment()
-                        counter.decrement()
-                        counter.add(5)
-                        counter.subtract(5)
-                    }
+            blockingThreads(threadCount) {
+                repeat(count) {
+                    counter.increment()
+                    counter.decrement()
+                    counter.add(5)
+                    counter.subtract(5)
                 }
-
-                counter.get() shouldEqual 0L
             }
+
+            counter.get() shouldEqual 0L
+        }
     }
 
     @Test
@@ -127,59 +124,58 @@ class DistributedAtomicLongTests {
 
         blockingThreads(threadCount) { i ->
             logger.info { "Creating counter #$i" }
-            DistributedAtomicLong(urls, path)
-                .use { counter ->
-                    val count = 25
-                    val maxPause = 50
-                    val latchList = mutableListOf<CountDownLatch>()
-                    val exceptionList = mutableListOf<ExceptionHolder>()
+            DistributedAtomicLong(urls, path).use { counter ->
+                val count = 25
+                val maxPause = 50
+                val latchList = mutableListOf<CountDownLatch>()
+                val exceptionList = mutableListOf<ExceptionHolder>()
 
-                    val (latch0, e0) =
-                        threadWithExceptionCheck {
-                            logger.info { "Begin increments for counter #$i" }
-                            repeat(count) { counter.increment() }
-                            sleep(maxPause.random.milliseconds)
-                            logger.info { "Completed increments for counter #$i" }
-                        }
-                    latchList += latch0
-                    exceptionList += e0
+                val (latch0, e0) =
+                    threadWithExceptionCheck {
+                        logger.info { "Begin increments for counter #$i" }
+                        repeat(count) { counter.increment() }
+                        sleep(maxPause.random.milliseconds)
+                        logger.info { "Completed increments for counter #$i" }
+                    }
+                latchList += latch0
+                exceptionList += e0
 
-                    val (latch1, e1) =
-                        threadWithExceptionCheck {
-                            logger.info { "Begin decrements for counter #$i" }
-                            repeat(count) { counter.decrement() }
-                            sleep(maxPause.random.milliseconds)
-                            logger.info { "Completed decrements for counter #$i" }
-                        }
-                    latchList += latch1
-                    exceptionList += e1
+                val (latch1, e1) =
+                    threadWithExceptionCheck {
+                        logger.info { "Begin decrements for counter #$i" }
+                        repeat(count) { counter.decrement() }
+                        sleep(maxPause.random.milliseconds)
+                        logger.info { "Completed decrements for counter #$i" }
+                    }
+                latchList += latch1
+                exceptionList += e1
 
-                    val (latch2, e2) =
-                        threadWithExceptionCheck {
-                            logger.info { "Begin adds for counter #$i" }
-                            repeat(count) { counter.add(5) }
-                            sleep(maxPause.random.milliseconds)
-                            logger.info { "Completed adds for counter #$i" }
-                        }
-                    latchList += latch2
-                    exceptionList += e2
+                val (latch2, e2) =
+                    threadWithExceptionCheck {
+                        logger.info { "Begin adds for counter #$i" }
+                        repeat(count) { counter.add(5) }
+                        sleep(maxPause.random.milliseconds)
+                        logger.info { "Completed adds for counter #$i" }
+                    }
+                latchList += latch2
+                exceptionList += e2
 
-                    val (latch3, e3) =
-                        threadWithExceptionCheck {
-                            logger.info { "Begin subtracts for counter #$i" }
-                            repeat(count) { counter.subtract(5) }
-                            sleep(maxPause.random.milliseconds)
-                            logger.info { "Completed subtracts for counter #$i" }
-                        }
-                    latchList += latch3
-                    exceptionList += e3
+                val (latch3, e3) =
+                    threadWithExceptionCheck {
+                        logger.info { "Begin subtracts for counter #$i" }
+                        repeat(count) { counter.subtract(5) }
+                        sleep(maxPause.random.milliseconds)
+                        logger.info { "Completed subtracts for counter #$i" }
+                    }
+                latchList += latch3
+                exceptionList += e3
 
-                    // Wait for all the threads to finish
-                    latchList.forEach { it.await() }
+                // Wait for all the threads to finish
+                latchList.forEach { it.await() }
 
-                    // If an exception occurred, throw it
-                    exceptionList.throwExceptionFromList()
-                }
+                // If an exception occurred, throw it
+                exceptionList.throwExceptionFromList()
+            }
         }
 
         DistributedAtomicLong(urls, path).use { counter -> counter.get() shouldEqual 0L }

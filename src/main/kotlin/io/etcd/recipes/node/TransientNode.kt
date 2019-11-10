@@ -32,7 +32,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.time.seconds
 
-class TtlNode
+class TransientNode
 @JvmOverloads
 constructor(urls: List<String>,
             val nodePath: String,
@@ -56,7 +56,7 @@ constructor(urls: List<String>,
     }
 
     @Synchronized
-    fun start(): TtlNode {
+    fun start(): TransientNode {
         if (startCalled)
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
@@ -105,6 +105,6 @@ constructor(urls: List<String>,
     }
 
     companion object : KLogging() {
-        private fun defaultClientId() = "${TtlNode::class.simpleName}:${randomId(tokenLength)}"
+        private fun defaultClientId() = "${TransientNode::class.simpleName}:${randomId(tokenLength)}"
     }
 }

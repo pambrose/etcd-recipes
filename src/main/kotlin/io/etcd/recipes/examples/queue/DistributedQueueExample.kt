@@ -22,7 +22,7 @@ import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenCount
-import io.etcd.recipes.queue.DistributedQueue
+import io.etcd.recipes.common.withDistributedQueue
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -38,17 +38,16 @@ fun main() {
     }
 
     // Enqueue some data prior to dequeues
-    DistributedQueue(urls, queuePath).use { queue ->
-        repeat(count) { i -> queue.enqueue("Value $i") }
+    withDistributedQueue(urls, queuePath) {
+        repeat(count) { i -> enqueue("Value $i") }
     }
 
     val latch = CountDownLatch(subcount)
     repeat(subcount) { sub ->
         thread {
-            DistributedQueue(urls, queuePath)
-                .use { queue ->
-                    repeat((count / subcount) * 2) { i -> println("$sub ${queue.dequeue().asString}") }
-                }
+            withDistributedQueue(urls, queuePath) {
+                repeat((count / subcount) * 2) { i -> println("$sub ${dequeue().asString}") }
+            }
             latch.countDown()
         }
     }
@@ -56,10 +55,9 @@ fun main() {
     sleep(2.seconds)
 
     // Now enqueue some data with dequeues waiting
-    DistributedQueue(urls, queuePath)
-        .use { queue ->
-            repeat(count) { i -> queue.enqueue("Value $i") }
-        }
+    withDistributedQueue(urls, queuePath) {
+        repeat(count) { i -> enqueue("Value $i") }
+    }
 
     latch.await()
 

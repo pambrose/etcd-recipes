@@ -18,23 +18,24 @@
 
 package io.etcd.recipes.queue
 
+import com.sudothought.common.concurrent.thread
 import com.sudothought.common.concurrent.withLock
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.withDistributedQueue
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.concurrent.thread
 
 class DistributedQueueTest {
     val count = 500
     val subcount = 10
-    val testData = List(count) { "Value $it" }
+    val testData = List(count) { "V $it" }
 
     @Test
     fun serialTestNoWait() {
@@ -43,15 +44,9 @@ class DistributedQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        DistributedQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i]) }
-            }
+        withDistributedQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i]) } }
 
-        DistributedQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { dequeuedData += queue.dequeue().asString }
-            }
+        withDistributedQueue(urls, queuePath) { repeat(count) { dequeuedData += dequeue().asString } }
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
@@ -72,22 +67,17 @@ class DistributedQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        thread {
-            DistributedQueue(urls, queuePath)
-                .use { queue ->
-                    repeat(count) {
-                        semaphore.withLock {
-                            dequeuedData += queue.dequeue().asString
-                        }
+        thread(latch) {
+            withDistributedQueue(urls, queuePath) {
+                repeat(count) {
+                    semaphore.withLock {
+                        dequeuedData += dequeue().asString
                     }
                 }
-            latch.countDown()
+            }
         }
 
-        DistributedQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i]) }
-            }
+        withDistributedQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i]) } }
 
         latch.await()
 
@@ -109,18 +99,13 @@ class DistributedQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        DistributedQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i]) }
-            }
+        withDistributedQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i]) } }
 
         repeat(subcount) {
-            thread {
-                DistributedQueue(urls, queuePath)
-                    .use { queue ->
-                        repeat(count / subcount) { dequeuedData += queue.dequeue().asString }
-                    }
-                latch.countDown()
+            thread(latch) {
+                withDistributedQueue(urls, queuePath) {
+                    repeat(count / subcount) { dequeuedData += dequeue().asString }
+                }
             }
         }
 
@@ -146,23 +131,16 @@ class DistributedQueueTest {
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
         repeat(subcount) {
-            thread {
-                DistributedQueue(urls, queuePath)
-                    .use { queue ->
-                        repeat(count / subcount) {
-                            semaphore.withLock {
-                                dequeuedData += queue.dequeue().asString
-                            }
-                        }
+            thread(latch) {
+                withDistributedQueue(urls, queuePath) {
+                    repeat(count / subcount) {
+                        semaphore.withLock { dequeuedData += dequeue().asString }
                     }
-                latch.countDown()
+                }
             }
         }
 
-        DistributedQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i]) }
-            }
+        withDistributedQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i]) } }
 
         latch.await()
 
@@ -184,26 +162,24 @@ class DistributedQueueTest {
         val latch = CountDownLatch(subcount)
 
         // Prime the queue with a value
-        DistributedQueue(urls, queuePath).use { queue -> queue.enqueue(token) }
+        withDistributedQueue(urls, queuePath) { enqueue(token) }
 
         repeat(subcount) {
-            thread {
-                DistributedQueue(urls, queuePath)
-                    .use { queue ->
-                        repeat(count) {
-                            val v = queue.dequeue().asString
-                            v shouldEqual token
-                            queue.enqueue(v)
-                            counter.incrementAndGet()
-                        }
+            thread(latch) {
+                withDistributedQueue(urls, queuePath) {
+                    repeat(count) {
+                        val v = dequeue().asString
+                        v shouldEqual token
+                        enqueue(v)
+                        counter.incrementAndGet()
                     }
-                latch.countDown()
+                }
             }
         }
 
         latch.await()
-        DistributedQueue(urls, queuePath).use { queue ->
-            val v = queue.dequeue().asString
+        withDistributedQueue(urls, queuePath) {
+            val v = dequeue().asString
             v shouldEqual token
         }
 

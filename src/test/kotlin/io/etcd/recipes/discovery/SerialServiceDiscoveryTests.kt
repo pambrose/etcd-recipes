@@ -40,56 +40,55 @@ class SerialServiceDiscoveryTests {
 
     @Test
     fun discoveryTest() {
-        ServiceDiscovery(urls, path)
-            .use { sd ->
+        ServiceDiscovery(urls, path).use { sd ->
 
-                val payload = TestPayload(-999)
-                val service = ServiceInstance("TestName", payload.toJson())
+            val payload = TestPayload(-999)
+            val service = ServiceInstance("TestName", payload.toJson())
 
-                logger.info { service.toJson() }
+            logger.info { service.toJson() }
 
-                logger.info { "Registering" }
-                sd.registerService(service)
+            logger.info { "Registering" }
+            sd.registerService(service)
 
+            logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
+            sd.queryForInstance(service.name, service.id) shouldEqual service
+
+            logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
+            sd.queryForInstances(service.name) shouldEqual listOf(service)
+
+            logger.info { "Retrieved names: ${sd.queryForNames()}" }
+            sd.queryForNames().first() shouldEndWith service.id
+
+            logger.info { "Updating payload" }
+            payload.testval = -888
+            service.jsonPayload = payload.toJson()
+            sd.updateService(service)
+
+            logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
+            sd.queryForInstance(service.name, service.id) shouldEqual service
+
+            logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
+            sd.queryForInstances(service.name) shouldEqual listOf(service)
+
+            logger.info { "Retrieved names: ${sd.queryForNames()}" }
+            sd.queryForNames().first() shouldEndWith service.id
+
+            logger.info { "Unregistering" }
+            sd.unregisterService(service)
+            sleep(3.seconds)
+
+
+            sd.queryForNames().size shouldEqual 0
+            sd.queryForInstances(service.name).size shouldEqual 0
+
+            invoking { sd.queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
+
+            try {
                 logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
-                sd.queryForInstance(service.name, service.id) shouldEqual service
-
-                logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
-                sd.queryForInstances(service.name) shouldEqual listOf(service)
-
-                logger.info { "Retrieved names: ${sd.queryForNames()}" }
-                sd.queryForNames().first() shouldEndWith service.id
-
-                logger.info { "Updating payload" }
-                payload.testval = -888
-                service.jsonPayload = payload.toJson()
-                sd.updateService(service)
-
-                logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
-                sd.queryForInstance(service.name, service.id) shouldEqual service
-
-                logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
-                sd.queryForInstances(service.name) shouldEqual listOf(service)
-
-                logger.info { "Retrieved names: ${sd.queryForNames()}" }
-                sd.queryForNames().first() shouldEndWith service.id
-
-                logger.info { "Unregistering" }
-                sd.unregisterService(service)
-                sleep(3.seconds)
-
-
-                sd.queryForNames().size shouldEqual 0
-                sd.queryForInstances(service.name).size shouldEqual 0
-
-                invoking { sd.queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
-
-                try {
-                    logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
-                } catch (e: EtcdRecipeException) {
-                    logger.info { "Exception: $e" }
-                }
+            } catch (e: EtcdRecipeException) {
+                logger.info { "Exception: $e" }
             }
+        }
     }
 
     companion object : KLogging()

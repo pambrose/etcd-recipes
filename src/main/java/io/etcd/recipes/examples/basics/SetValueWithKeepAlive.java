@@ -75,9 +75,10 @@ public class SetValueWithKeepAlive {
                         });
                 System.out.println("Keep-alive is now terminated");
                 sleepSecs(5);
+            } finally {
+                System.out.println("Releasing latch");
+                latch.countDown();
             }
-            System.out.println("Releasing latch");
-            latch.countDown();
         });
 
         latch.await();

@@ -58,8 +58,9 @@ public class SetValueAndWatch {
                     delete(kvClient, path);
                     sleepSecs(1);
                 }
+            } finally {
+                latch.countDown();
             }
-            latch.countDown();
         });
 
         executor.submit(() -> {
@@ -84,8 +85,9 @@ public class SetValueAndWatch {
                     System.out.println("Closing watch");
                 }
                 System.out.println("Closed watch");
+            } finally {
+                latch.countDown();
             }
-            latch.countDown();
         });
 
         latch.await();

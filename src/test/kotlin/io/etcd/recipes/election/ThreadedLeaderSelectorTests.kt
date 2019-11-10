@@ -39,7 +39,7 @@ class ThreadedLeaderSelectorTests {
         val relinquishLeadershiptCounter = AtomicInteger(0)
 
         blockingThreads(count) {
-            val takeLeadershipAction =
+            val takeAction =
                 { selector: LeaderSelector ->
                     val pause = 3.random.seconds
                     logger.info { "${selector.clientId} elected leader for $pause" }
@@ -47,17 +47,16 @@ class ThreadedLeaderSelectorTests {
                     sleep(pause)
                 }
 
-            val relinquishLeadershipAction =
+            val relinquishAction =
                 { selector: LeaderSelector ->
                     relinquishLeadershiptCounter.incrementAndGet()
                     logger.info { "${selector.clientId} relinquished leadership" }
                 }
 
-            LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, clientId = "Thread$it")
-                .use { election ->
-                    election.start()
-                    election.waitOnLeadershipComplete()
-                }
+            LeaderSelector(urls, path, takeAction, relinquishAction, clientId = "Thread$it").use { election ->
+                election.start()
+                election.waitOnLeadershipComplete()
+            }
         }
 
         takeLeadershiptCounter.get() shouldEqual count

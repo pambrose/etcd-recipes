@@ -18,23 +18,24 @@
 
 package io.etcd.recipes.queue
 
+import com.sudothought.common.concurrent.thread
 import com.sudothought.common.concurrent.withLock
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.withDistributedPriorityQueue
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.concurrent.thread
 
 class DistributedPriorityQueueTest {
     val count = 500
     val subcount = 10
-    val testData = List(count) { "Value %04d".format(it) }
+    val testData = List(count) { "V %04d".format(it) }
 
     @Test
     fun serialTestNoWait() {
@@ -43,15 +44,9 @@ class DistributedPriorityQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        DistributedPriorityQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i], 1u) }
-            }
+        withDistributedPriorityQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i], 1u) } }
 
-        DistributedPriorityQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { dequeuedData += queue.dequeue().asString }
-            }
+        withDistributedPriorityQueue(urls, queuePath) { repeat(count) { dequeuedData += dequeue().asString } }
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
@@ -72,22 +67,15 @@ class DistributedPriorityQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        thread {
-            DistributedPriorityQueue(urls, queuePath)
-                .use { queue ->
-                    repeat(count) {
-                        semaphore.withLock {
-                            dequeuedData += queue.dequeue().asString
-                        }
-                    }
+        thread(latch) {
+            withDistributedPriorityQueue(urls, queuePath) {
+                repeat(count) {
+                    semaphore.withLock { dequeuedData += dequeue().asString }
                 }
-            latch.countDown()
+            }
         }
 
-        DistributedPriorityQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i], 1u) }
-            }
+        withDistributedPriorityQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i], 1u) } }
 
         latch.await()
 
@@ -109,18 +97,13 @@ class DistributedPriorityQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        DistributedPriorityQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i], 1u) }
-            }
+        withDistributedPriorityQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i], 1u) } }
 
         repeat(subcount) {
-            thread {
-                DistributedPriorityQueue(urls, queuePath)
-                    .use { queue ->
-                        repeat(count / subcount) { dequeuedData += queue.dequeue().asString }
-                    }
-                latch.countDown()
+            thread(latch) {
+                withDistributedPriorityQueue(urls, queuePath) {
+                    repeat(count / subcount) { dequeuedData += dequeue().asString }
+                }
             }
         }
 
@@ -146,23 +129,14 @@ class DistributedPriorityQueueTest {
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
         repeat(subcount) {
-            thread {
-                DistributedPriorityQueue(urls, queuePath)
-                    .use { queue ->
-                        repeat(count / subcount) {
-                            semaphore.withLock {
-                                dequeuedData += queue.dequeue().asString
-                            }
-                        }
-                    }
-                latch.countDown()
+            thread(latch) {
+                withDistributedPriorityQueue(urls, queuePath) {
+                    repeat(count / subcount) { semaphore.withLock { dequeuedData += dequeue().asString } }
+                }
             }
         }
 
-        DistributedPriorityQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i], 1u) }
-            }
+        withDistributedPriorityQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i], 1u) } }
 
         latch.await()
 
@@ -184,26 +158,24 @@ class DistributedPriorityQueueTest {
         val latch = CountDownLatch(subcount)
 
         // Prime the queue with a value
-        DistributedPriorityQueue(urls, queuePath).use { queue -> queue.enqueue(token, 1u) }
+        withDistributedPriorityQueue(urls, queuePath) { enqueue(token, 1u) }
 
         repeat(subcount) {
-            thread {
-                DistributedPriorityQueue(urls, queuePath)
-                    .use { queue ->
-                        repeat(count) {
-                            val v = queue.dequeue().asString
-                            v shouldEqual token
-                            queue.enqueue(v, 1u)
-                            counter.incrementAndGet()
-                        }
+            thread(latch) {
+                withDistributedPriorityQueue(urls, queuePath) {
+                    repeat(count) {
+                        val v = dequeue().asString
+                        v shouldEqual token
+                        enqueue(v, 1u)
+                        counter.incrementAndGet()
                     }
-                latch.countDown()
+                }
             }
         }
 
         latch.await()
-        DistributedPriorityQueue(urls, queuePath).use { queue ->
-            val v = queue.dequeue().asString
+        withDistributedPriorityQueue(urls, queuePath) {
+            val v = dequeue().asString
             v shouldEqual token
         }
 
@@ -217,15 +189,9 @@ class DistributedPriorityQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        DistributedPriorityQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i], i) }
-            }
+        withDistributedPriorityQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i], i) } }
 
-        DistributedPriorityQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { dequeuedData += queue.dequeue().asString }
-            }
+        withDistributedPriorityQueue(urls, queuePath) { repeat(count) { dequeuedData += dequeue().asString } }
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
@@ -244,15 +210,9 @@ class DistributedPriorityQueueTest {
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-        DistributedPriorityQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { i -> queue.enqueue(testData[i], (count - i)) }
-            }
+        withDistributedPriorityQueue(urls, queuePath) { repeat(count) { i -> enqueue(testData[i], (count - i)) } }
 
-        DistributedPriorityQueue(urls, queuePath)
-            .use { queue ->
-                repeat(count) { dequeuedData += queue.dequeue().asString }
-            }
+        withDistributedPriorityQueue(urls, queuePath) { repeat(count) { dequeuedData += dequeue().asString } }
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 

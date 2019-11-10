@@ -50,8 +50,9 @@ public class SetAndDeleteValue {
                 sleepSecs(5);
                 System.out.println(format("Deleting %s", path));
                 delete(kvClient, path);
+            } finally {
+                latch.countDown();
             }
-            latch.countDown();
         });
 
         executor.submit(() -> {
@@ -64,8 +65,9 @@ public class SetAndDeleteValue {
                             path, getValue(kvClient, path, "unset"), elapsed));
                     sleepSecs(1);
                 }
+            } finally {
+                latch.countDown();
             }
-            latch.countDown();
         });
 
         latch.await();
