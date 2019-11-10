@@ -29,13 +29,13 @@ import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.PutOption
 
-fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
+fun KV.transaction(reciever: Txn.() -> Txn): TxnResponse =
     txn().run {
-        block()
+        reciever()
         commit()
     }.get()
 
-fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
+fun Lazy<KV>.transaction(reciever: Txn.() -> Txn): TxnResponse = value.transaction(reciever)
 
 fun <T> equalTo(bytes: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(bytes, Cmp.Op.EQUAL, target)
 fun <T> lessThan(bytes: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(bytes, Cmp.Op.LESS, target)

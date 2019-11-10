@@ -30,19 +30,19 @@ import io.etcd.jetcd.Maintenance
 import io.etcd.jetcd.Watch
 
 @JvmOverloads
-fun connectToEtcd(urls: List<String>, initBlock: ClientBuilder.() -> ClientBuilder = { this }): Client =
-    etcdClient { endpoints(*urls.toTypedArray()).initBlock() }
+fun connectToEtcd(urls: List<String>, reciever: ClientBuilder.() -> ClientBuilder = { this }): Client =
+    etcdClient { endpoints(*urls.toTypedArray()).reciever() }
 
 @JvmOverloads
 fun connectToEtcd(urls: List<String>,
-                  initBlock: ClientBuilder.() -> ClientBuilder = { this },
-                  block: (client: Client) -> Unit) = connectToEtcd(urls, initBlock).use { block(it) }
+                  reciever: ClientBuilder.() -> ClientBuilder = { this },
+                  block: (client: Client) -> Unit) = connectToEtcd(urls, reciever).use { block(it) }
 
 @JvmOverloads
 fun etcdExec(urls: List<String>,
-             initBlock: ClientBuilder.() -> ClientBuilder = { this },
+             reciever: ClientBuilder.() -> ClientBuilder = { this },
              block: (client: Client, kvClient: KV) -> Unit) {
-    connectToEtcd(urls, initBlock) { client ->
+    connectToEtcd(urls, reciever) { client ->
         client.withKvClient { kvClient ->
             block(client, kvClient)
         }

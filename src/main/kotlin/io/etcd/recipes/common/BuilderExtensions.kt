@@ -30,18 +30,20 @@ import io.etcd.jetcd.options.WatchOption
 
 fun etcdClient(block: ClientBuilder.() -> ClientBuilder): Client = Client.builder().block().build()
 
-fun compactOption(block: CompactOption.Builder.() -> CompactOption.Builder): CompactOption =
-    CompactOption.newBuilder().block().build()
+fun compactOption(reciever: CompactOption.Builder.() -> CompactOption.Builder): CompactOption =
+    CompactOption.newBuilder().reciever().build()
 
-fun deleteOption(block: DeleteOption.Builder.() -> DeleteOption.Builder): DeleteOption =
-    DeleteOption.newBuilder().block().build()
+fun deleteOption(reciever: DeleteOption.Builder.() -> DeleteOption.Builder): DeleteOption =
+    DeleteOption.newBuilder().reciever().build()
 
-fun getOption(block: GetOption.Builder.() -> GetOption.Builder): GetOption = GetOption.newBuilder().block().build()
+fun getOption(reciever: GetOption.Builder.() -> GetOption.Builder): GetOption =
+    GetOption.newBuilder().reciever().build()
 
-fun leaseOption(block: LeaseOption.Builder.() -> LeaseOption.Builder): LeaseOption =
-    LeaseOption.newBuilder().block().build()
+fun leaseOption(reciever: LeaseOption.Builder.() -> LeaseOption.Builder): LeaseOption =
+    LeaseOption.newBuilder().reciever().build()
 
-fun putOption(block: PutOption.Builder.() -> PutOption.Builder): PutOption = PutOption.newBuilder().block().build()
+fun putOption(reciever: PutOption.Builder.() -> PutOption.Builder): PutOption =
+    PutOption.newBuilder().reciever().build()
 
-fun watchOption(block: WatchOption.Builder.() -> WatchOption.Builder): WatchOption =
-    WatchOption.newBuilder().block().build()
+fun watchOption(reciever: WatchOption.Builder.() -> WatchOption.Builder): WatchOption =
+    WatchOption.newBuilder().reciever().build()

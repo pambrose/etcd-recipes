@@ -16,17 +16,32 @@
 
 package io.etcd.recipes.common
 
+import io.etcd.recipes.counter.DistributedAtomicLong
 import io.etcd.recipes.queue.DistributedPriorityQueue
 import io.etcd.recipes.queue.DistributedQueue
 
-fun withDistributedQueue(urls: List<String>, queuePath: String, block: DistributedQueue.() -> Unit) {
+fun withDistributedQueue(urls: List<String>,
+                         queuePath: String,
+                         receiver: DistributedQueue.() -> Unit) {
     DistributedQueue(urls, queuePath).use { queue ->
-        queue.block()
+        queue.receiver()
     }
 }
 
-fun withDistributedPriorityQueue(urls: List<String>, queuePath: String, block: DistributedPriorityQueue.() -> Unit) {
+fun withDistributedPriorityQueue(urls: List<String>,
+                                 queuePath: String,
+                                 receiver: DistributedPriorityQueue.() -> Unit) {
     DistributedPriorityQueue(urls, queuePath).use { queue ->
-        queue.block()
+        queue.receiver()
+    }
+}
+
+@JvmOverloads
+fun withDistributedAtomicLong(urls: List<String>,
+                              counterPath: String,
+                              default: Long = 0L,
+                              receiver: DistributedAtomicLong.() -> Unit) {
+    DistributedAtomicLong(urls, counterPath, default).use { counter ->
+        counter.receiver()
     }
 }

@@ -78,5 +78,5 @@ data class ServiceInstance(val name: String,
 @JvmOverloads
 fun serviceInstance(name: String,
                     jsonPayload: String,
-                    block: ServiceInstanceBuilder.() -> ServiceInstanceBuilder = { this }): ServiceInstance =
-    ServiceInstance.newBuilder(name, jsonPayload).block().build()
+                    reciever: ServiceInstanceBuilder.() -> ServiceInstanceBuilder = { this }): ServiceInstance =
+    ServiceInstance.newBuilder(name, jsonPayload).reciever().build()
