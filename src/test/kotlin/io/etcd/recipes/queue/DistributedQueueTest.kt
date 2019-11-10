@@ -31,50 +31,124 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 class DistributedQueueTest {
-        @Test
-        fun serialTestNoWait() {
-            val queuePath = "/queue/serialTestNoWait"
-            val count = 2000
-            val testData = List(count) { "Value $it" }
-            val dequeuedData = mutableListOf<String>()
+    val count = 500
+    val subcount = 10
+    val testData = List(count) { "Value $it" }
 
-            etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+    @Test
+    fun serialTestNoWait() {
+        val queuePath = "/queue/serialTestNoWait"
+        val dequeuedData = mutableListOf<String>()
 
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        DistributedQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { i -> queue.enqueue(testData[i]) }
+            }
+
+        DistributedQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { dequeuedData += queue.dequeue().asString }
+            }
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        if (count <= 500)
+            println(dequeuedData)
+
+        dequeuedData.size shouldEqual testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
+        dequeuedData shouldEqual testData
+    }
+
+    @Test
+    fun serialTestWithWait() {
+        val queuePath = "/queue/serialTestWithWait"
+        val dequeuedData = mutableListOf<String>()
+        val latch = CountDownLatch(1)
+        val semaphore = Semaphore(1)
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        thread {
             DistributedQueue(urls, queuePath)
                 .use { queue ->
-                    repeat(count) { i -> queue.enqueue(testData[i]) }
+                    repeat(count) {
+                        semaphore.withLock {
+                            dequeuedData += queue.dequeue().asString
+                        }
+                    }
                 }
-
-            DistributedQueue(urls, queuePath)
-                .use { queue ->
-                    repeat(count) { dequeuedData += queue.dequeue().asString }
-                }
-
-            etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
-
-            if (count <= 500)
-                println(dequeuedData)
-
-            dequeuedData.size shouldEqual testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
-            dequeuedData shouldEqual testData
+            latch.countDown()
         }
 
-        @Test
-        fun serialTestWithWait() {
-            val queuePath = "/queue/serialTestWithWait"
-            val count = 2000
-            val testData = List(count) { "Value $it" }
-            val dequeuedData = mutableListOf<String>()
-            val latch = CountDownLatch(1)
-            val semaphore = Semaphore(1)
+        DistributedQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { i -> queue.enqueue(testData[i]) }
+            }
 
-            etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+        latch.await()
 
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        if (count <= 500)
+            println(dequeuedData)
+
+        dequeuedData.size shouldEqual testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
+        dequeuedData shouldEqual testData
+    }
+
+    @Test
+    fun threadedTestNoWait() {
+        val queuePath = "/queue/threadedTestNoWait"
+        val latch = CountDownLatch(subcount)
+        val dequeuedData = mutableListOf<String>()
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        DistributedQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { i -> queue.enqueue(testData[i]) }
+            }
+
+        repeat(subcount) {
             thread {
                 DistributedQueue(urls, queuePath)
                     .use { queue ->
-                        repeat(count) {
+                        repeat(count / subcount) { dequeuedData += queue.dequeue().asString }
+                    }
+                latch.countDown()
+            }
+        }
+
+        latch.await()
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        if (count <= 500)
+            println(dequeuedData)
+
+        dequeuedData.size shouldEqual testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
+        dequeuedData shouldEqual testData
+    }
+
+    @Test
+    fun threadedTestWithWait() {
+        val queuePath = "/queue/threadedTestWithWait"
+        val latch = CountDownLatch(subcount)
+        val dequeuedData = mutableListOf<String>()
+        val semaphore = Semaphore(1)
+
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+
+        repeat(subcount) {
+            thread {
+                DistributedQueue(urls, queuePath)
+                    .use { queue ->
+                        repeat(count / subcount) {
                             semaphore.withLock {
                                 dequeuedData += queue.dequeue().asString
                             }
@@ -82,121 +156,40 @@ class DistributedQueueTest {
                     }
                 latch.countDown()
             }
-
-            DistributedQueue(urls, queuePath)
-                .use { queue ->
-                    repeat(count) { i -> queue.enqueue(testData[i]) }
-                }
-
-            latch.await()
-
-            etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
-
-            if (count <= 500)
-                println(dequeuedData)
-
-            dequeuedData.size shouldEqual testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
-            dequeuedData shouldEqual testData
         }
 
-        @Test
-        fun threadedTestNoWait() {
-            val queuePath = "/queue/threadedTestNoWait"
-            val count = 2000
-            val subcount = 10
-            val latch = CountDownLatch(subcount)
-            val testData = List(count) { "Value $it" }
-            val dequeuedData = mutableListOf<String>()
-
-            etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
-
-            DistributedQueue(urls, queuePath)
-                .use { queue ->
-                    repeat(count) { i -> queue.enqueue(testData[i]) }
-                }
-
-            repeat(subcount) {
-                thread {
-                    DistributedQueue(urls, queuePath)
-                        .use { queue ->
-                            repeat(count / subcount) { dequeuedData += queue.dequeue().asString }
-                        }
-                    latch.countDown()
-                }
+        DistributedQueue(urls, queuePath)
+            .use { queue ->
+                repeat(count) { i -> queue.enqueue(testData[i]) }
             }
 
-            latch.await()
+        latch.await()
 
-            etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
+        etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
 
-            if (count <= 500)
-                println(dequeuedData)
+        if (count <= 500)
+            println(dequeuedData)
 
-            dequeuedData.size shouldEqual testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
-            dequeuedData shouldEqual testData
-        }
-
-        @Test
-        fun threadedTestWithWait() {
-            val queuePath = "/queue/threadedTestWithWait"
-            val count = 2000
-            val subcount = 10
-            val latch = CountDownLatch(subcount)
-            val testData = List(count) { "Value $it" }
-            val dequeuedData = mutableListOf<String>()
-            val semaphore = Semaphore(1)
-
-            etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
-
-            repeat(subcount) {
-                thread {
-                    DistributedQueue(urls, queuePath)
-                        .use { queue ->
-                            repeat(count / subcount) {
-                                semaphore.withLock {
-                                    dequeuedData += queue.dequeue().asString
-                                }
-                            }
-                        }
-                    latch.countDown()
-                }
-            }
-
-            DistributedQueue(urls, queuePath)
-                .use { queue ->
-                    repeat(count) { i -> queue.enqueue(testData[i]) }
-                }
-
-            latch.await()
-
-            etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
-
-            if (count <= 500)
-                println(dequeuedData)
-
-            dequeuedData.size shouldEqual testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
-            dequeuedData shouldEqual testData
-        }
+        dequeuedData.size shouldEqual testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
+        dequeuedData shouldEqual testData
+    }
 
     @Test
     fun pingPongTest() {
         val queuePath = "/queue/pingPongTest"
-        val count = 200
-        val subcount = 10
         val counter = AtomicInteger(0)
         val token = "Pong"
         val latch = CountDownLatch(subcount)
 
+        // Prime the queue with a value
         DistributedQueue(urls, queuePath).use { queue -> queue.enqueue(token) }
 
-        repeat(subcount) { threadCnt ->
+        repeat(subcount) {
             thread {
                 DistributedQueue(urls, queuePath)
                     .use { queue ->
-                        repeat(count) { i ->
+                        repeat(count) {
                             val v = queue.dequeue().asString
                             v shouldEqual token
                             queue.enqueue(v)

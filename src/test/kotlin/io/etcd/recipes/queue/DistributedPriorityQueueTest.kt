@@ -31,11 +31,13 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 class DistributedPriorityQueueTest {
+    val count = 500
+    val subcount = 10
+    val testData = List(count) { "Value $it" }
+
     @Test
     fun serialTestNoWait() {
         val queuePath = "/queue/serialTestNoWait"
-        val count = 2000
-        val testData = List(count) { "Value $it" }
         val dequeuedData = mutableListOf<String>()
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
@@ -63,8 +65,6 @@ class DistributedPriorityQueueTest {
     @Test
     fun serialTestWithWait() {
         val queuePath = "/queue/serialTestWithWait"
-        val count = 2000
-        val testData = List(count) { "Value $it" }
         val dequeuedData = mutableListOf<String>()
         val latch = CountDownLatch(1)
         val semaphore = Semaphore(1)
@@ -103,10 +103,7 @@ class DistributedPriorityQueueTest {
     @Test
     fun threadedTestNoWait() {
         val queuePath = "/queue/threadedTestNoWait"
-        val count = 2000
-        val subcount = 10
         val latch = CountDownLatch(subcount)
-        val testData = List(count) { "Value $it" }
         val dequeuedData = mutableListOf<String>()
 
         etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
@@ -141,10 +138,7 @@ class DistributedPriorityQueueTest {
     @Test
     fun threadedTestWithWait() {
         val queuePath = "/queue/threadedTestWithWait"
-        val count = 2000
-        val subcount = 10
         val latch = CountDownLatch(subcount)
-        val testData = List(count) { "Value $it" }
         val dequeuedData = mutableListOf<String>()
         val semaphore = Semaphore(1)
 
@@ -184,19 +178,18 @@ class DistributedPriorityQueueTest {
     @Test
     fun pingPongTest() {
         val queuePath = "/queue/pingPongTest"
-        val count = 200
-        val subcount = 10
         val counter = AtomicInteger(0)
         val token = "Pong"
         val latch = CountDownLatch(subcount)
 
+        // Prime the queue with a value
         DistributedPriorityQueue(urls, queuePath).use { queue -> queue.enqueue(token, 1u) }
 
-        repeat(subcount) { threadCnt ->
+        repeat(subcount) {
             thread {
                 DistributedPriorityQueue(urls, queuePath)
                     .use { queue ->
-                        repeat(count) { i ->
+                        repeat(count) {
                             val v = queue.dequeue().asString
                             v shouldEqual token
                             queue.enqueue(v, 1u)

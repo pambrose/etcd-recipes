@@ -54,7 +54,7 @@ fun main() {
         thread {
             DistributedPriorityQueue(urls, queuePath)
                 .use { queue ->
-                    repeat((count / subcount) * 2) { i -> println("$sub ${queue.dequeue().asString}") }
+                    repeat((count / subcount) * 2) { println("$sub ${queue.dequeue().asString}") }
                 }
             latch.countDown()
         }

@@ -38,7 +38,7 @@ constructor(urls: List<String>,
             val nodePath: String,
             val nodeValue: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
-            val autoStart: Boolean = true,
+            autoStart: Boolean = true,
             private val userExecutor: Executor? = null,
             val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
 
