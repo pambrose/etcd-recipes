@@ -46,7 +46,7 @@ import kotlin.time.seconds
 
 class DistributedBarrier
 @JvmOverloads
-constructor(val urls: List<String>,
+constructor(urls: List<String>,
             val barrierPath: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
             private val waitOnMissingBarriers: Boolean = true,

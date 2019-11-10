@@ -40,7 +40,7 @@ import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
 
-class ServiceCache internal constructor(val urls: List<String>,
+class ServiceCache internal constructor(urls: List<String>,
                                         val namesPath: String,
                                         val serviceName: String) : EtcdConnector(urls), Closeable {
 

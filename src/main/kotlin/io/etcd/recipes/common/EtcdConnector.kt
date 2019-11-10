@@ -25,7 +25,7 @@ import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Watch
 import java.util.Collections.synchronizedList
 
-open class EtcdConnector(urls: List<String>) {
+open class EtcdConnector(val urls: List<String>) {
 
     protected val client: Lazy<Client> = lazy { connectToEtcd(urls) }
     protected val kvClient: Lazy<KV> = lazy { client.value.kvClient }

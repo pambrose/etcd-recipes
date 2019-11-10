@@ -37,13 +37,21 @@ fun KV.transaction(block: Txn.() -> Txn): TxnResponse =
 
 fun Lazy<KV>.transaction(block: Txn.() -> Txn): TxnResponse = value.transaction(block)
 
-fun <T> equalTo(key: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(key, Cmp.Op.EQUAL, target)
-fun <T> lessThan(key: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(key, Cmp.Op.LESS, target)
-fun <T> greaterThan(key: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(key, Cmp.Op.GREATER, target)
+fun <T> equalTo(bytes: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(bytes, Cmp.Op.EQUAL, target)
+fun <T> lessThan(bytes: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(bytes, Cmp.Op.LESS, target)
+fun <T> greaterThan(bytes: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(bytes, Cmp.Op.GREATER, target)
 
-fun <T> equalTo(keyName: String, target: CmpTarget<T>): Cmp = equalTo(keyName.asByteSequence, target)
-fun <T> lessThan(keyName: String, target: CmpTarget<T>): Cmp = lessThan(keyName.asByteSequence, target)
-fun <T> greaterThan(keyName: String, target: CmpTarget<T>): Cmp = greaterThan(keyName.asByteSequence, target)
+fun <T> equalTo(value: String, target: CmpTarget<T>): Cmp = equalTo(value.asByteSequence, target)
+fun <T> lessThan(value: String, target: CmpTarget<T>): Cmp = lessThan(value.asByteSequence, target)
+fun <T> greaterThan(value: String, target: CmpTarget<T>): Cmp = greaterThan(value.asByteSequence, target)
+
+fun <T> equalTo(value: Int, target: CmpTarget<T>): Cmp = equalTo(value.asByteSequence, target)
+fun <T> lessThan(value: Int, target: CmpTarget<T>): Cmp = lessThan(value.asByteSequence, target)
+fun <T> greaterThan(value: Int, target: CmpTarget<T>): Cmp = greaterThan(value.asByteSequence, target)
+
+fun <T> equalTo(value: Long, target: CmpTarget<T>): Cmp = equalTo(value.asByteSequence, target)
+fun <T> lessThan(value: Long, target: CmpTarget<T>): Cmp = lessThan(value.asByteSequence, target)
+fun <T> greaterThan(value: Long, target: CmpTarget<T>): Cmp = greaterThan(value.asByteSequence, target)
 
 val String.doesNotExist: Cmp get() = equalTo(this, CmpTarget.version(0))
 val String.doesExist: Cmp get() = greaterThan(this, CmpTarget.version(0))

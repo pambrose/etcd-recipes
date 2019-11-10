@@ -21,6 +21,8 @@ package io.etcd.recipes.barrier
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
@@ -54,7 +56,7 @@ class DistributedBarrierWithCountTests {
         val retryCounter = AtomicInteger(0)
         val advancedCounter = AtomicInteger(0)
 
-        DistributedBarrierWithCount.delete(urls, path)
+        etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
         fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
 

@@ -22,6 +22,8 @@ import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
@@ -58,7 +60,7 @@ class DistributedDoubleBarrierTests {
         val enterCounter = AtomicInteger(0)
         val leaveCounter = AtomicInteger(0)
 
-        DistributedDoubleBarrier.delete(urls, path)
+        etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
         fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
             sleep(5.random.seconds)

@@ -18,16 +18,19 @@
 
 package io.etcd.recipes.queue
 
+import com.sudothought.common.concurrent.withLock
 import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.etcdExec
+import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.common.urls
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 class DistributedQueueTest {
-    /*
         @Test
         fun serialTestNoWait() {
             val queuePath = "/queue/serialTestNoWait"
@@ -44,9 +47,7 @@ class DistributedQueueTest {
 
             DistributedQueue(urls, queuePath)
                 .use { queue ->
-                    repeat(count) {
-                        dequeuedData += queue.dequeue().asString
-                    }
+                    repeat(count) { dequeuedData += queue.dequeue().asString }
                 }
 
             etcdExec(urls) { _, kvClient -> kvClient.getChildrenCount(queuePath) shouldEqual 0 }
@@ -119,9 +120,7 @@ class DistributedQueueTest {
                 thread {
                     DistributedQueue(urls, queuePath)
                         .use { queue ->
-                            repeat(count / subcount) {
-                                dequeuedData += queue.dequeue().asString
-                            }
+                            repeat(count / subcount) { dequeuedData += queue.dequeue().asString }
                         }
                     latch.countDown()
                 }
@@ -181,7 +180,7 @@ class DistributedQueueTest {
             repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
             dequeuedData shouldEqual testData
         }
-    */
+
     @Test
     fun pingPongTest() {
         val queuePath = "/queue/pingPongTest"
@@ -201,7 +200,6 @@ class DistributedQueueTest {
                             val v = queue.dequeue().asString
                             v shouldEqual token
                             queue.enqueue(v)
-                            //println("$threadCnt $i $v")
                             counter.incrementAndGet()
                         }
                     }

@@ -20,83 +20,24 @@ package io.etcd.recipes.queue
 
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.ByteSequence
-import io.etcd.jetcd.KeyValue
-import io.etcd.jetcd.kv.PutResponse
-import io.etcd.jetcd.op.CmpTarget
-import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.asByteSequence
-import io.etcd.recipes.common.deleteKey
-import io.etcd.recipes.common.ensureSuffix
-import io.etcd.recipes.common.equalTo
-import io.etcd.recipes.common.getOldestChild
 import io.etcd.recipes.common.putValue
-import io.etcd.recipes.common.transaction
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.watcher
-import mu.KLogging
-import java.io.Closeable
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.atomic.AtomicReference
 
-class DistributedQueue(val urls: List<String>, val queuePath: String) : EtcdConnector(urls), Closeable {
-
-    init {
-        require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
-    }
+class DistributedQueue(urls: List<String>, queuePath: String) : AbstractQueue(urls, queuePath) {
 
     fun enqueue(value: String) = enqueue(value.asByteSequence)
     fun enqueue(value: Int) = enqueue(value.asByteSequence)
     fun enqueue(value: Long) = enqueue(value.asByteSequence)
 
-    fun enqueue(value: ByteSequence): PutResponse {
+
+    fun enqueue(value: ByteSequence) {
         checkCloseNotCalled()
-        return kvClient.putValue("$queuePath/${System.currentTimeMillis()}-${randomId(3)}", value)
+        val key = keyFormat.format(queuePath, System.currentTimeMillis(), randomId(3))
+        kvClient.putValue(key, value)
     }
 
-    fun dequeue(): ByteSequence {
-        checkCloseNotCalled()
-        val childList = kvClient.getOldestChild(queuePath).kvs
-
-        if (!childList.isEmpty()) {
-            val child = childList.first()
-            // If transactional delete fails, then just call self again
-            return if (deleteRevKey(child)) child.value else dequeue()
-        }
-
-        // No values available, so wait on them
-        val watchLatch = CountDownLatch(1)
-        val trailingPath = queuePath.ensureSuffix("/").asByteSequence
-        val watchOption = watchOption { withPrefix(trailingPath) }
-        val keyFound = AtomicReference<KeyValue?>()
-        watchClient.watcher(queuePath, watchOption) { watchResponse ->
-            watchResponse.events.forEach { watchEvent ->
-                if (watchEvent.eventType == PUT) {
-                    keyFound.compareAndSet(null, watchEvent.keyValue)
-                    watchLatch.countDown()
-                }
-            }
-
-        }.use {
-            // Query again in case a value arrived just before watch was created
-            val waitingChildList = kvClient.getOldestChild(queuePath).kvs
-            if (!waitingChildList.isEmpty()) {
-                keyFound.compareAndSet(null, waitingChildList.first())
-                watchLatch.countDown()
-            }
-            watchLatch.await()
-        }
-
-        val kv: KeyValue = keyFound.get()!!
-        // If transactional delete fails, then just call self again
-        return if (deleteRevKey(kv)) kv.value else dequeue()
+    companion object {
+        private val maxLongWidth = Long.MAX_VALUE.toString().length
+        val keyFormat = "%s/%0${maxLongWidth}d-%s"
     }
-
-    private fun deleteRevKey(kv: KeyValue): Boolean =
-        kvClient.transaction {
-            If(equalTo(kv.key, CmpTarget.modRevision(kv.modRevision)))
-            Then(deleteKey(kv.key))
-        }.isSucceeded
-
-    companion object : KLogging()
 }

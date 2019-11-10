@@ -22,6 +22,8 @@ import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedDoubleBarrier
+import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.etcdExec
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -34,7 +36,7 @@ fun main() {
     val leaveLatch = CountDownLatch(count - 1)
     val doneLatch = CountDownLatch(count)
 
-    DistributedDoubleBarrier.delete(urls, barrierPath)
+    etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(barrierPath) }
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
         sleep(10.random.seconds)

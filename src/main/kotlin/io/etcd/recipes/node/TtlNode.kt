@@ -34,7 +34,7 @@ import kotlin.time.seconds
 
 class TtlNode
 @JvmOverloads
-constructor(val urls: List<String>,
+constructor(urls: List<String>,
             val nodePath: String,
             val nodeValue: String,
             val leaseTtlSecs: Long = defaultTtlSecs,

@@ -34,9 +34,7 @@ import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.ensureSuffix
-import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getChildrenCount
-import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.isKeyPresent
@@ -61,7 +59,7 @@ import kotlin.time.seconds
 */
 class DistributedBarrierWithCount
 @JvmOverloads
-constructor(val urls: List<String>,
+constructor(urls: List<String>,
             val barrierPath: String,
             val memberCount: Int,
             val leaseTtlSecs: Long = defaultTtlSecs,
@@ -190,16 +188,5 @@ constructor(val urls: List<String>,
 
     companion object {
         private fun defaultClientId() = "${DistributedBarrierWithCount::class.simpleName}:${randomId(tokenLength)}"
-
-        @JvmStatic
-        fun delete(urls: List<String>, barrierPath: String) {
-
-            require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-
-            etcdExec(urls) { _, kvClient ->
-                // Delete all children
-                kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
-            }
-        }
     }
 }

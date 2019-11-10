@@ -18,35 +18,28 @@
 
 package io.etcd.recipes.queue
 
-import com.sudothought.common.util.randomId
 import io.etcd.jetcd.ByteSequence
-import io.etcd.jetcd.kv.PutResponse
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.getLastChildByKey
-import io.etcd.recipes.common.greaterThan
-import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.lessThan
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
-import mu.KLogging
-import java.io.Closeable
 
-class DistributedPriorityQueue(val urls: List<String>, val queuePath: String) : EtcdConnector(urls), Closeable {
+class DistributedPriorityQueue(urls: List<String>, queuePath: String) : AbstractQueue(urls, queuePath) {
 
-    init {
-        require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
+    fun enqueue(value: String, priority: UShort) = enqueue(value.asByteSequence, priority)
+    fun enqueue(value: Int, priority: UShort) = enqueue(value.asByteSequence, priority)
+    fun enqueue(value: Long, priority: UShort) = enqueue(value.asByteSequence, priority)
+
+    fun enqueue(value: ByteSequence, priority: UShort) {
+        checkCloseNotCalled()
+        val prefix = "%s/%05d".format(queuePath, priority.toInt())
+        newSequentialKV(prefix, value)
     }
 
-    fun enqueue(value: String, priority: Int) = enqueue(value.asByteSequence, priority)
-    fun enqueue(value: Int, priority: Int) = enqueue(value.asByteSequence, priority)
-    fun enqueue(value: Long, priority: Int) = enqueue(value.asByteSequence, priority)
-
-    fun enqueue(value: ByteSequence, priority: Int): PutResponse {
-        checkCloseNotCalled()
-        val prefix = "%s/%05d".format(queuePath, priority)
-
+    private fun newSequentialKV(prefix: String, value: ByteSequence) {
         val resp = kvClient.getLastChildByKey(prefix)
         val kvs = resp.kvs
 
@@ -56,21 +49,16 @@ class DistributedPriorityQueue(val urls: List<String>, val queuePath: String) : 
             newSeqNum = fields[(fields.size) - 1].toInt() + 1
         }
 
-        val newKey = "%s/%016d".format(prefix, newSeqNum)
-        println("Newkey = $newKey")
-
-        val baseKey = "__$prefix"
-
         val txn =
             kvClient.transaction {
-                If(greaterThan(resp.header.revision.asByteSequence,
-                               CmpTarget.ModRevisionCmpTarget.value(baseKey.asByteSequence)))
+                val newKey = "%s/%016d".format(prefix, newSeqNum)
+                val baseKey = "__$prefix"
+                If(lessThan(baseKey, CmpTarget.modRevision(resp.header.revision + 1)))
                 Then(baseKey setTo "", newKey setTo value)
             }
 
-        return kvClient.putValue("$queuePath/${System.currentTimeMillis()}-${randomId(3)}", value)
+        if (!txn.isSucceeded)
+            newSequentialKV(prefix, value)
     }
-
-    companion object : KLogging()
 
 }

@@ -39,7 +39,7 @@ import kotlin.time.milliseconds
 
 class DistributedAtomicLong
 @JvmOverloads
-constructor(val urls: List<String>,
+constructor(urls: List<String>,
             val counterPath: String,
             private val default: Long = 0L) : EtcdConnector(urls), Closeable {
 

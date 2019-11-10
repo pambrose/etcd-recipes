@@ -45,9 +45,9 @@ import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
 import kotlin.time.seconds
 
-data class ServiceDiscovery
+class ServiceDiscovery
 @JvmOverloads
-constructor(val urls: List<String>,
+constructor(urls: List<String>,
             private val servicePath: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
             val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {

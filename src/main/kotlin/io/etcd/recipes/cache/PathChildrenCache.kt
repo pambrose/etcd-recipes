@@ -51,7 +51,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 
-class PathChildrenCache(val urls: List<String>,
+class PathChildrenCache(urls: List<String>,
                         val cachePath: String,
                         private val userExecutor: Executor? = null) : EtcdConnector(urls), Closeable {
 

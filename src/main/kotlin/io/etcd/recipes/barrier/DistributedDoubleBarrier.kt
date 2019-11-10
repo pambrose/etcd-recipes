@@ -23,9 +23,6 @@ import com.sudothought.common.util.randomId
 import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.delete
-import io.etcd.recipes.common.etcdExec
-import io.etcd.recipes.common.getChildrenKeys
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -74,18 +71,6 @@ constructor(val urls: List<String>,
 
     companion object {
         private fun defaultClientId() = "${DistributedDoubleBarrier::class.simpleName}:${randomId(tokenLength)}"
-
-        @JvmStatic
-        fun delete(urls: List<String>, barrierPath: String) {
-
-            require(urls.isNotEmpty()) { "URLs cannot be empty" }
-            require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-
-            etcdExec(urls) { _, kvClient ->
-                // Delete all children
-                kvClient.getChildrenKeys(barrierPath).forEach { kvClient.delete(it) }
-            }
-        }
     }
 }
 
