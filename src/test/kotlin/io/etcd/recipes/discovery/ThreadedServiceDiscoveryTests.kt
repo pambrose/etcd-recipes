@@ -67,7 +67,7 @@ class ThreadedServiceDiscoveryTests {
                     contextMap.values.forEach { context ->
                         context.serviceMap.forEach { (_, service) ->
                             val inst = queryForInstance(service.name, service.id)
-                            logger.info { "Retrieved value: $inst" }
+                            //logger.info { "Retrieved value: $inst" }
                             inst shouldEqual service
                         }
                     }
@@ -80,7 +80,7 @@ class ThreadedServiceDiscoveryTests {
                     val payload = TestPayload.toObject(service.jsonPayload)
                     payload.testval = payload.testval * -1
                     service.jsonPayload = payload.toJson()
-                    logger.info { "Updating service: $service" }
+                    //logger.info { "Updating service: $service" }
                     context.serviceDiscovery.updateService(service)
                 }
             }
@@ -91,7 +91,7 @@ class ThreadedServiceDiscoveryTests {
                     contextMap.values.forEach { context ->
                         context.serviceMap.forEach { (_, service) ->
                             val inst = queryForInstance(service.name, service.id)
-                            logger.info { "Retrieved updated value: $inst" }
+                            //logger.info { "Retrieved updated value: $inst" }
                             inst shouldEqual service
                         }
                     }

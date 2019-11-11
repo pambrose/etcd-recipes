@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.queue
 
+import com.sudothought.common.util.length
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
@@ -43,7 +44,6 @@ class DistributedQueue(client: Client, queuePath: String) : AbstractQueue(client
     }
 
     companion object {
-        private const val maxLongWidth = Long.MAX_VALUE.toString().length
-        private const val keyFormat = "%s/%0${maxLongWidth}d-%s"
+        private val keyFormat = "%s/%0${Long.MAX_VALUE.length()}d-%s"
     }
 }

@@ -37,7 +37,6 @@ import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
-import kotlin.time.milliseconds
 import kotlin.time.seconds
 
 class PathChildrenCacheTests {
@@ -198,7 +197,6 @@ class PathChildrenCacheTests {
 
             kvs.forEach { kv ->
                 client.putValue("${path}/${kv.first}", kv.second)
-                sleep(500.milliseconds)
                 client.putValue("${path}/${kv.first}", kv.second + suffix)
             }
 

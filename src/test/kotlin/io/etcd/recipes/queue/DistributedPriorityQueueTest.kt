@@ -50,9 +50,6 @@ class DistributedPriorityQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
         }
 
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
-
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
         dequeuedData shouldEqual testData
@@ -84,9 +81,6 @@ class DistributedPriorityQueueTest {
 
             client.getChildCount(queuePath) shouldEqual 0
         }
-
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -120,9 +114,6 @@ class DistributedPriorityQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
         }
 
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
-
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
         dequeuedData shouldEqual testData
@@ -155,9 +146,6 @@ class DistributedPriorityQueueTest {
 
             client.getChildCount(queuePath) shouldEqual 0
         }
-
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -217,9 +205,6 @@ class DistributedPriorityQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
         }
 
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
-
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
         dequeuedData shouldEqual testData
@@ -239,9 +224,6 @@ class DistributedPriorityQueueTest {
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
             client.getChildCount(queuePath) shouldEqual 0
         }
-
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[iterCount - i - 1] }

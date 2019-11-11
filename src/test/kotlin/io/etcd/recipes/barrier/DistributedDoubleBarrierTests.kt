@@ -47,7 +47,7 @@ class DistributedDoubleBarrierTests {
     }
 
     @Test
-    fun main() {
+    fun barrierTest() {
         val path = "/barriers/${javaClass.simpleName}"
         val count = 10
         val retryAttempts = 5
