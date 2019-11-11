@@ -25,6 +25,8 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.urls
+import io.etcd.recipes.keyvalue.TransientNode
+import io.etcd.recipes.keyvalue.withTransientNode
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import kotlin.time.seconds

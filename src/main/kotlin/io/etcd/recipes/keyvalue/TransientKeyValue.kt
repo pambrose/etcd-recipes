@@ -16,7 +16,7 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package io.etcd.recipes.node
+package io.etcd.recipes.keyvalue
 
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
@@ -40,7 +40,13 @@ fun <T> withTransientNode(client: Client,
                           userExecutor: Executor? = null,
                           clientId: String = defaultClientId(),
                           receiver: TransientNode.() -> T): T =
-    TransientNode(client, nodePath, nodeValue, leaseTtlSecs, autoStart, userExecutor, clientId).use { it.receiver() }
+    TransientNode(client,
+                  nodePath,
+                  nodeValue,
+                  leaseTtlSecs,
+                  autoStart,
+                  userExecutor,
+                  clientId).use { it.receiver() }
 
 class TransientNode
 @JvmOverloads
