@@ -18,11 +18,12 @@
 
 package io.etcd.recipes.cache
 
-import com.google.common.collect.Maps
-import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.google.common.collect.Maps.newConcurrentMap
+import com.sudothought.common.delegate.AtomicDelegates.nullableReference
 import com.sudothought.common.time.timeUnitToDuration
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.Client
+import io.etcd.jetcd.Watch
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
@@ -42,7 +43,6 @@ import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import mu.KLogging
-import java.io.Closeable
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -51,13 +51,19 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 
-class PathChildrenCache(val urls: List<String>,
-                        val cachePath: String,
-                        private val userExecutor: Executor? = null) : EtcdConnector(urls), Closeable {
+@JvmOverloads
+fun <T> withPathChildrenCache(client: Client,
+                              cachePath: String,
+                              userExecutor: Executor? = null,
+                              receiver: PathChildrenCache.() -> T): T =
+    PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
 
-    private var startCalled by atomicBoolean(false)
-    private val startThreadComplete = BooleanMonitor(false)
-    private val cacheMap: ConcurrentMap<String, ByteSequence> = Maps.newConcurrentMap()
+class PathChildrenCache(client: Client,
+                        val cachePath: String,
+                        private val userExecutor: Executor? = null) : EtcdConnector(client) {
+
+    private var watcher: Watch.Watcher? by nullableReference()
+    private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
     private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
     // Use a single threaded executor to maintain order
     private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
@@ -144,7 +150,7 @@ class PathChildrenCache(val urls: List<String>,
 
     private fun loadData() {
         try {
-            val kvs = kvClient.getChildren(cachePath)
+            val kvs = client.getChildren(cachePath)
             for (kv in kvs) {
                 val (k, v) = kv
                 val s = k.substring(cachePath.length + 1)
@@ -160,7 +166,7 @@ class PathChildrenCache(val urls: List<String>,
         val trailingPath = cachePath.ensureSuffix("/")
         logger.debug { "Setting up watch for $trailingPath" }
         val watchOption = watchOption { withPrefix(trailingPath.asByteSequence) }
-        watchClient.watcher(trailingPath, watchOption) { watchResponse ->
+        watcher = client.watcher(trailingPath, watchOption) { watchResponse ->
             watchResponse.events
                 .forEach { event ->
                     val (k, v) = event.keyValue.asPair
@@ -232,10 +238,6 @@ class PathChildrenCache(val urls: List<String>,
 
     fun clear() = cacheMap.clear()
 
-    private fun checkStartCalled() {
-        if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
-    }
-
     @Synchronized
     override fun close() {
         if (closeCalled)
@@ -243,13 +245,14 @@ class PathChildrenCache(val urls: List<String>,
 
         checkStartCalled()
 
+        watcher?.close()
+
         listeners.clear()
         startThreadComplete.waitUntilTrue()
 
-        // Close waiter before shutting down executor
-        super.close()
-
         if (userExecutor == null) (executor as ExecutorService).shutdown()
+
+        super.close()
     }
 
     companion object : KLogging()

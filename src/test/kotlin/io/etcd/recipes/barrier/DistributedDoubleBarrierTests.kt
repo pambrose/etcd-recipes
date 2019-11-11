@@ -18,10 +18,11 @@
 
 package io.etcd.recipes.barrier
 
-import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
@@ -39,9 +40,10 @@ class DistributedDoubleBarrierTests {
 
     @Test
     fun badArgsTest() {
-        invoking { DistributedDoubleBarrier(urls, "something", 0) } shouldThrow IllegalArgumentException::class
-        invoking { DistributedDoubleBarrier(urls, "", 1) } shouldThrow IllegalArgumentException::class
-        invoking { DistributedDoubleBarrier(emptyList(), "something", 1) } shouldThrow IllegalArgumentException::class
+        connectToEtcd(urls) { client ->
+            invoking { DistributedDoubleBarrier(client, "something", 0) } shouldThrow IllegalArgumentException::class
+            invoking { DistributedDoubleBarrier(client, "", 1) } shouldThrow IllegalArgumentException::class
+        }
     }
 
     @Test
@@ -57,8 +59,6 @@ class DistributedDoubleBarrierTests {
         val leaveRetryCounter = AtomicInteger(0)
         val enterCounter = AtomicInteger(0)
         val leaveCounter = AtomicInteger(0)
-
-        DistributedDoubleBarrier.delete(urls, path)
 
         fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
             sleep(5.random.seconds)
@@ -82,51 +82,55 @@ class DistributedDoubleBarrierTests {
         }
 
         fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-            doneLatch.countDown {
-                sleep(10.random.seconds)
+            sleep(10.random.seconds)
 
-                repeat(retryCount) {
-                    logger.info { "#$id Waiting to leave barrier" }
-                    if (it % 2 == 0)
-                        barrier.leave(1000.random.milliseconds)
-                    else
-                        barrier.leave(1000, TimeUnit.MILLISECONDS)
-                    leaveRetryCounter.incrementAndGet()
-                    logger.info { "#$id Timed out leaving barrier" }
-                }
-
-                leaveLatch.countDown()
+            repeat(retryCount) {
                 logger.info { "#$id Waiting to leave barrier" }
-                barrier.leave()
-                leaveCounter.incrementAndGet()
-                logger.info { "#$id Left barrier" }
+                if (it % 2 == 0)
+                    barrier.leave(1000.random.milliseconds)
+                else
+                    barrier.leave(1000, TimeUnit.MILLISECONDS)
+                leaveRetryCounter.incrementAndGet()
+                logger.info { "#$id Timed out leaving barrier" }
             }
+
+            leaveLatch.countDown()
+            logger.info { "#$id Waiting to leave barrier" }
+            barrier.leave()
+            leaveCounter.incrementAndGet()
+            logger.info { "#$id Left barrier" }
+            doneLatch.countDown()
         }
+
+        // Clean up leftover children
+        connectToEtcd(urls) { client -> client.deleteChildren(path) }
 
         val (finishedLatch, holder) =
             nonblockingThreads(count - 1) { i ->
-                DistributedDoubleBarrier(urls, path, count)
-                    .use { barrier ->
-                        enterBarrier(i, barrier, retryAttempts)
+                connectToEtcd(urls) { client ->
+                    withDistributedDoubleBarrier(client, path, count) {
+                        enterBarrier(i, this, retryAttempts)
                         sleep(5.random.seconds)
-                        leaveBarrier(i, barrier, retryAttempts)
+                        leaveBarrier(i, this, retryAttempts)
                     }
+                }
             }
 
-        DistributedDoubleBarrier(urls, path, count)
-            .use { barrier ->
+        connectToEtcd(urls) { client ->
+            withDistributedDoubleBarrier(client, path, count) {
                 enterLatch.await()
                 sleep(2.seconds)
 
-                barrier.enterWaiterCount.toInt() shouldEqual count - 1
-                enterBarrier(99, barrier)
+                enterWaiterCount.toInt() shouldEqual count - 1
+                enterBarrier(99, this)
 
                 leaveLatch.await()
                 sleep(2.seconds)
 
-                barrier.leaveWaiterCount.toInt() shouldEqual count - 1
-                leaveBarrier(99, barrier)
+                leaveWaiterCount.toInt() shouldEqual count - 1
+                leaveBarrier(99, this)
             }
+        }
 
         doneLatch.await()
 

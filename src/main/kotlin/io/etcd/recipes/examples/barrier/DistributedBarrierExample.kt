@@ -18,9 +18,10 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.sudothought.common.concurrent.countDown
+import com.sudothought.common.concurrent.thread
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.barrier.DistributedBarrier
+import io.etcd.recipes.barrier.withDistributedBarrier
+import io.etcd.recipes.common.connectToEtcd
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -33,36 +34,37 @@ fun main() {
     val goLatch = CountDownLatch(1)
 
     thread {
-        DistributedBarrier(urls, barrierPath)
-            .use { barrier ->
+        connectToEtcd(urls) { client ->
+            withDistributedBarrier(client, barrierPath) {
                 println("Setting Barrier")
-                barrier.setBarrier()
+                setBarrier()
                 goLatch.countDown()
                 sleep(6.seconds)
                 println("Removing Barrier")
-                barrier.removeBarrier()
+                removeBarrier()
                 sleep(3.seconds)
             }
+        }
     }
 
     repeat(count) { i ->
-        thread {
+        thread(waitLatch) {
             goLatch.await()
-            DistributedBarrier(urls, barrierPath)
-                .use { barrier ->
-                    waitLatch.countDown {
-                        println("$i Waiting on Barrier")
-                        barrier.waitOnBarrier(1.seconds)
+            connectToEtcd(urls) { client ->
+                withDistributedBarrier(client, barrierPath) {
+                    println("$i Waiting on Barrier")
+                    waitOnBarrier(1.seconds)
 
-                        println("$i Timed out waiting on barrier, waiting again")
-                        barrier.waitOnBarrier()
+                    println("$i Timed out waiting on barrier, waiting again")
+                    waitOnBarrier()
 
-                        println("$i Done Waiting on Barrier")
-                    }
+                    println("$i Done Waiting on Barrier")
                 }
+            }
         }
     }
 
     waitLatch.await()
+
     println("Done")
 }

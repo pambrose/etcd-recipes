@@ -21,11 +21,12 @@ package io.etcd.recipes.election
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
-import java.util.*
+import java.util.Collections.synchronizedList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
@@ -39,7 +40,7 @@ class ThreadedLeaderSelectorTests {
         val relinquishLeadershiptCounter = AtomicInteger(0)
 
         blockingThreads(count) {
-            val takeLeadershipAction =
+            val takeAction =
                 { selector: LeaderSelector ->
                     val pause = 3.random.seconds
                     logger.info { "${selector.clientId} elected leader for $pause" }
@@ -47,17 +48,18 @@ class ThreadedLeaderSelectorTests {
                     sleep(pause)
                 }
 
-            val relinquishLeadershipAction =
+            val relinquishAction =
                 { selector: LeaderSelector ->
                     relinquishLeadershiptCounter.incrementAndGet()
                     logger.info { "${selector.clientId} relinquished leadership" }
                 }
 
-            LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, clientId = "Thread$it")
-                .use { election ->
-                    election.start()
-                    election.waitOnLeadershipComplete()
+            connectToEtcd(urls) { client ->
+                withLeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it") {
+                    start()
+                    waitOnLeadershipComplete()
                 }
+            }
         }
 
         takeLeadershiptCounter.get() shouldEqual count
@@ -68,34 +70,38 @@ class ThreadedLeaderSelectorTests {
     fun threadedElection2Test() {
         val takeLeadershiptCounter = AtomicInteger(0)
         val relinquishLeadershiptCounter = AtomicInteger(0)
-        val electionList: MutableList<LeaderSelector> = Collections.synchronizedList(mutableListOf())
+        val electionList: MutableList<LeaderSelector> = synchronizedList(mutableListOf())
 
-        blockingThreads(count) {
-            val takeLeadershipAction =
-                { selector: LeaderSelector ->
-                    val pause = 3.random.seconds
-                    logger.info { "${selector.clientId} elected leader for $pause" }
-                    takeLeadershiptCounter.incrementAndGet()
-                    sleep(pause)
-                }
+        val takeAction =
+            { selector: LeaderSelector ->
+                val pause = 3.random.seconds
+                logger.info { "${selector.clientId} elected leader for $pause" }
+                takeLeadershiptCounter.incrementAndGet()
+                sleep(pause)
+            }
 
-            val relinquishLeadershipAction =
-                { selector: LeaderSelector ->
-                    relinquishLeadershiptCounter.incrementAndGet()
-                    logger.info { "${selector.clientId} relinquished leadership" }
-                }
+        val relinquishAction =
+            { selector: LeaderSelector ->
+                relinquishLeadershiptCounter.incrementAndGet()
+                logger.info { "${selector.clientId} relinquished leadership" }
+            }
 
-            logger.info { "Creating Thread$it" }
-            val election =
-                LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, clientId = "Thread$it")
-            electionList += election
-            election.start()
+        connectToEtcd(urls) { client ->
+            blockingThreads(count) {
+                logger.info { "Creating Thread$it" }
+
+                val election = LeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it")
+                electionList += election
+                election.start()
+
+            }
+
+            logger.info { "Size = ${electionList.size}" }
+
+            electionList
+                .onEach { it.waitOnLeadershipComplete() }
+                .forEach { it.close() }
         }
-
-        logger.info { "Size = ${electionList.size}" }
-        electionList
-            .onEach { it.waitOnLeadershipComplete() }
-            .forEach { it.close() }
 
         takeLeadershiptCounter.get() shouldEqual count
         relinquishLeadershiptCounter.get() shouldEqual count

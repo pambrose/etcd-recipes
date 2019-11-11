@@ -18,12 +18,11 @@ package io.etcd.recipes.examples.basics;
 
 import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
-import io.etcd.jetcd.KV;
 
 import java.util.List;
 
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.delete;
+import static io.etcd.recipes.common.KVUtils.deleteKeys;
 import static io.etcd.recipes.common.KVUtils.getValue;
 import static io.etcd.recipes.common.KVUtils.isKeyPresent;
 import static io.etcd.recipes.common.KVUtils.putValue;
@@ -38,28 +37,26 @@ public class SetValueWithTxn {
     private static final String keyval = "foobar";
 
     public static void main(String[] args) {
-        try (Client client = connectToEtcd(urls);
-             KV kvClient = client.getKVClient()) {
-
+        try (Client client = connectToEtcd(urls)) {
             System.out.println("Deleting keys");
-            delete(kvClient, path, keyval);
+            deleteKeys(client, path, keyval);
 
-            System.out.println(format("Key present: %s", isKeyPresent(kvClient, keyval)));
-            checkForKey(kvClient);
-            System.out.println(format("Key present: %s", isKeyPresent(kvClient, keyval)));
-            putValue(kvClient, path, "Something");
-            checkForKey(kvClient);
+            System.out.println(format("Key present: %s", isKeyPresent(client, keyval)));
+            checkForKey(client);
+            System.out.println(format("Key present: %s", isKeyPresent(client, keyval)));
+            putValue(client, path, "Something");
+            checkForKey(client);
         }
     }
 
-    private static void checkForKey(KV kvClient) {
-        transaction(kvClient, (txn) -> {
+    private static void checkForKey(Client client) {
+        transaction(client, (txn) -> {
             txn.If(getDoesExist(path));
             txn.Then(setTo(keyval, format("Key %s found", path)));
             txn.Else(setTo(keyval, format("Key %s not found", path)));
             return txn;
         });
 
-        System.out.println(format("Debug value: %s", getValue(kvClient, keyval, "not_used")));
+        System.out.println(format("Debug value: %s", getValue(client, keyval, "not_used")));
     }
 }

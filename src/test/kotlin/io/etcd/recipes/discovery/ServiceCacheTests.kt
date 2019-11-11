@@ -23,6 +23,7 @@ import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.captureException
 import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
@@ -46,11 +47,9 @@ class ServiceCacheTests {
         val holder = ExceptionHolder()
         val totalCounter = AtomicInteger(0)
 
-        ServiceDiscovery(urls, path)
-            .use { cachesd ->
-
-                cachesd.serviceCache(name).apply {
-
+        connectToEtcd(urls) { client ->
+            withServiceDiscovery(client, path) {
+                withServiceCache(name) {
                     start()
                     sleep(2.seconds)
 
@@ -82,38 +81,37 @@ class ServiceCacheTests {
                     })
 
                     addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
-                }
 
-                val (finishedLatch, holder2) =
-                    nonblockingThreads(threadCount) {
-                        ServiceDiscovery(urls, path)
-                            .use { sd ->
+                    val (finishedLatch, holder2) =
+                        nonblockingThreads(threadCount) {
+                            withServiceDiscovery(client, path) {
                                 repeat(serviceCount) {
                                     val service = ServiceInstance(name, TestPayload(it).toJson())
-                                    println("Registering: ${service.name} ${service.id}")
-                                    sd.registerService(service)
+                                    logger.info { "Registering: ${service.name} ${service.id}" }
+                                    registerService(service)
 
                                     sleep(1.seconds)
 
                                     val payload = TestPayload.toObject(service.jsonPayload)
                                     payload.testval = payload.testval * -1
                                     service.jsonPayload = payload.toJson()
-                                    println("Updating: ${service.name} ${service.id}")
-                                    sd.updateService(service)
+                                    logger.info { "Updating: ${service.name} ${service.id}" }
+                                    updateService(service)
 
                                     sleep(1.seconds)
 
-                                    println("Unregistering: ${service.name} ${service.id}")
-                                    sd.unregisterService(service)
+                                    logger.info { "Unregistering: ${service.name} ${service.id}" }
+                                    unregisterService(service)
 
                                     sleep(1.seconds)
                                 }
                             }
-                    }
-
-                finishedLatch.await()
-                holder2.checkForException()
+                        }
+                    finishedLatch.await()
+                    holder2.checkForException()
+                }
             }
+        }
 
         // Wait for deletes to propagate
         sleep(5.seconds)

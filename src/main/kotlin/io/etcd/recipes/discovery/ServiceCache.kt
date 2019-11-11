@@ -18,9 +18,11 @@
 
 package io.etcd.recipes.discovery
 
-import com.google.common.collect.Maps
+import com.google.common.collect.Maps.newConcurrentMap
 import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.sudothought.common.delegate.AtomicDelegates
+import io.etcd.jetcd.Client
+import io.etcd.jetcd.Watch
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
@@ -28,27 +30,26 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withPrefix
 import mu.KLogging
-import java.io.Closeable
-import java.util.*
+import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
 
-class ServiceCache internal constructor(val urls: List<String>,
+class ServiceCache internal constructor(client: Client,
                                         val namesPath: String,
-                                        val serviceName: String) : EtcdConnector(urls), Closeable {
+                                        val serviceName: String) : EtcdConnector(client) {
 
-    private var startCalled by atomicBoolean(false)
+    private var watcher: Watch.Watcher? by AtomicDelegates.nullableReference()
     private var dataPreloaded = BooleanMonitor(false)
     private val servicePath = namesPath.appendToPath(serviceName)
-    private val serviceMap: ConcurrentMap<String, String> = Maps.newConcurrentMap()
-    private val listeners: MutableList<ServiceCacheListener> = Collections.synchronizedList(mutableListOf())
+    private val serviceMap: ConcurrentMap<String, String> = newConcurrentMap()
+    private val listeners: MutableList<ServiceCacheListener> = synchronizedList(mutableListOf())
 
     init {
         require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }
@@ -60,10 +61,10 @@ class ServiceCache internal constructor(val urls: List<String>,
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
 
-        val trailingServicePath = servicePath.ensureSuffix("/").asByteSequence
+        val trailingServicePath = servicePath.ensureSuffix("/")
         val trailingNamesPath = namesPath.ensureSuffix("/")
         val watchOption = watchOption { withPrefix(trailingServicePath) }
-        watchClient.watcher(trailingServicePath, watchOption) { watchResponse ->
+        watcher = client.watcher(trailingServicePath, watchOption) { watchResponse ->
             // Wait for data to be loaded
             dataPreloaded.waitUntilTrue()
 
@@ -101,10 +102,11 @@ class ServiceCache internal constructor(val urls: List<String>,
                         else         -> logger.error { "Unknown error with $servicePath watch" }
                     }
                 }
+            startThreadComplete.set(true)
         }
 
         // Preload with initial data
-        val kvs = kvClient.getChildren(trailingServicePath)
+        val kvs = client.getChildren(trailingServicePath)
         for (kv in kvs) {
             val (k, v) = kv
             val stripped = k.substring(trailingNamesPath.length)
@@ -141,6 +143,21 @@ class ServiceCache internal constructor(val urls: List<String>,
     fun addListenerForChanges(listener: ServiceCacheListener) {
         checkCloseNotCalled()
         listeners += listener
+    }
+
+    @Synchronized
+    override fun close() {
+        if (closeCalled)
+            return
+
+        checkStartCalled()
+
+        watcher?.close()
+
+        listeners.clear()
+        startThreadComplete.waitUntilTrue()
+
+        super.close()
     }
 
     companion object : KLogging()

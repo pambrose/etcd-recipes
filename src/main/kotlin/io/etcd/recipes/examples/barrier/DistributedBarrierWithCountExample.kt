@@ -18,10 +18,12 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedBarrierWithCount
+import io.etcd.recipes.barrier.withDistributedBarrierWithCount
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteChildren
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -33,42 +35,45 @@ fun main() {
     val waitLatch = CountDownLatch(count)
     val retryLatch = CountDownLatch(count - 1)
 
-    DistributedBarrierWithCount.delete(urls, barrierPath)
-
     fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
-        waitLatch.countDown {
-            sleep(10.random.seconds)
-            println("#$id Waiting on barrier")
+        sleep(10.random.seconds)
+        println("#$id Waiting on barrier")
 
-            repeat(retryCount) {
-                barrier.waitOnBarrier(2.seconds)
-                println("#$id Timed out waiting on barrier, waiting again")
-            }
-
-            retryLatch.countDown()
-
-            println("#$id Waiter count = ${barrier.waiterCount}")
-            barrier.waitOnBarrier()
-            println("#$id Done waiting on barrier")
+        repeat(retryCount) {
+            barrier.waitOnBarrier(2.seconds)
+            println("#$id Timed out waiting on barrier, waiting again")
         }
+
+        retryLatch.countDown()
+
+        println("#$id Waiter count = ${barrier.waiterCount}")
+        barrier.waitOnBarrier()
+        println("#$id Done waiting on barrier")
+        waitLatch.countDown()
+    }
+
+    connectToEtcd(urls) { client ->
+        client.deleteChildren(barrierPath)
     }
 
     repeat(count - 1) { i ->
         thread {
-            DistributedBarrierWithCount(urls, barrierPath, count)
-                .use { barrier ->
-                    waiter(i, barrier, 5)
+            connectToEtcd(urls) { client ->
+                withDistributedBarrierWithCount(client, barrierPath, count) {
+                    waiter(i, this, 5)
                 }
+            }
         }
     }
 
     retryLatch.await()
     sleep(2.seconds)
 
-    DistributedBarrierWithCount(urls, barrierPath, count)
-        .use { barrier ->
-            waiter(99, barrier)
+    connectToEtcd(urls) { client ->
+        withDistributedBarrierWithCount(client, barrierPath, count) {
+            waiter(99, this)
         }
+    }
 
     waitLatch.await()
 

@@ -18,10 +18,12 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.sudothought.common.concurrent.countDown
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedDoubleBarrier
+import io.etcd.recipes.barrier.withDistributedDoubleBarrier
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteChildren
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -33,8 +35,6 @@ fun main() {
     val enterLatch = CountDownLatch(count - 1)
     val leaveLatch = CountDownLatch(count - 1)
     val doneLatch = CountDownLatch(count)
-
-    DistributedDoubleBarrier.delete(urls, barrierPath)
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
         sleep(10.random.seconds)
@@ -53,44 +53,49 @@ fun main() {
     }
 
     fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-        doneLatch.countDown {
-            sleep(10.random.seconds)
+        sleep(10.random.seconds)
 
-            repeat(retryCount) {
-                println("#$id Waiting to leave barrier")
-                barrier.leave(2.seconds)
-                println("#$id Timed out leaving barrier")
-            }
-
-            leaveLatch.countDown()
-
+        repeat(retryCount) {
             println("#$id Waiting to leave barrier")
-            barrier.leave()
-            println("#$id Left barrier")
+            barrier.leave(2.seconds)
+            println("#$id Timed out leaving barrier")
         }
+
+        leaveLatch.countDown()
+
+        println("#$id Waiting to leave barrier")
+        barrier.leave()
+        println("#$id Left barrier")
+        doneLatch.countDown()
+    }
+
+    connectToEtcd(urls) { client ->
+        client.deleteChildren(barrierPath)
     }
 
     repeat(count - 1) { i ->
         thread {
-            DistributedDoubleBarrier(urls, barrierPath, count)
-                .use { barrier ->
-                    enterBarrier(i, barrier, 2)
+            connectToEtcd(urls) { client ->
+                withDistributedDoubleBarrier(client, barrierPath, count) {
+                    enterBarrier(i, this, 2)
                     sleep(5.random.seconds)
-                    leaveBarrier(i, barrier, 2)
+                    leaveBarrier(i, this, 2)
                 }
+            }
         }
     }
 
-    DistributedDoubleBarrier(urls, barrierPath, count)
-        .use { barrier ->
+    connectToEtcd(urls) { client ->
+        withDistributedDoubleBarrier(client, barrierPath, count) {
             enterLatch.await()
             sleep(2.seconds)
-            enterBarrier(99, barrier)
+            enterBarrier(99, this)
 
             leaveLatch.await()
             sleep(2.seconds)
-            leaveBarrier(99, barrier)
+            leaveBarrier(99, this)
         }
+    }
 
     doneLatch.await()
 

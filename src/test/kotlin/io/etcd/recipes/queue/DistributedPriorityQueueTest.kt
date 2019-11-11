@@ -20,7 +20,6 @@ package io.etcd.recipes.queue
 
 import com.sudothought.common.concurrent.thread
 import com.sudothought.common.concurrent.withLock
-import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -33,12 +32,11 @@ import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.seconds
 
-class DistributedQueueTest {
+class DistributedPriorityQueueTest {
     val iterCount = 500
     val threadCount = 10
-    val testData = List(iterCount) { "V $it" }
+    val testData = List(iterCount) { "V %04d".format(it) }
 
     @Test
     fun serialTestNoWait() {
@@ -46,10 +44,9 @@ class DistributedQueueTest {
         val dequeuedData = mutableListOf<String>()
 
         connectToEtcd(urls) { client ->
-            client.deleteChildren(queuePath)
             client.getChildCount(queuePath) shouldEqual 0
-            withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
-            withDistributedQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
+            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
+            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
             client.getChildCount(queuePath) shouldEqual 0
         }
 
@@ -64,25 +61,24 @@ class DistributedQueueTest {
     @Test
     fun serialTestWithWait() {
         val queuePath = "/queue/serialTestWithWait"
-        val dequeuedData = synchronizedList(mutableListOf<String>())
+        val dequeuedData = mutableListOf<String>()
         val latch = CountDownLatch(1)
         val semaphore = Semaphore(1)
 
         connectToEtcd(urls) { client ->
-            client.deleteChildren(queuePath)
             client.getChildCount(queuePath) shouldEqual 0
 
             thread(latch) {
                 connectToEtcd(urls) { client ->
-                    withDistributedQueue(client, queuePath) {
-                        repeat(iterCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
+                    withDistributedPriorityQueue(client, queuePath) {
+                        repeat(iterCount) {
+                            semaphore.withLock { dequeuedData += dequeue().asString }
+                        }
                     }
                 }
             }
 
-            sleep(2.seconds)
-
-            withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
+            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
             latch.await()
 
@@ -101,20 +97,19 @@ class DistributedQueueTest {
     fun threadedTestNoWait() {
         val queuePath = "/queue/threadedTestNoWait"
         val latch = CountDownLatch(threadCount)
-        val dequeuedData = synchronizedList(mutableListOf<String>())
-        val semaphore = Semaphore(1)
+        val dequeuedData = mutableListOf<String>()
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
             client.getChildCount(queuePath) shouldEqual 0
 
-            withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
+            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
             repeat(threadCount) {
                 thread(latch) {
                     connectToEtcd(urls) { client ->
-                        withDistributedQueue(client, queuePath) {
-                            repeat(iterCount / threadCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
+                        withDistributedPriorityQueue(client, queuePath) {
+                            repeat(iterCount / threadCount) { dequeuedData += dequeue().asString }
                         }
                     }
                 }
@@ -144,25 +139,17 @@ class DistributedQueueTest {
             client.deleteChildren(queuePath)
             client.getChildCount(queuePath) shouldEqual 0
 
-            repeat(threadCount) { t ->
+            repeat(threadCount) {
                 thread(latch) {
-                    withDistributedQueue(client, queuePath) {
-                        repeat(iterCount / threadCount) {
-                            semaphore.withLock { dequeuedData += dequeue().asString }
+                    connectToEtcd(urls) { client ->
+                        withDistributedPriorityQueue(client, queuePath) {
+                            repeat(iterCount / threadCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
                         }
                     }
                 }
             }
 
-            sleep(2.seconds)
-
-            withDistributedQueue(client, queuePath) {
-                repeat(iterCount) { i ->
-                    val v = testData[i]
-                    enqueue(v)
-                    //println("Enqueued: $v")
-                }
-            }
+            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
             latch.await()
 
@@ -187,17 +174,17 @@ class DistributedQueueTest {
 
         // Prime the queue with a value
         connectToEtcd(urls) { client ->
-            withDistributedQueue(client, queuePath) { enqueue(token) }
+            withDistributedPriorityQueue(client, queuePath) { enqueue(token, 1u) }
         }
 
         repeat(threadCount) {
             thread(latch) {
                 connectToEtcd(urls) { client ->
-                    withDistributedQueue(client, queuePath) {
+                    withDistributedPriorityQueue(client, queuePath) {
                         repeat(iterCount) {
                             val v = dequeue().asString
                             v shouldEqual token
-                            enqueue(v)
+                            enqueue(v, 1u)
                             counter.incrementAndGet()
                         }
                     }
@@ -208,13 +195,57 @@ class DistributedQueueTest {
         latch.await()
 
         connectToEtcd(urls) { client ->
-            withDistributedQueue(client, queuePath) {
+            withDistributedPriorityQueue(client, queuePath) {
                 val v = dequeue().asString
                 v shouldEqual token
             }
         }
 
         counter.get() shouldEqual threadCount * iterCount
+    }
+
+    @Test
+    fun serialTestNoWaitWithPriorities() {
+        val queuePath = "/queue/serialTestNoWaitWithPriorities"
+        val dequeuedData = mutableListOf<String>()
+
+        connectToEtcd(urls) { client ->
+            client.deleteChildren(queuePath)
+            client.getChildCount(queuePath) shouldEqual 0
+            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], i) } }
+            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
+            client.getChildCount(queuePath) shouldEqual 0
+        }
+
+        if (iterCount <= 500)
+            logger.info { dequeuedData }
+
+        dequeuedData.size shouldEqual testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
+        dequeuedData shouldEqual testData
+    }
+
+    @Test
+    fun serialTestNoWaitWithReversedPriorities() {
+        val queuePath = "/queue/serialTestNoWaitWithReversedPriorities"
+        val dequeuedData = mutableListOf<String>()
+
+        connectToEtcd(urls) { client ->
+            client.deleteChildren(queuePath)
+            client.getChildCount(queuePath) shouldEqual 0
+            withDistributedPriorityQueue(client, queuePath) {
+                repeat(iterCount) { i -> enqueue(testData[i], (iterCount - i)) }
+            }
+            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
+            client.getChildCount(queuePath) shouldEqual 0
+        }
+
+        if (iterCount <= 500)
+            logger.info { dequeuedData }
+
+        dequeuedData.size shouldEqual testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[iterCount - i - 1] }
+        dequeuedData shouldEqual testData.reversed()
     }
 
     companion object : KLogging()

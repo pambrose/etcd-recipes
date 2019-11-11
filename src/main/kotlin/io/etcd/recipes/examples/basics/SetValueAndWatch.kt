@@ -18,19 +18,16 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.sudothought.common.concurrent.countDown
+import com.sudothought.common.concurrent.thread
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
 import io.etcd.jetcd.watch.WatchResponse
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.delete
-import io.etcd.recipes.common.etcdExec
+import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.putValue
-import io.etcd.recipes.common.watcher
-import io.etcd.recipes.common.withWatchClient
+import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.CountDownLatch
-import kotlin.concurrent.thread
 import kotlin.time.seconds
 
 fun main() {
@@ -39,40 +36,32 @@ fun main() {
     val keyval = "foobar"
     val latch = CountDownLatch(2)
 
-    thread {
-        latch.countDown {
-            sleep(3.seconds)
-
-            etcdExec(urls) { _, kvClient ->
-                repeatWithSleep(10) { i, _ ->
-                    val kv = keyval + i
-                    println("Assigning $path = $kv")
-                    kvClient.putValue(path, kv)
-                    sleep(2.seconds)
-                    println("Deleting $path")
-                    kvClient.delete(path)
-                }
+    thread(latch) {
+        sleep(3.seconds)
+        connectToEtcd(urls) { client ->
+            repeatWithSleep(10) { i, _ ->
+                val kv = keyval + i
+                println("Assigning $path = $kv")
+                client.putValue(path, kv)
+                sleep(2.seconds)
+                println("Deleting $path")
+                client.deleteKey(path)
             }
         }
     }
 
-    thread {
-        latch.countDown {
-            connectToEtcd(urls) { client ->
-                client.withWatchClient { watchClient ->
-                    watchClient.watcher(path) { watchResponse: WatchResponse ->
-                        watchResponse.events
-                            .forEach { watchEvent ->
-                                println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asString}")
-                            }
-                    }.use {
-                        println("Started watch")
-                        sleep(10.seconds)
-                        println("Closing watch")
-                    }
-                    println("Closed watch")
-                }
+    thread(latch) {
+        connectToEtcd(urls) { client ->
+            client.withWatcher(path,
+                               block = { watchResponse: WatchResponse ->
+                                   for (event in watchResponse.events)
+                                       println("Watch event: ${event.eventType} ${event.keyValue.asString}")
+                               }) {
+                println("Started watch")
+                sleep(10.seconds)
+                println("Closing watch")
             }
+            println("Closed watch")
         }
     }
 

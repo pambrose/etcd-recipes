@@ -18,10 +18,11 @@
 
 package io.etcd.recipes.examples.counter
 
-import com.sudothought.common.concurrent.countDown
+import com.sudothought.common.concurrent.thread
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.counter.DistributedAtomicLong
+import io.etcd.recipes.counter.withDistributedAtomicLong
 import java.util.concurrent.CountDownLatch
-import kotlin.concurrent.thread
 import kotlin.time.measureTimedValue
 
 fun main() {
@@ -31,26 +32,26 @@ fun main() {
     val repeatCount = 10
     val latch = CountDownLatch(threadCount)
 
-    DistributedAtomicLong.delete(urls, path)
+    connectToEtcd(urls) { client ->
 
-    val (_, dur) =
-        measureTimedValue {
-            repeat(threadCount) { i ->
-                thread {
-                    latch.countDown {
+        DistributedAtomicLong.delete(client, path)
+
+        val (_, dur) =
+            measureTimedValue {
+                repeat(threadCount) { i ->
+                    thread(latch) {
                         println("Creating counter #$i")
-                        DistributedAtomicLong(urls, path)
-                            .use { counter ->
-                                repeat(repeatCount) { counter.increment() }
-                                repeat(repeatCount) { counter.decrement() }
-                                repeat(repeatCount) { counter.add(5) }
-                                repeat(repeatCount) { counter.subtract(5) }
-                            }
+                        withDistributedAtomicLong(client, path) {
+                            repeat(repeatCount) { increment() }
+                            repeat(repeatCount) { decrement() }
+                            repeat(repeatCount) { add(5) }
+                            repeat(repeatCount) { subtract(5) }
+                        }
                     }
                 }
+                latch.await()
             }
-            latch.await()
-        }
 
-    DistributedAtomicLong(urls, path).use { println("Counter value = ${it.get()} in $dur") }
+        withDistributedAtomicLong(client, path) { println("Counter value = ${get()} in $dur") }
+    }
 }

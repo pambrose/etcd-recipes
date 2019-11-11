@@ -17,6 +17,7 @@
 package io.etcd.recipes.examples.election;
 
 import com.google.common.collect.Lists;
+import io.etcd.jetcd.Client;
 import io.etcd.recipes.election.LeaderSelector;
 import io.etcd.recipes.election.LeaderSelectorListener;
 
@@ -24,6 +25,7 @@ import java.util.List;
 
 import static com.sudothought.common.util.Misc.random;
 import static com.sudothought.common.util.Misc.sleepSecs;
+import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static java.lang.String.format;
 
 public class LeaderSelectorExample {
@@ -49,29 +51,32 @@ public class LeaderSelectorExample {
                     }
                 };
 
-        System.out.println("Single leader is created and repeatedly runs for election");
-        try (LeaderSelector selector = new LeaderSelector(urls, electionPath, listener)) {
-            for (int i = 0; i < count; i++) {
+        try (Client client = connectToEtcd(urls)) {
+
+            System.out.println("Single leader is created and repeatedly runs for election");
+            try (LeaderSelector selector = new LeaderSelector(client, electionPath, listener)) {
+                for (int i = 0; i < count; i++) {
+                    selector.start();
+
+                    selector.waitOnLeadershipComplete();
+                }
+            }
+
+            System.out.println("\nMultiple leaders are created and each runs for election once");
+            List<LeaderSelector> selectors = Lists.newArrayList();
+            for (int i = 0; i < count; i++)
+                selectors.add(new LeaderSelector(client, electionPath, listener));
+
+            for (LeaderSelector selector : selectors)
                 selector.start();
 
+            System.out.println(format("Participants: %s", LeaderSelector.getParticipants(client, electionPath)));
+
+            for (LeaderSelector selector : selectors)
                 selector.waitOnLeadershipComplete();
-            }
+
+            for (LeaderSelector selector : selectors)
+                selector.close();
         }
-
-        System.out.println("\nMultiple leaders are created and each runs for election once");
-        List<LeaderSelector> selectors = Lists.newArrayList();
-        for (int i = 0; i < count; i++)
-            selectors.add(new LeaderSelector(urls, electionPath, listener));
-
-        for (LeaderSelector selector : selectors)
-            selector.start();
-
-        System.out.println(format("Participants: %s", LeaderSelector.getParticipants(urls, electionPath)));
-
-        for (LeaderSelector selector : selectors)
-            selector.waitOnLeadershipComplete();
-
-        for (LeaderSelector selector : selectors)
-            selector.close();
     }
 }

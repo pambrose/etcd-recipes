@@ -18,10 +18,10 @@
 
 package io.etcd.recipes.examples.basics
 
-import io.etcd.jetcd.KV
-import io.etcd.recipes.common.delete
+import io.etcd.jetcd.Client
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteKeys
 import io.etcd.recipes.common.doesExist
-import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.putValue
@@ -33,24 +33,24 @@ fun main() {
     val path = "/txnexample"
     val keyval = "debug"
 
-    fun checkForKey(kvClient: KV) {
-        kvClient.transaction {
+    fun checkForKey(client: Client) {
+        client.transaction {
             If(path.doesExist)
             Then(keyval setTo "Key $path found")
             Else(keyval setTo "Key $path not found")
         }
 
-        println("Debug value: ${kvClient.getValue(keyval, "not_used")}")
+        println("Debug value: ${client.getValue(keyval, "not_used")}")
     }
 
-    etcdExec(urls) { _, kvClient ->
+    connectToEtcd(urls) { client ->
         println("Deleting keys")
-        kvClient.delete(path, keyval)
+        client.deleteKeys(path, keyval)
 
-        println("Key present: ${kvClient.isKeyPresent(keyval)}")
-        checkForKey(kvClient)
-        println("Key present: ${kvClient.isKeyPresent(keyval)}")
-        kvClient.putValue(path, "Something")
-        checkForKey(kvClient)
+        println("Key present: ${client.isKeyPresent(keyval)}")
+        checkForKey(client)
+        println("Key present: ${client.isKeyPresent(keyval)}")
+        client.putValue(path, "Something")
+        checkForKey(client)
     }
 }

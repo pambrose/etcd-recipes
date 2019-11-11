@@ -16,40 +16,53 @@
 
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
-package io.etcd.recipes.node
+package io.etcd.recipes.keyvalue
 
-import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.delegate.AtomicDelegates
 import com.sudothought.common.util.randomId
+import io.etcd.jetcd.Client
+import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.putValueWithKeepAlive
 import mu.KLogging
-import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.time.seconds
 
-class TtlNode
 @JvmOverloads
-constructor(val urls: List<String>,
+fun <T> withTransientNode(client: Client,
+                          nodePath: String,
+                          nodeValue: String,
+                          leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+                          autoStart: Boolean = true,
+                          userExecutor: Executor? = null,
+                          clientId: String = defaultClientId(),
+                          receiver: TransientNode.() -> T): T =
+    TransientNode(client,
+                  nodePath,
+                  nodeValue,
+                  leaseTtlSecs,
+                  autoStart,
+                  userExecutor,
+                  clientId).use { it.receiver() }
+
+class TransientNode
+@JvmOverloads
+constructor(client: Client,
             val nodePath: String,
             val nodeValue: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
-            val autoStart: Boolean = true,
+            autoStart: Boolean = true,
             private val userExecutor: Executor? = null,
-            val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
+            val clientId: String = defaultClientId()) : EtcdConnector(client) {
 
     private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
-    private val startThreadComplete = BooleanMonitor(false)
-    private var startCalled by AtomicDelegates.atomicBoolean(false)
     private val keepAliveWaitLatch = CountDownLatch(1)
     private val keepAliveStartedLatch = CountDownLatch(1)
 
     init {
-        require(urls.isNotEmpty()) { "URLs cannot be empty" }
         require(nodePath.isNotEmpty()) { "Node path cannot be empty" }
 
         if (autoStart)
@@ -57,7 +70,7 @@ constructor(val urls: List<String>,
     }
 
     @Synchronized
-    fun start(): TtlNode {
+    fun start(): TransientNode {
         if (startCalled)
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
@@ -66,7 +79,7 @@ constructor(val urls: List<String>,
             try {
                 val leaseTtl = leaseTtlSecs.seconds
                 logger.info { "$leaseTtl keep-alive started for $clientId $nodePath" }
-                kvClient.value.putValueWithKeepAlive(client.value, nodePath, nodeValue, leaseTtl) {
+                client.putValueWithKeepAlive(nodePath, nodeValue, leaseTtl) {
                     keepAliveStartedLatch.countDown()
                     keepAliveWaitLatch.await()
                     logger.info { "$leaseTtl keep-alive terminated for $clientId $nodePath" }
@@ -85,10 +98,6 @@ constructor(val urls: List<String>,
         return this
     }
 
-    private fun checkStartCalled() {
-        if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
-    }
-
     @Synchronized
     override fun close() {
         if (closeCalled)
@@ -99,13 +108,12 @@ constructor(val urls: List<String>,
         keepAliveWaitLatch.countDown()
         startThreadComplete.waitUntilTrue()
 
-        // Close client and kvClient before shutting down executor
-        super.close()
-
         if (userExecutor == null) (executor as ExecutorService).shutdown()
+
+        super.close()
     }
 
     companion object : KLogging() {
-        private fun defaultClientId() = "${TtlNode::class.simpleName}:${randomId(tokenLength)}"
+        internal fun defaultClientId() = "${TransientNode::class.simpleName}:${randomId(tokenLength)}"
     }
 }

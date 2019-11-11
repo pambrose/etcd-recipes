@@ -18,47 +18,46 @@
 
 package io.etcd.recipes.examples.queue
 
-import com.sudothought.common.concurrent.thread
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
-import io.etcd.recipes.queue.withDistributedQueue
+import io.etcd.recipes.queue.withDistributedPriorityQueue
 import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
-    val queuePath = "/queue/example"
+    val queuePath = "/priorityqueue/example"
     val iterCount = 50
     val threadCount = 5
 
     connectToEtcd(urls) { client ->
-
+        // client.deleteChildren("/")
         println("Count: ${client.getChildCount(queuePath)}")
 
         // Enqueue some data prior to dequeues
-        withDistributedQueue(client, queuePath) {
-            repeat(iterCount) { i -> enqueue("Before value $i") }
+        withDistributedPriorityQueue(client, queuePath) {
+            repeat(iterCount) { i ->
+                enqueue("Value $i",
+                        iterCount - i)
+            }
         }
 
+        // println(client.getChildrenKeys("/").sorted().joinToString("\n"))
+
         val latch = CountDownLatch(threadCount)
-        repeat(threadCount) { sub ->
-            thread(latch) {
-                connectToEtcd(urls) { client ->
-                    withDistributedQueue(client, queuePath) {
-                        repeat((iterCount / threadCount) * 2) { println("Thread#: $sub Value: ${dequeue().asString}") }
-                    }
+        repeat(threadCount) { i ->
+            thread {
+                withDistributedPriorityQueue(client, queuePath) {
+                    repeat((iterCount / threadCount)) { println("Thread#: $i ${dequeue().asString}") }
                 }
+                latch.countDown()
             }
         }
 
         sleep(2.seconds)
-
-        // Now enqueue some data with dequeues waiting
-        withDistributedQueue(client, queuePath) {
-            repeat(iterCount) { i -> enqueue("After value $i") }
-        }
 
         latch.await()
 

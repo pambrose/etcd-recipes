@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-@file:JvmName("ClientUtils")
 @file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
 
 package io.etcd.recipes.common
 
-import io.etcd.jetcd.Client
-import io.etcd.jetcd.ClientBuilder
+import org.amshove.kluent.invoking
+import org.amshove.kluent.shouldThrow
+import org.junit.jupiter.api.Test
 
-@JvmOverloads
-fun connectToEtcd(urls: List<String>, initReciever: ClientBuilder.() -> ClientBuilder = { this }): Client {
-    require(urls.isNotEmpty()) { "URLs cannot be empty" }
-    return etcdClient { endpoints(*urls.toTypedArray()).initReciever() }
+class ConnectTest {
+
+    @Test
+    fun badArgsTest() {
+        invoking { connectToEtcd(emptyList()) { this } } shouldThrow IllegalArgumentException::class
+    }
+
 }
-
-@JvmOverloads
-fun <T> connectToEtcd(urls: List<String>,
-                      initReciever: ClientBuilder.() -> ClientBuilder = { this },
-                      block: (client: Client) -> T): T = connectToEtcd(urls, initReciever).use { block(it) }

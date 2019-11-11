@@ -19,16 +19,17 @@
 package io.etcd.recipes.examples.discovery
 
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.discovery.ServiceDiscovery
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.ServiceInstance
+import io.etcd.recipes.discovery.withServiceDiscovery
 import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
     val servicePath = "/services/test"
 
-    ServiceDiscovery(urls, servicePath)
-        .use { sd ->
+    connectToEtcd(urls) { client ->
+        withServiceDiscovery(client, servicePath) {
 
             val payload = IntPayload(-999)
             val service = ServiceInstance("TestName", payload.toJson())
@@ -36,32 +37,33 @@ fun main() {
             println(service.toJson())
 
             println("Registering")
-            sd.registerService(service)
-            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-            println("Retrieved values: ${sd.queryForInstances(service.name)}")
-            println("Retrieved names: ${sd.queryForNames()}")
+            registerService(service)
+            println("Retrieved value: ${queryForInstance(service.name, service.id)}")
+            println("Retrieved values: ${queryForInstances(service.name)}")
+            println("Retrieved names: ${queryForNames()}")
 
 
             sleep(2.seconds)
             println("Updating")
             payload.intval = -888
             service.jsonPayload = payload.toJson()
-            sd.updateService(service)
-            println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
-            println("Retrieved values: ${sd.queryForInstances(service.name)}")
-            println("Retrieved names: ${sd.queryForNames()}")
+            updateService(service)
+            println("Retrieved value: ${queryForInstance(service.name, service.id)}")
+            println("Retrieved values: ${queryForInstances(service.name)}")
+            println("Retrieved names: ${queryForNames()}")
 
             sleep(2.seconds)
             println("Unregistering")
-            sd.unregisterService(service)
+            unregisterService(service)
             sleep(3.seconds)
 
             try {
-                println("Retrieved value: ${sd.queryForInstance(service.name, service.id)}")
+                println("Retrieved value: ${queryForInstance(service.name, service.id)}")
             } catch (e: Throwable) {
                 println("Exception: $e")
             }
 
             sleep(2.seconds)
         }
+    }
 }
