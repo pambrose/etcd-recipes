@@ -19,10 +19,10 @@
 
 package io.etcd.recipes.common
 
-import io.etcd.jetcd.Lock
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.lock.LockResponse
 import io.etcd.jetcd.lock.UnlockResponse
 
-fun Lock.lock(keyName: String, leaseId: Long): LockResponse = lock(keyName.asByteSequence, leaseId).get()
+fun Client.lock(keyName: String, leaseId: Long): LockResponse = lockClient.lock(keyName.asByteSequence, leaseId).get()
 
-fun Lock.unlock(keyName: String): UnlockResponse = unlock(keyName.asByteSequence).get()
+fun Client.unlock(keyName: String): UnlockResponse = lockClient.unlock(keyName.asByteSequence).get()
