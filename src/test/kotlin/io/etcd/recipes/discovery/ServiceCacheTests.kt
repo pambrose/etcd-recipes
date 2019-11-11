@@ -87,7 +87,7 @@ class ServiceCacheTests {
                             withServiceDiscovery(client, path) {
                                 repeat(serviceCount) {
                                     val service = ServiceInstance(name, TestPayload(it).toJson())
-                                    logger.info { "Registering: ${service.name} ${service.id}" }
+                                    //logger.info { "Registering: ${service.name} ${service.id}" }
                                     registerService(service)
 
                                     sleep(1.seconds)
@@ -95,12 +95,12 @@ class ServiceCacheTests {
                                     val payload = TestPayload.toObject(service.jsonPayload)
                                     payload.testval = payload.testval * -1
                                     service.jsonPayload = payload.toJson()
-                                    logger.info { "Updating: ${service.name} ${service.id}" }
+                                    //logger.info { "Updating: ${service.name} ${service.id}" }
                                     updateService(service)
 
                                     sleep(1.seconds)
 
-                                    logger.info { "Unregistering: ${service.name} ${service.id}" }
+                                    //logger.info { "Unregistering: ${service.name} ${service.id}" }
                                     unregisterService(service)
 
                                     sleep(1.seconds)

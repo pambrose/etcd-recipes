@@ -53,9 +53,6 @@ class DistributedQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
         }
 
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
-
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
         dequeuedData shouldEqual testData
@@ -89,9 +86,6 @@ class DistributedQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
         }
 
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
-
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
         dequeuedData shouldEqual testData
@@ -124,9 +118,6 @@ class DistributedQueueTest {
 
             client.getChildCount(queuePath) shouldEqual 0
         }
-
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -168,9 +159,6 @@ class DistributedQueueTest {
 
             client.getChildCount(queuePath) shouldEqual 0
         }
-
-        if (iterCount <= 500)
-            logger.info { dequeuedData }
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
