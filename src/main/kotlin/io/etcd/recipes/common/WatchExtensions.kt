@@ -36,15 +36,22 @@ val WatchEvent.valueAsString get() = keyValue.value.asString
 val WatchEvent.valueAsInt get() = keyValue.value.asInt
 val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
-@JvmOverloads
-fun Client.watcher(key: ByteSequence,
-                   option: WatchOption = WatchOption.DEFAULT,
-                   block: (WatchResponse) -> Unit): Watch.Watcher = watchClient.watch(key, option) { block(it) }
+fun WatchOption.Builder.withPrefix(prefix: String) = withPrefix(prefix.asByteSequence)
 
 @JvmOverloads
 fun Client.watcher(keyName: String,
                    option: WatchOption = WatchOption.DEFAULT,
-                   block: (WatchResponse) -> Unit): Watch.Watcher = watcher(keyName.asByteSequence, option, block)
+                   block: (WatchResponse) -> Unit): Watch.Watcher =
+    watchClient.watch(keyName.asByteSequence, option) { block(it) }
+
+
+@JvmOverloads
+fun Client.withWatcher(keyName: String,
+                       option: WatchOption = WatchOption.DEFAULT,
+                       block: (WatchResponse) -> Unit,
+                       receiver: Watch.Watcher.() -> Unit) {
+    watcher(keyName, option, block).use { it.receiver() }
+}
 
 @JvmOverloads
 fun Client.watcherWithLatch(keyName: String,

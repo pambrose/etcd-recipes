@@ -29,13 +29,13 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withPrefix
 import mu.KLogging
 import java.io.Closeable
 import java.util.Collections.synchronizedList
@@ -61,7 +61,7 @@ class ServiceCache internal constructor(client: Client,
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
 
-        val trailingServicePath = servicePath.ensureSuffix("/").asByteSequence
+        val trailingServicePath = servicePath.ensureSuffix("/")
         val trailingNamesPath = namesPath.ensureSuffix("/")
         val watchOption = watchOption { withPrefix(trailingServicePath) }
         client.watcher(trailingServicePath, watchOption) { watchResponse ->
@@ -105,7 +105,7 @@ class ServiceCache internal constructor(client: Client,
         }
 
         // Preload with initial data
-        val kvs = client.getChildren(trailingServicePath.asString)
+        val kvs = client.getChildren(trailingServicePath)
         for (kv in kvs) {
             val (k, v) = kv
             val stripped = k.substring(trailingNamesPath.length)
