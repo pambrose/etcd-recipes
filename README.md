@@ -26,11 +26,9 @@ examples are included in the repo.
 ## Usage
 ```kotlin
 connectToEtcd(urls) { client ->
-    client.apply {
-        putValue("test_key", "test_value")
-        sleep(5.seconds)
-        delete("test_key")
-    }
+    client.putValue("test_key", "test_value")
+    sleep(5.seconds)
+    client.delete("test_key")
 }
 ```
 
