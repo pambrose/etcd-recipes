@@ -86,22 +86,21 @@ class ThreadedLeaderSelectorTests {
                 logger.info { "${selector.clientId} relinquished leadership" }
             }
 
-        blockingThreads(count) {
-            logger.info { "Creating Thread$it" }
+        connectToEtcd(urls) { client ->
+            blockingThreads(count) {
+                logger.info { "Creating Thread$it" }
 
-            connectToEtcd(urls) { client ->
                 val election = LeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it")
                 electionList += election
                 election.start()
 
-                logger.info { "Size = ${electionList.size}" }
-
-                electionList
-                    .forEach {
-                        it.waitOnLeadershipComplete()
-                        it.close()
-                    }
             }
+
+            logger.info { "Size = ${electionList.size}" }
+
+            electionList
+                .onEach { it.waitOnLeadershipComplete() }
+                .forEach { it.close() }
         }
 
         takeLeadershiptCounter.get() shouldEqual count

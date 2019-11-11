@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
+
 package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
@@ -24,17 +26,13 @@ import io.etcd.recipes.queue.DistributedQueue
 fun withDistributedQueue(client: Client,
                          queuePath: String,
                          receiver: DistributedQueue.() -> Unit) {
-    DistributedQueue(client, queuePath).use { queue ->
-        queue.receiver()
-    }
+    DistributedQueue(client, queuePath).use { queue -> queue.receiver() }
 }
 
 fun withDistributedPriorityQueue(client: Client,
                                  queuePath: String,
                                  receiver: DistributedPriorityQueue.() -> Unit) {
-    DistributedPriorityQueue(client, queuePath).use { queue ->
-        queue.receiver()
-    }
+    DistributedPriorityQueue(client, queuePath).use { queue -> queue.receiver() }
 }
 
 @JvmOverloads
@@ -42,7 +40,5 @@ fun withDistributedAtomicLong(client: Client,
                               counterPath: String,
                               default: Long = 0L,
                               receiver: DistributedAtomicLong.() -> Unit) {
-    DistributedAtomicLong(client, counterPath, default).use { counter ->
-        counter.receiver()
-    }
+    DistributedAtomicLong(client, counterPath, default).use { counter -> counter.receiver() }
 }

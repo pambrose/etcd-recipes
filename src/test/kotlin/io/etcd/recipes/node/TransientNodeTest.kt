@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test
 import kotlin.time.seconds
 
 class TransientNodeTest {
+    val defaultValue = "nothing"
 
     @Test
     fun singleNodeTest() {
@@ -38,7 +39,7 @@ class TransientNodeTest {
 
         connectToEtcd(urls) { client ->
 
-            client.getValue(path, "nothing") shouldEqual "nothing"
+            client.getValue(path, defaultValue) shouldEqual defaultValue
 
             TransientNode(client, path, id).use {
                 repeat(10) {
@@ -49,7 +50,7 @@ class TransientNodeTest {
 
             // Wait for node to go away
             sleep(5.seconds)
-            client.getValue(path, "nothing") shouldEqual "nothing"
+            client.getValue(path, defaultValue) shouldEqual defaultValue
         }
 
         @Test
@@ -62,7 +63,7 @@ class TransientNodeTest {
 
                 client.apply {
                     for (p in paths)
-                        getValue(p, "nothing") shouldEqual "nothing"
+                        getValue(p, defaultValue) shouldEqual defaultValue
 
                     getChildCount("/node") shouldEqual 0
 
@@ -82,7 +83,7 @@ class TransientNodeTest {
                     // Wait for nodes to go away
                     sleep(5.seconds)
                     for (p in paths)
-                        getValue(p, "nothing") shouldEqual "nothing"
+                        getValue(p, defaultValue) shouldEqual defaultValue
 
                     getChildCount("/node") shouldEqual 0
                 }
