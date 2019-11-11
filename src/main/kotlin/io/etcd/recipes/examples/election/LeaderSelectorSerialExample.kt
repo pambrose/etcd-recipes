@@ -21,6 +21,7 @@ package io.etcd.recipes.examples.election
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderSelector
+import io.etcd.recipes.election.withLeaderSelector
 import kotlin.time.seconds
 
 fun main() {
@@ -35,22 +36,20 @@ fun main() {
     }
 
     connectToEtcd(urls) { client ->
-        LeaderSelector(client, electionPath, leadershipAction)
-            .use { selector ->
-                repeat(100) {
-                    println("Iteration $it")
-                    selector.start()
-                    selector.waitOnLeadershipComplete()
-                }
+        withLeaderSelector(client, electionPath, leadershipAction) {
+            repeat(100) {
+                println("Iteration $it")
+                start()
+                waitOnLeadershipComplete()
             }
+        }
 
         repeat(5) {
-            LeaderSelector(client, electionPath, leadershipAction)
-                .use { selector ->
-                    println("Iteration $it")
-                    selector.start()
-                    selector.waitOnLeadershipComplete()
-                }
+            withLeaderSelector(client, electionPath, leadershipAction) {
+                println("Iteration $it")
+                start()
+                waitOnLeadershipComplete()
+            }
         }
     }
 }

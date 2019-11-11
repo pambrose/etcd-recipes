@@ -21,6 +21,7 @@ package io.etcd.recipes.examples.barrier
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedBarrierWithCount
+import io.etcd.recipes.barrier.withDistributedBarrierWithCount
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import java.util.concurrent.CountDownLatch
@@ -58,10 +59,9 @@ fun main() {
     repeat(count - 1) { i ->
         thread {
             connectToEtcd(urls) { client ->
-                DistributedBarrierWithCount(client, barrierPath, count)
-                    .use { barrier ->
-                        waiter(i, barrier, 5)
-                    }
+                withDistributedBarrierWithCount(client, barrierPath, count) {
+                    waiter(i, this, 5)
+                }
             }
         }
     }
@@ -70,10 +70,9 @@ fun main() {
     sleep(2.seconds)
 
     connectToEtcd(urls) { client ->
-        DistributedBarrierWithCount(client, barrierPath, count)
-            .use { barrier ->
-                waiter(99, barrier)
-            }
+        withDistributedBarrierWithCount(client, barrierPath, count) {
+            waiter(99, this)
+        }
     }
 
     waitLatch.await()

@@ -25,6 +25,7 @@ import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.deleteKey
@@ -51,7 +52,7 @@ fun withDistributedBarrier(client: Client,
                            barrierPath: String,
                            leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
                            waitOnMissingBarriers: Boolean = true,
-                           clientId: String = DistributedBarrier.defaultClientId(),
+                           clientId: String = defaultClientId(),
                            receiver: DistributedBarrier.() -> Unit) {
     DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
 }

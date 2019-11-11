@@ -24,7 +24,9 @@ import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.lease.LeaseGrantResponse
+import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
@@ -44,6 +46,15 @@ import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
 import kotlin.time.seconds
+
+@JvmOverloads
+fun withServiceDiscovery(client: Client,
+                         servicePath: String,
+                         leaseTtlSecs: Long = defaultTtlSecs,
+                         clientId: String = defaultClientId(),
+                         receiver: ServiceDiscovery.() -> Unit) {
+    ServiceDiscovery(client, servicePath, leaseTtlSecs, clientId).use { it.receiver() }
+}
 
 class ServiceDiscovery
 @JvmOverloads
@@ -136,6 +147,10 @@ constructor(client: Client,
         return cache
     }
 
+    fun withServiceCache(name: String, receiver: ServiceCache.() -> Unit) {
+        serviceCache(name).use { it.receiver() }
+    }
+
     fun serviceProvider(serviceName: String): ServiceProvider {
         val provider = ServiceProvider(client, namesPath, serviceName)
         serviceProviderList += provider
@@ -181,6 +196,6 @@ constructor(client: Client,
     private fun getNamesPath(vararg elems: String) = namesPath.appendToPath(elems.joinToString("/"))
 
     companion object : KLogging() {
-        private fun defaultClientId() = "${ServiceDiscovery::class.simpleName}:${randomId(tokenLength)}"
+        internal fun defaultClientId() = "${ServiceDiscovery::class.simpleName}:${randomId(tokenLength)}"
     }
 }

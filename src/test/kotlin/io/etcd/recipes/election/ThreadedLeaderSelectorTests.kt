@@ -55,9 +55,9 @@ class ThreadedLeaderSelectorTests {
                 }
 
             connectToEtcd(urls) { client ->
-                LeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it").use { election ->
-                    election.start()
-                    election.waitOnLeadershipComplete()
+                withLeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it") {
+                    start()
+                    waitOnLeadershipComplete()
                 }
             }
         }

@@ -45,9 +45,9 @@ class ParticipantTests {
         blockingThreads(count) {
             thread(finishedLatch) {
                 connectToEtcd(urls) { client ->
-                    LeaderSelector(client,
-                                   path,
-                                   object : LeaderSelectorListenerAdapter() {
+                    withLeaderSelector(client,
+                                       path,
+                                       object : LeaderSelectorListenerAdapter() {
                                        override fun takeLeadership(selector: LeaderSelector) {
                                            val pause = 2.seconds
                                            logger.info { "${selector.clientId} elected leader for $pause" }
@@ -59,11 +59,10 @@ class ParticipantTests {
                                            leaderNames += selector.clientId
                                        }
                                    },
-                                   clientId = "Thread$it")
-                        .use { election ->
-                            election.start()
+                                       clientId = "Thread$it") {
+                        start()
                             startedLatch.countDown()
-                            election.waitOnLeadershipComplete()
+                        waitOnLeadershipComplete()
                         }
                 }
             }

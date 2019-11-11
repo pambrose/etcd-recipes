@@ -17,8 +17,8 @@
 package io.etcd.recipes.examples.cache
 
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.cache.PathChildrenCacheEvent
+import io.etcd.recipes.cache.withPathChildrenCache
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -36,21 +36,19 @@ fun main() {
 
         sleep(1.seconds)
 
-        PathChildrenCache(client, cachePath)
-            .use { cache ->
-                cache.apply {
-                    addListener { event: PathChildrenCacheEvent ->
-                        println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                    }
-
-                    start(true)
-                    waitOnStartComplete()
-                    currentData.forEach { println("${it.key} ${it.value.asString}") }
-
-                    println("Deleted: ${client.deleteChildren(cachePath)}")
-
-                    sleep(1.seconds)
-                }
+        withPathChildrenCache(client, cachePath) {
+            addListener { event: PathChildrenCacheEvent ->
+                println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
             }
+
+            start(true)
+            waitOnStartComplete()
+
+            currentData.forEach { println("${it.key} ${it.value.asString}") }
+
+            println("Deleted: ${client.deleteChildren(cachePath)}")
+
+            sleep(1.seconds)
+        }
     }
 }

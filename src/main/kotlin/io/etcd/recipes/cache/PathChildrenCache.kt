@@ -52,6 +52,14 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 
+@JvmOverloads
+fun withPathChildrenCache(client: Client,
+                          cachePath: String,
+                          userExecutor: Executor? = null,
+                          receiver: PathChildrenCache.() -> Unit) {
+    PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
+}
+
 class PathChildrenCache(client: Client,
                         val cachePath: String,
                         private val userExecutor: Executor? = null) : EtcdConnector(client), Closeable {

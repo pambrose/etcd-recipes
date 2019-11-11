@@ -27,6 +27,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
 import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.common.EtcdRecipeException
@@ -56,6 +57,35 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 import kotlin.time.seconds
+
+@JvmOverloads
+fun withLeaderSelector(client: Client,
+                       electionPath: String,
+                       listener: LeaderSelectorListener,
+                       leaseTtlSecs: Long = defaultTtlSecs,
+                       userExecutor: Executor? = null,
+                       clientId: String = defaultClientId(),
+                       receiver: LeaderSelector.() -> Unit) {
+    LeaderSelector(client, electionPath, listener, leaseTtlSecs, userExecutor, clientId).use { it.receiver() }
+}
+
+@JvmOverloads
+fun withLeaderSelector(client: Client,
+                       electionPath: String,
+                       takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+                       relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+                       leaseTtlSecs: Long = defaultTtlSecs,
+                       executorService: ExecutorService? = null,
+                       clientId: String = defaultClientId(),
+                       receiver: LeaderSelector.() -> Unit) {
+    LeaderSelector(client,
+                   electionPath,
+                   takeLeadershipBlock,
+                   relinquishLeadershipBlock,
+                   leaseTtlSecs,
+                   executorService,
+                   clientId).use { it.receiver() }
+}
 
 // For Java clients
 class LeaderSelector
@@ -330,7 +360,7 @@ constructor(val client: Client,
 
         internal val String.stripUniqueSuffix get() = dropLast(tokenLength + 1)
 
-        private fun defaultClientId() = "${LeaderSelector::class.simpleName}:${randomId(tokenLength)}"
+        internal fun defaultClientId() = "${LeaderSelector::class.simpleName}:${randomId(tokenLength)}"
 
         @JvmStatic
         fun getParticipants(client: Client, electionPath: String): List<Participant> {

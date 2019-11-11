@@ -81,8 +81,8 @@ class DistributedBarrierWithCountTests {
             val (finishedLatch, holder) =
                 nonblockingThreads(count - 1) { i ->
                     connectToEtcd(urls) { client ->
-                        DistributedBarrierWithCount(client, path, count).use { barrier ->
-                            waiter(i, barrier, retryAttempts)
+                        withDistributedBarrierWithCount(client, path, count) {
+                            waiter(i, this, retryAttempts)
                         }
                     }
                 }
@@ -90,8 +90,8 @@ class DistributedBarrierWithCountTests {
             retryLatch.await()
             sleep(2.seconds)
 
-            DistributedBarrierWithCount(client, path, count).use { barrier ->
-                waiter(99, barrier)
+            withDistributedBarrierWithCount(client, path, count) {
+                waiter(99, this)
             }
 
             finishedLatch.await()

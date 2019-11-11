@@ -41,7 +41,7 @@ class TransientNodeTest {
 
             client.getValue(path, defaultValue) shouldEqual defaultValue
 
-            TransientNode(client, path, id).use {
+            withTransientNode(client, path, id) {
                 repeat(10) {
                     client.getValue(path)?.asString shouldEqual id
                     sleep(1.seconds)

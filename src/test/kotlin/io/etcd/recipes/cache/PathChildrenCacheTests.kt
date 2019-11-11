@@ -77,43 +77,41 @@ class PathChildrenCacheTests {
             client.deleteChildren(path)
             client.getChildCount(path) shouldEqual 0
 
-            PathChildrenCache(client, path).use { cache ->
-                cache.apply {
+            withPathChildrenCache(client, path) {
 
-                    addListener { event: PathChildrenCacheEvent ->
-                        //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                        when (event.type) {
-                            CHILD_ADDED   -> addCount.incrementAndGet()
-                            CHILD_UPDATED -> updateCount.incrementAndGet()
-                            CHILD_REMOVED -> deleteCount.incrementAndGet()
-                            INITIALIZED   -> initCount.incrementAndGet()
-                        }
+                addListener { event: PathChildrenCacheEvent ->
+                    //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+                    when (event.type) {
+                        CHILD_ADDED   -> addCount.incrementAndGet()
+                        CHILD_UPDATED -> updateCount.incrementAndGet()
+                        CHILD_REMOVED -> deleteCount.incrementAndGet()
+                        INITIALIZED   -> initCount.incrementAndGet()
                     }
-
-                    start(true)
-                    waitOnStartComplete()
-                    currentData shouldEqual emptyList()
-
-                    addCount.get() shouldEqual 0
-                    updateCount.get() shouldEqual 0
-                    deleteCount.get() shouldEqual 0
-                    initCount.get() shouldEqual 0
-
-                    val kvs = generateTestData(count)
-
-                    kvs.forEach { kv ->
-                        client.putValue("${path}/${kv.first}", kv.second)
-                        client.putValue("${path}/${kv.first}", kv.second + suffix)
-                    }
-
-                    sleep(5.seconds)
-                    compareData(count, currentData, kvs, suffix)
-
-                    client.deleteChildren(path)
-
-                    sleep(5.seconds)
-                    currentData shouldEqual emptyList()
                 }
+
+                start(true)
+                waitOnStartComplete()
+                currentData shouldEqual emptyList()
+
+                addCount.get() shouldEqual 0
+                updateCount.get() shouldEqual 0
+                deleteCount.get() shouldEqual 0
+                initCount.get() shouldEqual 0
+
+                val kvs = generateTestData(count)
+
+                kvs.forEach { kv ->
+                    client.putValue("${path}/${kv.first}", kv.second)
+                    client.putValue("${path}/${kv.first}", kv.second + suffix)
+                }
+
+                sleep(5.seconds)
+                compareData(count, currentData, kvs, suffix)
+
+                client.deleteChildren(path)
+
+                sleep(5.seconds)
+                currentData shouldEqual emptyList()
             }
         }
 
@@ -147,34 +145,32 @@ class PathChildrenCacheTests {
                 client.putValue("${path}/${kv.first}", kv.second + suffix)
             }
 
-            PathChildrenCache(client, path).use { cache ->
-                cache.apply {
-                    addListener { event: PathChildrenCacheEvent ->
-                        //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                        when (event.type) {
-                            CHILD_ADDED   -> addCount.incrementAndGet()
-                            CHILD_UPDATED -> updateCount.incrementAndGet()
-                            CHILD_REMOVED -> deleteCount.incrementAndGet()
-                            INITIALIZED   -> initCount.incrementAndGet()
-                        }
+            withPathChildrenCache(client, path) {
+                addListener { event: PathChildrenCacheEvent ->
+                    //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+                    when (event.type) {
+                        CHILD_ADDED   -> addCount.incrementAndGet()
+                        CHILD_UPDATED -> updateCount.incrementAndGet()
+                        CHILD_REMOVED -> deleteCount.incrementAndGet()
+                        INITIALIZED   -> initCount.incrementAndGet()
                     }
-
-                    start(true)
-                    waitOnStartComplete()
-
-                    sleep(5.seconds)
-                    compareData(count, currentData, testKvs, suffix)
-
-                    addCount.get() shouldEqual 0
-                    updateCount.get() shouldEqual 0
-                    deleteCount.get() shouldEqual 0
-                    initCount.get() shouldEqual 0
-
-                    client.deleteChildren(path)
-
-                    sleep(5.seconds)
-                    currentData shouldEqual emptyList()
                 }
+
+                start(true)
+                waitOnStartComplete()
+
+                sleep(5.seconds)
+                compareData(count, currentData, testKvs, suffix)
+
+                addCount.get() shouldEqual 0
+                updateCount.get() shouldEqual 0
+                deleteCount.get() shouldEqual 0
+                initCount.get() shouldEqual 0
+
+                client.deleteChildren(path)
+
+                sleep(5.seconds)
+                currentData shouldEqual emptyList()
             }
         }
 
@@ -208,34 +204,33 @@ class PathChildrenCacheTests {
 
             var initData: List<ChildData>? = null
 
-            PathChildrenCache(client, path).use { cache ->
-                cache.apply {
+            withPathChildrenCache(client, path) {
 
-                    addListener { event: PathChildrenCacheEvent ->
-                        //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                        when (event.type) {
-                            CHILD_ADDED   -> addCount.incrementAndGet()
-                            CHILD_UPDATED -> updateCount.incrementAndGet()
-                            CHILD_REMOVED -> deleteCount.incrementAndGet()
-                            INITIALIZED   -> {
-                                initCount.incrementAndGet()
-                                initData = event.initialData
-                            }
+                addListener { event: PathChildrenCacheEvent ->
+                    //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+                    when (event.type) {
+                        CHILD_ADDED   -> addCount.incrementAndGet()
+                        CHILD_UPDATED -> updateCount.incrementAndGet()
+                        CHILD_REMOVED -> deleteCount.incrementAndGet()
+                        INITIALIZED   -> {
+                            initCount.incrementAndGet()
+                            initData = event.initialData
                         }
                     }
-
-                    start(POST_INITIALIZED_EVENT)
-                    waitOnStartComplete()
-
-                    sleep(5.seconds)
-                    compareData(count, currentData, kvs, suffix)
-
-                    client.deleteChildren(path)
-
-                    sleep(5.seconds)
-                    currentData shouldEqual emptyList()
                 }
+
+                start(POST_INITIALIZED_EVENT)
+                waitOnStartComplete()
+
+                sleep(5.seconds)
+                compareData(count, currentData, kvs, suffix)
+
+                client.deleteChildren(path)
+
+                sleep(5.seconds)
+                currentData shouldEqual emptyList()
             }
+
             compareData(count, initData!!, kvs, suffix)
         }
 
@@ -253,14 +248,14 @@ class PathChildrenCacheTests {
         val kvs = generateTestData(count)
 
         connectToEtcd(urls) { client ->
-            PathChildrenCache(client, path).use { cache ->
-                cache.start(false)
+            withPathChildrenCache(client, path) {
+                start(false)
 
                 val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
                 client.putValuesWithKeepAlive(bsvals, 2.seconds) {
 
                     sleep(5.seconds)
-                    val data = cache.currentData
+                    val data = currentData
 
                     //println("KVs:  ${kvs.map { it.first }.sorted()}")
                     //println("Data: ${data.map { it.key }.sorted()}")
@@ -269,7 +264,7 @@ class PathChildrenCacheTests {
                 }
 
                 sleep(5.seconds)
-                cache.currentData shouldEqual emptyList()
+                currentData shouldEqual emptyList()
             }
         }
     }

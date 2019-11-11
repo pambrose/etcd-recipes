@@ -20,7 +20,7 @@ package io.etcd.recipes.examples.discovery
 
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.discovery.ServiceDiscovery
+import io.etcd.recipes.discovery.withServiceDiscovery
 import kotlin.time.days
 
 fun main() {
@@ -28,27 +28,23 @@ fun main() {
     val servicePath = "/services/test"
 
     connectToEtcd(urls) { client ->
-        ServiceDiscovery(client, servicePath)
-            .use { sd ->
-
-                sd.serviceCache("TestName")
-                    .use { cache ->
-                        cache.addListenerForChanges { eventType,
-                                                      isAdd,
-                                                      serviceName,
-                                                      serviceInstance ->
-                            println("Change $isAdd $eventType $serviceName $serviceInstance")
-                            serviceInstance?.let {
-                                println("Payload: ${IntPayload.toObject(
-                                    it.jsonPayload)}")
-                            }
-                            println("Instances: ${cache.instances}")
-                        }
-
-                        cache.start()
-
-                        sleep(1.days)
+        withServiceDiscovery(client, servicePath) {
+            withServiceCache("TestName") {
+                addListenerForChanges { eventType,
+                                        isAdd,
+                                        serviceName,
+                                        serviceInstance ->
+                    println("Change $isAdd $eventType $serviceName $serviceInstance")
+                    serviceInstance?.let {
+                        println("Payload: ${IntPayload.toObject(it.jsonPayload)}")
                     }
+                    println("Instances: ${instances}")
+                }
+
+                start()
+
+                sleep(1.days)
             }
+        }
     }
 }

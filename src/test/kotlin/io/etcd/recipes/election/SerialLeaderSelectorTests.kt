@@ -61,11 +61,11 @@ class SerialLeaderSelectorTests {
         }
 
         connectToEtcd(urls) { client ->
-            LeaderSelector(client, path, leadershipAction, relinquishAction).use { selector ->
+            withLeaderSelector(client, path, leadershipAction, relinquishAction) {
                 repeat(count) {
                     logger.info { "First iteration: $it" }
-                    selector.start()
-                    selector.waitOnLeadershipComplete()
+                    start()
+                    waitOnLeadershipComplete()
                 }
             }
         }
@@ -80,9 +80,9 @@ class SerialLeaderSelectorTests {
         connectToEtcd(urls) { client ->
             repeat(count) {
                 logger.info { "Second iteration: $it" }
-                LeaderSelector(client, path, leadershipAction, relinquishAction).use { selector ->
-                    selector.start()
-                    selector.waitOnLeadershipComplete()
+                withLeaderSelector(client, path, leadershipAction, relinquishAction) {
+                    start()
+                    waitOnLeadershipComplete()
                 }
             }
         }

@@ -25,6 +25,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.recipes.barrier.DistributedBarrierWithCount.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
@@ -58,6 +59,17 @@ import kotlin.time.seconds
     Query the number of children after each PUT on waiter and DELETE /ready if memberCount seen
     Leave if DELETE of /ready is seen
 */
+
+@JvmOverloads
+fun withDistributedBarrierWithCount(client: Client,
+                                    barrierPath: String,
+                                    memberCount: Int,
+                                    leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+                                    clientId: String = defaultClientId(),
+                                    receiver: DistributedBarrierWithCount.() -> Unit) {
+    DistributedBarrierWithCount(client, barrierPath, memberCount, leaseTtlSecs, clientId).use { it.receiver() }
+}
+
 class DistributedBarrierWithCount
 @JvmOverloads
 constructor(client: Client,
@@ -188,6 +200,6 @@ constructor(client: Client,
     }
 
     companion object {
-        private fun defaultClientId() = "${DistributedBarrierWithCount::class.simpleName}:${randomId(tokenLength)}"
+        internal fun defaultClientId() = "${DistributedBarrierWithCount::class.simpleName}:${randomId(tokenLength)}"
     }
 }

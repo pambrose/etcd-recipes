@@ -48,9 +48,8 @@ class ServiceCacheTests {
         val totalCounter = AtomicInteger(0)
 
         connectToEtcd(urls) { client ->
-            ServiceDiscovery(client, path).use { cachesd ->
-
-                cachesd.serviceCache(name).apply {
+            withServiceDiscovery(client, path) {
+                withServiceCache(name) {
                     start()
                     sleep(2.seconds)
 
@@ -87,11 +86,11 @@ class ServiceCacheTests {
 
             val (finishedLatch, holder2) =
                 nonblockingThreads(threadCount) {
-                    ServiceDiscovery(client, path).use { sd ->
+                    withServiceDiscovery(client, path) {
                         repeat(serviceCount) {
                             val service = ServiceInstance(name, TestPayload(it).toJson())
                             logger.info { "Registering: ${service.name} ${service.id}" }
-                            sd.registerService(service)
+                            registerService(service)
 
                             sleep(1.seconds)
 
@@ -99,12 +98,12 @@ class ServiceCacheTests {
                             payload.testval = payload.testval * -1
                             service.jsonPayload = payload.toJson()
                             logger.info { "Updating: ${service.name} ${service.id}" }
-                            sd.updateService(service)
+                            updateService(service)
 
                             sleep(1.seconds)
 
                             logger.info { "Unregistering: ${service.name} ${service.id}" }
-                            sd.unregisterService(service)
+                            unregisterService(service)
 
                             sleep(1.seconds)
                         }

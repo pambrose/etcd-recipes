@@ -21,6 +21,7 @@ package io.etcd.recipes.barrier
 import com.sudothought.common.time.timeUnitToDuration
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
+import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
@@ -28,6 +29,15 @@ import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
+
+@JvmOverloads
+fun withDistributedDoubleBarrier(client: Client,
+                                 barrierPath: String,
+                                 memberCount: Int,
+                                 clientId: String = defaultClientId(),
+                                 receiver: DistributedDoubleBarrier.() -> Unit) {
+    DistributedDoubleBarrier(client, barrierPath, memberCount, clientId).use { it.receiver() }
+}
 
 class DistributedDoubleBarrier
 @JvmOverloads
@@ -71,7 +81,7 @@ constructor(client: Client,
     }
 
     companion object {
-        private fun defaultClientId() = "${DistributedDoubleBarrier::class.simpleName}:${randomId(tokenLength)}"
+        internal fun defaultClientId() = "${DistributedDoubleBarrier::class.simpleName}:${randomId(tokenLength)}"
     }
 }
 

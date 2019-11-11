@@ -22,6 +22,7 @@ import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
+import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.putValueWithKeepAlive
@@ -32,6 +33,18 @@ import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.time.seconds
+
+@JvmOverloads
+fun withTransientNode(client: Client,
+                      nodePath: String,
+                      nodeValue: String,
+                      leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+                      autoStart: Boolean = true,
+                      userExecutor: Executor? = null,
+                      clientId: String = defaultClientId(),
+                      receiver: TransientNode.() -> Unit) {
+    TransientNode(client, nodePath, nodeValue, leaseTtlSecs, autoStart, userExecutor, clientId).use { it.receiver() }
+}
 
 class TransientNode
 @JvmOverloads
@@ -105,6 +118,6 @@ constructor(client: Client,
     }
 
     companion object : KLogging() {
-        private fun defaultClientId() = "${TransientNode::class.simpleName}:${randomId(tokenLength)}"
+        internal fun defaultClientId() = "${TransientNode::class.simpleName}:${randomId(tokenLength)}"
     }
 }

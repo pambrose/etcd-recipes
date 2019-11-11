@@ -59,20 +59,19 @@ class ReportLeaderTests {
 
         blockingThreads(count) {
             connectToEtcd(urls) { client ->
-                LeaderSelector(client,
-                               path,
-                               object : LeaderSelectorListenerAdapter() {
-                                   override fun takeLeadership(selector: LeaderSelector) {
-                                       val pause = 2.random.seconds
-                                       logger.info { "${selector.clientId} elected leader for $pause" }
-                                       sleep(pause)
-                                   }
-                               },
-                               clientId = "Thread$it")
-                    .use { election ->
-                        election.start()
-                        election.waitOnLeadershipComplete()
-                    }
+                withLeaderSelector(client,
+                                   path,
+                                   object : LeaderSelectorListenerAdapter() {
+                                       override fun takeLeadership(selector: LeaderSelector) {
+                                           val pause = 2.random.seconds
+                                           logger.info { "${selector.clientId} elected leader for $pause" }
+                                           sleep(pause)
+                                       }
+                                   },
+                                   clientId = "Thread$it") {
+                    start()
+                    waitOnLeadershipComplete()
+                }
             }
         }
 

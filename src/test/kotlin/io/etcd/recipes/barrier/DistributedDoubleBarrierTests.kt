@@ -108,27 +108,27 @@ class DistributedDoubleBarrierTests {
         val (finishedLatch, holder) =
             nonblockingThreads(count - 1) { i ->
                 connectToEtcd(urls) { client ->
-                    DistributedDoubleBarrier(client, path, count).use { barrier ->
-                        enterBarrier(i, barrier, retryAttempts)
+                    withDistributedDoubleBarrier(client, path, count) {
+                        enterBarrier(i, this, retryAttempts)
                         sleep(5.random.seconds)
-                        leaveBarrier(i, barrier, retryAttempts)
+                        leaveBarrier(i, this, retryAttempts)
                     }
                 }
             }
 
         connectToEtcd(urls) { client ->
-            DistributedDoubleBarrier(client, path, count).use { barrier ->
+            withDistributedDoubleBarrier(client, path, count) {
                 enterLatch.await()
                 sleep(2.seconds)
 
-                barrier.enterWaiterCount.toInt() shouldEqual count - 1
-                enterBarrier(99, barrier)
+                enterWaiterCount.toInt() shouldEqual count - 1
+                enterBarrier(99, this)
 
                 leaveLatch.await()
                 sleep(2.seconds)
 
-                barrier.leaveWaiterCount.toInt() shouldEqual count - 1
-                leaveBarrier(99, barrier)
+                leaveWaiterCount.toInt() shouldEqual count - 1
+                leaveBarrier(99, this)
             }
         }
 

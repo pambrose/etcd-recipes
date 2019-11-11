@@ -24,6 +24,7 @@ import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.election.LeaderSelector.Companion.getParticipants
+import io.etcd.recipes.election.withLeaderSelector
 import java.util.concurrent.CountDownLatch
 import kotlin.time.seconds
 
@@ -49,15 +50,14 @@ fun main() {
                 }
 
             connectToEtcd(urls) { client ->
-                LeaderSelector(client,
-                               electionPath,
-                               takeLeadershipAction,
-                               relinquishLeadershipAction,
-                               clientId = "Thread$it")
-                    .use { election ->
-                        election.start()
-                        election.waitOnLeadershipComplete()
-                    }
+                withLeaderSelector(client,
+                                   electionPath,
+                                   takeLeadershipAction,
+                                   relinquishLeadershipAction,
+                                   clientId = "Thread$it") {
+                    start()
+                    waitOnLeadershipComplete()
+                }
             }
         }
     }

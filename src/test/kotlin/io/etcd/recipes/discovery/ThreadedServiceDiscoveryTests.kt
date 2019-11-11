@@ -63,11 +63,12 @@ class ThreadedServiceDiscoveryTests {
 
             // Query services
             blockingThreads(threadCount) {
-                ServiceDiscovery(client, path).use { sd ->
+                withServiceDiscovery(client, path) {
                     contextMap.values.forEach { context ->
                         context.serviceMap.forEach { (_, service) ->
-                            logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
-                            sd.queryForInstance(service.name, service.id) shouldEqual service
+                            val inst = queryForInstance(service.name, service.id)
+                            logger.info { "Retrieved value: $inst" }
+                            inst shouldEqual service
                         }
                     }
                 }
@@ -86,19 +87,21 @@ class ThreadedServiceDiscoveryTests {
 
             // Query updated services
             blockingThreads(threadCount) {
-                ServiceDiscovery(client, path).use { sd ->
+                withServiceDiscovery(client, path) {
                     contextMap.values.forEach { context ->
                         context.serviceMap.forEach { (_, service) ->
-                            logger.info { "Retrieved updated value: ${sd.queryForInstance(service.name, service.id)}" }
-                            sd.queryForInstance(service.name, service.id) shouldEqual service
+                            val inst = queryForInstance(service.name, service.id)
+                            logger.info { "Retrieved updated value: $inst" }
+                            inst shouldEqual service
                         }
                     }
                 }
             }
 
-            ServiceDiscovery(client, path).use { sd ->
-                logger.info { "Retrieved all names: ${sd.queryForNames().size}" }
-                sd.queryForNames().size shouldEqual threadCount * serviceCount
+            withServiceDiscovery(client, path) {
+                val size = queryForNames().size
+                logger.info { "Retrieved all names: $size" }
+                size shouldEqual threadCount * serviceCount
             }
 
             // Delete services
@@ -119,12 +122,12 @@ class ThreadedServiceDiscoveryTests {
         // Query deleted services
         blockingThreads(threadCount) {
             connectToEtcd(urls) { client ->
-                ServiceDiscovery(client, path).use { sd ->
+                withServiceDiscovery(client, path) {
                     contextMap.values.forEach { context ->
                         context.serviceMap.forEach { (_, service) ->
                             val name = service.name
                             logger.info { "Query deleted service: $name  ${service.id}" }
-                            invoking { sd.queryForInstance(name, service.id) } shouldThrow EtcdRecipeException::class
+                            invoking { queryForInstance(name, service.id) } shouldThrow EtcdRecipeException::class
                         }
                     }
                 }
