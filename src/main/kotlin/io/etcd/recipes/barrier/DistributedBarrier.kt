@@ -40,7 +40,6 @@ import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import mu.KLogging
-import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -62,7 +61,7 @@ constructor(client: Client,
             val barrierPath: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
             private val waitOnMissingBarriers: Boolean = true,
-            val clientId: String = defaultClientId()) : EtcdConnector(client), Closeable {
+            val clientId: String = defaultClientId()) : EtcdConnector(client) {
 
     private var keepAliveLease by nullableReference<CloseableClient?>(null)
     private var barrierRemoved by atomicBoolean(false)

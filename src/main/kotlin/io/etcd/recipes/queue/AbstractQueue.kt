@@ -33,13 +33,12 @@ import io.etcd.recipes.common.getFirstChild
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
-import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 
 abstract class AbstractQueue(client: Client,
                              val queuePath: String,
-                             private val target: SortTarget) : EtcdConnector(client), Closeable {
+                             private val target: SortTarget) : EtcdConnector(client) {
 
     init {
         require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }

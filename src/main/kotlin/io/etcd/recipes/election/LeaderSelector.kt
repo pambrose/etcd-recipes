@@ -28,8 +28,8 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
+import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
-import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.appendToPath
@@ -47,8 +47,6 @@ import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import mu.KLogging
-import java.io.Closeable
-import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -88,12 +86,12 @@ fun <T> withLeaderSelector(client: Client,
 // For Java clients
 class LeaderSelector
 @JvmOverloads
-constructor(val client: Client,
+constructor(client: Client,
             val electionPath: String,
             private val listener: LeaderSelectorListener,
             val leaseTtlSecs: Long = defaultTtlSecs,
             private val userExecutor: Executor? = null,
-            val clientId: String = defaultClientId()) : Closeable {
+            val clientId: String = defaultClientId()) : EtcdConnector(client) {
 
     // For Kotlin clients
     @JvmOverloads
@@ -122,14 +120,10 @@ constructor(val client: Client,
     private val terminateWatch = BooleanMonitor(false)
     private val terminateKeepAlive = BooleanMonitor(false)
     private val leadershipComplete = BooleanMonitor(false)
-    private val startThreadComplete = BooleanMonitor(false)
     private val attemptLeadership = BooleanMonitor(true)
-    private var startCalled by atomicBoolean(false)
-    private var closeCalled by atomicBoolean(false)
     private var electedLeader by atomicBoolean(false)
     private var startCallAllowed by atomicBoolean(true)
     private val leaderPath = electionPath.withLeaderSuffix
-    private val exceptionList: Lazy<MutableList<Throwable>> = lazy { synchronizedList(mutableListOf<Throwable>()) }
 
     init {
         require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
@@ -139,14 +133,6 @@ constructor(val client: Client,
     val isLeader get() = electedLeader
 
     val isFinished get() = leadershipComplete.get()
-
-    val exceptions get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList<Throwable>()
-
-    val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.size > 0
-
-    fun clearExceptions() {
-        if (exceptionList.isInitialized()) exceptionList.value.clear()
-    }
 
     fun start(): LeaderSelector {
 
@@ -255,24 +241,19 @@ constructor(val client: Client,
         leadershipComplete.set(true)
     }
 
-    private fun checkStartCalled() {
-        if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
-    }
-
-    private fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
-    }
-
     @Synchronized
     override fun close() {
+        if (closeCalled)
+            return
+
         checkStartCalled()
 
-        if (!closeCalled) {
-            closeCalled = true
-            markLeadershipComplete()
-            startThreadComplete.waitUntilTrue()
-            if (userExecutor == null) (executor as ExecutorService).shutdown()
-        }
+        markLeadershipComplete()
+        startThreadComplete.waitUntilTrue()
+
+        if (userExecutor == null) (executor as ExecutorService).shutdown()
+
+        super.close()
     }
 
     @Throws(EtcdRecipeException::class)

@@ -43,7 +43,6 @@ import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import mu.KLogging
-import java.io.Closeable
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -61,7 +60,7 @@ fun <T> withPathChildrenCache(client: Client,
 
 class PathChildrenCache(client: Client,
                         val cachePath: String,
-                        private val userExecutor: Executor? = null) : EtcdConnector(client), Closeable {
+                        private val userExecutor: Executor? = null) : EtcdConnector(client) {
 
     private var watcher: Watch.Watcher? by nullableReference()
     private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()

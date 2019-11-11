@@ -46,7 +46,6 @@ import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
-import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
@@ -75,7 +74,7 @@ constructor(client: Client,
             val barrierPath: String,
             val memberCount: Int,
             val leaseTtlSecs: Long = defaultTtlSecs,
-            val clientId: String = defaultClientId()) : EtcdConnector(client), Closeable {
+            val clientId: String = defaultClientId()) : EtcdConnector(client) {
 
     private val readyPath = barrierPath.appendToPath("ready")
     private val waitingPath = barrierPath.appendToPath("waiting")

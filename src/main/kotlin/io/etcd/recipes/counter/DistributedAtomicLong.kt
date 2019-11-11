@@ -34,7 +34,6 @@ import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import mu.KLogging
-import java.io.Closeable
 import kotlin.time.milliseconds
 
 @JvmOverloads
@@ -48,7 +47,7 @@ class DistributedAtomicLong
 @JvmOverloads
 constructor(client: Client,
             val counterPath: String,
-            private val default: Long = 0L) : EtcdConnector(client), Closeable {
+            private val default: Long = 0L) : EtcdConnector(client) {
 
     init {
         require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }

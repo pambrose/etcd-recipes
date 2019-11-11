@@ -21,9 +21,10 @@ package io.etcd.recipes.common
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.Client
+import java.io.Closeable
 import java.util.Collections.synchronizedList
 
-open class EtcdConnector(val client: Client) {
+open class EtcdConnector(val client: Client) : Closeable {
 
     protected var startCalled by atomicBoolean(false)
     protected val startThreadComplete = BooleanMonitor(false)
@@ -47,7 +48,7 @@ open class EtcdConnector(val client: Client) {
     }
 
     @Synchronized
-    open fun close() {
+    override fun close() {
             closeCalled = true
     }
 

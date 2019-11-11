@@ -25,7 +25,6 @@ import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.putValueWithKeepAlive
 import mu.KLogging
-import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -51,7 +50,7 @@ constructor(client: Client,
             val leaseTtlSecs: Long = defaultTtlSecs,
             autoStart: Boolean = true,
             private val userExecutor: Executor? = null,
-            val clientId: String = defaultClientId()) : EtcdConnector(client), Closeable {
+            val clientId: String = defaultClientId()) : EtcdConnector(client) {
 
     private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
     private val keepAliveWaitLatch = CountDownLatch(1)

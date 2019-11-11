@@ -38,13 +38,12 @@ import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import io.etcd.recipes.common.withPrefix
 import mu.KLogging
-import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
 
 class ServiceCache internal constructor(client: Client,
                                         val namesPath: String,
-                                        val serviceName: String) : EtcdConnector(client), Closeable {
+                                        val serviceName: String) : EtcdConnector(client) {
 
     private var watcher: Watch.Watcher? by AtomicDelegates.nullableReference()
     private var dataPreloaded = BooleanMonitor(false)
