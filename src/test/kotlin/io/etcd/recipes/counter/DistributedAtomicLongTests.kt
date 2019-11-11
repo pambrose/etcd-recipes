@@ -150,40 +150,40 @@ class DistributedAtomicLongTests {
 
                     val (latch0, e0) =
                         threadWithExceptionCheck {
-                            logger.info { "Begin increments for counter #$i" }
+                            //logger.info { "Begin increments for counter #$i" }
                             repeat(count) { increment() }
                             sleep(maxPause.random.milliseconds)
-                            logger.info { "Completed increments for counter #$i" }
+                            //logger.info { "Completed increments for counter #$i" }
                         }
                     latchList += latch0
                     exceptionList += e0
 
                     val (latch1, e1) =
                         threadWithExceptionCheck {
-                            logger.info { "Begin decrements for counter #$i" }
+                            //logger.info { "Begin decrements for counter #$i" }
                             repeat(count) { decrement() }
                             sleep(maxPause.random.milliseconds)
-                            logger.info { "Completed decrements for counter #$i" }
+                            //logger.info { "Completed decrements for counter #$i" }
                         }
                     latchList += latch1
                     exceptionList += e1
 
                     val (latch2, e2) =
                         threadWithExceptionCheck {
-                            logger.info { "Begin adds for counter #$i" }
+                            //logger.info { "Begin adds for counter #$i" }
                             repeat(count) { add(5) }
                             sleep(maxPause.random.milliseconds)
-                            logger.info { "Completed adds for counter #$i" }
+                            //logger.info { "Completed adds for counter #$i" }
                         }
                     latchList += latch2
                     exceptionList += e2
 
                     val (latch3, e3) =
                         threadWithExceptionCheck {
-                            logger.info { "Begin subtracts for counter #$i" }
+                            //logger.info { "Begin subtracts for counter #$i" }
                             repeat(count) { subtract(5) }
                             sleep(maxPause.random.milliseconds)
-                            logger.info { "Completed subtracts for counter #$i" }
+                            //logger.info { "Completed subtracts for counter #$i" }
                         }
                     latchList += latch3
                     exceptionList += e3

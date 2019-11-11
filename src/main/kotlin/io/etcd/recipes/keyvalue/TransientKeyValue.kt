@@ -32,27 +32,27 @@ import java.util.concurrent.Executors
 import kotlin.time.seconds
 
 @JvmOverloads
-fun <T> withTransientNode(client: Client,
-                          nodePath: String,
-                          nodeValue: String,
-                          leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
-                          autoStart: Boolean = true,
-                          userExecutor: Executor? = null,
-                          clientId: String = defaultClientId(),
-                          receiver: TransientNode.() -> T): T =
-    TransientNode(client,
-                  nodePath,
-                  nodeValue,
-                  leaseTtlSecs,
-                  autoStart,
-                  userExecutor,
-                  clientId).use { it.receiver() }
+fun <T> withTransientKeyValue(client: Client,
+                              keyPath: String,
+                              keyValue: String,
+                              leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+                              autoStart: Boolean = true,
+                              userExecutor: Executor? = null,
+                              clientId: String = defaultClientId(),
+                              receiver: TransientKeyValue.() -> T): T =
+    TransientKeyValue(client,
+                      keyPath,
+                      keyValue,
+                      leaseTtlSecs,
+                      autoStart,
+                      userExecutor,
+                      clientId).use { it.receiver() }
 
-class TransientNode
+class TransientKeyValue
 @JvmOverloads
 constructor(client: Client,
-            val nodePath: String,
-            val nodeValue: String,
+            val keyPath: String,
+            val keyValue: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
             autoStart: Boolean = true,
             private val userExecutor: Executor? = null,
@@ -63,14 +63,14 @@ constructor(client: Client,
     private val keepAliveStartedLatch = CountDownLatch(1)
 
     init {
-        require(nodePath.isNotEmpty()) { "Node path cannot be empty" }
+        require(keyPath.isNotEmpty()) { "Key path cannot be empty" }
 
         if (autoStart)
             start()
     }
 
     @Synchronized
-    fun start(): TransientNode {
+    fun start(): TransientKeyValue {
         if (startCalled)
             throw EtcdRecipeRuntimeException("start() already called")
         checkCloseNotCalled()
@@ -78,11 +78,11 @@ constructor(client: Client,
         executor.execute {
             try {
                 val leaseTtl = leaseTtlSecs.seconds
-                logger.info { "$leaseTtl keep-alive started for $clientId $nodePath" }
-                client.putValueWithKeepAlive(nodePath, nodeValue, leaseTtl) {
+                logger.info { "$leaseTtl keep-alive started for $clientId $keyPath" }
+                client.putValueWithKeepAlive(keyPath, keyValue, leaseTtl) {
                     keepAliveStartedLatch.countDown()
                     keepAliveWaitLatch.await()
-                    logger.info { "$leaseTtl keep-alive terminated for $clientId $nodePath" }
+                    logger.info { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
                 }
             } catch (e: Throwable) {
                 logger.error(e) { "In start()" }
@@ -114,6 +114,6 @@ constructor(client: Client,
     }
 
     companion object : KLogging() {
-        internal fun defaultClientId() = "${TransientNode::class.simpleName}:${randomId(tokenLength)}"
+        internal fun defaultClientId() = "${TransientKeyValue::class.simpleName}:${randomId(tokenLength)}"
     }
 }

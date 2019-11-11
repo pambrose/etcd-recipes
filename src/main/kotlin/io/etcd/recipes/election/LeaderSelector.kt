@@ -280,11 +280,11 @@ constructor(client: Client,
                 Then(path.setTo(clientId, putOption { withLeaseId(lease.id) }))
             }
 
-        // Run keep-alive until closed
-        if (txn.isSucceeded)
-            client.keepAliveWith(lease) { terminateKeepAlive.waitUntilTrue() }
-        else
+        if (!txn.isSucceeded)
             throw EtcdRecipeException("Participation registration failed [$path]")
+
+        // Run keep-alive until closed
+        client.keepAliveWith(lease) { terminateKeepAlive.waitUntilTrue() }
     }
 
     // This will not return until election failure or leader surrenders leadership after being elected
