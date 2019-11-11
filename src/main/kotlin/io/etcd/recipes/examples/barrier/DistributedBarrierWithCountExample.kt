@@ -21,8 +21,8 @@ package io.etcd.recipes.examples.barrier
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedBarrierWithCount
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
-import io.etcd.recipes.common.etcdExec
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -33,8 +33,6 @@ fun main() {
     val count = 30
     val waitLatch = CountDownLatch(count)
     val retryLatch = CountDownLatch(count - 1)
-
-    etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(barrierPath) }
 
     fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
         sleep(10.random.seconds)
@@ -53,22 +51,30 @@ fun main() {
         waitLatch.countDown()
     }
 
+    connectToEtcd(urls) { client ->
+        client.deleteChildren(barrierPath)
+    }
+
     repeat(count - 1) { i ->
         thread {
-            DistributedBarrierWithCount(urls, barrierPath, count)
-                .use { barrier ->
-                    waiter(i, barrier, 5)
-                }
+            connectToEtcd(urls) { client ->
+                DistributedBarrierWithCount(client, barrierPath, count)
+                    .use { barrier ->
+                        waiter(i, barrier, 5)
+                    }
+            }
         }
     }
 
     retryLatch.await()
     sleep(2.seconds)
 
-    DistributedBarrierWithCount(urls, barrierPath, count)
-        .use { barrier ->
-            waiter(99, barrier)
-        }
+    connectToEtcd(urls) { client ->
+        DistributedBarrierWithCount(client, barrierPath, count)
+            .use { barrier ->
+                waiter(99, barrier)
+            }
+    }
 
     waitLatch.await()
 

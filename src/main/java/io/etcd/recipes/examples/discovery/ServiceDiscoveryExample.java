@@ -17,6 +17,7 @@
 package io.etcd.recipes.examples.discovery;
 
 import com.google.common.collect.Lists;
+import io.etcd.jetcd.Client;
 import io.etcd.recipes.common.EtcdRecipeException;
 import io.etcd.recipes.discovery.ServiceDiscovery;
 import io.etcd.recipes.discovery.ServiceInstance;
@@ -24,6 +25,7 @@ import io.etcd.recipes.discovery.ServiceInstance;
 import java.util.List;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
+import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 
 public class ServiceDiscoveryExample {
 
@@ -37,7 +39,8 @@ public class ServiceDiscoveryExample {
 
     public static void serviceExample(boolean verbose) throws EtcdRecipeException {
 
-        try (ServiceDiscovery sd = new ServiceDiscovery(urls, path)) {
+        try (Client client = connectToEtcd(urls);
+             ServiceDiscovery sd = new ServiceDiscovery(client, path)) {
 
             IntPayload payload = new IntPayload(-999);
             ServiceInstance service = ServiceInstance.newBuilder(serviceName, payload.toJson()).build();

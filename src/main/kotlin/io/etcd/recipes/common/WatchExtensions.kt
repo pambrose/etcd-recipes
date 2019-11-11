@@ -20,6 +20,7 @@
 package io.etcd.recipes.common
 
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
@@ -35,31 +36,23 @@ val WatchEvent.valueAsString get() = keyValue.value.asString
 val WatchEvent.valueAsInt get() = keyValue.value.asInt
 val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
-fun Lazy<Watch>.watcher(key: ByteSequence,
-                        option: WatchOption = WatchOption.DEFAULT,
-                        block: (WatchResponse) -> Unit): Watch.Watcher = value.watcher(key, option, block)
-
-fun Lazy<Watch>.watcher(keyName: String,
-                        option: WatchOption = WatchOption.DEFAULT,
-                        block: (WatchResponse) -> Unit): Watch.Watcher = watcher(keyName.asByteSequence, option, block)
+@JvmOverloads
+fun Client.watcher(key: ByteSequence,
+                   option: WatchOption = WatchOption.DEFAULT,
+                   block: (WatchResponse) -> Unit): Watch.Watcher = watchClient.watch(key, option) { block(it) }
 
 @JvmOverloads
-fun Watch.watcher(key: ByteSequence,
-                  option: WatchOption = WatchOption.DEFAULT,
-                  block: (WatchResponse) -> Unit): Watch.Watcher = watch(key, option) { block(it) }
+fun Client.watcher(keyName: String,
+                   option: WatchOption = WatchOption.DEFAULT,
+                   block: (WatchResponse) -> Unit): Watch.Watcher = watcher(keyName.asByteSequence, option, block)
 
 @JvmOverloads
-fun Watch.watcher(keyName: String,
-                  option: WatchOption = WatchOption.DEFAULT,
-                  block: (WatchResponse) -> Unit): Watch.Watcher = watcher(keyName.asByteSequence, option, block)
-
-@JvmOverloads
-fun Watch.watcherWithLatch(keyName: String,
-                           endWatchLatch: CountDownLatch,
-                           onPut: (WatchEvent) -> Unit,
-                           onDelete: (WatchEvent) -> Unit,
-                           option: WatchOption = WatchOption.DEFAULT) {
-    watch(keyName.asByteSequence, option) { watchResponse ->
+fun Client.watcherWithLatch(keyName: String,
+                            endWatchLatch: CountDownLatch,
+                            onPut: (WatchEvent) -> Unit,
+                            onDelete: (WatchEvent) -> Unit,
+                            option: WatchOption = WatchOption.DEFAULT) {
+    watchClient.watch(keyName.asByteSequence, option) { watchResponse ->
         watchResponse.events
             .forEach { event ->
                 when (event.eventType) {

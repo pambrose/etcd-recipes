@@ -23,6 +23,7 @@ import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.captureException
 import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
@@ -46,46 +47,47 @@ class ServiceCacheTests {
         val holder = ExceptionHolder()
         val totalCounter = AtomicInteger(0)
 
-        ServiceDiscovery(urls, path).use { cachesd ->
+        connectToEtcd(urls) { client ->
+            ServiceDiscovery(client, path).use { cachesd ->
 
-            cachesd.serviceCache(name).apply {
+                cachesd.serviceCache(name).apply {
+                    start()
+                    sleep(2.seconds)
 
-                start()
-                sleep(2.seconds)
+                    instances.size shouldEqualTo 0
+                    serviceName shouldEqual name
+                    urls shouldEqual urls
 
-                instances.size shouldEqualTo 0
-                serviceName shouldEqual name
-                urls shouldEqual urls
+                    addListenerForChanges(object : ServiceCacheListener {
+                        override fun cacheChanged(eventType: EventType,
+                                                  isAdd: Boolean,
+                                                  serviceName: String,
+                                                  serviceInstance: ServiceInstance?) {
+                            captureException(holder) {
+                                //println("Comparing $serviceName and $name")
+                                serviceName.split("/").first() shouldEqual name
 
-                addListenerForChanges(object : ServiceCacheListener {
-                    override fun cacheChanged(eventType: EventType,
-                                              isAdd: Boolean,
-                                              serviceName: String,
-                                              serviceInstance: ServiceInstance?) {
-                        captureException(holder) {
-                            //println("Comparing $serviceName and $name")
-                            serviceName.split("/").first() shouldEqual name
+                                if (eventType == EventType.PUT) {
+                                    if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
 
-                            if (eventType == EventType.PUT) {
-                                if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
+                                    serviceInstance?.name shouldEqual name
+                                }
 
-                                serviceInstance?.name shouldEqual name
-                            }
-
-                            if (eventType == EventType.DELETE) {
-                                unregisterCounter.incrementAndGet()
-                                serviceInstance?.name shouldEqual name
+                                if (eventType == EventType.DELETE) {
+                                    unregisterCounter.incrementAndGet()
+                                    serviceInstance?.name shouldEqual name
+                                }
                             }
                         }
-                    }
-                })
+                    })
 
-                addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
+                    addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
+                }
             }
 
             val (finishedLatch, holder2) =
                 nonblockingThreads(threadCount) {
-                    ServiceDiscovery(urls, path).use { sd ->
+                    ServiceDiscovery(client, path).use { sd ->
                         repeat(serviceCount) {
                             val service = ServiceInstance(name, TestPayload(it).toJson())
                             logger.info { "Registering: ${service.name} ${service.id}" }

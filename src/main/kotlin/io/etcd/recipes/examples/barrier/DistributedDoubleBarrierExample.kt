@@ -21,8 +21,8 @@ package io.etcd.recipes.examples.barrier
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedDoubleBarrier
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
-import io.etcd.recipes.common.etcdExec
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -34,8 +34,6 @@ fun main() {
     val enterLatch = CountDownLatch(count - 1)
     val leaveLatch = CountDownLatch(count - 1)
     val doneLatch = CountDownLatch(count)
-
-    etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(barrierPath) }
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
         sleep(10.random.seconds)
@@ -70,27 +68,35 @@ fun main() {
         doneLatch.countDown()
     }
 
+    connectToEtcd(urls) { client ->
+        client.deleteChildren(barrierPath)
+    }
+
     repeat(count - 1) { i ->
         thread {
-            DistributedDoubleBarrier(urls, barrierPath, count)
-                .use { barrier ->
-                    enterBarrier(i, barrier, 2)
-                    sleep(5.random.seconds)
-                    leaveBarrier(i, barrier, 2)
-                }
+            connectToEtcd(urls) { client ->
+                DistributedDoubleBarrier(client, barrierPath, count)
+                    .use { barrier ->
+                        enterBarrier(i, barrier, 2)
+                        sleep(5.random.seconds)
+                        leaveBarrier(i, barrier, 2)
+                    }
+            }
         }
     }
 
-    DistributedDoubleBarrier(urls, barrierPath, count)
-        .use { barrier ->
-            enterLatch.await()
-            sleep(2.seconds)
-            enterBarrier(99, barrier)
+    connectToEtcd(urls) { client ->
+        DistributedDoubleBarrier(client, barrierPath, count)
+            .use { barrier ->
+                enterLatch.await()
+                sleep(2.seconds)
+                enterBarrier(99, barrier)
 
-            leaveLatch.await()
-            sleep(2.seconds)
-            leaveBarrier(99, barrier)
-        }
+                leaveLatch.await()
+                sleep(2.seconds)
+                leaveBarrier(99, barrier)
+            }
+    }
 
     doneLatch.await()
 

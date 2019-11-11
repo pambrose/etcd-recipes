@@ -18,15 +18,16 @@
 
 package io.etcd.recipes.election
 
+import com.sudothought.common.concurrent.thread
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
-import kotlin.concurrent.thread
 import kotlin.time.seconds
 
 class ParticipantTests {
@@ -42,57 +43,60 @@ class ParticipantTests {
         val leaderNames: MutableList<String> = synchronizedList(mutableListOf())
 
         blockingThreads(count) {
-            thread {
-                LeaderSelector(urls,
-                               path,
-                               object : LeaderSelectorListenerAdapter() {
-                                   override fun takeLeadership(selector: LeaderSelector) {
-                                       val pause = 2.seconds
-                                       logger.info { "${selector.clientId} elected leader for $pause" }
-                                       sleep(pause)
+            thread(finishedLatch) {
+                connectToEtcd(urls) { client ->
+                    LeaderSelector(client,
+                                   path,
+                                   object : LeaderSelectorListenerAdapter() {
+                                       override fun takeLeadership(selector: LeaderSelector) {
+                                           val pause = 2.seconds
+                                           logger.info { "${selector.clientId} elected leader for $pause" }
+                                           sleep(pause)
 
-                                       // Wait until participation count has been taken
-                                       holdLatch.await()
-                                       participantCounts += LeaderSelector.getParticipants(urls, path).size
-                                       leaderNames += selector.clientId
-                                   }
-                               },
-                               clientId = "Thread$it")
-                    .use { election ->
-                        election.start()
-                        startedLatch.countDown()
-                        election.waitOnLeadershipComplete()
-                        finishedLatch.countDown()
-                    }
+                                           // Wait until participation count has been taken
+                                           holdLatch.await()
+                                           participantCounts += LeaderSelector.getParticipants(client, path).size
+                                           leaderNames += selector.clientId
+                                       }
+                                   },
+                                   clientId = "Thread$it")
+                        .use { election ->
+                            election.start()
+                            startedLatch.countDown()
+                            election.waitOnLeadershipComplete()
+                        }
+                }
             }
         }
 
         startedLatch.await()
 
-        // Wait for participants to register
-        sleep(3.seconds)
-        var particpants = LeaderSelector.getParticipants(urls, path)
-        logger.info { "Found ${particpants.size} participants" }
-        particpants.size shouldEqual count
+        connectToEtcd(urls) { client ->
+            // Wait for participants to register
+            sleep(3.seconds)
+            var particpants = LeaderSelector.getParticipants(client, path)
+            logger.info { "Found ${particpants.size} participants" }
+            particpants.size shouldEqual count
 
-        holdLatch.countDown()
+            holdLatch.countDown()
 
-        finishedLatch.await()
+            finishedLatch.await()
 
-        sleep(5.seconds)
+            sleep(5.seconds)
 
-        particpants = LeaderSelector.getParticipants(urls, path)
-        logger.info { "Found ${particpants.size} participants" }
-        particpants.size shouldEqual 0
+            particpants = LeaderSelector.getParticipants(client, path)
+            logger.info { "Found ${particpants.size} participants" }
+            particpants.size shouldEqual 0
 
-        // Compare participant counts
-        logger.info { "participantCounts = $participantCounts" }
-        participantCounts.size shouldEqual count
-        participantCounts shouldEqual (count downTo 1).toList()
+            // Compare participant counts
+            logger.info { "participantCounts = $participantCounts" }
+            participantCounts.size shouldEqual count
+            participantCounts shouldEqual (count downTo 1).toList()
 
-        // Compare leader names
-        logger.info { "leaderNames = $leaderNames" }
-        leaderNames.sorted() shouldEqual List(count) { "Thread$it" }.sorted()
+            // Compare leader names
+            logger.info { "leaderNames = $leaderNames" }
+            leaderNames.sorted() shouldEqual List(count) { "Thread$it" }.sorted()
+        }
     }
 
     companion object : KLogging()

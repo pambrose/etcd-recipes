@@ -21,6 +21,7 @@ package io.etcd.recipes.barrier
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.time.timeUnitToDuration
 import com.sudothought.common.util.randomId
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
@@ -29,16 +30,16 @@ import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.delete
 import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.ensureSuffix
-import io.etcd.recipes.common.getChildrenCount
+import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.leaseGrant
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
@@ -59,11 +60,11 @@ import kotlin.time.seconds
 */
 class DistributedBarrierWithCount
 @JvmOverloads
-constructor(urls: List<String>,
+constructor(client: Client,
             val barrierPath: String,
             val memberCount: Int,
             val leaseTtlSecs: Long = defaultTtlSecs,
-            val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
+            val clientId: String = defaultClientId()) : EtcdConnector(client), Closeable {
 
     private val readyPath = barrierPath.appendToPath("ready")
     private val waitingPath = barrierPath.appendToPath("waiting")
@@ -76,13 +77,13 @@ constructor(urls: List<String>,
     private val isReadySet: Boolean
         get() {
             checkCloseNotCalled()
-            return kvClient.isKeyPresent(readyPath)
+            return client.isKeyPresent(readyPath)
         }
 
     val waiterCount: Long
         get() {
             checkCloseNotCalled()
-            return kvClient.getChildrenCount(waitingPath)
+            return client.getChildCount(waitingPath)
         }
 
     @Throws(InterruptedException::class, EtcdRecipeException::class)
@@ -105,7 +106,7 @@ constructor(urls: List<String>,
             if (!keepAliveClosed.get()) {
                 keepAliveLease?.close()
                 keepAliveLease = null
-                kvClient.value.delete(waitingPath)
+                client.deleteKey(waitingPath)
                 keepAliveClosed.set(true)
             }
         }
@@ -120,34 +121,34 @@ constructor(urls: List<String>,
                     closeKeepAlive()
 
                     // Delete /ready key
-                    kvClient.transaction {
+                    client.transaction {
                         If(readyPath.doesExist)
-                        Then(deleteKey(readyPath))
+                        Then(deleteOp(readyPath))
                     }
                 }
             }
         }
 
         // Do a CAS on the /ready name. If it is not found, then set it
-        kvClient.transaction {
+        client.transaction {
             If(readyPath.doesNotExist)
             Then(readyPath setTo uniqueToken)
         }
 
-        val lease = leaseClient.grant(leaseTtlSecs.seconds).get()
+        val lease = client.leaseGrant(leaseTtlSecs.seconds)
 
         val txn =
-            kvClient.transaction {
+            client.transaction {
                 If(waitingPath.doesNotExist)
                 Then(waitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
             }
 
         when {
-            !txn.isSucceeded                                        -> throw EtcdRecipeException("Failed to set waitingPath")
-            kvClient.getValue(waitingPath)?.asString != uniqueToken -> throw EtcdRecipeException("Failed to assign waitingPath unique value")
-            else                                                    -> {
+            !txn.isSucceeded                                      -> throw EtcdRecipeException("Failed to set waitingPath")
+            client.getValue(waitingPath)?.asString != uniqueToken -> throw EtcdRecipeException("Failed to assign waitingPath unique value")
+            else                                                  -> {
                 // Keep key alive
-                keepAliveLease = leaseClient.keepAlive(lease)
+                keepAliveLease = client.keepAlive(lease)
 
                 checkWaiterCount()
 
@@ -158,7 +159,7 @@ constructor(urls: List<String>,
                     // Watch for DELETE of /ready and PUTS on /waiters/*
                     val trailingKey = barrierPath.ensureSuffix("/")
                     val watchOption = watchOption { withPrefix(trailingKey.asByteSequence) }
-                    watchClient.watcher(trailingKey, watchOption) { watchResponse ->
+                    client.watcher(trailingKey, watchOption) { watchResponse ->
                         watchResponse.events
                             .forEach { watchEvent ->
                                 val key = watchEvent.keyValue.key.asString
@@ -176,7 +177,7 @@ constructor(urls: List<String>,
                         // Cleanup if a time-out occurred
                         if (!success) {
                             closeKeepAlive()
-                            kvClient.delete(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
+                            client.deleteKey(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
                         }
 
                         success

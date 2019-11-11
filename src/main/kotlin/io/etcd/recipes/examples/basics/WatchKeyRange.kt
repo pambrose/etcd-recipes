@@ -21,76 +21,70 @@ package io.etcd.recipes.examples.basics
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.delete
-import io.etcd.recipes.common.etcdExec
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getChildren
-import io.etcd.recipes.common.getChildrenCount
 import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
-import io.etcd.recipes.common.withWatchClient
 import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
     val path = "/watchkeyrange"
 
-    etcdExec(urls) { client, kvClient ->
-        kvClient.apply {
+    connectToEtcd(urls) { client ->
+        client.apply {
+            val watchOption = watchOption { withPrefix(path.asByteSequence) }
+            watcher(path, watchOption) { watchResponse ->
+                for (event in watchResponse.events)
+                    println("${event.eventType} for ${event.keyValue.asString}")
+            }.use {
+                // Create empty root
+                putValue(path, "root")
 
-            client.withWatchClient { watchClient ->
-                val watchOption = watchOption { withPrefix(path.asByteSequence) }
-                watchClient.watcher(path, watchOption) { watchResponse ->
-                    watchResponse.events
-                        .forEach { watchEvent ->
-                            println("${watchEvent.eventType} for ${watchEvent.keyValue.asString}")
-                        }
-                }.use {
-                    // Create empty root
-                    putValue(path, "root")
+                println("After creation:")
+                println(getChildren(path))
+                println(getChildCount(path))
 
-                    println("After creation:")
-                    println(getChildren(path))
-                    println(getChildrenCount(path))
+                sleep(5.seconds)
 
-                    sleep(5.seconds)
+                // Add children
+                putValue("$path/election/a", "a")
+                putValue("$path/election/b", "bb")
+                putValue("$path/waiting/c", "ccc")
+                putValue("$path/waiting/d", "dddd")
 
-                    // Add children
-                    putValue("$path/election/a", "a")
-                    putValue("$path/election/b", "bb")
-                    putValue("$path/waiting/c", "ccc")
-                    putValue("$path/waiting/d", "dddd")
+                println("\nAfter putValues:")
+                println(getChildren(path).asString)
+                println(getChildCount(path))
 
-                    println("\nAfter putValues:")
-                    println(getChildren(path).asString)
-                    println(getChildrenCount(path))
+                println("\nElection only:")
+                println(getChildren("$path/election").asString)
+                println(getChildCount("$path/election"))
 
-                    println("\nElection only:")
-                    println(getChildren("$path/election").asString)
-                    println(getChildrenCount("$path/election"))
+                println("\nWaiting only:")
+                println(getChildren("$path/waiting").asString)
+                println(getChildCount("$path/waiting"))
 
-                    println("\nWaiting only:")
-                    println(getChildren("$path/waiting").asString)
-                    println(getChildrenCount("$path/waiting"))
+                sleep(5.seconds)
 
-                    sleep(5.seconds)
+                // Delete root
+                deleteKey(path)
 
-                    // Delete root
-                    delete(path)
-
-                    // Delete children
-                    getChildrenKeys(path).forEach {
-                        println("Deleting key: $it")
-                        delete(it)
-                    }
-
-                    println("\nAfter removal:")
-                    println(getChildren(path).asString)
-                    println(getChildrenCount(path))
-
-                    sleep(5.seconds)
+                // Delete children
+                getChildrenKeys(path).forEach {
+                    println("Deleting key: $it")
+                    deleteKey(it)
                 }
+
+                println("\nAfter removal:")
+                println(getChildren(path).asString)
+                println(getChildCount(path))
+
+                sleep(5.seconds)
             }
         }
     }

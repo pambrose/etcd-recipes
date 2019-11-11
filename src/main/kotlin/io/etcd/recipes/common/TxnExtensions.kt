@@ -20,7 +20,7 @@
 package io.etcd.recipes.common
 
 import io.etcd.jetcd.ByteSequence
-import io.etcd.jetcd.KV
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.Cmp
@@ -29,13 +29,11 @@ import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.PutOption
 
-fun KV.transaction(reciever: Txn.() -> Txn): TxnResponse =
-    txn().run {
+fun Client.transaction(reciever: Txn.() -> Txn): TxnResponse =
+    kvClient.txn().run {
         reciever()
         commit()
     }.get()
-
-fun Lazy<KV>.transaction(reciever: Txn.() -> Txn): TxnResponse = value.transaction(reciever)
 
 fun <T> equalTo(bytes: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(bytes, Cmp.Op.EQUAL, target)
 fun <T> lessThan(bytes: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(bytes, Cmp.Op.LESS, target)
@@ -57,11 +55,11 @@ val String.doesNotExist: Cmp get() = equalTo(this, CmpTarget.version(0))
 val String.doesExist: Cmp get() = greaterThan(this, CmpTarget.version(0))
 
 @JvmOverloads
-fun deleteKey(key: ByteSequence, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp = Op.delete(key, option)
+fun deleteOp(key: ByteSequence, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp = Op.delete(key, option)
 
 @JvmOverloads
-fun deleteKey(keyName: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
-    deleteKey(keyName.asByteSequence, option)
+fun deleteOp(key: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
+    deleteOp(key.asByteSequence, option)
 
 fun String.setTo(value: ByteSequence, putOption: PutOption): Op.PutOp =
     Op.put(asByteSequence, value, putOption)

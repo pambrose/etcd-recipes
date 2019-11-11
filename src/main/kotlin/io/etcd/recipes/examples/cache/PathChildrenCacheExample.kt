@@ -20,8 +20,8 @@ import com.sudothought.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
-import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.putValue
 import kotlin.time.seconds
 
@@ -29,27 +29,28 @@ fun main() {
     val urls = listOf("http://localhost:2379")
     val cachePath = "/cache/test"
 
-    etcdExec(urls) { _, kvClient ->
-        kvClient.putValue("${cachePath}/child1", "a child 1 value")
-        kvClient.putValue("${cachePath}/child2", "a child 2 value")
-    }
+    connectToEtcd(urls) { client ->
 
-    sleep(1.seconds)
+        client.putValue("${cachePath}/child1", "a child 1 value")
+        client.putValue("${cachePath}/child2", "a child 2 value")
 
-    PathChildrenCache(urls, cachePath)
-        .use { cache ->
-            cache.apply {
-                addListener { event: PathChildrenCacheEvent ->
-                    println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+        sleep(1.seconds)
+
+        PathChildrenCache(client, cachePath)
+            .use { cache ->
+                cache.apply {
+                    addListener { event: PathChildrenCacheEvent ->
+                        println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+                    }
+
+                    start(true)
+                    waitOnStartComplete()
+                    currentData.forEach { println("${it.key} ${it.value.asString}") }
+
+                    println("Deleted: ${client.deleteChildren(cachePath)}")
+
+                    sleep(1.seconds)
                 }
-
-                start(true)
-                waitOnStartComplete()
-                currentData.forEach { println("${it.key} ${it.value.asString}") }
-
-                etcdExec(urls) { _, kvClient -> println("Deleted: ${kvClient.deleteChildren(cachePath)}") }
-
-                sleep(1.seconds)
             }
-        }
+    }
 }

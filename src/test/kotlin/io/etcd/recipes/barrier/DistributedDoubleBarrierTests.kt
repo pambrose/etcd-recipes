@@ -21,8 +21,8 @@ package io.etcd.recipes.barrier
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
-import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
@@ -40,9 +40,10 @@ class DistributedDoubleBarrierTests {
 
     @Test
     fun badArgsTest() {
-        invoking { DistributedDoubleBarrier(urls, "something", 0) } shouldThrow IllegalArgumentException::class
-        invoking { DistributedDoubleBarrier(urls, "", 1) } shouldThrow IllegalArgumentException::class
-        invoking { DistributedDoubleBarrier(emptyList(), "something", 1) } shouldThrow IllegalArgumentException::class
+        connectToEtcd(urls) { client ->
+            invoking { DistributedDoubleBarrier(client, "something", 0) } shouldThrow IllegalArgumentException::class
+            invoking { DistributedDoubleBarrier(client, "", 1) } shouldThrow IllegalArgumentException::class
+        }
     }
 
     @Test
@@ -58,8 +59,6 @@ class DistributedDoubleBarrierTests {
         val leaveRetryCounter = AtomicInteger(0)
         val enterCounter = AtomicInteger(0)
         val leaveCounter = AtomicInteger(0)
-
-        etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
         fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
             sleep(5.random.seconds)
@@ -103,27 +102,34 @@ class DistributedDoubleBarrierTests {
             doneLatch.countDown()
         }
 
+        // Clean up leftover children
+        connectToEtcd(urls) { client -> client.deleteChildren(path) }
+
         val (finishedLatch, holder) =
             nonblockingThreads(count - 1) { i ->
-                DistributedDoubleBarrier(urls, path, count).use { barrier ->
-                    enterBarrier(i, barrier, retryAttempts)
-                    sleep(5.random.seconds)
-                    leaveBarrier(i, barrier, retryAttempts)
+                connectToEtcd(urls) { client ->
+                    DistributedDoubleBarrier(client, path, count).use { barrier ->
+                        enterBarrier(i, barrier, retryAttempts)
+                        sleep(5.random.seconds)
+                        leaveBarrier(i, barrier, retryAttempts)
+                    }
                 }
             }
 
-        DistributedDoubleBarrier(urls, path, count).use { barrier ->
-            enterLatch.await()
-            sleep(2.seconds)
+        connectToEtcd(urls) { client ->
+            DistributedDoubleBarrier(client, path, count).use { barrier ->
+                enterLatch.await()
+                sleep(2.seconds)
 
-            barrier.enterWaiterCount.toInt() shouldEqual count - 1
-            enterBarrier(99, barrier)
+                barrier.enterWaiterCount.toInt() shouldEqual count - 1
+                enterBarrier(99, barrier)
 
-            leaveLatch.await()
-            sleep(2.seconds)
+                leaveLatch.await()
+                sleep(2.seconds)
 
-            barrier.leaveWaiterCount.toInt() shouldEqual count - 1
-            leaveBarrier(99, barrier)
+                barrier.leaveWaiterCount.toInt() shouldEqual count - 1
+                leaveBarrier(99, barrier)
+            }
         }
 
         doneLatch.await()

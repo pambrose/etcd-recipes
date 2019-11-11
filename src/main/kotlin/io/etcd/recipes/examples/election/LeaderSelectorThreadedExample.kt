@@ -21,6 +21,7 @@ package io.etcd.recipes.examples.election
 import com.sudothought.common.concurrent.thread
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.election.LeaderSelector.Companion.getParticipants
 import java.util.concurrent.CountDownLatch
@@ -47,21 +48,25 @@ fun main() {
                     println("${selector.clientId} relinquished leadership")
                 }
 
-            LeaderSelector(urls,
-                           electionPath,
-                           takeLeadershipAction,
-                           relinquishLeadershipAction,
-                           clientId = "Thread$it")
-                .use { election ->
-                    election.start()
-                    election.waitOnLeadershipComplete()
-                }
+            connectToEtcd(urls) { client ->
+                LeaderSelector(client,
+                               electionPath,
+                               takeLeadershipAction,
+                               relinquishLeadershipAction,
+                               clientId = "Thread$it")
+                    .use { election ->
+                        election.start()
+                        election.waitOnLeadershipComplete()
+                    }
+            }
         }
     }
 
-    while (latch.count > 0) {
-        println("Participants: ${getParticipants(urls, electionPath)}")
-        sleep(1.seconds)
+    connectToEtcd(urls) { client ->
+        while (latch.count > 0) {
+            println("Participants: ${getParticipants(client, electionPath)}")
+            sleep(1.seconds)
+        }
     }
 
     latch.await()

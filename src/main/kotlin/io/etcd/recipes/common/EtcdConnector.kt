@@ -20,23 +20,12 @@ package io.etcd.recipes.common
 
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.KV
-import io.etcd.jetcd.Lease
-import io.etcd.jetcd.Watch
 import java.util.Collections.synchronizedList
 
-open class EtcdConnector(val urls: List<String>) {
+open class EtcdConnector(val client: Client) {
 
-    protected val client: Lazy<Client> = lazy { connectToEtcd(urls) }
-    protected val kvClient: Lazy<KV> = lazy { client.value.kvClient }
-    protected val leaseClient: Lazy<Lease> = lazy { client.value.leaseClient }
-    protected val watchClient: Lazy<Watch> = lazy { client.value.watchClient }
     protected var closeCalled: Boolean by atomicBoolean(false)
     protected val exceptionList: Lazy<MutableList<Throwable>> = lazy { synchronizedList(mutableListOf<Throwable>()) }
-
-    init {
-        require(urls.isNotEmpty()) { "URLs cannot be empty" }
-    }
 
     protected fun checkCloseNotCalled() {
         if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
@@ -53,18 +42,6 @@ open class EtcdConnector(val urls: List<String>) {
     @Synchronized
     open fun close() {
         if (!closeCalled) {
-            if (watchClient.isInitialized())
-                watchClient.value.close()
-
-            if (leaseClient.isInitialized())
-                leaseClient.value.close()
-
-            if (kvClient.isInitialized())
-                kvClient.value.close()
-
-            if (client.isInitialized())
-                client.value.close()
-
             closeCalled = true
         }
     }

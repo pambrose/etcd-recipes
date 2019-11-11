@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.examples.counter
 
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.counter.DistributedAtomicLong
 import kotlin.time.measureTimedValue
 
@@ -25,25 +26,28 @@ fun main() {
     val urls = listOf("http://localhost:2379")
     val counterPath = "counter2"
 
-    DistributedAtomicLong.delete(urls, counterPath)
+    connectToEtcd(urls) { client ->
 
-    val counters = List(30) { DistributedAtomicLong(urls, counterPath) }
+        DistributedAtomicLong.delete(client, counterPath)
 
-    val (total, dur) =
-        measureTimedValue {
-            val count = 25
-            counters
-                .onEach { counter ->
-                    repeat(count) { counter.increment() }
-                    repeat(count) { counter.decrement() }
-                    repeat(count) { counter.add(5) }
-                    repeat(count) { counter.subtract(5) }
-                }
-                .first()
-                .get()
-        }
+        val counters = List(30) { DistributedAtomicLong(client, counterPath) }
 
-    println("Total: $total in $dur")
+        val (total, dur) =
+            measureTimedValue {
+                val count = 25
+                counters
+                    .onEach { counter ->
+                        repeat(count) { counter.increment() }
+                        repeat(count) { counter.decrement() }
+                        repeat(count) { counter.add(5) }
+                        repeat(count) { counter.subtract(5) }
+                    }
+                    .first()
+                    .get()
+            }
 
-    counters.forEach { it.close() }
+        println("Total: $total in $dur")
+
+        counters.forEach { it.close() }
+    }
 }

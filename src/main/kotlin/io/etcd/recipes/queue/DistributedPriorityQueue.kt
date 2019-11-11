@@ -19,16 +19,17 @@
 package io.etcd.recipes.queue
 
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.getLast
+import io.etcd.recipes.common.getLastChild
 import io.etcd.recipes.common.lessThan
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 
-class DistributedPriorityQueue(urls: List<String>, queuePath: String) : AbstractQueue(urls, queuePath, SortTarget.KEY) {
+class DistributedPriorityQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.KEY) {
 
     fun enqueue(value: String, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
     fun enqueue(value: Int, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
@@ -46,7 +47,7 @@ class DistributedPriorityQueue(urls: List<String>, queuePath: String) : Abstract
     }
 
     private fun newSequentialKV(prefix: String, value: ByteSequence) {
-        val resp = kvClient.getLast(prefix, SortTarget.KEY)
+        val resp = client.getLastChild(prefix, SortTarget.KEY)
         val kvs = resp.kvs
 
         var newSeqNum = 0
@@ -56,7 +57,7 @@ class DistributedPriorityQueue(urls: List<String>, queuePath: String) : Abstract
         }
 
         val txn =
-            kvClient.transaction {
+            client.transaction {
                 val newKey = "%s/%016d".format(prefix, newSeqNum)
                 val baseKey = "__$prefix"
                 If(lessThan(baseKey, CmpTarget.modRevision(resp.header.revision + 1)))

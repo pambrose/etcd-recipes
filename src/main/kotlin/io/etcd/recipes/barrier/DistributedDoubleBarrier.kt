@@ -20,6 +20,7 @@ package io.etcd.recipes.barrier
 
 import com.sudothought.common.time.timeUnitToDuration
 import com.sudothought.common.util.randomId
+import io.etcd.jetcd.Client
 import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
@@ -30,13 +31,13 @@ import kotlin.time.days
 
 class DistributedDoubleBarrier
 @JvmOverloads
-constructor(val urls: List<String>,
+constructor(client: Client,
             barrierPath: String,
             memberCount: Int,
             val clientId: String = defaultClientId()) : Closeable {
 
-    private val enterBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("enter"), memberCount)
-    private val leaveBarrier = DistributedBarrierWithCount(urls, barrierPath.appendToPath("leave"), memberCount)
+    private val enterBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("enter"), memberCount)
+    private val leaveBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("leave"), memberCount)
 
     init {
         require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }

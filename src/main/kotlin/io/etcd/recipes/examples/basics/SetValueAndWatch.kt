@@ -24,11 +24,9 @@ import com.sudothought.common.util.sleep
 import io.etcd.jetcd.watch.WatchResponse
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.delete
-import io.etcd.recipes.common.etcdExec
+import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.watcher
-import io.etcd.recipes.common.withWatchClient
 import java.util.concurrent.CountDownLatch
 import kotlin.time.seconds
 
@@ -40,34 +38,29 @@ fun main() {
 
     thread(latch) {
         sleep(3.seconds)
-
-        etcdExec(urls) { _, kvClient ->
+        connectToEtcd(urls) { client ->
             repeatWithSleep(10) { i, _ ->
                 val kv = keyval + i
                 println("Assigning $path = $kv")
-                kvClient.putValue(path, kv)
+                client.putValue(path, kv)
                 sleep(2.seconds)
                 println("Deleting $path")
-                kvClient.delete(path)
+                client.deleteKey(path)
             }
         }
     }
 
     thread(latch) {
         connectToEtcd(urls) { client ->
-            client.withWatchClient { watchClient ->
-                watchClient.watcher(path) { watchResponse: WatchResponse ->
-                    watchResponse.events
-                        .forEach { watchEvent ->
-                            println("Watch event: ${watchEvent.eventType} ${watchEvent.keyValue.asString}")
-                        }
-                }.use {
-                    println("Started watch")
-                    sleep(10.seconds)
-                    println("Closing watch")
-                }
-                println("Closed watch")
+            client.watcher(path) { watchResponse: WatchResponse ->
+                for (event in watchResponse.events)
+                    println("Watch event: ${event.eventType} ${event.keyValue.asString}")
+            }.use {
+                println("Started watch")
+                sleep(10.seconds)
+                println("Closing watch")
             }
+            println("Closed watch")
         }
     }
 

@@ -19,6 +19,7 @@
 package io.etcd.recipes.examples.counter
 
 import com.sudothought.common.concurrent.thread
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.withDistributedAtomicLong
 import io.etcd.recipes.counter.DistributedAtomicLong
 import java.util.concurrent.CountDownLatch
@@ -31,23 +32,26 @@ fun main() {
     val repeatCount = 10
     val latch = CountDownLatch(threadCount)
 
-    DistributedAtomicLong.delete(urls, path)
+    connectToEtcd(urls) { client ->
 
-    val (_, dur) =
-        measureTimedValue {
-            repeat(threadCount) { i ->
-                thread(latch) {
-                    println("Creating counter #$i")
-                    withDistributedAtomicLong(urls, path) {
-                        repeat(repeatCount) { increment() }
-                        repeat(repeatCount) { decrement() }
-                        repeat(repeatCount) { add(5) }
-                        repeat(repeatCount) { subtract(5) }
+        DistributedAtomicLong.delete(client, path)
+
+        val (_, dur) =
+            measureTimedValue {
+                repeat(threadCount) { i ->
+                    thread(latch) {
+                        println("Creating counter #$i")
+                        withDistributedAtomicLong(client, path) {
+                            repeat(repeatCount) { increment() }
+                            repeat(repeatCount) { decrement() }
+                            repeat(repeatCount) { add(5) }
+                            repeat(repeatCount) { subtract(5) }
+                        }
                     }
                 }
+                latch.await()
             }
-            latch.await()
-        }
 
-    withDistributedAtomicLong(urls, path) { println("Counter value = ${get()} in $dur") }
+        withDistributedAtomicLong(client, path) { println("Counter value = ${get()} in $dur") }
+    }
 }

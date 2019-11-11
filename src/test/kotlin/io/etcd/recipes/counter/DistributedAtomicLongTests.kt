@@ -22,6 +22,7 @@ import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.blockingThreads
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.threadWithExceptionCheck
 import io.etcd.recipes.common.throwExceptionFromList
 import io.etcd.recipes.common.urls
@@ -39,79 +40,99 @@ class DistributedAtomicLongTests {
     val path = "/counters/${javaClass.simpleName}"
 
     @BeforeEach
-    fun deleteCounter() = DistributedAtomicLong.delete(urls, path)
-
-    @Test
-    fun badArgsTest() {
-        invoking { DistributedAtomicLong(urls, "") } shouldThrow IllegalArgumentException::class
-        invoking { DistributedAtomicLong(emptyList(), "something") } shouldThrow IllegalArgumentException::class
+    fun deleteCounter() {
+        connectToEtcd(urls) { client ->
+            DistributedAtomicLong.delete(client, path)
+        }
     }
 
     @Test
-    fun defaultInitialValueTest() = withDistributedAtomicLong(urls, path) { get() shouldEqual 0L }
+    fun badArgsTest() {
+        connectToEtcd(urls) { client ->
+            invoking { DistributedAtomicLong(client, "") } shouldThrow IllegalArgumentException::class
+        }
+    }
 
     @Test
-    fun nondefaultInitialValueTest() = withDistributedAtomicLong(urls, path, 100L) { get() shouldEqual 100L }
+    fun defaultInitialValueTest() {
+        connectToEtcd(urls) { client ->
+            withDistributedAtomicLong(client, path) { get() shouldEqual 0L }
+        }
+    }
+
+    @Test
+    fun nondefaultInitialValueTest() {
+        connectToEtcd(urls) { client ->
+            withDistributedAtomicLong(client, path, 100L) { get() shouldEqual 100L }
+        }
+    }
 
     @Test
     fun incrementDecrementTest() {
         val count = 100
-        withDistributedAtomicLong(urls, path) {
-            repeat(count) {
-                increment()
-                decrement()
+        connectToEtcd(urls) { client ->
+            withDistributedAtomicLong(client, path) {
+                repeat(count) {
+                    increment()
+                    decrement()
+                }
+                get() shouldEqual 0L
             }
-            get() shouldEqual 0L
         }
     }
 
     @Test
     fun addSubtractTest() {
         val count = 100
-        withDistributedAtomicLong(urls, path) {
-            repeat(count) {
-                add(5)
-                subtract(5)
+        connectToEtcd(urls) { client ->
+            withDistributedAtomicLong(client, path) {
+                repeat(count) {
+                    add(5)
+                    subtract(5)
+                }
+                get() shouldEqual 0L
             }
-            get() shouldEqual 0L
         }
     }
 
     @Test
     fun serialTest() {
         val count = 20
-        val counters = List(20) { DistributedAtomicLong(urls, path) }
-        val total =
-            counters
-                .onEach { counter ->
-                    repeat(count) { counter.increment() }
-                    repeat(count) { counter.decrement() }
-                    repeat(count) { counter.add(5) }
-                    repeat(count) { counter.subtract(5) }
-                }
-                .first()
-                .get()
-
-        counters.forEach { it.close() }
-        total shouldEqual 0L
+        connectToEtcd(urls) { client ->
+            val counters = List(20) { DistributedAtomicLong(client, path) }
+            val total =
+                counters
+                    .onEach { counter ->
+                        repeat(count) { counter.increment() }
+                        repeat(count) { counter.decrement() }
+                        repeat(count) { counter.add(5) }
+                        repeat(count) { counter.subtract(5) }
+                    }
+                    .first()
+                    .get()
+            counters.forEach { it.close() }
+            total shouldEqual 0L
+        }
     }
 
     @Test
     fun threaded1Test() {
-        withDistributedAtomicLong(urls, path) {
-            val threadCount = 10
-            val count = 50
+        connectToEtcd(urls) { client ->
+            withDistributedAtomicLong(client, path) {
+                val threadCount = 10
+                val count = 50
 
-            blockingThreads(threadCount) {
-                repeat(count) {
-                    increment()
-                    decrement()
-                    add(5)
-                    subtract(5)
+                blockingThreads(threadCount) {
+                    repeat(count) {
+                        increment()
+                        decrement()
+                        add(5)
+                        subtract(5)
+                    }
                 }
-            }
 
-            get() shouldEqual 0L
+                get() shouldEqual 0L
+            }
         }
     }
 
@@ -121,61 +142,65 @@ class DistributedAtomicLongTests {
 
         blockingThreads(threadCount) { i ->
             logger.info { "Creating counter #$i" }
-            withDistributedAtomicLong(urls, path) {
-                val count = 25
-                val maxPause = 50
-                val latchList = mutableListOf<CountDownLatch>()
-                val exceptionList = mutableListOf<ExceptionHolder>()
+            connectToEtcd(urls) { client ->
+                withDistributedAtomicLong(client, path) {
+                    val count = 25
+                    val maxPause = 50
+                    val latchList = mutableListOf<CountDownLatch>()
+                    val exceptionList = mutableListOf<ExceptionHolder>()
 
-                val (latch0, e0) =
-                    threadWithExceptionCheck {
-                        logger.info { "Begin increments for counter #$i" }
-                        repeat(count) { increment() }
-                        sleep(maxPause.random.milliseconds)
-                        logger.info { "Completed increments for counter #$i" }
-                    }
-                latchList += latch0
-                exceptionList += e0
+                    val (latch0, e0) =
+                        threadWithExceptionCheck {
+                            logger.info { "Begin increments for counter #$i" }
+                            repeat(count) { increment() }
+                            sleep(maxPause.random.milliseconds)
+                            logger.info { "Completed increments for counter #$i" }
+                        }
+                    latchList += latch0
+                    exceptionList += e0
 
-                val (latch1, e1) =
-                    threadWithExceptionCheck {
-                        logger.info { "Begin decrements for counter #$i" }
-                        repeat(count) { decrement() }
-                        sleep(maxPause.random.milliseconds)
-                        logger.info { "Completed decrements for counter #$i" }
-                    }
-                latchList += latch1
-                exceptionList += e1
+                    val (latch1, e1) =
+                        threadWithExceptionCheck {
+                            logger.info { "Begin decrements for counter #$i" }
+                            repeat(count) { decrement() }
+                            sleep(maxPause.random.milliseconds)
+                            logger.info { "Completed decrements for counter #$i" }
+                        }
+                    latchList += latch1
+                    exceptionList += e1
 
-                val (latch2, e2) =
-                    threadWithExceptionCheck {
-                        logger.info { "Begin adds for counter #$i" }
-                        repeat(count) { add(5) }
-                        sleep(maxPause.random.milliseconds)
-                        logger.info { "Completed adds for counter #$i" }
-                    }
-                latchList += latch2
-                exceptionList += e2
+                    val (latch2, e2) =
+                        threadWithExceptionCheck {
+                            logger.info { "Begin adds for counter #$i" }
+                            repeat(count) { add(5) }
+                            sleep(maxPause.random.milliseconds)
+                            logger.info { "Completed adds for counter #$i" }
+                        }
+                    latchList += latch2
+                    exceptionList += e2
 
-                val (latch3, e3) =
-                    threadWithExceptionCheck {
-                        logger.info { "Begin subtracts for counter #$i" }
-                        repeat(count) { subtract(5) }
-                        sleep(maxPause.random.milliseconds)
-                        logger.info { "Completed subtracts for counter #$i" }
-                    }
-                latchList += latch3
-                exceptionList += e3
+                    val (latch3, e3) =
+                        threadWithExceptionCheck {
+                            logger.info { "Begin subtracts for counter #$i" }
+                            repeat(count) { subtract(5) }
+                            sleep(maxPause.random.milliseconds)
+                            logger.info { "Completed subtracts for counter #$i" }
+                        }
+                    latchList += latch3
+                    exceptionList += e3
 
-                // Wait for all the threads to finish
-                latchList.forEach { it.await() }
+                    // Wait for all the threads to finish
+                    latchList.forEach { it.await() }
 
-                // If an exception occurred, throw it
-                exceptionList.throwExceptionFromList()
+                    // If an exception occurred, throw it
+                    exceptionList.throwExceptionFromList()
+                }
             }
         }
 
-        withDistributedAtomicLong(urls, path) { get() shouldEqual 0L }
+        connectToEtcd(urls) { client ->
+            withDistributedAtomicLong(client, path) { get() shouldEqual 0L }
+        }
     }
 
     companion object : KLogging()

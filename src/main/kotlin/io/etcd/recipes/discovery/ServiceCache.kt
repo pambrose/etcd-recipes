@@ -21,6 +21,7 @@ package io.etcd.recipes.discovery
 import com.google.common.collect.Maps.newConcurrentMap
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
@@ -40,9 +41,9 @@ import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
 
-class ServiceCache internal constructor(urls: List<String>,
+class ServiceCache internal constructor(client: Client,
                                         val namesPath: String,
-                                        val serviceName: String) : EtcdConnector(urls), Closeable {
+                                        val serviceName: String) : EtcdConnector(client), Closeable {
 
     private var startCalled by atomicBoolean(false)
     private var dataPreloaded = BooleanMonitor(false)
@@ -63,7 +64,7 @@ class ServiceCache internal constructor(urls: List<String>,
         val trailingServicePath = servicePath.ensureSuffix("/").asByteSequence
         val trailingNamesPath = namesPath.ensureSuffix("/")
         val watchOption = watchOption { withPrefix(trailingServicePath) }
-        watchClient.watcher(trailingServicePath, watchOption) { watchResponse ->
+        client.watcher(trailingServicePath, watchOption) { watchResponse ->
             // Wait for data to be loaded
             dataPreloaded.waitUntilTrue()
 
@@ -104,7 +105,7 @@ class ServiceCache internal constructor(urls: List<String>,
         }
 
         // Preload with initial data
-        val kvs = kvClient.getChildren(trailingServicePath)
+        val kvs = client.getChildren(trailingServicePath.asString)
         for (kv in kvs) {
             val (k, v) = kv
             val stripped = k.substring(trailingNamesPath.length)

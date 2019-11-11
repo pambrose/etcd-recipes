@@ -22,19 +22,21 @@ import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.delegate.AtomicDelegates.nullableReference
 import com.sudothought.common.time.timeUnitToDuration
 import com.sudothought.common.util.randomId
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.leaseGrant
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.io.Closeable
@@ -46,11 +48,11 @@ import kotlin.time.seconds
 
 class DistributedBarrier
 @JvmOverloads
-constructor(urls: List<String>,
+constructor(client: Client,
             val barrierPath: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
             private val waitOnMissingBarriers: Boolean = true,
-            val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
+            val clientId: String = defaultClientId()) : EtcdConnector(client), Closeable {
 
     private var keepAliveLease by nullableReference<CloseableClient?>(null)
     private var barrierRemoved by atomicBoolean(false)
@@ -61,7 +63,7 @@ constructor(urls: List<String>,
 
     fun isBarrierSet(): Boolean {
         checkCloseNotCalled()
-        return kvClient.isKeyPresent(barrierPath)
+        return client.isKeyPresent(barrierPath)
     }
 
     @Synchronized
@@ -71,22 +73,22 @@ constructor(urls: List<String>,
         // Create unique token to avoid collision from clients with same id
         val uniqueToken = "$clientId:${randomId(tokenLength)}"
 
-        return if (kvClient.isKeyPresent(barrierPath))
+        return if (client.isKeyPresent(barrierPath))
             false
         else {
             // Prime lease with 2 seconds to give keepAlive a chance to get started
-            val lease = leaseClient.grant(leaseTtlSecs.seconds).get()
+            val lease = client.leaseGrant(leaseTtlSecs.seconds)
 
             // Do a CAS on the key name. If it is not found, then set it
             val txn =
-                kvClient.transaction {
+                client.transaction {
                     If(barrierPath.doesNotExist)
                     Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
                 }
 
             // Check to see if unique value was successfully set in the CAS step
-            if (txn.isSucceeded && kvClient.getValue(barrierPath)?.asString == uniqueToken) {
-                keepAliveLease = leaseClient.keepAlive(lease)
+            if (txn.isSucceeded && client.getValue(barrierPath)?.asString == uniqueToken) {
+                keepAliveLease = client.keepAlive(lease)
                 true
             } else {
                 false
@@ -103,7 +105,7 @@ constructor(urls: List<String>,
             keepAliveLease?.close()
             keepAliveLease = null
 
-            kvClient.delete(barrierPath)
+            client.deleteKey(barrierPath)
 
             barrierRemoved = true
 
@@ -128,12 +130,11 @@ constructor(urls: List<String>,
 
         val waitLatch = CountDownLatch(1)
 
-        return watchClient.watcher(barrierPath) { watchResponse ->
-            watchResponse.events
-                .forEach { watchEvent ->
-                    if (watchEvent.eventType == DELETE)
-                        waitLatch.countDown()
-                }
+        val watchOption = watchOption { withNoPut(true) }
+        return client.watcher(barrierPath, watchOption) { watchResponse ->
+            for (event in watchResponse.events)
+                if (event.eventType == DELETE)
+                    waitLatch.countDown()
 
         }.use {
             // Check one more time in case watch missed the delete just after last check

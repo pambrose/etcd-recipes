@@ -20,6 +20,7 @@ package io.etcd.recipes.election
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
@@ -34,8 +35,9 @@ class SerialLeaderSelectorTests {
 
     @Test
     fun badArgsTest() {
-        invoking { LeaderSelector(urls, "") } shouldThrow IllegalArgumentException::class
-        invoking { LeaderSelector(emptyList(), "something") } shouldThrow IllegalArgumentException::class
+        connectToEtcd(urls) { client ->
+            invoking { LeaderSelector(client, "") } shouldThrow IllegalArgumentException::class
+        }
     }
 
     @Test
@@ -58,11 +60,13 @@ class SerialLeaderSelectorTests {
             Unit
         }
 
-        LeaderSelector(urls, path, leadershipAction, relinquishAction).use { selector ->
-            repeat(count) {
-                logger.info { "First iteration: $it" }
-                selector.start()
-                selector.waitOnLeadershipComplete()
+        connectToEtcd(urls) { client ->
+            LeaderSelector(client, path, leadershipAction, relinquishAction).use { selector ->
+                repeat(count) {
+                    logger.info { "First iteration: $it" }
+                    selector.start()
+                    selector.waitOnLeadershipComplete()
+                }
             }
         }
 
@@ -73,11 +77,13 @@ class SerialLeaderSelectorTests {
         takeLeadershiptCounter.set(0)
         relinquishLeadershiptCounter.set(0)
 
-        repeat(count) {
-            logger.info { "Second iteration: $it" }
-            LeaderSelector(urls, path, leadershipAction, relinquishAction).use { selector ->
-                selector.start()
-                selector.waitOnLeadershipComplete()
+        connectToEtcd(urls) { client ->
+            repeat(count) {
+                logger.info { "Second iteration: $it" }
+                LeaderSelector(client, path, leadershipAction, relinquishAction).use { selector ->
+                    selector.start()
+                    selector.waitOnLeadershipComplete()
+                }
             }
         }
 

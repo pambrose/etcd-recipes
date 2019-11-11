@@ -20,11 +20,12 @@ package io.etcd.recipes.queue
 
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.putValue
 
-class DistributedQueue(urls: List<String>, queuePath: String) : AbstractQueue(urls, queuePath, SortTarget.MOD) {
+class DistributedQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.MOD) {
 
     fun enqueue(value: String) = enqueue(value.asByteSequence)
     fun enqueue(value: Int) = enqueue(value.asByteSequence)
@@ -33,7 +34,7 @@ class DistributedQueue(urls: List<String>, queuePath: String) : AbstractQueue(ur
     fun enqueue(value: ByteSequence) {
         checkCloseNotCalled()
         val key = keyFormat.format(queuePath, System.currentTimeMillis(), randomId(3))
-        kvClient.putValue(key, value)
+        client.putValue(key, value)
     }
 
     companion object {

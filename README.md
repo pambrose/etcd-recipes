@@ -26,10 +26,10 @@ examples are included in the repo.
 ## Usage
 ```kotlin
 connectToEtcd(urls) { client ->
-    client.withKvClient { kvClient ->
-        kvClient.putValue("test_key", "test_value")
+    client.apply {
+        putValue("test_key", "test_value")
         sleep(5.seconds)
-        kvClient.delete("test_key")
+        delete("test_key")
     }
 }
 ```

@@ -20,6 +20,7 @@ package io.etcd.recipes.discovery
 
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
@@ -34,59 +35,62 @@ class SerialServiceDiscoveryTests {
 
     @Test
     fun badArgsTest() {
-        invoking { ServiceDiscovery(urls, "") } shouldThrow IllegalArgumentException::class
-        invoking { ServiceDiscovery(emptyList(), "something") } shouldThrow IllegalArgumentException::class
+        connectToEtcd(urls) { client ->
+            invoking { ServiceDiscovery(client, "") } shouldThrow IllegalArgumentException::class
+        }
     }
 
     @Test
     fun discoveryTest() {
-        ServiceDiscovery(urls, path).use { sd ->
+        connectToEtcd(urls) { client ->
+            ServiceDiscovery(client, path).use { sd ->
 
-            val payload = TestPayload(-999)
-            val service = ServiceInstance("TestName", payload.toJson())
+                val payload = TestPayload(-999)
+                val service = ServiceInstance("TestName", payload.toJson())
 
-            logger.info { service.toJson() }
+                logger.info { service.toJson() }
 
-            logger.info { "Registering" }
-            sd.registerService(service)
+                logger.info { "Registering" }
+                sd.registerService(service)
 
-            logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
-            sd.queryForInstance(service.name, service.id) shouldEqual service
-
-            logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
-            sd.queryForInstances(service.name) shouldEqual listOf(service)
-
-            logger.info { "Retrieved names: ${sd.queryForNames()}" }
-            sd.queryForNames().first() shouldEndWith service.id
-
-            logger.info { "Updating payload" }
-            payload.testval = -888
-            service.jsonPayload = payload.toJson()
-            sd.updateService(service)
-
-            logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
-            sd.queryForInstance(service.name, service.id) shouldEqual service
-
-            logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
-            sd.queryForInstances(service.name) shouldEqual listOf(service)
-
-            logger.info { "Retrieved names: ${sd.queryForNames()}" }
-            sd.queryForNames().first() shouldEndWith service.id
-
-            logger.info { "Unregistering" }
-            sd.unregisterService(service)
-            sleep(3.seconds)
-
-
-            sd.queryForNames().size shouldEqual 0
-            sd.queryForInstances(service.name).size shouldEqual 0
-
-            invoking { sd.queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
-
-            try {
                 logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
-            } catch (e: EtcdRecipeException) {
-                logger.info { "Exception: $e" }
+                sd.queryForInstance(service.name, service.id) shouldEqual service
+
+                logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
+                sd.queryForInstances(service.name) shouldEqual listOf(service)
+
+                logger.info { "Retrieved names: ${sd.queryForNames()}" }
+                sd.queryForNames().first() shouldEndWith service.id
+
+                logger.info { "Updating payload" }
+                payload.testval = -888
+                service.jsonPayload = payload.toJson()
+                sd.updateService(service)
+
+                logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
+                sd.queryForInstance(service.name, service.id) shouldEqual service
+
+                logger.info { "Retrieved values: ${sd.queryForInstances(service.name)}" }
+                sd.queryForInstances(service.name) shouldEqual listOf(service)
+
+                logger.info { "Retrieved names: ${sd.queryForNames()}" }
+                sd.queryForNames().first() shouldEndWith service.id
+
+                logger.info { "Unregistering" }
+                sd.unregisterService(service)
+                sleep(3.seconds)
+
+
+                sd.queryForNames().size shouldEqual 0
+                sd.queryForInstances(service.name).size shouldEqual 0
+
+                invoking { sd.queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
+
+                try {
+                    logger.info { "Retrieved value: ${sd.queryForInstance(service.name, service.id)}" }
+                } catch (e: EtcdRecipeException) {
+                    logger.info { "Exception: $e" }
+                }
             }
         }
     }

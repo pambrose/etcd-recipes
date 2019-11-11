@@ -21,8 +21,8 @@ package io.etcd.recipes.examples.basics
 import com.sudothought.common.concurrent.thread
 import com.sudothought.common.util.repeatWithSleep
 import com.sudothought.common.util.sleep
-import io.etcd.recipes.common.delete
-import io.etcd.recipes.common.etcdExec
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.putValue
 import java.util.concurrent.CountDownLatch
@@ -36,20 +36,20 @@ fun main() {
 
     thread(latch) {
         sleep(3.seconds)
-        etcdExec(urls) { _, kvClient ->
+        connectToEtcd(urls) { client ->
             println("Assigning $path = $keyval")
-            kvClient.putValue(path, keyval)
+            client.putValue(path, keyval)
             sleep(5.seconds)
             println("Deleting $path")
-            kvClient.delete(path)
+            client.deleteKey(path)
         }
     }
 
     thread(latch) {
-        etcdExec(urls) { _, kvClient ->
+        connectToEtcd(urls) { client ->
             repeatWithSleep(12) { _, start ->
                 val elapsed = System.currentTimeMillis() - start
-                println("Key $path = ${kvClient.getValue(path, "unset")} after ${elapsed}ms")
+                println("Key $path = ${client.getValue(path, "unset")} after ${elapsed}ms")
             }
         }
     }

@@ -21,6 +21,7 @@ package io.etcd.recipes.election
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
@@ -53,9 +54,11 @@ class ThreadedLeaderSelectorTests {
                     logger.info { "${selector.clientId} relinquished leadership" }
                 }
 
-            LeaderSelector(urls, path, takeAction, relinquishAction, clientId = "Thread$it").use { election ->
-                election.start()
-                election.waitOnLeadershipComplete()
+            connectToEtcd(urls) { client ->
+                LeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it").use { election ->
+                    election.start()
+                    election.waitOnLeadershipComplete()
+                }
             }
         }
 
@@ -69,32 +72,37 @@ class ThreadedLeaderSelectorTests {
         val relinquishLeadershiptCounter = AtomicInteger(0)
         val electionList: MutableList<LeaderSelector> = synchronizedList(mutableListOf())
 
+        val takeAction =
+            { selector: LeaderSelector ->
+                val pause = 3.random.seconds
+                logger.info { "${selector.clientId} elected leader for $pause" }
+                takeLeadershiptCounter.incrementAndGet()
+                sleep(pause)
+            }
+
+        val relinquishAction =
+            { selector: LeaderSelector ->
+                relinquishLeadershiptCounter.incrementAndGet()
+                logger.info { "${selector.clientId} relinquished leadership" }
+            }
+
         blockingThreads(count) {
-            val takeLeadershipAction =
-                { selector: LeaderSelector ->
-                    val pause = 3.random.seconds
-                    logger.info { "${selector.clientId} elected leader for $pause" }
-                    takeLeadershiptCounter.incrementAndGet()
-                    sleep(pause)
-                }
-
-            val relinquishLeadershipAction =
-                { selector: LeaderSelector ->
-                    relinquishLeadershiptCounter.incrementAndGet()
-                    logger.info { "${selector.clientId} relinquished leadership" }
-                }
-
             logger.info { "Creating Thread$it" }
-            val election =
-                LeaderSelector(urls, path, takeLeadershipAction, relinquishLeadershipAction, clientId = "Thread$it")
-            electionList += election
-            election.start()
-        }
 
-        logger.info { "Size = ${electionList.size}" }
-        electionList
-            .onEach { it.waitOnLeadershipComplete() }
-            .forEach { it.close() }
+            connectToEtcd(urls) { client ->
+                val election = LeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it")
+                electionList += election
+                election.start()
+
+                logger.info { "Size = ${electionList.size}" }
+
+                electionList
+                    .forEach {
+                        it.waitOnLeadershipComplete()
+                        it.close()
+                    }
+            }
+        }
 
         takeLeadershiptCounter.get() shouldEqual count
         relinquishLeadershiptCounter.get() shouldEqual count

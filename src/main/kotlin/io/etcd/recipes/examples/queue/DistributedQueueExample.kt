@@ -18,50 +18,50 @@
 
 package io.etcd.recipes.examples.queue
 
+import com.sudothought.common.concurrent.thread
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.etcdExec
-import io.etcd.recipes.common.getChildrenCount
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.withDistributedQueue
 import java.util.concurrent.CountDownLatch
-import kotlin.concurrent.thread
 import kotlin.time.seconds
 
 fun main() {
     val urls = listOf("http://localhost:2379")
     val queuePath = "/queue/example"
-    val count = 50
-    val subcount = 5
+    val iterCount = 50
+    val threadCount = 5
 
-    etcdExec(urls) { _, kvClient ->
-        println("Count: ${kvClient.getChildrenCount(queuePath)}")
-    }
+    connectToEtcd(urls) { client ->
 
-    // Enqueue some data prior to dequeues
-    withDistributedQueue(urls, queuePath) {
-        repeat(count) { i -> enqueue("Value $i") }
-    }
+        println("Count: ${client.getChildCount(queuePath)}")
 
-    val latch = CountDownLatch(subcount)
-    repeat(subcount) { sub ->
-        thread {
-            withDistributedQueue(urls, queuePath) {
-                repeat((count / subcount) * 2) { i -> println("$sub ${dequeue().asString}") }
-            }
-            latch.countDown()
+        // Enqueue some data prior to dequeues
+        withDistributedQueue(client, queuePath) {
+            repeat(iterCount) { i -> enqueue("Before value $i") }
         }
-    }
 
-    sleep(2.seconds)
+        val latch = CountDownLatch(threadCount)
+        repeat(threadCount) { sub ->
+            thread(latch) {
+                connectToEtcd(urls) { client ->
+                    withDistributedQueue(client, queuePath) {
+                        repeat((iterCount / threadCount) * 2) { println("Thread#: $sub Value: ${dequeue().asString}") }
+                    }
+                }
+            }
+        }
 
-    // Now enqueue some data with dequeues waiting
-    withDistributedQueue(urls, queuePath) {
-        repeat(count) { i -> enqueue("Value $i") }
-    }
+        sleep(2.seconds)
 
-    latch.await()
+        // Now enqueue some data with dequeues waiting
+        withDistributedQueue(client, queuePath) {
+            repeat(iterCount) { i -> enqueue("After value $i") }
+        }
 
-    etcdExec(urls) { _, kvClient ->
-        println("Count: ${kvClient.getChildrenCount(queuePath)}")
+        latch.await()
+
+        println("Count: ${client.getChildCount(queuePath)}")
     }
 }

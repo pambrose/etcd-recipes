@@ -17,6 +17,7 @@
 package io.etcd.recipes.examples.barrier;
 
 import com.google.common.collect.Lists;
+import io.etcd.jetcd.Client;
 import io.etcd.recipes.barrier.DistributedBarrier;
 
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.sudothought.common.util.Misc.sleepSecs;
+import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static java.lang.String.format;
 
 public class DistributedBarrierExample {
@@ -39,7 +41,8 @@ public class DistributedBarrierExample {
         ExecutorService executor = Executors.newCachedThreadPool();
 
         executor.submit(() -> {
-            try (DistributedBarrier barrier = new DistributedBarrier(urls, path)) {
+            try (Client client = connectToEtcd(urls);
+                 DistributedBarrier barrier = new DistributedBarrier(client, path)) {
                 System.out.println("Setting Barrier");
                 barrier.setBarrier();
 
@@ -57,7 +60,8 @@ public class DistributedBarrierExample {
             executor.submit(() -> {
                         try {
                             goLatch.await();
-                            try (DistributedBarrier barrier = new DistributedBarrier(urls, path)) {
+                            try (Client client = connectToEtcd(urls);
+                                 DistributedBarrier barrier = new DistributedBarrier(client, path)) {
                                 System.out.println(format("%d Waiting on Barrier", id));
                                 barrier.waitOnBarrier(1, TimeUnit.SECONDS);
 

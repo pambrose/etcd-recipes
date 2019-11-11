@@ -23,6 +23,7 @@ import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import com.sudothought.common.time.timeUnitToDuration
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
@@ -51,9 +52,9 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.days
 
-class PathChildrenCache(urls: List<String>,
+class PathChildrenCache(client: Client,
                         val cachePath: String,
-                        private val userExecutor: Executor? = null) : EtcdConnector(urls), Closeable {
+                        private val userExecutor: Executor? = null) : EtcdConnector(client), Closeable {
 
     private var startCalled by atomicBoolean(false)
     private val startThreadComplete = BooleanMonitor(false)
@@ -144,7 +145,7 @@ class PathChildrenCache(urls: List<String>,
 
     private fun loadData() {
         try {
-            val kvs = kvClient.getChildren(cachePath)
+            val kvs = client.getChildren(cachePath)
             for (kv in kvs) {
                 val (k, v) = kv
                 val s = k.substring(cachePath.length + 1)
@@ -160,7 +161,7 @@ class PathChildrenCache(urls: List<String>,
         val trailingPath = cachePath.ensureSuffix("/")
         logger.debug { "Setting up watch for $trailingPath" }
         val watchOption = watchOption { withPrefix(trailingPath.asByteSequence) }
-        watchClient.watcher(trailingPath, watchOption) { watchResponse ->
+        client.watcher(trailingPath, watchOption) { watchResponse ->
             watchResponse.events
                 .forEach { event ->
                     val (k, v) = event.keyValue.asPair

@@ -21,6 +21,7 @@ package io.etcd.recipes.election
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
@@ -57,20 +58,22 @@ class ReportLeaderTests {
         sleep(5.seconds)
 
         blockingThreads(count) {
-            LeaderSelector(urls,
-                           path,
-                           object : LeaderSelectorListenerAdapter() {
-                               override fun takeLeadership(selector: LeaderSelector) {
-                                   val pause = 2.random.seconds
-                                   logger.info { "${selector.clientId} elected leader for $pause" }
-                                   sleep(pause)
-                               }
-                           },
-                           clientId = "Thread$it")
-                .use { election ->
-                    election.start()
-                    election.waitOnLeadershipComplete()
-                }
+            connectToEtcd(urls) { client ->
+                LeaderSelector(client,
+                               path,
+                               object : LeaderSelectorListenerAdapter() {
+                                   override fun takeLeadership(selector: LeaderSelector) {
+                                       val pause = 2.random.seconds
+                                       logger.info { "${selector.clientId} elected leader for $pause" }
+                                       sleep(pause)
+                                   }
+                               },
+                               clientId = "Thread$it")
+                    .use { election ->
+                        election.start()
+                        election.waitOnLeadershipComplete()
+                    }
+            }
         }
 
         // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership

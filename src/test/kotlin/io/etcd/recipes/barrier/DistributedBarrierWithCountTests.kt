@@ -21,8 +21,8 @@ package io.etcd.recipes.barrier
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
-import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
@@ -38,13 +38,10 @@ class DistributedBarrierWithCountTests {
 
     @Test
     fun badArgsTest() {
-        invoking { DistributedBarrierWithCount(urls, "something", 0) } shouldThrow IllegalArgumentException::class
-        invoking { DistributedBarrierWithCount(urls, "", 1) } shouldThrow IllegalArgumentException::class
-        invoking {
-            DistributedBarrierWithCount(emptyList(),
-                                        "something",
-                                        1)
-        } shouldThrow IllegalArgumentException::class
+        connectToEtcd(urls) { client ->
+            invoking { DistributedBarrierWithCount(client, "something", 0) } shouldThrow IllegalArgumentException::class
+            invoking { DistributedBarrierWithCount(client, "", 1) } shouldThrow IllegalArgumentException::class
+        }
     }
 
     @Test
@@ -55,8 +52,6 @@ class DistributedBarrierWithCountTests {
         val retryLatch = CountDownLatch(count - 1)
         val retryCounter = AtomicInteger(0)
         val advancedCounter = AtomicInteger(0)
-
-        etcdExec(urls) { _, kvClient -> kvClient.deleteChildren(path) }
 
         fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
 
@@ -79,23 +74,30 @@ class DistributedBarrierWithCountTests {
             logger.info { "#$id Done waiting on barrier" }
         }
 
-        val (finishedLatch, holder) =
-            nonblockingThreads(count - 1) { i ->
-                DistributedBarrierWithCount(urls, path, count).use { barrier ->
-                    waiter(i, barrier, retryAttempts)
+        connectToEtcd(urls) { client ->
+
+            client.deleteChildren(path)
+
+            val (finishedLatch, holder) =
+                nonblockingThreads(count - 1) { i ->
+                    connectToEtcd(urls) { client ->
+                        DistributedBarrierWithCount(client, path, count).use { barrier ->
+                            waiter(i, barrier, retryAttempts)
+                        }
+                    }
                 }
+
+            retryLatch.await()
+            sleep(2.seconds)
+
+            DistributedBarrierWithCount(client, path, count).use { barrier ->
+                waiter(99, barrier)
             }
 
-        retryLatch.await()
-        sleep(2.seconds)
+            finishedLatch.await()
 
-        DistributedBarrierWithCount(urls, path, count).use { barrier ->
-            waiter(99, barrier)
+            holder.checkForException()
         }
-
-        finishedLatch.await()
-
-        holder.checkForException()
 
         retryCounter.get() shouldEqual retryAttempts * (count - 1)
         advancedCounter.get() shouldEqual count

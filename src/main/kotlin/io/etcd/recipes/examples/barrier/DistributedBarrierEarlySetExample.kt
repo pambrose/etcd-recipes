@@ -20,6 +20,7 @@ package io.etcd.recipes.examples.barrier
 
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.barrier.DistributedBarrier
+import io.etcd.recipes.common.connectToEtcd
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds
@@ -33,17 +34,19 @@ fun main() {
 
     repeat(count) { i ->
         thread {
-            DistributedBarrier(urls, barrierPath)
-                .use { barrier ->
-                    println("$i Waiting on Barrier")
-                    barrier.waitOnBarrier(1.seconds)
+            connectToEtcd(urls) { client ->
+                DistributedBarrier(client, barrierPath)
+                    .use { barrier ->
+                        println("$i Waiting on Barrier")
+                        barrier.waitOnBarrier(1.seconds)
 
-                    println("$i Timed out waiting on barrier, waiting again")
-                    barrier.waitOnBarrier()
+                        println("$i Timed out waiting on barrier, waiting again")
+                        barrier.waitOnBarrier()
 
-                    println("$i Done Waiting on Barrier")
-                    waitLatch.countDown()
-                }
+                        println("$i Done Waiting on Barrier")
+                        waitLatch.countDown()
+                    }
+            }
         }
         goLatch.countDown()
     }
@@ -51,17 +54,20 @@ fun main() {
     thread {
         goLatch.await()
         sleep(5.seconds)
-        DistributedBarrier(urls, barrierPath)
-            .use { barrier ->
-                println("Setting Barrier")
-                barrier.setBarrier()
-                sleep(6.seconds)
-                println("Removing Barrier")
-                barrier.removeBarrier()
-                sleep(3.seconds)
-            }
+        connectToEtcd(urls) { client ->
+            DistributedBarrier(client, barrierPath)
+                .use { barrier ->
+                    println("Setting Barrier")
+                    barrier.setBarrier()
+                    sleep(6.seconds)
+                    println("Removing Barrier")
+                    barrier.removeBarrier()
+                    sleep(3.seconds)
+                }
+        }
     }
 
     waitLatch.await()
+
     println("Done")
 }

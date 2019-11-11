@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.common
 
+import com.sudothought.common.concurrent.thread
 import org.junit.jupiter.api.Assertions.fail
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -30,14 +31,12 @@ fun nonblockingThreads(threadCount: Int,
     val finishedLatch = CountDownLatch(threadCount)
     val holder = ExceptionHolder()
     repeat(threadCount) {
-        thread {
+        thread(finishedLatch) {
             try {
                 block(it)
                 waitLatch?.await()
             } catch (e: Throwable) {
                 holder.exception = e
-            } finally {
-                finishedLatch.countDown()
             }
         }
     }

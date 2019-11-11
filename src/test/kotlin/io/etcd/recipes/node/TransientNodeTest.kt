@@ -21,8 +21,8 @@ package io.etcd.recipes.node
 import com.sudothought.common.util.randomId
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.etcdExec
-import io.etcd.recipes.common.getChildrenCount
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.urls
 import org.amshove.kluent.shouldEqual
@@ -36,55 +36,57 @@ class TransientNodeTest {
         val path = "/node/singleNodeTest"
         val id = randomId(8)
 
-        etcdExec(urls) { _, kvClient -> kvClient.getValue(path, "nothing") shouldEqual "nothing" }
+        connectToEtcd(urls) { client ->
 
-        TransientNode(urls, path, id).use {
-            repeat(10) {
-                etcdExec(urls) { _, kvClient -> kvClient.getValue(path)?.asString shouldEqual id }
-                sleep(1.seconds)
-            }
-        }
+            client.getValue(path, "nothing") shouldEqual "nothing"
 
-        // Wait for node to go away
-        sleep(5.seconds)
-        etcdExec(urls) { _, kvClient -> kvClient.getValue(path, "nothing") shouldEqual "nothing" }
-    }
-
-    @Test
-    fun multiNodeTest() {
-        val count = 25
-        val paths = List(count) { "/node/multiNodeTest$it" }
-        val ids = List(count) { randomId(8) }
-
-        etcdExec(urls) { _, kvClient ->
-            for (path in paths)
-                kvClient.getValue(path, "nothing") shouldEqual "nothing"
-
-            kvClient.getChildrenCount("/node") shouldEqual 0
-        }
-
-        val nodes = List(count) { TransientNode(urls, paths[it], ids[it]) }
-
-        etcdExec(urls) { _, kvClient ->
-            repeat(10) {
-                repeat(count) { j ->
-                    kvClient.getValue(paths[j])?.asString shouldEqual ids[j]
+            TransientNode(client, path, id).use {
+                repeat(10) {
+                    client.getValue(path)?.asString shouldEqual id
+                    sleep(1.seconds)
                 }
             }
 
-            kvClient.getChildrenCount("/node") shouldEqual 25
+            // Wait for node to go away
+            sleep(5.seconds)
+            client.getValue(path, "nothing") shouldEqual "nothing"
         }
 
-        for (node in nodes)
-            node.close()
+        @Test
+        fun multiNodeTest() {
+            val count = 25
+            val paths = List(count) { "/node/multiNodeTest$it" }
+            val ids = List(count) { randomId(8) }
 
-        // Wait for nodes to go away
-        sleep(5.seconds)
-        etcdExec(urls) { _, kvClient ->
-            for (path in paths)
-                kvClient.getValue(path, "nothing") shouldEqual "nothing"
+            connectToEtcd(urls) { client ->
 
-            kvClient.getChildrenCount("/node") shouldEqual 0
+                client.apply {
+                    for (p in paths)
+                        getValue(p, "nothing") shouldEqual "nothing"
+
+                    getChildCount("/node") shouldEqual 0
+
+                    val nodes = List(count) { TransientNode(client, paths[it], ids[it]) }
+
+                    repeat(10) {
+                        repeat(count) { j ->
+                            getValue(paths[j])?.asString shouldEqual ids[j]
+                        }
+                    }
+
+                    getChildCount("/node") shouldEqual 25
+
+                    for (node in nodes)
+                        node.close()
+
+                    // Wait for nodes to go away
+                    sleep(5.seconds)
+                    for (p in paths)
+                        getValue(p, "nothing") shouldEqual "nothing"
+
+                    getChildCount("/node") shouldEqual 0
+                }
+            }
         }
     }
 }

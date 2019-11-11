@@ -20,15 +20,15 @@ package io.etcd.recipes.counter
 
 import com.sudothought.common.util.random
 import com.sudothought.common.util.sleep
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.asLong
-import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.equalTo
-import io.etcd.recipes.common.etcdExec
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.setTo
@@ -39,9 +39,9 @@ import kotlin.time.milliseconds
 
 class DistributedAtomicLong
 @JvmOverloads
-constructor(urls: List<String>,
+constructor(client: Client,
             val counterPath: String,
-            private val default: Long = 0L) : EtcdConnector(urls), Closeable {
+            private val default: Long = 0L) : EtcdConnector(client), Closeable {
 
     init {
         require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
@@ -53,7 +53,7 @@ constructor(urls: List<String>,
     @Synchronized
     fun get(): Long {
         checkCloseNotCalled()
-        return kvClient.getValue(counterPath, -1L)
+        return client.getValue(counterPath, -1L)
     }
 
     fun increment(): Long = modifyCounterValue(1L)
@@ -80,14 +80,14 @@ constructor(urls: List<String>,
         } while (!txnResponse.isSucceeded)
 
         // Return the latest value
-        return kvClient.getValue(counterPath, -1L)
+        return client.getValue(counterPath, -1L)
     }
 
     private fun createCounterIfNotPresent(): Boolean =
         // Run the transaction if the counter is not present
-        if (kvClient.getResponse(counterPath).kvs.isEmpty()) {
+        if (client.getResponse(counterPath).kvs.isEmpty()) {
             val txn =
-                kvClient.transaction {
+                client.transaction {
                     If(counterPath.doesNotExist)
                     Then(counterPath setTo default)
                 }
@@ -97,8 +97,8 @@ constructor(urls: List<String>,
         }
 
     private fun applyCounterTransaction(amount: Long): TxnResponse =
-        kvClient.transaction {
-            val kvList: List<KeyValue> = kvClient.getResponse(counterPath).kvs
+        client.transaction {
+            val kvList: List<KeyValue> = client.getResponse(counterPath).kvs
             if (kvList.isEmpty()) throw IllegalStateException("Empty KeyValue list")
             val kv = kvList.first()
             If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
@@ -110,12 +110,9 @@ constructor(urls: List<String>,
         //val totalCount = AtomicLong()
 
         @JvmStatic
-        fun delete(urls: List<String>, counterPath: String) {
-
-            require(urls.isNotEmpty()) { "URLs cannot be empty" }
+        fun delete(client: Client, counterPath: String) {
             require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
-
-            etcdExec(urls) { _, kvClient -> kvClient.delete(counterPath) }
+            client.deleteKey(counterPath)
         }
     }
 }

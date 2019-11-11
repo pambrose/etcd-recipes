@@ -18,8 +18,6 @@ package io.etcd.recipes.examples.basics;
 
 import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
-import io.etcd.jetcd.KV;
-import io.etcd.jetcd.Watch;
 import kotlin.Unit;
 
 import java.util.List;
@@ -45,9 +43,8 @@ public class SetValueWithKeepAlive {
         CountDownLatch endWatchLatch = new CountDownLatch(1);
 
         executor.submit(() -> {
-            try (Client client = connectToEtcd(urls);
-                 Watch watchClient = client.getWatchClient()) {
-                watcherWithLatch(watchClient,
+            try (Client client = connectToEtcd(urls)) {
+                watcherWithLatch(client,
                         path,
                         endWatchLatch,
                         (event) -> {
@@ -63,10 +60,9 @@ public class SetValueWithKeepAlive {
         });
 
         executor.submit(() -> {
-            try (Client client = connectToEtcd(urls);
-                 KV kvClient = client.getKVClient()) {
+            try (Client client = connectToEtcd(urls)) {
                 System.out.println(format("Assigning %s = %s", path, keyval));
-                putValueWithKeepAlive(kvClient, client, path, keyval, 2,
+                putValueWithKeepAlive(client, path, keyval, 2,
                         () -> {
                             System.out.println("Starting sleep");
                             sleepSecs(5);

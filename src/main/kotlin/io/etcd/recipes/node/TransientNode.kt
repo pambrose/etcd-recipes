@@ -21,6 +21,7 @@ package io.etcd.recipes.node
 import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates
 import com.sudothought.common.util.randomId
+import io.etcd.jetcd.Client
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.putValueWithKeepAlive
@@ -34,13 +35,13 @@ import kotlin.time.seconds
 
 class TransientNode
 @JvmOverloads
-constructor(urls: List<String>,
+constructor(client: Client,
             val nodePath: String,
             val nodeValue: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
             autoStart: Boolean = true,
             private val userExecutor: Executor? = null,
-            val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
+            val clientId: String = defaultClientId()) : EtcdConnector(client), Closeable {
 
     private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
     private val startThreadComplete = BooleanMonitor(false)
@@ -65,7 +66,7 @@ constructor(urls: List<String>,
             try {
                 val leaseTtl = leaseTtlSecs.seconds
                 logger.info { "$leaseTtl keep-alive started for $clientId $nodePath" }
-                kvClient.value.putValueWithKeepAlive(client.value, nodePath, nodeValue, leaseTtl) {
+                client.putValueWithKeepAlive(nodePath, nodeValue, leaseTtl) {
                     keepAliveStartedLatch.countDown()
                     keepAliveWaitLatch.await()
                     logger.info { "$leaseTtl keep-alive terminated for $clientId $nodePath" }
@@ -98,10 +99,9 @@ constructor(urls: List<String>,
         keepAliveWaitLatch.countDown()
         startThreadComplete.waitUntilTrue()
 
-        // Close client and kvClient before shutting down executor
-        super.close()
-
         if (userExecutor == null) (executor as ExecutorService).shutdown()
+
+        super.close()
     }
 
     companion object : KLogging() {

@@ -19,6 +19,7 @@
 package io.etcd.recipes.examples.election
 
 import com.sudothought.common.util.sleep
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderSelector
 import kotlin.time.seconds
 
@@ -33,21 +34,23 @@ fun main() {
         println("${selector.clientId} surrendering after $pause")
     }
 
-    LeaderSelector(urls, electionPath, leadershipAction)
-        .use { selector ->
-            repeat(100) {
-                println("Iteration $it")
-                selector.start()
-                selector.waitOnLeadershipComplete()
-            }
-        }
-
-    repeat(5) {
-        LeaderSelector(urls, electionPath, leadershipAction)
+    connectToEtcd(urls) { client ->
+        LeaderSelector(client, electionPath, leadershipAction)
             .use { selector ->
-                println("Iteration $it")
-                selector.start()
-                selector.waitOnLeadershipComplete()
+                repeat(100) {
+                    println("Iteration $it")
+                    selector.start()
+                    selector.waitOnLeadershipComplete()
+                }
             }
+
+        repeat(5) {
+            LeaderSelector(client, electionPath, leadershipAction)
+                .use { selector ->
+                    println("Iteration $it")
+                    selector.start()
+                    selector.waitOnLeadershipComplete()
+                }
+        }
     }
 }

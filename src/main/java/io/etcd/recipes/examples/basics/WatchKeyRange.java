@@ -19,10 +19,9 @@ package io.etcd.recipes.examples.basics;
 import com.google.common.collect.Lists;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Client;
-import io.etcd.jetcd.KV;
-import io.etcd.jetcd.Watch;
 import io.etcd.jetcd.Watch.Watcher;
 import io.etcd.jetcd.options.WatchOption;
+import io.etcd.recipes.common.ChildrenUtils;
 import io.etcd.recipes.common.KVUtils;
 import kotlin.Unit;
 
@@ -31,9 +30,9 @@ import java.util.List;
 import static com.sudothought.common.util.Misc.sleepSecs;
 import static io.etcd.recipes.common.BuilderUtils.watchOption;
 import static io.etcd.recipes.common.ByteSequenceUtils.getAsByteSequence;
+import static io.etcd.recipes.common.ChildrenUtils.getChildCount;
+import static io.etcd.recipes.common.ChildrenUtils.getChildren;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.delete;
-import static io.etcd.recipes.common.KVUtils.getChildren;
 import static io.etcd.recipes.common.KVUtils.putValue;
 import static io.etcd.recipes.common.KeyValueUtils.getAsString;
 import static io.etcd.recipes.common.PairUtils.getAsString;
@@ -50,63 +49,60 @@ public class WatchKeyRange {
         WatchOption watchOption = watchOption((WatchOption.Builder builder) -> builder.withPrefix(pathBS));
 
         try (Client client = connectToEtcd(urls);
-             KV kvClient = client.getKVClient();
-             Watch watchClient = client.getWatchClient();
-
              Watcher watcher =
-                     watcher(watchClient,
+                     watcher(client,
                              path,
                              watchOption,
                              (watchResponse) -> {
-                                 watchResponse.getEvents().forEach((watchEvent) ->
+                                 watchResponse.getEvents().forEach((event) ->
                                          System.out.println(format("%s for %s",
-                                                 watchEvent.getEventType(),
-                                                 getAsString(watchEvent.getKeyValue())
+                                                 event.getEventType(),
+                                                 getAsString(event.getKeyValue())
                                          )));
                                  return Unit.INSTANCE;
                              })) {
 
             // Create empty root
-            putValue(kvClient, path, "root");
+            putValue(client, path, "root");
 
             System.out.println("After creation:");
-            System.out.println(getAsString(getChildren(kvClient, path)));
-            System.out.println(KVUtils.getChildrenCount(kvClient, path));
+            System.out.println(getAsString(getChildren(client, path)));
+            System.out.println(getChildCount(client, path));
 
             sleepSecs(5);
 
             // Add children
-            putValue(kvClient, path + "/election/a", "a");
-            putValue(kvClient, path + "/election/b", "bb");
-            putValue(kvClient, path + "/waiting/c", "ccc");
-            putValue(kvClient, path + "/waiting/d", "dddd");
+            putValue(client, path + "/election/a", "a");
+            putValue(client, path + "/election/b", "bb");
+            putValue(client, path + "/waiting/c", "ccc");
+            putValue(client, path + "/waiting/d", "dddd");
 
             System.out.println("\nAfter putValues:");
-            System.out.println(getAsString(getChildren(kvClient, path)));
-            System.out.println(KVUtils.getChildrenCount(kvClient, path));
+            System.out.println(getAsString(getChildren(client, path)));
+            System.out.println(getChildCount(client, path));
 
             System.out.println("\nElections only:");
-            System.out.println(getAsString(getChildren(kvClient, path + "/election")));
-            System.out.println(KVUtils.getChildrenCount(kvClient, path + "/election"));
+            System.out.println(getAsString(getChildren(client, path + "/election")));
+            System.out.println(getChildCount(client, path + "/election"));
 
             System.out.println("\nWaitings only:");
-            System.out.println(getAsString(getChildren(kvClient, path + "/waiting")));
-            System.out.println(KVUtils.getChildrenCount(kvClient, path + "/waiting"));
+            System.out.println(getAsString(getChildren(client, path + "/waiting")));
+            System.out.println(getChildCount(client, path + "/waiting"));
 
             sleepSecs(5);
 
             // Delete root
-            delete(kvClient, path);
+            KVUtils.deleteKey(client, path);
 
             // Delete children
-            KVUtils.getChildrenKeys(kvClient, path).forEach((keyName) -> {
+            ChildrenUtils.getChildrenKeys(client, path).forEach((keyName) -> {
                 System.out.println(format("Deleting key: %s", keyName));
-                delete(kvClient, keyName);
+                KVUtils.deleteKey(client, keyName);
             });
 
             System.out.println("\nAfter delete:");
-            System.out.println(getAsString(getChildren(kvClient, path)));
-            System.out.println(KVUtils.getChildrenCount(kvClient, path));
+            System.out.println(getAsString(getChildren(client, path)));
+            System.out.println(getChildCount(client, path));
 
             sleepSecs(5);
         }

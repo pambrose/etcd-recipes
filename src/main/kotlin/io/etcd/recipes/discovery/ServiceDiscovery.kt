@@ -21,21 +21,21 @@ package io.etcd.recipes.discovery
 import com.google.common.collect.Maps.newConcurrentMap
 import com.sudothought.common.delegate.AtomicDelegates.nonNullableReference
 import com.sudothought.common.util.randomId
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
-import io.etcd.jetcd.KV
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.grant
 import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.leaseGrant
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
@@ -47,10 +47,10 @@ import kotlin.time.seconds
 
 class ServiceDiscovery
 @JvmOverloads
-constructor(urls: List<String>,
+constructor(client: Client,
             private val servicePath: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
-            val clientId: String = defaultClientId()) : EtcdConnector(urls), Closeable {
+            val clientId: String = defaultClientId()) : EtcdConnector(client), Closeable {
 
     private val namesPath = servicePath.appendToPath("/names")
     private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = newConcurrentMap()
@@ -62,14 +62,14 @@ constructor(urls: List<String>,
     }
 
     private class ServiceInstanceContext(val service: ServiceInstance,
-                                         val kvClient: KV,
+                                         val client: Client,
                                          val instancePath: String) : Closeable {
         var lease: LeaseGrantResponse by nonNullableReference()
         var keepAlive: CloseableClient by nonNullableReference()
 
         override fun close() {
             keepAlive.close()
-            kvClient.delete(instancePath)
+            client.deleteKey(instancePath)
         }
     }
 
@@ -79,22 +79,22 @@ constructor(urls: List<String>,
         checkCloseNotCalled()
 
         val instancePath = getNamesPath(service)
-        val context = ServiceInstanceContext(service, kvClient.value, instancePath)
+        val context = ServiceInstanceContext(service, client, instancePath)
 
         serviceContextMap[service.id] = context
 
         // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
-        context.lease = leaseClient.grant(leaseTtlSecs.seconds).get()
+        context.lease = client.leaseGrant(leaseTtlSecs.seconds)
 
         val txn =
-            kvClient.transaction {
+            client.transaction {
                 If(instancePath.doesNotExist)
                 Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.lease.id) }))
             }
 
         // Run keep-alive until closed
         if (txn.isSucceeded)
-            context.keepAlive = leaseClient.keepAlive(context.lease)
+            context.keepAlive = client.keepAlive(context.lease)
         else
             throw EtcdRecipeException("Service registration failed for $instancePath")
     }
@@ -107,7 +107,7 @@ constructor(urls: List<String>,
         val context = serviceContextMap[service.id]
             ?: throw EtcdRecipeException("ServiceInstance ${service.name} was not first registered with registerService()")
         val txn =
-            kvClient.transaction {
+            client.transaction {
                 If(instancePath.doesExist)
                 Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.lease.id) }))
             }
@@ -131,13 +131,13 @@ constructor(urls: List<String>,
 
     fun serviceCache(name: String): ServiceCache {
         checkCloseNotCalled()
-        val cache = ServiceCache(urls, namesPath, name)
+        val cache = ServiceCache(client, namesPath, name)
         serviceCacheList += cache
         return cache
     }
 
     fun serviceProvider(serviceName: String): ServiceProvider {
-        val provider = ServiceProvider(urls, namesPath, serviceName)
+        val provider = ServiceProvider(client, namesPath, serviceName)
         serviceProviderList += provider
         return provider
     }
@@ -145,13 +145,13 @@ constructor(urls: List<String>,
     @Synchronized
     fun queryForNames(): List<String> {
         checkCloseNotCalled()
-        return kvClient.getChildrenKeys(namesPath)
+        return client.getChildrenKeys(namesPath)
     }
 
     @Synchronized
     fun queryForInstances(name: String): List<ServiceInstance> {
         checkCloseNotCalled()
-        return kvClient.getChildrenValues(getNamesPath(name)).asString.map { ServiceInstance.toObject(it) }
+        return client.getChildrenValues(getNamesPath(name)).map { it.asString }.map { ServiceInstance.toObject(it) }
     }
 
     @Synchronized
@@ -159,7 +159,7 @@ constructor(urls: List<String>,
     fun queryForInstance(name: String, id: String): ServiceInstance {
         checkCloseNotCalled()
         val path = getNamesPath(name, id)
-        val json = kvClient.getValue(path)?.asString
+        val json = client.getValue(path)?.asString
             ?: throw EtcdRecipeException("ServiceInstance $path not present")
         return ServiceInstance.toObject(json)
     }

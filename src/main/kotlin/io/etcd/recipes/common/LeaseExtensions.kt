@@ -19,28 +19,23 @@
 
 package io.etcd.recipes.common
 
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.CloseableClient
-import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Observers
 import io.etcd.jetcd.lease.LeaseGrantResponse
-import java.util.concurrent.CompletableFuture
 import kotlin.time.Duration
 
-fun Lease.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) =
+fun Client.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) =
     keepAlive(lease)
         .use {
             block.invoke()
         }
 
-fun Lease.keepAlive(lease: LeaseGrantResponse): CloseableClient =
-    keepAlive(lease.id,
-              Observers.observer(
-                  { /*println("KeepAlive next resp: $next")*/ },
-                  { /*println("KeepAlive err resp: $err")*/ }))
+fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
+    leaseClient.keepAlive(lease.id,
+                          Observers.observer(
+                              { /*println("KeepAlive next resp: $next")*/ },
+                              { /*println("KeepAlive err resp: $err")*/ }))
 
-fun Lease.grant(ttl: Duration): CompletableFuture<LeaseGrantResponse> = grant(ttl.inSeconds.toLong())
+fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse = leaseClient.grant(ttl.inSeconds.toLong()).get()
 
-fun Lazy<Lease>.keepAlive(lease: LeaseGrantResponse) = value.keepAlive(lease)
-fun Lazy<Lease>.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) = value.keepAliveWith(lease, block)
-fun Lazy<Lease>.grant(ttl: Duration): CompletableFuture<LeaseGrantResponse> = value.grant(ttl)
-fun Lazy<Lease>.grant(ttlSecs: Long): CompletableFuture<LeaseGrantResponse> = value.grant(ttlSecs)

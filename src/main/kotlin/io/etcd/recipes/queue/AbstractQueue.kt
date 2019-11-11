@@ -19,16 +19,17 @@
 package io.etcd.recipes.queue
 
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.asByteSequence
-import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.equalTo
-import io.etcd.recipes.common.getFirst
+import io.etcd.recipes.common.getFirstChild
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
@@ -36,9 +37,9 @@ import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 
-abstract class AbstractQueue(urls: List<String>,
+abstract class AbstractQueue(client: Client,
                              val queuePath: String,
-                             private val target: SortTarget) : EtcdConnector(urls), Closeable {
+                             private val target: SortTarget) : EtcdConnector(client), Closeable {
 
     init {
         require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
@@ -46,7 +47,7 @@ abstract class AbstractQueue(urls: List<String>,
 
     fun dequeue(): ByteSequence {
         checkCloseNotCalled()
-        val childList = kvClient.getFirst(queuePath, target).kvs
+        val childList = client.getFirstChild(queuePath, target).kvs
 
         if (!childList.isEmpty()) {
             val child = childList.first()
@@ -57,9 +58,12 @@ abstract class AbstractQueue(urls: List<String>,
         // No values available, so wait on them
         val watchLatch = CountDownLatch(1)
         val trailingPath = queuePath.ensureSuffix("/").asByteSequence
-        val watchOption = watchOption { withPrefix(trailingPath) }
+        val watchOption = watchOption {
+            withPrefix(trailingPath)
+            withNoDelete(true)
+        }
         val keyFound = AtomicReference<KeyValue?>()
-        watchClient.watcher(queuePath, watchOption) { watchResponse ->
+        client.watcher(queuePath, watchOption) { watchResponse ->
             watchResponse.events.forEach { watchEvent ->
                 if (watchEvent.eventType == WatchEvent.EventType.PUT) {
                     keyFound.compareAndSet(null, watchEvent.keyValue)
@@ -69,7 +73,7 @@ abstract class AbstractQueue(urls: List<String>,
 
         }.use {
             // Query again in case a value arrived just before watch was created
-            val waitingChildList = kvClient.getFirst(queuePath, target).kvs
+            val waitingChildList = client.getFirstChild(queuePath, target).kvs
             if (!waitingChildList.isEmpty()) {
                 keyFound.compareAndSet(null, waitingChildList.first())
                 watchLatch.countDown()
@@ -83,8 +87,8 @@ abstract class AbstractQueue(urls: List<String>,
     }
 
     private fun deleteRevKey(kv: KeyValue): Boolean =
-        kvClient.transaction {
+        client.transaction {
             If(equalTo(kv.key, CmpTarget.modRevision(kv.modRevision)))
-            Then(deleteKey(kv.key))
+            Then(deleteOp(kv.key))
         }.isSucceeded
 }

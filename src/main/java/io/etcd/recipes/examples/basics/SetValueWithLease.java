@@ -18,7 +18,6 @@ package io.etcd.recipes.examples.basics;
 
 import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
-import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Lease;
 import io.etcd.jetcd.lease.LeaseGrantResponse;
 import io.etcd.jetcd.options.PutOption;
@@ -46,13 +45,12 @@ public class SetValueWithLease {
         CountDownLatch latch = new CountDownLatch(1);
 
         executor.submit(() -> {
-            try (Client client = connectToEtcd(urls);
-                 Lease leaseClient = client.getLeaseClient();
-                 KV kvClient = client.getKVClient()) {
+            try (Client client = connectToEtcd(urls)) {
+                Lease leaseClient = client.getLeaseClient();
                 System.out.println(format("Assigning %s = %s", path, keyval));
                 LeaseGrantResponse lease = leaseClient.grant(5).get();
                 PutOption putOption = putOption((PutOption.Builder builder) -> builder.withLeaseId(lease.getID()));
-                putValue(kvClient, path, keyval, putOption);
+                putValue(client, path, keyval, putOption);
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             } finally {
@@ -62,11 +60,10 @@ public class SetValueWithLease {
 
 
         executor.submit(() -> {
-            try (Client client = connectToEtcd(urls);
-                 KV kvClient = client.getKVClient()) {
+            try (Client client = connectToEtcd(urls)) {
                 long start = System.currentTimeMillis();
                 for (int i = 0; i < 12; i++) {
-                    String kval = getValue(kvClient, path, "unset");
+                    String kval = getValue(client, path, "unset");
                     System.out.println(format("Key %s = %s after %sms",
                             path, kval, System.currentTimeMillis() - start));
                     sleepSecs(1);
