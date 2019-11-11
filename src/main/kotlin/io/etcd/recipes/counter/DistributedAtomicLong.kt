@@ -37,6 +37,14 @@ import mu.KLogging
 import java.io.Closeable
 import kotlin.time.milliseconds
 
+@JvmOverloads
+fun withDistributedAtomicLong(client: Client,
+                              counterPath: String,
+                              default: Long = 0L,
+                              receiver: DistributedAtomicLong.() -> Unit) {
+    DistributedAtomicLong(client, counterPath, default).use { it.receiver() }
+}
+
 class DistributedAtomicLong
 @JvmOverloads
 constructor(client: Client,

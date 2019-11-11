@@ -23,11 +23,12 @@ import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.options.GetOption
+import io.etcd.jetcd.options.GetOption.SortOrder
 
 @JvmOverloads
 fun Client.getChildren(keyName: String,
                        target: GetOption.SortTarget = GetOption.SortTarget.KEY,
-                       order: GetOption.SortOrder = GetOption.SortOrder.ASCEND,
+                       order: SortOrder = SortOrder.ASCEND,
                        keysOnly: Boolean = false): List<Pair<String, ByteSequence>> {
     val trailingKey = keyName.ensureSuffix("/").asByteSequence
     val getOption =
@@ -41,14 +42,14 @@ fun Client.getChildren(keyName: String,
 }
 
 fun Client.getFirstChild(keyName: String, target: GetOption.SortTarget): GetResponse =
-    getSingleChild(keyName, target, GetOption.SortOrder.ASCEND)
+    getSingleChild(keyName, target, SortOrder.ASCEND)
 
 fun Client.getLastChild(keyName: String, target: GetOption.SortTarget): GetResponse =
-    getSingleChild(keyName, target, GetOption.SortOrder.DESCEND)
+    getSingleChild(keyName, target, SortOrder.DESCEND)
 
 private fun Client.getSingleChild(keyName: String,
                                   target: GetOption.SortTarget,
-                                  order: GetOption.SortOrder): GetResponse {
+                                  order: SortOrder): GetResponse {
     val trailingKey = keyName.ensureSuffix("/").asByteSequence
     val getOption =
         getOption {
@@ -63,13 +64,13 @@ private fun Client.getSingleChild(keyName: String,
 @JvmOverloads
 fun Client.getChildrenKeys(keyName: String,
                            target: GetOption.SortTarget = GetOption.SortTarget.KEY,
-                           order: GetOption.SortOrder = GetOption.SortOrder.ASCEND): List<String> =
+                           order: SortOrder = SortOrder.ASCEND): List<String> =
     getChildren(keyName, target, order, true).keys
 
 @JvmOverloads
 fun Client.getChildrenValues(keyName: String,
                              target: GetOption.SortTarget = GetOption.SortTarget.KEY,
-                             order: GetOption.SortOrder = GetOption.SortOrder.ASCEND): List<ByteSequence> =
+                             order: SortOrder = SortOrder.ASCEND): List<ByteSequence> =
     getChildren(keyName, target, order).values
 
 

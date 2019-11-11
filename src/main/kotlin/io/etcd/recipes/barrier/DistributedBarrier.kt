@@ -46,6 +46,16 @@ import kotlin.time.Duration
 import kotlin.time.days
 import kotlin.time.seconds
 
+@JvmOverloads
+fun withDistributedBarrier(client: Client,
+                           barrierPath: String,
+                           leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+                           waitOnMissingBarriers: Boolean = true,
+                           clientId: String = DistributedBarrier.defaultClientId(),
+                           receiver: DistributedBarrier.() -> Unit) {
+    DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
+}
+
 class DistributedBarrier
 @JvmOverloads
 constructor(client: Client,
@@ -157,6 +167,6 @@ constructor(client: Client,
     }
 
     companion object : KLogging() {
-        private fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(tokenLength)}"
+        internal fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(tokenLength)}"
     }
 }

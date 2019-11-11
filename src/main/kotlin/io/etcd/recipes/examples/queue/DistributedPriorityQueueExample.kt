@@ -22,7 +22,7 @@ import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
-import io.etcd.recipes.common.withDistributedPriorityQueue
+import io.etcd.recipes.queue.withDistributedPriorityQueue
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.seconds

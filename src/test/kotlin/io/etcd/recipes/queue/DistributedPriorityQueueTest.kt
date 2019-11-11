@@ -25,7 +25,6 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.urls
-import io.etcd.recipes.common.withDistributedPriorityQueue
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test

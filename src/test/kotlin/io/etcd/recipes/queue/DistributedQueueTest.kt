@@ -20,12 +20,12 @@ package io.etcd.recipes.queue
 
 import com.sudothought.common.concurrent.thread
 import com.sudothought.common.concurrent.withLock
+import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.urls
-import io.etcd.recipes.common.withDistributedQueue
 import mu.KLogging
 import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
@@ -33,6 +33,7 @@ import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.seconds
 
 class DistributedQueueTest {
     val iterCount = 500
@@ -78,6 +79,8 @@ class DistributedQueueTest {
                     }
                 }
             }
+
+            sleep(2.seconds)
 
             withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
 
@@ -141,7 +144,7 @@ class DistributedQueueTest {
             client.deleteChildren(queuePath)
             client.getChildCount(queuePath) shouldEqual 0
 
-            repeat(threadCount) {
+            repeat(threadCount) { t ->
                 thread(latch) {
                     withDistributedQueue(client, queuePath) {
                         repeat(iterCount / threadCount) {
@@ -151,7 +154,15 @@ class DistributedQueueTest {
                 }
             }
 
-            withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
+            sleep(2.seconds)
+
+            withDistributedQueue(client, queuePath) {
+                repeat(iterCount) { i ->
+                    val v = testData[i]
+                    enqueue(v)
+                    //println("Enqueued: $v")
+                }
+            }
 
             latch.await()
 

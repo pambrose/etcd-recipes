@@ -26,7 +26,6 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.threadWithExceptionCheck
 import io.etcd.recipes.common.throwExceptionFromList
 import io.etcd.recipes.common.urls
-import io.etcd.recipes.common.withDistributedAtomicLong
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldEqual

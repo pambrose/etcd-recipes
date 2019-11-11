@@ -47,6 +47,13 @@ abstract class AbstractQueue(client: Client,
 
     fun dequeue(): ByteSequence {
         checkCloseNotCalled()
+
+        /*
+        println(client.getFirstChild(queuePath, target = target).kvs
+                    .map { p -> p.key.asString to p.value.asString }
+                    .joinToString("\n"))
+        */
+
         val childList = client.getFirstChild(queuePath, target).kvs
 
         if (!childList.isEmpty()) {
