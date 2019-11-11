@@ -36,7 +36,7 @@ val WatchEvent.valueAsString get() = keyValue.value.asString
 val WatchEvent.valueAsInt get() = keyValue.value.asInt
 val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
-fun WatchOption.Builder.withPrefix(prefix: String) = withPrefix(prefix.asByteSequence)
+fun WatchOption.Builder.withPrefix(prefix: String): WatchOption.Builder = withPrefix(prefix.asByteSequence)
 
 @JvmOverloads
 fun Client.watcher(keyName: String,

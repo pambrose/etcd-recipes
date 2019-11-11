@@ -53,12 +53,12 @@ internal fun Client.getResponse(keyName: ByteSequence,
                                 option: GetOption = GetOption.DEFAULT,
                                 iteration: Int = 0): GetResponse {
     val response = kvClient.get(keyName, option).get()
-    if (response.kvs.isEmpty() && response.isMore) {
+    return if (response.kvs.isEmpty() && response.isMore) {
         if (iteration == 10)
             throw EtcdRecipeRuntimeException("Unable to fulfill call to getResponse after multiple attempts")
-        return getResponse(keyName, option, iteration + 1)
+        getResponse(keyName, option, iteration + 1)
     } else {
-        return response
+        response
     }
 }
 

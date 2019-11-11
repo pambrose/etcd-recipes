@@ -43,7 +43,7 @@ class DistributedQueue(client: Client, queuePath: String) : AbstractQueue(client
     }
 
     companion object {
-        private val maxLongWidth = Long.MAX_VALUE.toString().length
-        private val keyFormat = "%s/%0${maxLongWidth}d-%s"
+        private const val maxLongWidth = Long.MAX_VALUE.toString().length
+        private const val keyFormat = "%s/%0${maxLongWidth}d-%s"
     }
 }

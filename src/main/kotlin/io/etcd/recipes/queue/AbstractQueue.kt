@@ -55,7 +55,7 @@ abstract class AbstractQueue(client: Client,
 
         val childList = client.getFirstChild(queuePath, target).kvs
 
-        if (!childList.isEmpty()) {
+        if (childList.isNotEmpty()) {
             val child = childList.first()
             // If transactional delete fails, then just call self again
             return if (deleteRevKey(child)) child.value else dequeue()
@@ -82,7 +82,7 @@ abstract class AbstractQueue(client: Client,
                            }) {
             // Query again in case a value arrived just before watch was created
             val waitingChildList = client.getFirstChild(queuePath, target).kvs
-            if (!waitingChildList.isEmpty()) {
+            if (waitingChildList.isNotEmpty()) {
                 keyFound.compareAndSet(null, waitingChildList.first())
                 watchLatch.countDown()
             }

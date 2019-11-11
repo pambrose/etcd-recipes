@@ -38,7 +38,7 @@ fun main() {
                     serviceInstance?.let {
                         println("Payload: ${IntPayload.toObject(it.jsonPayload)}")
                     }
-                    println("Instances: ${instances}")
+                    println("Instances: $instances")
                 }
 
                 start()

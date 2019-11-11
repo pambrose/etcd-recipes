@@ -26,7 +26,7 @@ class ConnectTest {
 
     @Test
     fun badArgsTest() {
-        invoking { connectToEtcd(emptyList(), { this }) } shouldThrow IllegalArgumentException::class
+        invoking { connectToEtcd(emptyList()) { this } } shouldThrow IllegalArgumentException::class
     }
 
 }

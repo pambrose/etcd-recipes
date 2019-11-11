@@ -58,7 +58,7 @@ fun <T> withServiceDiscovery(client: Client,
 class ServiceDiscovery
 @JvmOverloads
 constructor(client: Client,
-            private val servicePath: String,
+            val servicePath: String,
             val leaseTtlSecs: Long = defaultTtlSecs,
             val clientId: String = defaultClientId()) : EtcdConnector(client) {
 
