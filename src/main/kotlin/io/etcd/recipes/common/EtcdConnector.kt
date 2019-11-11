@@ -18,12 +18,15 @@
 
 package io.etcd.recipes.common
 
+import com.sudothought.common.concurrent.BooleanMonitor
 import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.Client
 import java.util.Collections.synchronizedList
 
 open class EtcdConnector(val client: Client) {
 
+    protected var startCalled by atomicBoolean(false)
+    protected val startThreadComplete = BooleanMonitor(false)
     protected var closeCalled: Boolean by atomicBoolean(false)
     protected val exceptionList: Lazy<MutableList<Throwable>> = lazy { synchronizedList(mutableListOf<Throwable>()) }
 
@@ -39,11 +42,13 @@ open class EtcdConnector(val client: Client) {
         if (exceptionList.isInitialized()) exceptionList.value.clear()
     }
 
+    protected fun checkStartCalled() {
+        if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
+    }
+
     @Synchronized
     open fun close() {
-        if (!closeCalled) {
             closeCalled = true
-        }
     }
 
     companion object {

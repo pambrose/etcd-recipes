@@ -46,12 +46,10 @@ fun Client.watcher(keyName: String,
 
 
 @JvmOverloads
-fun Client.withWatcher(keyName: String,
-                       option: WatchOption = WatchOption.DEFAULT,
-                       block: (WatchResponse) -> Unit,
-                       receiver: Watch.Watcher.() -> Unit) {
-    watcher(keyName, option, block).use { it.receiver() }
-}
+fun <T> Client.withWatcher(keyName: String,
+                           option: WatchOption = WatchOption.DEFAULT,
+                           block: (WatchResponse) -> Unit,
+                           receiver: Watch.Watcher.() -> T): T = watcher(keyName, option, block).use { it.receiver() }
 
 @JvmOverloads
 fun Client.watcherWithLatch(keyName: String,
@@ -59,19 +57,21 @@ fun Client.watcherWithLatch(keyName: String,
                             onPut: (WatchEvent) -> Unit,
                             onDelete: (WatchEvent) -> Unit,
                             option: WatchOption = WatchOption.DEFAULT) {
-    watchClient.watch(keyName.asByteSequence, option) { watchResponse ->
-        watchResponse.events
-            .forEach { event ->
-                when (event.eventType) {
-                    EventType.PUT          -> onPut(event)
-                    EventType.DELETE       -> onDelete(event)
-                    EventType.UNRECOGNIZED -> { // Ignore
-                    }
-                    else                   -> { // Ignore
-                    }
-                }
-            }
-    }.use {
+    withWatcher(keyName,
+                option,
+                { watchResponse ->
+                    watchResponse.events
+                        .forEach { event ->
+                            when (event.eventType) {
+                                EventType.PUT          -> onPut(event)
+                                EventType.DELETE       -> onDelete(event)
+                                EventType.UNRECOGNIZED -> { // Ignore
+                                }
+                                else                   -> { // Ignore
+                                }
+                            }
+                        }
+                }) {
         endWatchLatch.await()
     }
 }

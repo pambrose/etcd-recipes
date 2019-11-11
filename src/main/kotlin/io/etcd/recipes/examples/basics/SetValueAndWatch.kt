@@ -26,7 +26,7 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.putValue
-import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.CountDownLatch
 import kotlin.time.seconds
 
@@ -52,10 +52,11 @@ fun main() {
 
     thread(latch) {
         connectToEtcd(urls) { client ->
-            client.watcher(path) { watchResponse: WatchResponse ->
-                for (event in watchResponse.events)
-                    println("Watch event: ${event.eventType} ${event.keyValue.asString}")
-            }.use {
+            client.withWatcher(path,
+                               block = { watchResponse: WatchResponse ->
+                                   for (event in watchResponse.events)
+                                       println("Watch event: ${event.eventType} ${event.keyValue.asString}")
+                               }) {
                 println("Started watch")
                 sleep(10.seconds)
                 println("Closing watch")

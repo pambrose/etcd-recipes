@@ -25,11 +25,10 @@ import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.putValue
 
-fun withDistributedQueue(client: Client,
-                         queuePath: String,
-                         receiver: DistributedQueue.() -> Unit) {
+fun <T> withDistributedQueue(client: Client,
+                             queuePath: String,
+                             receiver: DistributedQueue.() -> T): T =
     DistributedQueue(client, queuePath).use { it.receiver() }
-}
 
 class DistributedQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.MOD) {
 

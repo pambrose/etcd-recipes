@@ -48,13 +48,12 @@ import java.util.concurrent.ConcurrentMap
 import kotlin.time.seconds
 
 @JvmOverloads
-fun withServiceDiscovery(client: Client,
-                         servicePath: String,
-                         leaseTtlSecs: Long = defaultTtlSecs,
-                         clientId: String = defaultClientId(),
-                         receiver: ServiceDiscovery.() -> Unit) {
+fun <T> withServiceDiscovery(client: Client,
+                             servicePath: String,
+                             leaseTtlSecs: Long = defaultTtlSecs,
+                             clientId: String = defaultClientId(),
+                             receiver: ServiceDiscovery.() -> T): T =
     ServiceDiscovery(client, servicePath, leaseTtlSecs, clientId).use { it.receiver() }
-}
 
 class ServiceDiscovery
 @JvmOverloads
@@ -147,9 +146,7 @@ constructor(client: Client,
         return cache
     }
 
-    fun withServiceCache(name: String, receiver: ServiceCache.() -> Unit) {
-        serviceCache(name).use { it.receiver() }
-    }
+    fun <T> withServiceCache(name: String, receiver: ServiceCache.() -> T) = serviceCache(name).use { it.receiver() }
 
     fun serviceProvider(serviceName: String): ServiceProvider {
         val provider = ServiceProvider(client, namesPath, serviceName)

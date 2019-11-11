@@ -45,7 +45,7 @@ import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withWatcher
 import mu.KLogging
 import java.io.Closeable
 import java.util.Collections.synchronizedList
@@ -59,25 +59,24 @@ import kotlin.time.days
 import kotlin.time.seconds
 
 @JvmOverloads
-fun withLeaderSelector(client: Client,
-                       electionPath: String,
-                       listener: LeaderSelectorListener,
-                       leaseTtlSecs: Long = defaultTtlSecs,
-                       userExecutor: Executor? = null,
-                       clientId: String = defaultClientId(),
-                       receiver: LeaderSelector.() -> Unit) {
+fun <T> withLeaderSelector(client: Client,
+                           electionPath: String,
+                           listener: LeaderSelectorListener,
+                           leaseTtlSecs: Long = defaultTtlSecs,
+                           userExecutor: Executor? = null,
+                           clientId: String = defaultClientId(),
+                           receiver: LeaderSelector.() -> T): T =
     LeaderSelector(client, electionPath, listener, leaseTtlSecs, userExecutor, clientId).use { it.receiver() }
-}
 
 @JvmOverloads
-fun withLeaderSelector(client: Client,
-                       electionPath: String,
-                       takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-                       relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-                       leaseTtlSecs: Long = defaultTtlSecs,
-                       executorService: ExecutorService? = null,
-                       clientId: String = defaultClientId(),
-                       receiver: LeaderSelector.() -> Unit) {
+fun <T> withLeaderSelector(client: Client,
+                           electionPath: String,
+                           takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+                           relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+                           leaseTtlSecs: Long = defaultTtlSecs,
+                           executorService: ExecutorService? = null,
+                           clientId: String = defaultClientId(),
+                           receiver: LeaderSelector.() -> T): T =
     LeaderSelector(client,
                    electionPath,
                    takeLeadershipBlock,
@@ -85,7 +84,6 @@ fun withLeaderSelector(client: Client,
                    leaseTtlSecs,
                    executorService,
                    clientId).use { it.receiver() }
-}
 
 // For Java clients
 class LeaderSelector
@@ -180,13 +178,15 @@ constructor(val client: Client,
                 executor.execute {
                     try {
                         val watchOption = watchOption { withNoPut(true) }
-                        client.watcher(leaderPath, watchOption) { watchResponse ->
-                            for (event in watchResponse.events)
-                                if (event.eventType == DELETE) {
-                                    // Run for leader whenever leader key is deleted
-                                    attemptToBecomeLeader(client)
-                                }
-                        }.use {
+                        client.withWatcher(leaderPath,
+                                           watchOption,
+                                           { watchResponse ->
+                                               for (event in watchResponse.events)
+                                                   if (event.eventType == DELETE) {
+                                                       // Run for leader whenever leader key is deleted
+                                                       attemptToBecomeLeader(client)
+                                                   }
+                                           }) {
                             watchStarted.set(true)
                             terminateWatch.waitUntilTrue()
                         }
@@ -386,19 +386,20 @@ constructor(val client: Client,
             val terminateListener = CountDownLatch(1)
             executor.execute {
                 connectToEtcd(urls) { client ->
-                    client.watcher(electionPath.withLeaderSuffix) { watchResponse ->
-                        for (event in watchResponse.events)
-                            try {
-                                when (event.eventType) {
-                                    PUT          -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
-                                    DELETE       -> listener.relinquishLeadership()
-                                    UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
-                                    else         -> logger.error { "Unknown error with $electionPath watch" }
-                                }
-                            } catch (e: Throwable) {
-                                logger.error(e) { "Exception in reportLeader()" }
-                            }
-                    }.use {
+                    client.withWatcher(electionPath.withLeaderSuffix,
+                                       block = { watchResponse ->
+                                           for (event in watchResponse.events)
+                                               try {
+                                                   when (event.eventType) {
+                                                       PUT          -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
+                                                       DELETE       -> listener.relinquishLeadership()
+                                                       UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
+                                                       else         -> logger.error { "Unknown error with $electionPath watch" }
+                                                   }
+                                               } catch (e: Throwable) {
+                                                   logger.error(e) { "Exception in reportLeader()" }
+                                               }
+                                       }) {
                         terminateListener.await()
                     }
                 }

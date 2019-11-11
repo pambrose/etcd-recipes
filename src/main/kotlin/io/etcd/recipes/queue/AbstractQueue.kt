@@ -32,7 +32,7 @@ import io.etcd.recipes.common.equalTo
 import io.etcd.recipes.common.getFirstChild
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withWatcher
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
@@ -70,15 +70,17 @@ abstract class AbstractQueue(client: Client,
             withNoDelete(true)
         }
         val keyFound = AtomicReference<KeyValue?>()
-        client.watcher(queuePath, watchOption) { watchResponse ->
-            watchResponse.events.forEach { watchEvent ->
-                if (watchEvent.eventType == WatchEvent.EventType.PUT) {
-                    keyFound.compareAndSet(null, watchEvent.keyValue)
-                    watchLatch.countDown()
-                }
-            }
+        client.withWatcher(queuePath,
+                           watchOption,
+                           { watchResponse ->
+                               watchResponse.events.forEach { watchEvent ->
+                                   if (watchEvent.eventType == WatchEvent.EventType.PUT) {
+                                       keyFound.compareAndSet(null, watchEvent.keyValue)
+                                       watchLatch.countDown()
+                                   }
+                               }
 
-        }.use {
+                           }) {
             // Query again in case a value arrived just before watch was created
             val waitingChildList = client.getFirstChild(queuePath, target).kvs
             if (!waitingChildList.isEmpty()) {

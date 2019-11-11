@@ -18,8 +18,6 @@
 
 package io.etcd.recipes.node
 
-import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.delegate.AtomicDelegates
 import com.sudothought.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
@@ -35,16 +33,15 @@ import java.util.concurrent.Executors
 import kotlin.time.seconds
 
 @JvmOverloads
-fun withTransientNode(client: Client,
-                      nodePath: String,
-                      nodeValue: String,
-                      leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
-                      autoStart: Boolean = true,
-                      userExecutor: Executor? = null,
-                      clientId: String = defaultClientId(),
-                      receiver: TransientNode.() -> Unit) {
+fun <T> withTransientNode(client: Client,
+                          nodePath: String,
+                          nodeValue: String,
+                          leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+                          autoStart: Boolean = true,
+                          userExecutor: Executor? = null,
+                          clientId: String = defaultClientId(),
+                          receiver: TransientNode.() -> T): T =
     TransientNode(client, nodePath, nodeValue, leaseTtlSecs, autoStart, userExecutor, clientId).use { it.receiver() }
-}
 
 class TransientNode
 @JvmOverloads
@@ -57,8 +54,6 @@ constructor(client: Client,
             val clientId: String = defaultClientId()) : EtcdConnector(client), Closeable {
 
     private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
-    private val startThreadComplete = BooleanMonitor(false)
-    private var startCalled by AtomicDelegates.atomicBoolean(false)
     private val keepAliveWaitLatch = CountDownLatch(1)
     private val keepAliveStartedLatch = CountDownLatch(1)
 
@@ -96,10 +91,6 @@ constructor(client: Client,
         startCalled = true
 
         return this
-    }
-
-    private fun checkStartCalled() {
-        if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
     }
 
     @Synchronized

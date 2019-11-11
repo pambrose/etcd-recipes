@@ -29,6 +29,6 @@ fun connectToEtcd(urls: List<String>, initReciever: ClientBuilder.() -> ClientBu
 }
 
 @JvmOverloads
-fun connectToEtcd(urls: List<String>,
-                  initReciever: ClientBuilder.() -> ClientBuilder = { this },
-                  block: (client: Client) -> Unit) = connectToEtcd(urls, initReciever).use { block(it) }
+fun <T> connectToEtcd(urls: List<String>,
+                      initReciever: ClientBuilder.() -> ClientBuilder = { this },
+                      block: (client: Client) -> T): T = connectToEtcd(urls, initReciever).use { block(it) }

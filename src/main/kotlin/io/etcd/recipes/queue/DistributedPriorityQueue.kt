@@ -29,11 +29,10 @@ import io.etcd.recipes.common.lessThan
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 
-fun withDistributedPriorityQueue(client: Client,
-                                 queuePath: String,
-                                 receiver: DistributedPriorityQueue.() -> Unit) {
+fun <T> withDistributedPriorityQueue(client: Client,
+                                     queuePath: String,
+                                     receiver: DistributedPriorityQueue.() -> T): T =
     DistributedPriorityQueue(client, queuePath).use { it.receiver() }
-}
 
 class DistributedPriorityQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.KEY) {
 

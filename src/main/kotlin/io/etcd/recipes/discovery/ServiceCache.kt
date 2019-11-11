@@ -20,8 +20,9 @@ package io.etcd.recipes.discovery
 
 import com.google.common.collect.Maps.newConcurrentMap
 import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.sudothought.common.delegate.AtomicDelegates
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.Watch
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
@@ -45,7 +46,7 @@ class ServiceCache internal constructor(client: Client,
                                         val namesPath: String,
                                         val serviceName: String) : EtcdConnector(client), Closeable {
 
-    private var startCalled by atomicBoolean(false)
+    private var watcher: Watch.Watcher? by AtomicDelegates.nullableReference()
     private var dataPreloaded = BooleanMonitor(false)
     private val servicePath = namesPath.appendToPath(serviceName)
     private val serviceMap: ConcurrentMap<String, String> = newConcurrentMap()
@@ -64,7 +65,7 @@ class ServiceCache internal constructor(client: Client,
         val trailingServicePath = servicePath.ensureSuffix("/")
         val trailingNamesPath = namesPath.ensureSuffix("/")
         val watchOption = watchOption { withPrefix(trailingServicePath) }
-        client.watcher(trailingServicePath, watchOption) { watchResponse ->
+        watcher = client.watcher(trailingServicePath, watchOption) { watchResponse ->
             // Wait for data to be loaded
             dataPreloaded.waitUntilTrue()
 
@@ -102,6 +103,7 @@ class ServiceCache internal constructor(client: Client,
                         else         -> logger.error { "Unknown error with $servicePath watch" }
                     }
                 }
+            startThreadComplete.set(true)
         }
 
         // Preload with initial data
@@ -142,6 +144,21 @@ class ServiceCache internal constructor(client: Client,
     fun addListenerForChanges(listener: ServiceCacheListener) {
         checkCloseNotCalled()
         listeners += listener
+    }
+
+    @Synchronized
+    override fun close() {
+        if (closeCalled)
+            return
+
+        checkStartCalled()
+
+        watcher?.close()
+
+        listeners.clear()
+        startThreadComplete.waitUntilTrue()
+
+        super.close()
     }
 
     companion object : KLogging()

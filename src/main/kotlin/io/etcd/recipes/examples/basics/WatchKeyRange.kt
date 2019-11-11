@@ -28,7 +28,7 @@ import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withWatcher
 import kotlin.time.seconds
 
 fun main() {
@@ -38,10 +38,12 @@ fun main() {
     connectToEtcd(urls) { client ->
         client.apply {
             val watchOption = watchOption { withPrefix(path.asByteSequence) }
-            watcher(path, watchOption) { watchResponse ->
-                for (event in watchResponse.events)
-                    println("${event.eventType} for ${event.keyValue.asString}")
-            }.use {
+            withWatcher(path,
+                        watchOption,
+                        { watchResponse ->
+                            for (event in watchResponse.events)
+                                println("${event.eventType} for ${event.keyValue.asString}")
+                        }) {
                 // Create empty root
                 putValue(path, "root")
 

@@ -19,11 +19,11 @@
 package io.etcd.recipes.cache
 
 import com.google.common.collect.Maps.newConcurrentMap
-import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.sudothought.common.delegate.AtomicDelegates.nullableReference
 import com.sudothought.common.time.timeUnitToDuration
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.Watch
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
@@ -53,19 +53,17 @@ import kotlin.time.Duration
 import kotlin.time.days
 
 @JvmOverloads
-fun withPathChildrenCache(client: Client,
-                          cachePath: String,
-                          userExecutor: Executor? = null,
-                          receiver: PathChildrenCache.() -> Unit) {
+fun <T> withPathChildrenCache(client: Client,
+                              cachePath: String,
+                              userExecutor: Executor? = null,
+                              receiver: PathChildrenCache.() -> T): T =
     PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
-}
 
 class PathChildrenCache(client: Client,
                         val cachePath: String,
                         private val userExecutor: Executor? = null) : EtcdConnector(client), Closeable {
 
-    private var startCalled by atomicBoolean(false)
-    private val startThreadComplete = BooleanMonitor(false)
+    private var watcher: Watch.Watcher? by nullableReference()
     private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
     private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
     // Use a single threaded executor to maintain order
@@ -169,7 +167,7 @@ class PathChildrenCache(client: Client,
         val trailingPath = cachePath.ensureSuffix("/")
         logger.debug { "Setting up watch for $trailingPath" }
         val watchOption = watchOption { withPrefix(trailingPath.asByteSequence) }
-        client.watcher(trailingPath, watchOption) { watchResponse ->
+        watcher = client.watcher(trailingPath, watchOption) { watchResponse ->
             watchResponse.events
                 .forEach { event ->
                     val (k, v) = event.keyValue.asPair
@@ -241,10 +239,6 @@ class PathChildrenCache(client: Client,
 
     fun clear() = cacheMap.clear()
 
-    private fun checkStartCalled() {
-        if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
-    }
-
     @Synchronized
     override fun close() {
         if (closeCalled)
@@ -252,13 +246,14 @@ class PathChildrenCache(client: Client,
 
         checkStartCalled()
 
+        watcher?.close()
+
         listeners.clear()
         startThreadComplete.waitUntilTrue()
 
-        // Close waiter before shutting down executor
-        super.close()
-
         if (userExecutor == null) (executor as ExecutorService).shutdown()
+
+        super.close()
     }
 
     companion object : KLogging()

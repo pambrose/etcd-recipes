@@ -38,7 +38,7 @@ import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withWatcher
 import mu.KLogging
 import java.io.Closeable
 import java.util.concurrent.CountDownLatch
@@ -48,14 +48,13 @@ import kotlin.time.days
 import kotlin.time.seconds
 
 @JvmOverloads
-fun withDistributedBarrier(client: Client,
-                           barrierPath: String,
-                           leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
-                           waitOnMissingBarriers: Boolean = true,
-                           clientId: String = defaultClientId(),
-                           receiver: DistributedBarrier.() -> Unit) {
+fun <T> withDistributedBarrier(client: Client,
+                               barrierPath: String,
+                               leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+                               waitOnMissingBarriers: Boolean = true,
+                               clientId: String = defaultClientId(),
+                               receiver: DistributedBarrier.() -> T): T =
     DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
-}
 
 class DistributedBarrier
 @JvmOverloads
@@ -142,12 +141,14 @@ constructor(client: Client,
         val waitLatch = CountDownLatch(1)
 
         val watchOption = watchOption { withNoPut(true) }
-        return client.watcher(barrierPath, watchOption) { watchResponse ->
-            for (event in watchResponse.events)
-                if (event.eventType == DELETE)
-                    waitLatch.countDown()
+        return client.withWatcher(barrierPath,
+                                  watchOption,
+                                  { watchResponse ->
+                                      for (event in watchResponse.events)
+                                          if (event.eventType == DELETE)
+                                              waitLatch.countDown()
 
-        }.use {
+                                  }) {
             // Check one more time in case watch missed the delete just after last check
             if (!waitOnMissingBarriers && !isBarrierSet())
                 waitLatch.countDown()

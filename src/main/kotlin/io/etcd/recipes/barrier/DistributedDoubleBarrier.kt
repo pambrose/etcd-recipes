@@ -31,13 +31,12 @@ import kotlin.time.Duration
 import kotlin.time.days
 
 @JvmOverloads
-fun withDistributedDoubleBarrier(client: Client,
-                                 barrierPath: String,
-                                 memberCount: Int,
-                                 clientId: String = defaultClientId(),
-                                 receiver: DistributedDoubleBarrier.() -> Unit) {
+fun <T> withDistributedDoubleBarrier(client: Client,
+                                     barrierPath: String,
+                                     memberCount: Int,
+                                     clientId: String = defaultClientId(),
+                                     receiver: DistributedDoubleBarrier.() -> T): T =
     DistributedDoubleBarrier(client, barrierPath, memberCount, clientId).use { it.receiver() }
-}
 
 class DistributedDoubleBarrier
 @JvmOverloads

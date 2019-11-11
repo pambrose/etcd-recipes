@@ -25,7 +25,7 @@ import io.etcd.jetcd.Observers
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import kotlin.time.Duration
 
-fun Client.keepAliveWith(lease: LeaseGrantResponse, block: () -> Unit) =
+fun <T> Client.keepAliveWith(lease: LeaseGrantResponse, block: () -> T): T =
     keepAlive(lease).use { block.invoke() }
 
 fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
@@ -35,4 +35,3 @@ fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
                               { /*println("KeepAlive err resp: $err")*/ }))
 
 fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse = leaseClient.grant(ttl.inSeconds.toLong()).get()
-
