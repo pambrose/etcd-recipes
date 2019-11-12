@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.queue
 
+import com.sudothought.common.concurrent.withLock
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
@@ -34,6 +35,7 @@ import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withPrefix
 import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicReference
 
 abstract class AbstractQueue(client: Client,
@@ -70,22 +72,32 @@ abstract class AbstractQueue(client: Client,
                 withNoDelete(true)
             }
         val keyFound = AtomicReference<KeyValue?>()
+        val semaphore = Semaphore(1)
+
         client.withWatcher(queuePath,
                            watchOption,
                            { watchResponse ->
-                               for (watchEvent in watchResponse.events) {
-                                   if (watchEvent.eventType == WatchEvent.EventType.PUT) {
-                                       keyFound.compareAndSet(null, watchEvent.keyValue)
-                                       watchLatch.countDown()
+                               semaphore.withLock {
+                                   if (watchLatch.count > 0) {
+                                       for (watchEvent in watchResponse.events) {
+                                           if (watchEvent.eventType == WatchEvent.EventType.PUT) {
+                                               keyFound.compareAndSet(null, watchEvent.keyValue)
+                                               watchLatch.countDown()
+                                           }
+                                       }
                                    }
                                }
 
                            }) {
             // Query again in case a value arrived just before watch was created
-            val waitingChildList = client.getFirstChild(queuePath, target).kvs
-            if (waitingChildList.isNotEmpty()) {
-                keyFound.compareAndSet(null, waitingChildList.first())
-                watchLatch.countDown()
+            semaphore.withLock {
+                if (watchLatch.count > 0) {
+                    val waitingChildList = client.getFirstChild(queuePath, target).kvs
+                    if (waitingChildList.isNotEmpty()) {
+                        keyFound.compareAndSet(null, waitingChildList.first())
+                        watchLatch.countDown()
+                    }
+                }
             }
             watchLatch.await()
         }
