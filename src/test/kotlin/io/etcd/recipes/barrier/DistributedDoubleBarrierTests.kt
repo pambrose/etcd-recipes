@@ -64,41 +64,41 @@ class DistributedDoubleBarrierTests {
             sleep(5.random.seconds)
 
             repeat(retryCount) {
-                logger.info { "#$id Waiting to enter barrier" }
+                //logger.info { "#$id Waiting to enter barrier" }
                 if (it % 2 == 0)
                     barrier.enter(1000.random.milliseconds)
                 else
                     barrier.enter(1000, TimeUnit.MILLISECONDS)
                 enterRetryCounter.incrementAndGet()
-                logger.info { "#$id Timed out entering barrier" }
+                //logger.info { "#$id Timed out entering barrier" }
             }
 
             enterLatch.countDown()
-            logger.info { "#$id Waiting to enter barrier" }
+            //logger.info { "#$id Waiting to enter barrier" }
             barrier.enter()
             enterCounter.incrementAndGet()
 
-            logger.info { "#$id Entered barrier" }
+            //logger.info { "#$id Entered barrier" }
         }
 
         fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
             sleep(10.random.seconds)
 
             repeat(retryCount) {
-                logger.info { "#$id Waiting to leave barrier" }
+                //logger.info { "#$id Waiting to leave barrier" }
                 if (it % 2 == 0)
                     barrier.leave(1000.random.milliseconds)
                 else
                     barrier.leave(1000, TimeUnit.MILLISECONDS)
                 leaveRetryCounter.incrementAndGet()
-                logger.info { "#$id Timed out leaving barrier" }
+                //logger.info { "#$id Timed out leaving barrier" }
             }
 
             leaveLatch.countDown()
-            logger.info { "#$id Waiting to leave barrier" }
+            //logger.info { "#$id Waiting to leave barrier" }
             barrier.leave()
             leaveCounter.incrementAndGet()
-            logger.info { "#$id Left barrier" }
+            //logger.info { "#$id Left barrier" }
             doneLatch.countDown()
         }
 

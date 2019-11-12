@@ -56,7 +56,7 @@ class ThreadedServiceDiscoveryTests {
                 repeat(serviceCount) { j ->
                     val service = ServiceInstance("TestInstance$j", TestPayload(j).toJson())
                     context.serviceMap[service.id] = service
-                    logger.info { "Registering: $service" }
+                    //logger.info { "Registering: $service" }
                     sd.registerService(service)
                 }
             }
@@ -110,7 +110,7 @@ class ThreadedServiceDiscoveryTests {
                     val payload = TestPayload.toObject(service.jsonPayload)
                     payload.testval = payload.testval * -1
                     service.jsonPayload = payload.toJson()
-                    logger.info { "Unregistering service: $service" }
+                    //logger.info { "Unregistering service: $service" }
                     context.serviceDiscovery.unregisterService(service)
                 }
             }
@@ -126,7 +126,7 @@ class ThreadedServiceDiscoveryTests {
                     contextMap.values.forEach { context ->
                         context.serviceMap.forEach { (_, service) ->
                             val name = service.name
-                            logger.info { "Query deleted service: $name  ${service.id}" }
+                            //logger.info { "Query deleted service: $name  ${service.id}" }
                             invoking { queryForInstance(name, service.id) } shouldThrow EtcdRecipeException::class
                         }
                     }
