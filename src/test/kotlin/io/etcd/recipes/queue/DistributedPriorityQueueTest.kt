@@ -19,7 +19,6 @@
 package io.etcd.recipes.queue
 
 import com.sudothought.common.concurrent.thread
-import com.sudothought.common.concurrent.withLock
 import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
@@ -31,7 +30,6 @@ import org.amshove.kluent.shouldEqual
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
@@ -110,7 +108,6 @@ class DistributedPriorityQueueTest {
         val latch = CountDownLatch(threadCount)
         val dequeuedData = mutableListOf<String>()
         val testData = List(iterCount) { "V %04d".format(it) }
-        val semaphore = Semaphore(1)
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
@@ -123,7 +120,11 @@ class DistributedPriorityQueueTest {
             repeat(threadCount) {
                 thread(latch) {
                     withDistributedPriorityQueue(client, queuePath) {
-                        repeat(iterCount / threadCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
+                        repeat(iterCount / threadCount) {
+                            //synchronized(dequeuedData) {
+                            dequeuedData += dequeue().asString
+                            //}
+                        }
                     }
                 }
             }
@@ -165,7 +166,6 @@ class DistributedPriorityQueueTest {
         val queuePath = "/queue/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)
         val dequeuedData = synchronizedList(mutableListOf<String>())
-        val semaphore = Semaphore(1)
         val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
@@ -177,9 +177,9 @@ class DistributedPriorityQueueTest {
 
                     withDistributedPriorityQueue(client, queuePath) {
                         repeat(iterCount / threadCount) {
-                            semaphore.withLock {
+                            //synchronized(dequeuedData) {
                                 dequeuedData += dequeue().asString
-                            }
+                            //}
                         }
                     }
                 }
