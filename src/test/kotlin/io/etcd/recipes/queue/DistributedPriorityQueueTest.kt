@@ -148,6 +148,8 @@ class DistributedPriorityQueueTest {
 
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
+            sleep(2.seconds)
+
             latch.await()
 
             client.getChildCount(queuePath) shouldEqual 0
