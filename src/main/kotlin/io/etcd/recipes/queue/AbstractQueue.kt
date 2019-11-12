@@ -25,13 +25,13 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.equalTo
 import io.etcd.recipes.common.getFirstChild
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.withPrefix
 import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
@@ -63,16 +63,17 @@ abstract class AbstractQueue(client: Client,
 
         // No values available, so wait on them
         val watchLatch = CountDownLatch(1)
-        val trailingPath = queuePath.ensureSuffix("/").asByteSequence
-        val watchOption = watchOption {
-            withPrefix(trailingPath)
-            withNoDelete(true)
-        }
+        val trailingPath = queuePath.ensureSuffix("/")
+        val watchOption =
+            watchOption {
+                withPrefix(trailingPath)
+                withNoDelete(true)
+            }
         val keyFound = AtomicReference<KeyValue?>()
         client.withWatcher(queuePath,
                            watchOption,
                            { watchResponse ->
-                               watchResponse.events.forEach { watchEvent ->
+                               for (watchEvent in watchResponse.events) {
                                    if (watchEvent.eventType == WatchEvent.EventType.PUT) {
                                        keyFound.compareAndSet(null, watchEvent.keyValue)
                                        watchLatch.countDown()

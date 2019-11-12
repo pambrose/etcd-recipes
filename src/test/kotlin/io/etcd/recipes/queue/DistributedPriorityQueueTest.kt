@@ -20,7 +20,6 @@ package io.etcd.recipes.queue
 
 import com.sudothought.common.concurrent.thread
 import com.sudothought.common.concurrent.withLock
-import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -33,7 +32,6 @@ import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.seconds
 
 class DistributedPriorityQueueTest {
     val iterCount = 500
@@ -90,10 +88,33 @@ class DistributedPriorityQueueTest {
     }
 
     @Test
-    fun threadedTestNoWait() {
+    fun threadedTestNoWait1() {
+        repeat(5) {
+            threadedTestNoWait(10, 1)
+            threadedTestNoWait(10, 2)
+            threadedTestNoWait(10, 5)
+            threadedTestNoWait(10, 10)
+        }
+    }
+
+    @Test
+    fun threadedTestNoWait2() {
+        threadedTestNoWait(100, 1)
+        threadedTestNoWait(100, 2)
+        threadedTestNoWait(100, 5)
+        threadedTestNoWait(100, 10)
+    }
+
+    @Test
+    fun threadedTestNoWait3() {
+        threadedTestNoWait(iterCount, threadCount)
+    }
+
+    fun threadedTestNoWait(iterCount: Int, threadCount: Int) {
         val queuePath = "/queue/threadedTestNoWait"
         val latch = CountDownLatch(threadCount)
         val dequeuedData = mutableListOf<String>()
+        val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
@@ -101,7 +122,7 @@ class DistributedPriorityQueueTest {
 
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
-            sleep(2.seconds)
+            //sleep(2.seconds)
 
             repeat(threadCount) {
                 thread(latch) {
@@ -124,11 +145,34 @@ class DistributedPriorityQueueTest {
     }
 
     @Test
-    fun threadedTestWithWait() {
+    fun threadedTestWithWait1() {
+        repeat(5) {
+            threadedTestWithWait(10, 1)
+            threadedTestWithWait(10, 2)
+            threadedTestWithWait(10, 5)
+            threadedTestWithWait(10, 10)
+        }
+    }
+
+    @Test
+    fun threadedTestWithWait2() {
+        threadedTestWithWait(100, 1)
+        threadedTestWithWait(100, 2)
+        threadedTestWithWait(100, 5)
+        threadedTestWithWait(100, 10)
+    }
+
+    @Test
+    fun threadedTestWithWait3() {
+        threadedTestWithWait(iterCount, threadCount)
+    }
+
+    fun threadedTestWithWait(iterCount: Int, threadCount: Int) {
         val queuePath = "/queue/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)
         val dequeuedData = synchronizedList(mutableListOf<String>())
         val semaphore = Semaphore(1)
+        val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
@@ -144,11 +188,9 @@ class DistributedPriorityQueueTest {
                 }
             }
 
-            sleep(2.seconds)
+            //sleep(2.seconds)
 
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
-
-            sleep(2.seconds)
 
             latch.await()
 

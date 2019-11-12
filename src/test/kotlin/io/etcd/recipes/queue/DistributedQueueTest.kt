@@ -92,11 +92,34 @@ class DistributedQueueTest {
     }
 
     @Test
-    fun threadedTestNoWait() {
+    fun threadedTestNoWait1() {
+        repeat(5) {
+            threadedTestNoWait(10, 1)
+            threadedTestNoWait(10, 2)
+            threadedTestNoWait(10, 5)
+            threadedTestNoWait(10, 10)
+        }
+    }
+
+    @Test
+    fun threadedTestNoWait2() {
+        threadedTestNoWait(100, 1)
+        threadedTestNoWait(100, 2)
+        threadedTestNoWait(100, 5)
+        threadedTestNoWait(100, 10)
+    }
+
+    @Test
+    fun threadedTestNoWait3() {
+        threadedTestNoWait(iterCount, threadCount)
+    }
+
+    fun threadedTestNoWait(iterCount: Int, threadCount: Int) {
         val queuePath = "/queue/threadedTestNoWait"
         val latch = CountDownLatch(threadCount)
         val dequeuedData = synchronizedList(mutableListOf<String>())
         val semaphore = Semaphore(1)
+        val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
@@ -125,11 +148,34 @@ class DistributedQueueTest {
     }
 
     @Test
-    fun threadedTestWithWait() {
+    fun threadedTestWithWait1() {
+        repeat(5) {
+            threadedTestWithWait(10, 1)
+            threadedTestWithWait(10, 2)
+            threadedTestWithWait(10, 5)
+            threadedTestWithWait(10, 10)
+        }
+    }
+
+    @Test
+    fun threadedTestWithWait2() {
+        threadedTestWithWait(100, 1)
+        threadedTestWithWait(100, 2)
+        threadedTestWithWait(100, 5)
+        threadedTestWithWait(100, 10)
+    }
+
+    @Test
+    fun threadedTestWithWait3() {
+        threadedTestWithWait(iterCount, threadCount)
+    }
+
+    fun threadedTestWithWait(iterCount: Int, threadCount: Int) {
         val queuePath = "/queue/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)
         val dequeuedData = synchronizedList(mutableListOf<String>())
         val semaphore = Semaphore(1)
+        val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
