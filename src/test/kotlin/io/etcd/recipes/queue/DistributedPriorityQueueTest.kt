@@ -68,13 +68,8 @@ class DistributedPriorityQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
 
             thread(latch) {
-
-                    withDistributedPriorityQueue(client, queuePath) {
-                        repeat(iterCount) {
-                            semaphore.withLock {
-                                dequeuedData += dequeue().asString
-                        }
-                    }
+                withDistributedPriorityQueue(client, queuePath) {
+                    repeat(iterCount) { dequeuedData += dequeue().asString }
                 }
             }
 
@@ -92,12 +87,10 @@ class DistributedPriorityQueueTest {
 
     @Test
     fun threadedTestNoWait1() {
-        repeat(5) {
-            threadedTestNoWait(10, 1)
-            threadedTestNoWait(10, 2)
-            threadedTestNoWait(10, 5)
-            threadedTestNoWait(10, 10)
-        }
+        threadedTestNoWait(10, 1)
+        threadedTestNoWait(10, 2)
+        threadedTestNoWait(10, 5)
+        threadedTestNoWait(10, 10)
     }
 
     @Test
@@ -118,6 +111,7 @@ class DistributedPriorityQueueTest {
         val latch = CountDownLatch(threadCount)
         val dequeuedData = mutableListOf<String>()
         val testData = List(iterCount) { "V %04d".format(it) }
+        val semaphore = Semaphore(1)
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
@@ -130,7 +124,7 @@ class DistributedPriorityQueueTest {
             repeat(threadCount) {
                 thread(latch) {
                     withDistributedPriorityQueue(client, queuePath) {
-                        repeat(iterCount / threadCount) { dequeuedData += dequeue().asString }
+                        repeat(iterCount / threadCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
                     }
                 }
             }
@@ -149,12 +143,10 @@ class DistributedPriorityQueueTest {
 
     @Test
     fun threadedTestWithWait1() {
-        repeat(5) {
-            threadedTestWithWait(10, 1)
-            threadedTestWithWait(10, 2)
-            threadedTestWithWait(10, 5)
-            threadedTestWithWait(10, 10)
-        }
+        threadedTestWithWait(10, 1)
+        threadedTestWithWait(10, 2)
+        threadedTestWithWait(10, 5)
+        threadedTestWithWait(10, 10)
     }
 
     @Test
@@ -185,9 +177,9 @@ class DistributedPriorityQueueTest {
                 thread(latch) {
 
                     withDistributedPriorityQueue(client, queuePath) {
-                            repeat(iterCount / threadCount) {
-                                semaphore.withLock {
-                                    dequeuedData += dequeue().asString
+                        repeat(iterCount / threadCount) {
+                            semaphore.withLock {
+                                dequeuedData += dequeue().asString
                             }
                         }
                     }

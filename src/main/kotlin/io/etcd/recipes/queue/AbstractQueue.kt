@@ -81,8 +81,8 @@ abstract class AbstractQueue(client: Client,
                                    if (watchLatch.count > 0) {
                                        for (watchEvent in watchResponse.events) {
                                            if (watchEvent.eventType == WatchEvent.EventType.PUT) {
-                                               keyFound.compareAndSet(null, watchEvent.keyValue)
-                                               watchLatch.countDown()
+                                               if (keyFound.compareAndSet(null, watchEvent.keyValue))
+                                                   watchLatch.countDown()
                                            }
                                        }
                                    }
@@ -94,8 +94,8 @@ abstract class AbstractQueue(client: Client,
                 if (watchLatch.count > 0) {
                     val waitingChildList = client.getFirstChild(queuePath, target).kvs
                     if (waitingChildList.isNotEmpty()) {
-                        keyFound.compareAndSet(null, waitingChildList.first())
-                        watchLatch.countDown()
+                        if (keyFound.compareAndSet(null, waitingChildList.first()))
+                            watchLatch.countDown()
                     }
                 }
             }

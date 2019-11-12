@@ -71,9 +71,7 @@ class DistributedQueueTest {
 
             thread(latch) {
                 withDistributedQueue(client, queuePath) {
-                    repeat(iterCount) {
-                        semaphore.withLock { dequeuedData += dequeue().asString }
-                    }
+                    repeat(iterCount) { dequeuedData += dequeue().asString }
                 }
             }
 
@@ -95,12 +93,10 @@ class DistributedQueueTest {
 
     @Test
     fun threadedTestNoWait1() {
-        repeat(5) {
-            threadedTestNoWait(10, 1)
-            threadedTestNoWait(10, 2)
-            threadedTestNoWait(10, 5)
-            threadedTestNoWait(10, 10)
-        }
+        threadedTestNoWait(10, 1)
+        threadedTestNoWait(10, 2)
+        threadedTestNoWait(10, 5)
+        threadedTestNoWait(10, 10)
     }
 
     @Test
@@ -151,12 +147,10 @@ class DistributedQueueTest {
 
     @Test
     fun threadedTestWithWait1() {
-        repeat(5) {
-            threadedTestWithWait(10, 1)
-            threadedTestWithWait(10, 2)
-            threadedTestWithWait(10, 5)
-            threadedTestWithWait(10, 10)
-        }
+        threadedTestWithWait(10, 1)
+        threadedTestWithWait(10, 2)
+        threadedTestWithWait(10, 5)
+        threadedTestWithWait(10, 10)
     }
 
     @Test
