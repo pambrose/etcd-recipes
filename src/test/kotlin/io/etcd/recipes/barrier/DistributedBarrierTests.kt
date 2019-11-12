@@ -65,7 +65,7 @@ class DistributedBarrierTests {
 
                     isBarrierSet() shouldEqual false
 
-                    logger.info { "Setting Barrier" }
+                    logger.debug { "Setting Barrier" }
                     val isSet = setBarrier()
                     isSet.shouldBeTrue()
                     isBarrierSet().shouldBeTrue()
@@ -78,7 +78,7 @@ class DistributedBarrierTests {
                     // Pause to give time-outs a chance
                     sleep(6.seconds)
 
-                    logger.info { "Removing Barrier" }
+                    logger.debug { "Removing Barrier" }
                     removeBarrierTime.set(System.currentTimeMillis())
                     val isRemoved = removeBarrier()
                     isRemoved.shouldBeTrue()
@@ -96,19 +96,19 @@ class DistributedBarrierTests {
             setBarrierLatch.await()
             connectToEtcd(urls) { client ->
                 withDistributedBarrier(client, path) {
-                    logger.info { "$i Waiting on Barrier" }
+                    logger.debug { "$i Waiting on Barrier" }
                     waitOnBarrier(1.seconds)
 
                     timeoutCount.incrementAndGet()
 
-                    logger.info { "$i Timed out waiting on barrier, waiting again" }
+                    logger.debug { "$i Timed out waiting on barrier, waiting again" }
                     waitOnBarrier()
 
                     // Make sure the waiter advanced quickly
                     System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500
                     advancedCount.incrementAndGet()
 
-                    logger.info { "$i Done Waiting on Barrier" }
+                    logger.debug { "$i Done Waiting on Barrier" }
                 }
             }
         }
@@ -118,7 +118,7 @@ class DistributedBarrierTests {
         timeoutCount.get() shouldEqual count
         advancedCount.get() shouldEqual count
 
-        logger.info { "Done" }
+        logger.debug { "Done" }
     }
 
     @Test
@@ -133,19 +133,19 @@ class DistributedBarrierTests {
             nonblockingThreads(count) { i ->
                 connectToEtcd(urls) { client ->
                     withDistributedBarrier(client, path) {
-                        logger.info { "$i Waiting on Barrier" }
+                        logger.debug { "$i Waiting on Barrier" }
                         waitOnBarrier(1, TimeUnit.SECONDS)
 
                         timeoutCount.incrementAndGet()
 
-                        logger.info { "$i Timed out waiting on barrier, waiting again" }
+                        logger.debug { "$i Timed out waiting on barrier, waiting again" }
                         waitOnBarrier()
 
                         // Make sure the waiter advanced quickly
                         System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500
                         advancedCount.incrementAndGet()
 
-                        logger.info { "$i Done Waiting on Barrier" }
+                        logger.debug { "$i Done Waiting on Barrier" }
                     }
                 }
             }
@@ -157,7 +157,7 @@ class DistributedBarrierTests {
 
                 isBarrierSet() shouldEqual false
 
-                logger.info { "Setting Barrier" }
+                logger.debug { "Setting Barrier" }
                 val isSet = setBarrier()
                 isSet.shouldBeTrue()
                 isBarrierSet().shouldBeTrue()
@@ -169,7 +169,7 @@ class DistributedBarrierTests {
                 // Pause to give time-outs a chance
                 sleep(6.seconds)
 
-                logger.info { "Removing Barrier" }
+                logger.debug { "Removing Barrier" }
                 removeBarrierTime.set(System.currentTimeMillis())
                 removeBarrier()
 
@@ -184,7 +184,7 @@ class DistributedBarrierTests {
         timeoutCount.get() shouldEqual count
         advancedCount.get() shouldEqual count
 
-        logger.info { "Done" }
+        logger.debug { "Done" }
     }
 
     companion object : KLogging()

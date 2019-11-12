@@ -50,7 +50,7 @@ class ParticipantTests {
                                        object : LeaderSelectorListenerAdapter() {
                                        override fun takeLeadership(selector: LeaderSelector) {
                                            val pause = 2.seconds
-                                           logger.info { "${selector.clientId} elected leader for $pause" }
+                                           logger.debug { "${selector.clientId} elected leader for $pause" }
                                            sleep(pause)
 
                                            // Wait until participation count has been taken
@@ -74,7 +74,7 @@ class ParticipantTests {
             // Wait for participants to register
             sleep(3.seconds)
             var particpants = LeaderSelector.getParticipants(client, path)
-            logger.info { "Found ${particpants.size} participants" }
+            logger.debug { "Found ${particpants.size} participants" }
             particpants.size shouldEqual count
 
             holdLatch.countDown()
@@ -84,16 +84,16 @@ class ParticipantTests {
             sleep(5.seconds)
 
             particpants = LeaderSelector.getParticipants(client, path)
-            logger.info { "Found ${particpants.size} participants" }
+            logger.debug { "Found ${particpants.size} participants" }
             particpants.size shouldEqual 0
 
             // Compare participant counts
-            logger.info { "participantCounts = $participantCounts" }
+            logger.debug { "participantCounts = $participantCounts" }
             participantCounts.size shouldEqual count
             participantCounts shouldEqual (count downTo 1).toList()
 
             // Compare leader names
-            logger.info { "leaderNames = $leaderNames" }
+            logger.debug { "leaderNames = $leaderNames" }
             leaderNames.sorted() shouldEqual List(count) { "Thread$it" }.sorted()
         }
     }

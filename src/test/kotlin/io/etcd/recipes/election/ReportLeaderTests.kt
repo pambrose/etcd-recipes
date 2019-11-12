@@ -45,7 +45,7 @@ class ReportLeaderTests {
                                     path,
                                     object : LeaderListener {
                                         override fun takeLeadership(leaderName: String) {
-                                            logger.info { "$leaderName elected leader" }
+                                            logger.debug { "$leaderName elected leader" }
                                             takeLeadershiptCounter.incrementAndGet()
                                         }
 
@@ -64,7 +64,7 @@ class ReportLeaderTests {
                                    object : LeaderSelectorListenerAdapter() {
                                        override fun takeLeadership(selector: LeaderSelector) {
                                            val pause = 2.random.seconds
-                                           logger.info { "${selector.clientId} elected leader for $pause" }
+                                           logger.debug { "${selector.clientId} elected leader for $pause" }
                                            sleep(pause)
                                        }
                                    },

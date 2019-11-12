@@ -48,35 +48,35 @@ class SerialServiceDiscoveryTests {
                 val payload = TestPayload(-999)
                 val service = ServiceInstance("TestName", payload.toJson())
 
-                logger.info { service.toJson() }
+                logger.debug { service.toJson() }
 
-                logger.info { "Registering" }
+                logger.debug { "Registering" }
                 registerService(service)
 
-                logger.info { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
+                logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
                 queryForInstance(service.name, service.id) shouldEqual service
 
-                logger.info { "Retrieved values: ${queryForInstances(service.name)}" }
+                logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
                 queryForInstances(service.name) shouldEqual listOf(service)
 
-                logger.info { "Retrieved names: ${queryForNames()}" }
+                logger.debug { "Retrieved names: ${queryForNames()}" }
                 queryForNames().first() shouldEndWith service.id
 
-                logger.info { "Updating payload" }
+                logger.debug { "Updating payload" }
                 payload.testval = -888
                 service.jsonPayload = payload.toJson()
                 updateService(service)
 
-                logger.info { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
+                logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
                 queryForInstance(service.name, service.id) shouldEqual service
 
-                logger.info { "Retrieved values: ${queryForInstances(service.name)}" }
+                logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
                 queryForInstances(service.name) shouldEqual listOf(service)
 
-                logger.info { "Retrieved names: ${queryForNames()}" }
+                logger.debug { "Retrieved names: ${queryForNames()}" }
                 queryForNames().first() shouldEndWith service.id
 
-                logger.info { "Unregistering" }
+                logger.debug { "Unregistering" }
                 unregisterService(service)
                 sleep(3.seconds)
 
@@ -87,9 +87,9 @@ class SerialServiceDiscoveryTests {
                 invoking { queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
 
                 try {
-                    logger.info { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
+                    logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
                 } catch (e: EtcdRecipeException) {
-                    logger.info { "Exception: $e" }
+                    logger.debug { "Exception: $e" }
                 }
             }
         }

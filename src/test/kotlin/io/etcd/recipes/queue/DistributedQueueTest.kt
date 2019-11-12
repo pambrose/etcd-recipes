@@ -135,7 +135,7 @@ class DistributedQueueTest {
             client.deleteChildren(queuePath)
             client.getChildCount(queuePath) shouldEqual 0
 
-            repeat(threadCount) { t ->
+            repeat(threadCount) {
                 thread(latch) {
                     withDistributedQueue(client, queuePath) {
                         repeat(iterCount / threadCount) {

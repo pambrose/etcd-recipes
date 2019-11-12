@@ -64,41 +64,41 @@ class DistributedDoubleBarrierTests {
             sleep(5.random.seconds)
 
             repeat(retryCount) {
-                //logger.info { "#$id Waiting to enter barrier" }
+                logger.debug { "#$id Waiting to enter barrier" }
                 if (it % 2 == 0)
                     barrier.enter(1000.random.milliseconds)
                 else
                     barrier.enter(1000, TimeUnit.MILLISECONDS)
                 enterRetryCounter.incrementAndGet()
-                //logger.info { "#$id Timed out entering barrier" }
+                logger.debug { "#$id Timed out entering barrier" }
             }
 
             enterLatch.countDown()
-            //logger.info { "#$id Waiting to enter barrier" }
+            logger.debug { "#$id Waiting to enter barrier" }
             barrier.enter()
             enterCounter.incrementAndGet()
 
-            //logger.info { "#$id Entered barrier" }
+            logger.debug { "#$id Entered barrier" }
         }
 
         fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
             sleep(10.random.seconds)
 
             repeat(retryCount) {
-                //logger.info { "#$id Waiting to leave barrier" }
+                logger.debug { "#$id Waiting to leave barrier" }
                 if (it % 2 == 0)
                     barrier.leave(1000.random.milliseconds)
                 else
                     barrier.leave(1000, TimeUnit.MILLISECONDS)
                 leaveRetryCounter.incrementAndGet()
-                //logger.info { "#$id Timed out leaving barrier" }
+                logger.debug { "#$id Timed out leaving barrier" }
             }
 
             leaveLatch.countDown()
-            //logger.info { "#$id Waiting to leave barrier" }
+            logger.debug { "#$id Waiting to leave barrier" }
             barrier.leave()
             leaveCounter.incrementAndGet()
-            //logger.info { "#$id Left barrier" }
+            logger.debug { "#$id Left barrier" }
             doneLatch.countDown()
         }
 
@@ -143,7 +143,7 @@ class DistributedDoubleBarrierTests {
         leaveRetryCounter.get() shouldEqual retryAttempts * (count - 1)
         leaveCounter.get() shouldEqual count
 
-        logger.info { "Done" }
+        logger.debug { "Done" }
     }
 
     companion object : KLogging()
