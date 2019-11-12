@@ -43,7 +43,7 @@ class ThreadedLeaderSelectorTests {
             val takeAction =
                 { selector: LeaderSelector ->
                     val pause = 3.random.seconds
-                    logger.info { "${selector.clientId} elected leader for $pause" }
+                    logger.debug { "${selector.clientId} elected leader for $pause" }
                     takeLeadershiptCounter.incrementAndGet()
                     sleep(pause)
                 }
@@ -51,7 +51,7 @@ class ThreadedLeaderSelectorTests {
             val relinquishAction =
                 { selector: LeaderSelector ->
                     relinquishLeadershiptCounter.incrementAndGet()
-                    logger.info { "${selector.clientId} relinquished leadership" }
+                    logger.debug { "${selector.clientId} relinquished leadership" }
                 }
 
             connectToEtcd(urls) { client ->
@@ -75,7 +75,7 @@ class ThreadedLeaderSelectorTests {
         val takeAction =
             { selector: LeaderSelector ->
                 val pause = 3.random.seconds
-                logger.info { "${selector.clientId} elected leader for $pause" }
+                logger.debug { "${selector.clientId} elected leader for $pause" }
                 takeLeadershiptCounter.incrementAndGet()
                 sleep(pause)
             }
@@ -83,12 +83,12 @@ class ThreadedLeaderSelectorTests {
         val relinquishAction =
             { selector: LeaderSelector ->
                 relinquishLeadershiptCounter.incrementAndGet()
-                logger.info { "${selector.clientId} relinquished leadership" }
+                logger.debug { "${selector.clientId} relinquished leadership" }
             }
 
         connectToEtcd(urls) { client ->
             blockingThreads(count) {
-                logger.info { "Creating Thread$it" }
+                logger.debug { "Creating Thread$it" }
 
                 val election = LeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it")
                 electionList += election
@@ -96,7 +96,7 @@ class ThreadedLeaderSelectorTests {
 
             }
 
-            logger.info { "Size = ${electionList.size}" }
+            logger.debug { "Size = ${electionList.size}" }
 
             electionList
                 .onEach { it.waitOnLeadershipComplete() }

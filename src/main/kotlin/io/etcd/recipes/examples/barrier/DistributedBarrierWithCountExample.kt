@@ -54,22 +54,18 @@ fun main() {
 
     connectToEtcd(urls) { client ->
         client.deleteChildren(barrierPath)
-    }
 
-    repeat(count - 1) { i ->
-        thread {
-            connectToEtcd(urls) { client ->
+        repeat(count - 1) { i ->
+            thread {
                 withDistributedBarrierWithCount(client, barrierPath, count) {
                     waiter(i, this, 5)
                 }
             }
         }
-    }
 
-    retryLatch.await()
-    sleep(2.seconds)
+        retryLatch.await()
+        sleep(2.seconds)
 
-    connectToEtcd(urls) { client ->
         withDistributedBarrierWithCount(client, barrierPath, count) {
             waiter(99, this)
         }

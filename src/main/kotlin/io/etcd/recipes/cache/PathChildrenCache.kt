@@ -36,12 +36,12 @@ import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.INITIALIZED
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
+import io.etcd.recipes.common.withPrefix
 import mu.KLogging
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Executor
@@ -165,7 +165,7 @@ class PathChildrenCache(client: Client,
     private fun setupWatcher() {
         val trailingPath = cachePath.ensureSuffix("/")
         logger.debug { "Setting up watch for $trailingPath" }
-        val watchOption = watchOption { withPrefix(trailingPath.asByteSequence) }
+        val watchOption = watchOption { withPrefix(trailingPath) }
         watcher = client.watcher(trailingPath, watchOption) { watchResponse ->
             watchResponse.events
                 .forEach { event ->
