@@ -194,9 +194,7 @@ class DistributedQueueTest {
 
             withDistributedQueue(client, queuePath) {
                 repeat(iterCount) { i ->
-                    val v = testData[i]
-                    enqueue(v)
-                    //println("Enqueued: $v")
+                    enqueue(testData[i])
                 }
             }
 
