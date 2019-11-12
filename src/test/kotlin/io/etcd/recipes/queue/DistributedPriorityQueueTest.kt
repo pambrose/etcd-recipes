@@ -68,11 +68,9 @@ class DistributedPriorityQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
 
             thread(latch) {
-                connectToEtcd(urls) { client ->
-                    withDistributedPriorityQueue(client, queuePath) {
-                        repeat(iterCount) {
-                            semaphore.withLock { dequeuedData += dequeue().asString }
-                        }
+                withDistributedPriorityQueue(client, queuePath) {
+                    repeat(iterCount) {
+                        semaphore.withLock { dequeuedData += dequeue().asString }
                     }
                 }
             }
@@ -128,10 +126,8 @@ class DistributedPriorityQueueTest {
 
             repeat(threadCount) {
                 thread(latch) {
-                    connectToEtcd(urls) { client ->
-                        withDistributedPriorityQueue(client, queuePath) {
-                            repeat(iterCount / threadCount) { dequeuedData += dequeue().asString }
-                        }
+                    withDistributedPriorityQueue(client, queuePath) {
+                        repeat(iterCount / threadCount) { dequeuedData += dequeue().asString }
                     }
                 }
             }
@@ -182,11 +178,9 @@ class DistributedPriorityQueueTest {
 
             repeat(threadCount) {
                 thread(latch) {
-                    connectToEtcd(urls) { client ->
-                        semaphore.withLock {
-                            withDistributedPriorityQueue(client, queuePath) {
-                                repeat(iterCount / threadCount) { dequeuedData += dequeue().asString }
-                            }
+                    withDistributedPriorityQueue(client, queuePath) {
+                        repeat(iterCount / threadCount) {
+                            semaphore.withLock { dequeuedData += dequeue().asString }
                         }
                     }
                 }
@@ -217,11 +211,9 @@ class DistributedPriorityQueueTest {
         // Prime the queue with a value
         connectToEtcd(urls) { client ->
             withDistributedPriorityQueue(client, queuePath) { enqueue(token, 1u) }
-        }
 
-        repeat(threadCount) {
-            thread(latch) {
-                connectToEtcd(urls) { client ->
+            repeat(threadCount) {
+                thread(latch) {
                     withDistributedPriorityQueue(client, queuePath) {
                         repeat(iterCount) {
                             val v = dequeue().asString
@@ -232,11 +224,9 @@ class DistributedPriorityQueueTest {
                     }
                 }
             }
-        }
 
-        latch.await()
+            latch.await()
 
-        connectToEtcd(urls) { client ->
             withDistributedPriorityQueue(client, queuePath) {
                 val v = dequeue().asString
                 v shouldEqual token

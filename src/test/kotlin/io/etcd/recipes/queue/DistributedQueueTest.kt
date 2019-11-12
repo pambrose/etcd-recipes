@@ -70,10 +70,8 @@ class DistributedQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
 
             thread(latch) {
-                connectToEtcd(urls) { client ->
-                    withDistributedQueue(client, queuePath) {
-                        repeat(iterCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
-                    }
+                withDistributedQueue(client, queuePath) {
+                    repeat(iterCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
                 }
             }
 
@@ -131,10 +129,8 @@ class DistributedQueueTest {
 
             repeat(threadCount) {
                 thread(latch) {
-                    connectToEtcd(urls) { client ->
-                        withDistributedQueue(client, queuePath) {
-                            repeat(iterCount / threadCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
-                        }
+                    withDistributedQueue(client, queuePath) {
+                        repeat(iterCount / threadCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
                     }
                 }
             }
@@ -185,12 +181,8 @@ class DistributedQueueTest {
 
             repeat(threadCount) {
                 thread(latch) {
-                    semaphore.withLock {
-                        withDistributedQueue(client, queuePath) {
-                            repeat(iterCount / threadCount) {
-                                dequeuedData += dequeue().asString
-                            }
-                        }
+                    withDistributedQueue(client, queuePath) {
+                        repeat(iterCount / threadCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
                     }
                 }
             }
@@ -226,11 +218,9 @@ class DistributedQueueTest {
         // Prime the queue with a value
         connectToEtcd(urls) { client ->
             withDistributedQueue(client, queuePath) { enqueue(token) }
-        }
 
-        repeat(threadCount) {
-            thread(latch) {
-                connectToEtcd(urls) { client ->
+            repeat(threadCount) {
+                thread(latch) {
                     withDistributedQueue(client, queuePath) {
                         repeat(iterCount) {
                             val v = dequeue().asString
@@ -241,11 +231,9 @@ class DistributedQueueTest {
                     }
                 }
             }
-        }
 
-        latch.await()
+            latch.await()
 
-        connectToEtcd(urls) { client ->
             withDistributedQueue(client, queuePath) {
                 val v = dequeue().asString
                 v shouldEqual token
