@@ -48,14 +48,14 @@ class SerialLeaderSelectorTests {
 
         val leadershipAction = { selector: LeaderSelector ->
             val pause = 3.random.seconds
-            logger.info { "${selector.clientId} elected leader for $pause" }
+            logger.debug { "${selector.clientId} elected leader for $pause" }
             sleep(pause)
             takeLeadershiptCounter.incrementAndGet()
             Unit
         }
 
         val relinquishAction = { selector: LeaderSelector ->
-            logger.info { "${selector.clientId} relinquished" }
+            logger.debug { "${selector.clientId} relinquished" }
             relinquishLeadershiptCounter.incrementAndGet()
             Unit
         }
@@ -63,7 +63,7 @@ class SerialLeaderSelectorTests {
         connectToEtcd(urls) { client ->
             withLeaderSelector(client, path, leadershipAction, relinquishAction) {
                 repeat(count) {
-                    logger.info { "First iteration: $it" }
+                    logger.debug { "First iteration: $it" }
                     start()
                     waitOnLeadershipComplete()
                 }
@@ -79,7 +79,7 @@ class SerialLeaderSelectorTests {
 
         connectToEtcd(urls) { client ->
             repeat(count) {
-                logger.info { "Second iteration: $it" }
+                logger.debug { "Second iteration: $it" }
                 withLeaderSelector(client, path, leadershipAction, relinquishAction) {
                     start()
                     waitOnLeadershipComplete()

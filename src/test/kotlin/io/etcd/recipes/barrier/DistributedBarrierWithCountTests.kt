@@ -56,22 +56,22 @@ class DistributedBarrierWithCountTests {
         fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
 
             sleep(5.random.seconds)
-            logger.info { "#$id Waiting on barrier" }
+            logger.debug { "#$id Waiting on barrier" }
 
             repeat(retryCount) {
                 barrier.waitOnBarrier(1.seconds)
-                logger.info { "#$id Timed out waiting on barrier, waiting again" }
+                logger.debug { "#$id Timed out waiting on barrier, waiting again" }
                 retryCounter.incrementAndGet()
             }
 
             retryLatch.countDown()
 
-            logger.info { "#$id Waiter count = ${barrier.waiterCount}" }
+            logger.debug { "#$id Waiter count = ${barrier.waiterCount}" }
             barrier.waitOnBarrier()
 
             advancedCounter.incrementAndGet()
 
-            logger.info { "#$id Done waiting on barrier" }
+            logger.debug { "#$id Done waiting on barrier" }
         }
 
         connectToEtcd(urls) { client ->
@@ -102,7 +102,7 @@ class DistributedBarrierWithCountTests {
         retryCounter.get() shouldEqual retryAttempts * (count - 1)
         advancedCounter.get() shouldEqual count
 
-        logger.info { "Done" }
+        logger.debug { "Done" }
     }
 
     companion object : KLogging()

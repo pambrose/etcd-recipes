@@ -29,7 +29,6 @@ import io.etcd.recipes.barrier.DistributedBarrierWithCount.Companion.defaultClie
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.deleteOp
@@ -45,6 +44,7 @@ import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.withPrefix
 import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -168,7 +168,7 @@ constructor(client: Client,
                 } else {
                     // Watch for DELETE of /ready and PUTS on /waiters/*
                     val trailingKey = barrierPath.ensureSuffix("/")
-                    val watchOption = watchOption { withPrefix(trailingKey.asByteSequence) }
+                    val watchOption = watchOption { withPrefix(trailingKey) }
                     client.withWatcher(trailingKey,
                                        watchOption,
                                        { watchResponse ->

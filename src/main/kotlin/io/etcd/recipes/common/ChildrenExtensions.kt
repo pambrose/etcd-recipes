@@ -30,7 +30,7 @@ fun Client.getChildren(keyName: String,
                        target: GetOption.SortTarget = GetOption.SortTarget.KEY,
                        order: SortOrder = SortOrder.ASCEND,
                        keysOnly: Boolean = false): List<Pair<String, ByteSequence>> {
-    val trailingKey = keyName.ensureSuffix("/").asByteSequence
+    val trailingKey = keyName.ensureSuffix("/")
     val getOption =
         getOption {
             withPrefix(trailingKey)
@@ -47,10 +47,12 @@ fun Client.getFirstChild(keyName: String, target: GetOption.SortTarget): GetResp
 fun Client.getLastChild(keyName: String, target: GetOption.SortTarget): GetResponse =
     getSingleChild(keyName, target, SortOrder.DESCEND)
 
+fun GetOption.Builder.withPrefix(prefix: String): GetOption.Builder = withPrefix(prefix.asByteSequence)
+
 private fun Client.getSingleChild(keyName: String,
                                   target: GetOption.SortTarget,
                                   order: SortOrder): GetResponse {
-    val trailingKey = keyName.ensureSuffix("/").asByteSequence
+    val trailingKey = keyName.ensureSuffix("/")
     val getOption =
         getOption {
             withPrefix(trailingKey)
@@ -84,7 +86,7 @@ fun Client.deleteChildren(keyName: String): List<String> {
 
 // Count children keys
 fun Client.getChildCount(keyName: String): Long {
-    val trailingKey = keyName.ensureSuffix("/").asByteSequence
+    val trailingKey = keyName.ensureSuffix("/")
     val getOption: GetOption =
         getOption {
             withPrefix(trailingKey)

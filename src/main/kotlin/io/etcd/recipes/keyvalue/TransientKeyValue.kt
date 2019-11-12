@@ -78,11 +78,11 @@ constructor(client: Client,
         executor.execute {
             try {
                 val leaseTtl = leaseTtlSecs.seconds
-                logger.info { "$leaseTtl keep-alive started for $clientId $keyPath" }
+                logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
                 client.putValueWithKeepAlive(keyPath, keyValue, leaseTtl) {
                     keepAliveStartedLatch.countDown()
                     keepAliveWaitLatch.await()
-                    logger.info { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
+                    logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
                 }
             } catch (e: Throwable) {
                 logger.error(e) { "In start()" }
