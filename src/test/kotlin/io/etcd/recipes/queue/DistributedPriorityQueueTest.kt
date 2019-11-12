@@ -68,9 +68,11 @@ class DistributedPriorityQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
 
             thread(latch) {
-                withDistributedPriorityQueue(client, queuePath) {
-                    repeat(iterCount) {
-                        semaphore.withLock { dequeuedData += dequeue().asString }
+                semaphore.withLock {
+                    withDistributedPriorityQueue(client, queuePath) {
+                        repeat(iterCount) {
+                            dequeuedData += dequeue().asString
+                        }
                     }
                 }
             }
@@ -180,9 +182,11 @@ class DistributedPriorityQueueTest {
 
             repeat(threadCount) {
                 thread(latch) {
-                    withDistributedPriorityQueue(client, queuePath) {
-                        repeat(iterCount / threadCount) {
-                            semaphore.withLock { dequeuedData += dequeue().asString }
+                    semaphore.withLock {
+                        withDistributedPriorityQueue(client, queuePath) {
+                            repeat(iterCount / threadCount) {
+                                dequeuedData += dequeue().asString
+                            }
                         }
                     }
                 }

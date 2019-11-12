@@ -70,8 +70,10 @@ class DistributedQueueTest {
             client.getChildCount(queuePath) shouldEqual 0
 
             thread(latch) {
-                withDistributedQueue(client, queuePath) {
-                    repeat(iterCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
+                semaphore.withLock {
+                    withDistributedQueue(client, queuePath) {
+                        repeat(iterCount) { dequeuedData += dequeue().asString }
+                    }
                 }
             }
 
@@ -183,8 +185,10 @@ class DistributedQueueTest {
 
             repeat(threadCount) {
                 thread(latch) {
-                    withDistributedQueue(client, queuePath) {
-                        repeat(iterCount / threadCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
+                    semaphore.withLock {
+                        withDistributedQueue(client, queuePath) {
+                            repeat(iterCount / threadCount) { dequeuedData += dequeue().asString }
+                        }
                     }
                 }
             }
