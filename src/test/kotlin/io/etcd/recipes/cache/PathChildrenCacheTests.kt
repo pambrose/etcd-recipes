@@ -72,6 +72,7 @@ class PathChildrenCacheTests {
         val initCount = AtomicInteger(0)
 
         connectToEtcd(urls) { client ->
+
             // Clear leftover data
             client.deleteChildren(path)
             client.getChildCount(path) shouldEqual 0
@@ -190,6 +191,7 @@ class PathChildrenCacheTests {
 
         connectToEtcd(urls) { client ->
 
+            // Clear leftover data
             client.deleteChildren(path)
             client.getChildCount(path) shouldEqual 0
 
@@ -246,6 +248,7 @@ class PathChildrenCacheTests {
         val kvs = generateTestData(count)
 
         connectToEtcd(urls) { client ->
+
             withPathChildrenCache(client, path) {
                 start(false)
 

@@ -52,7 +52,6 @@ public class LeaderSelectorExample {
                 };
 
         try (Client client = connectToEtcd(urls)) {
-
             System.out.println("Single leader is created and repeatedly runs for election");
             try (LeaderSelector selector = new LeaderSelector(client, electionPath, listener)) {
                 for (int i = 0; i < count; i++) {

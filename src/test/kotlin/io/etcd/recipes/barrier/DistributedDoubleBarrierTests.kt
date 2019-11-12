@@ -102,21 +102,20 @@ class DistributedDoubleBarrierTests {
             doneLatch.countDown()
         }
 
-        // Clean up leftover children
-        connectToEtcd(urls) { client -> client.deleteChildren(path) }
+        connectToEtcd(urls) { client ->
 
-        val (finishedLatch, holder) =
-            nonblockingThreads(count - 1) { i ->
-                connectToEtcd(urls) { client ->
+            // Clean up leftover children
+            client.deleteChildren(path)
+
+            val (finishedLatch, holder) =
+                nonblockingThreads(count - 1) { i ->
                     withDistributedDoubleBarrier(client, path, count) {
                         enterBarrier(i, this, retryAttempts)
                         sleep(5.random.seconds)
                         leaveBarrier(i, this, retryAttempts)
                     }
                 }
-            }
 
-        connectToEtcd(urls) { client ->
             withDistributedDoubleBarrier(client, path, count) {
                 enterLatch.await()
                 sleep(2.seconds)
@@ -130,12 +129,12 @@ class DistributedDoubleBarrierTests {
                 leaveWaiterCount.toInt() shouldEqual count - 1
                 leaveBarrier(99, this)
             }
+
+            doneLatch.await()
+
+            finishedLatch.await()
+            holder.checkForException()
         }
-
-        doneLatch.await()
-
-        finishedLatch.await()
-        holder.checkForException()
 
         enterRetryCounter.get() shouldEqual retryAttempts * (count - 1)
         enterCounter.get() shouldEqual count

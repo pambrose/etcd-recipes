@@ -42,35 +42,33 @@ class ParticipantTests {
         val participantCounts: MutableList<Int> = synchronizedList(mutableListOf())
         val leaderNames: MutableList<String> = synchronizedList(mutableListOf())
 
-        blockingThreads(count) {
-            thread(finishedLatch) {
-                connectToEtcd(urls) { client ->
+        connectToEtcd(urls) { client ->
+            blockingThreads(count) {
+                thread(finishedLatch) {
                     withLeaderSelector(client,
                                        path,
                                        object : LeaderSelectorListenerAdapter() {
-                                       override fun takeLeadership(selector: LeaderSelector) {
-                                           val pause = 2.seconds
-                                           logger.debug { "${selector.clientId} elected leader for $pause" }
-                                           sleep(pause)
+                                           override fun takeLeadership(selector: LeaderSelector) {
+                                               val pause = 2.seconds
+                                               logger.debug { "${selector.clientId} elected leader for $pause" }
+                                               sleep(pause)
 
-                                           // Wait until participation count has been taken
-                                           holdLatch.await()
-                                           participantCounts += LeaderSelector.getParticipants(client, path).size
-                                           leaderNames += selector.clientId
-                                       }
-                                   },
+                                               // Wait until participation count has been taken
+                                               holdLatch.await()
+                                               participantCounts += LeaderSelector.getParticipants(client, path).size
+                                               leaderNames += selector.clientId
+                                           }
+                                       },
                                        clientId = "Thread$it") {
                         start()
-                            startedLatch.countDown()
+                        startedLatch.countDown()
                         waitOnLeadershipComplete()
-                        }
+                    }
                 }
             }
-        }
 
-        startedLatch.await()
+            startedLatch.await()
 
-        connectToEtcd(urls) { client ->
             // Wait for participants to register
             sleep(3.seconds)
             var particpants = LeaderSelector.getParticipants(client, path)

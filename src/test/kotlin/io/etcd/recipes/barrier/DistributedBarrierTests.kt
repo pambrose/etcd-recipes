@@ -58,8 +58,9 @@ class DistributedBarrierTests {
         val timeoutCount = AtomicInteger()
         val advancedCount = AtomicInteger()
 
-        thread(completeLatch) {
-            connectToEtcd(urls) { client ->
+        connectToEtcd(urls) { client ->
+
+            thread(completeLatch) {
 
                 withDistributedBarrier(client, path) {
 
@@ -90,11 +91,9 @@ class DistributedBarrierTests {
                     sleep(3.seconds)
                 }
             }
-        }
 
-        blockingThreads(count) { i ->
-            setBarrierLatch.await()
-            connectToEtcd(urls) { client ->
+            blockingThreads(count) { i ->
+                setBarrierLatch.await()
                 withDistributedBarrier(client, path) {
                     logger.debug { "$i Waiting on Barrier" }
                     waitOnBarrier(1.seconds)
@@ -129,9 +128,10 @@ class DistributedBarrierTests {
         val timeoutCount = AtomicInteger()
         val advancedCount = AtomicInteger()
 
-        val (finishedLatch, holder) =
-            nonblockingThreads(count) { i ->
-                connectToEtcd(urls) { client ->
+        connectToEtcd(urls) { client ->
+
+            val (finishedLatch, holder) =
+                nonblockingThreads(count) { i ->
                     withDistributedBarrier(client, path) {
                         logger.debug { "$i Waiting on Barrier" }
                         waitOnBarrier(1, TimeUnit.SECONDS)
@@ -148,11 +148,9 @@ class DistributedBarrierTests {
                         logger.debug { "$i Done Waiting on Barrier" }
                     }
                 }
-            }
 
-        sleep(5.seconds)
+            sleep(5.seconds)
 
-        connectToEtcd(urls) { client ->
             withDistributedBarrier(client, path) {
 
                 isBarrierSet() shouldEqual false
@@ -175,11 +173,11 @@ class DistributedBarrierTests {
 
                 sleep(3.seconds)
             }
+
+            finishedLatch.await()
+
+            holder.checkForException()
         }
-
-        finishedLatch.await()
-
-        holder.checkForException()
 
         timeoutCount.get() shouldEqual count
         advancedCount.get() shouldEqual count
