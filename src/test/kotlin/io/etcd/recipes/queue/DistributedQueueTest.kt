@@ -75,11 +75,13 @@ class DistributedQueueTest {
                 }
             }
 
-            sleep(2.seconds)
+            sleep(5.seconds)
 
             withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
 
             latch.await()
+
+            sleep(5.seconds)
 
             client.getChildCount(queuePath) shouldEqual 0
         }
@@ -187,7 +189,7 @@ class DistributedQueueTest {
                 }
             }
 
-            sleep(2.seconds)
+            sleep(5.seconds)
 
             withDistributedQueue(client, queuePath) {
                 repeat(iterCount) { i ->
@@ -201,6 +203,8 @@ class DistributedQueueTest {
 
             client.getChildCount(queuePath) shouldEqual 0
         }
+
+        sleep(5.seconds)
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }

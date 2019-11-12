@@ -122,7 +122,7 @@ class DistributedPriorityQueueTest {
 
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
-            sleep(2.seconds)
+            sleep(5.seconds)
 
             repeat(threadCount) {
                 thread(latch) {
@@ -136,6 +136,8 @@ class DistributedPriorityQueueTest {
 
             client.getChildCount(queuePath) shouldEqual 0
         }
+
+        sleep(5.seconds)
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -186,11 +188,13 @@ class DistributedPriorityQueueTest {
                 }
             }
 
-            //sleep(2.seconds)
+            sleep(5.seconds)
 
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
             latch.await()
+
+            sleep(5.seconds)
 
             client.getChildCount(queuePath) shouldEqual 0
         }
