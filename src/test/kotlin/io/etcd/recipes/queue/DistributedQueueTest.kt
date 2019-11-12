@@ -63,7 +63,6 @@ class DistributedQueueTest {
         val queuePath = "/queue/serialTestWithWait"
         val dequeuedData = synchronizedList(mutableListOf<String>())
         val latch = CountDownLatch(1)
-        val semaphore = Semaphore(1)
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)

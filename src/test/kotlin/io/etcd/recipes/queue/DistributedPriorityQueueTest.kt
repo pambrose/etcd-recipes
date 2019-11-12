@@ -62,7 +62,6 @@ class DistributedPriorityQueueTest {
         val queuePath = "/queue/serialTestWithWait"
         val dequeuedData = mutableListOf<String>()
         val latch = CountDownLatch(1)
-        val semaphore = Semaphore(1)
 
         connectToEtcd(urls) { client ->
             client.getChildCount(queuePath) shouldEqual 0
