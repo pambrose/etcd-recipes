@@ -20,6 +20,7 @@ package io.etcd.recipes.queue
 
 import com.sudothought.common.concurrent.thread
 import com.sudothought.common.concurrent.withLock
+import com.sudothought.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -32,6 +33,7 @@ import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.seconds
 
 class DistributedPriorityQueueTest {
     val iterCount = 500
@@ -122,7 +124,7 @@ class DistributedPriorityQueueTest {
 
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
-            //sleep(2.seconds)
+            sleep(2.seconds)
 
             repeat(threadCount) {
                 thread(latch) {
@@ -181,8 +183,10 @@ class DistributedPriorityQueueTest {
             repeat(threadCount) {
                 thread(latch) {
                     connectToEtcd(urls) { client ->
-                        withDistributedPriorityQueue(client, queuePath) {
-                            repeat(iterCount / threadCount) { semaphore.withLock { dequeuedData += dequeue().asString } }
+                        semaphore.withLock {
+                            withDistributedPriorityQueue(client, queuePath) {
+                                repeat(iterCount / threadCount) { dequeuedData += dequeue().asString }
+                            }
                         }
                     }
                 }

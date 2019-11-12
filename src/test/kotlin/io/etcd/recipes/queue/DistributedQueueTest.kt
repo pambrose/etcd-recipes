@@ -127,6 +127,8 @@ class DistributedQueueTest {
 
             withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
 
+            sleep(2.seconds)
+
             repeat(threadCount) {
                 thread(latch) {
                     connectToEtcd(urls) { client ->
@@ -183,9 +185,11 @@ class DistributedQueueTest {
 
             repeat(threadCount) {
                 thread(latch) {
-                    withDistributedQueue(client, queuePath) {
-                        repeat(iterCount / threadCount) {
-                            semaphore.withLock { dequeuedData += dequeue().asString }
+                    semaphore.withLock {
+                        withDistributedQueue(client, queuePath) {
+                            repeat(iterCount / threadCount) {
+                                dequeuedData += dequeue().asString
+                            }
                         }
                     }
                 }
