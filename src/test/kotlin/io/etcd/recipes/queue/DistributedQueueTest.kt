@@ -72,16 +72,16 @@ class DistributedQueueTest {
                 }
             }
 
-            sleep(5.seconds)
+            //sleep(5.seconds)
 
             withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
 
             latch.await()
 
-            sleep(5.seconds)
-
             client.getChildCount(queuePath) shouldEqual 0
         }
+
+        sleep(5.seconds)
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -121,15 +121,15 @@ class DistributedQueueTest {
 
             withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
 
-            sleep(2.seconds)
+            //sleep(5.seconds)
 
             repeat(threadCount) {
                 thread(latch) {
                     withDistributedQueue(client, queuePath) {
                         repeat(iterCount / threadCount) {
-                            //synchronized(dequeuedData) {
-                            dequeuedData += dequeue().asString
-                            //}
+                            synchronized(dequeuedData) {
+                                dequeuedData += dequeue().asString
+                            }
                         }
                     }
                 }
@@ -139,6 +139,8 @@ class DistributedQueueTest {
 
             client.getChildCount(queuePath) shouldEqual 0
         }
+
+        //sleep(5.seconds)
 
         dequeuedData.size shouldEqual testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
@@ -180,15 +182,15 @@ class DistributedQueueTest {
                 thread(latch) {
                     withDistributedQueue(client, queuePath) {
                         repeat(iterCount / threadCount) {
-                            //synchronized(dequeuedData) {
-                            dequeuedData += dequeue().asString
-                            //}
+                            synchronized(dequeuedData) {
+                                dequeuedData += dequeue().asString
+                            }
                         }
                     }
                 }
             }
 
-            sleep(5.seconds)
+            //sleep(5.seconds)
 
             withDistributedQueue(client, queuePath) {
                 repeat(iterCount) { i ->
