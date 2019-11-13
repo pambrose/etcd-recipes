@@ -11,6 +11,7 @@ group 'io.etcd'
 version '0.9.14'
 
 sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 jacocoTestReport {
     reports {
@@ -37,12 +38,13 @@ repositories {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinVersion}"
+    api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinVersion}"
     implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-runtime:${serializationVersion}"
-    implementation "io.etcd:jetcd-all:${jetcdVersion}"
+    api "org.jetbrains.kotlinx:kotlinx-serialization-runtime:${serializationVersion}"
+    api "io.etcd:jetcd-all:${jetcdVersion}"
+    api "com.github.pambrose:common-utils:${utilsVersion}"
     implementation "com.google.guava:guava:${guavaVersion}"
-    implementation "com.github.pambrose:common-utils:${utilsVersion}"
+
     implementation "io.github.microutils:kotlin-logging:${loggingVersion}"
     implementation "org.slf4j:slf4j-simple:${slf4jVersion}"
 
