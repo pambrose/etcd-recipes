@@ -44,6 +44,6 @@ class DistributedQueue(client: Client, queuePath: String) : AbstractQueue(client
     }
 
     companion object {
-        private val keyFormat = "%s/%0${Long.MAX_VALUE.length()}d-%s"
+        private val keyFormat = "%s/%0${Long.MAX_VALUE.length}d-%s"
     }
 }
