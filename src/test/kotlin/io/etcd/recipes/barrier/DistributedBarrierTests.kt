@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.barrier
 
-import com.sudothought.common.concurrent.thread
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.concurrent.thread
+import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd

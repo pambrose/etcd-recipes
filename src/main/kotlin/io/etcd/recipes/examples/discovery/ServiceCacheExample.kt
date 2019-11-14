@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.examples.discovery
 
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.withServiceDiscovery
 import kotlin.time.days

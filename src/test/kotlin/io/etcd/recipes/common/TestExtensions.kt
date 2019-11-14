@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.common
 
-import com.sudothought.common.concurrent.thread
+import com.github.pambrose.common.concurrent.thread
 import org.junit.jupiter.api.Assertions.fail
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread

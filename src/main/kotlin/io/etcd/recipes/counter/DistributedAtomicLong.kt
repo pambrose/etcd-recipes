@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.counter
 
-import com.sudothought.common.util.random
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.util.random
+import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse

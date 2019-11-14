@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.discovery
 
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls

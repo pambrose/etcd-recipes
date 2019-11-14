@@ -16,7 +16,7 @@
 
 package io.etcd.recipes.examples.cache
 
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.cache.withPathChildrenCache
 import io.etcd.recipes.common.asString

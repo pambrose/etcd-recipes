@@ -27,7 +27,7 @@ import kotlin.Unit;
 
 import java.util.List;
 
-import static com.sudothought.common.util.Misc.sleepSecs;
+import static com.github.pambrose.common.util.JavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.BuilderUtils.watchOption;
 import static io.etcd.recipes.common.ByteSequenceUtils.getAsByteSequence;
 import static io.etcd.recipes.common.ChildrenUtils.getChildCount;

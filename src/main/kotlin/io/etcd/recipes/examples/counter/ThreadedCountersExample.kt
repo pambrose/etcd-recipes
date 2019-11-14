@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.examples.counter
 
-import com.sudothought.common.concurrent.thread
+import com.github.pambrose.common.concurrent.thread
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.counter.DistributedAtomicLong
 import io.etcd.recipes.counter.withDistributedAtomicLong
