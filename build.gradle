@@ -38,11 +38,15 @@ repositories {
 }
 
 dependencies {
-    api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinVersion}"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinVersion}"
     implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+
     api "org.jetbrains.kotlinx:kotlinx-serialization-runtime:${serializationVersion}"
     api "io.etcd:jetcd-all:${jetcdVersion}"
+
     api "com.github.pambrose:common-utils:${utilsVersion}"
+    //api "com.github.pambrose.common-utils:base-utils:${utilsVersion}"
+    //api "com.github.pambrose.common-utils:guava-utils:${utilsVersion}"
     implementation "com.google.guava:guava:${guavaVersion}"
 
     implementation "io.github.microutils:kotlin-logging:${loggingVersion}"
