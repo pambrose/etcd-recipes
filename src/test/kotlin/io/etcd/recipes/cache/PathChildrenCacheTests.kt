@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.cache
 
-import com.sudothought.common.util.randomId
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.util.randomId
+import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCache.StartMode.POST_INITIALIZED_EVENT
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED

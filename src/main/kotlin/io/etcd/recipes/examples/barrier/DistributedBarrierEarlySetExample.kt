@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.barrier.withDistributedBarrier
 import io.etcd.recipes.common.connectToEtcd
 import java.util.concurrent.CountDownLatch

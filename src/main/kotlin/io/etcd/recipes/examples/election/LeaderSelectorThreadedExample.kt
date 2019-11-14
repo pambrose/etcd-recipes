@@ -18,9 +18,9 @@
 
 package io.etcd.recipes.examples.election
 
-import com.sudothought.common.concurrent.thread
-import com.sudothought.common.util.random
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.concurrent.thread
+import com.github.pambrose.common.util.random
+import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.election.LeaderSelector.Companion.getParticipants

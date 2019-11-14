@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.common
 
-import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
+import com.github.pambrose.common.concurrent.BooleanMonitor
+import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.Client
 import java.io.Closeable
 import java.util.Collections.synchronizedList

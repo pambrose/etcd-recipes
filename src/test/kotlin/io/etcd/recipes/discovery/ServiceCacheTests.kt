@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.discovery
 
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.captureException
