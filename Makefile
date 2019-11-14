@@ -4,7 +4,7 @@ clean:
 	./gradlew clean
 
 compile:
-	./gradlew build -x test
+	./gradlew build -xtest
 
 tests:
 	./gradlew check
