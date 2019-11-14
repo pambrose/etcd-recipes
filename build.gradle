@@ -8,9 +8,10 @@ plugins {
 }
 
 group 'io.etcd'
-version '0.9.13'
+version '0.9.14'
 
 sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 jacocoTestReport {
     reports {
@@ -23,7 +24,7 @@ def kotlinVersion = '1.3.50'
 def serializationVersion = '0.13.0'
 def jetcdVersion = '0.4.1'
 def guavaVersion = '28.1-android'
-def utilsVersion = '1.0.5'
+def utilsVersion = '1.1.1'
 def loggingVersion = '1.7.6'
 def slf4jVersion = '1.7.28'
 def kluentVersion = '1.56'
@@ -39,10 +40,14 @@ repositories {
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinVersion}"
     implementation "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-runtime:${serializationVersion}"
-    implementation "io.etcd:jetcd-all:${jetcdVersion}"
+
+    api "org.jetbrains.kotlinx:kotlinx-serialization-runtime:${serializationVersion}"
+    api "io.etcd:jetcd-all:${jetcdVersion}"
+
+    api "com.github.pambrose.common-utils:core-utils:${utilsVersion}"
+    api "com.github.pambrose.common-utils:guava-utils:${utilsVersion}"
     implementation "com.google.guava:guava:${guavaVersion}"
-    implementation "com.github.pambrose:common-utils:${utilsVersion}"
+
     implementation "io.github.microutils:kotlin-logging:${loggingVersion}"
     implementation "org.slf4j:slf4j-simple:${slf4jVersion}"
 
@@ -58,6 +63,10 @@ sourceSets {
             srcDirs 'src/main/kotlin'
         }
     }
+}
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 
 task sourcesJar(type: Jar, dependsOn: classes) {
@@ -76,17 +85,21 @@ artifacts {
 }
 
 compileKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-    kotlinOptions.freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
-                                       '-Xuse-experimental=kotlin.ExperimentalUnsignedTypes',
-                                       '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
+    kotlinOptions {
+        jvmTarget = "1.8"
+        freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
+                             '-Xuse-experimental=kotlin.ExperimentalUnsignedTypes',
+                             '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
+    }
 }
 
 compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-    kotlinOptions.freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
-                                       '-Xuse-experimental=kotlin.ExperimentalUnsignedTypes',
-                                       '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
+    kotlinOptions {
+        jvmTarget = "1.8"
+        freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
+                             '-Xuse-experimental=kotlin.ExperimentalUnsignedTypes',
+                             '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
+    }
 }
 
 test {

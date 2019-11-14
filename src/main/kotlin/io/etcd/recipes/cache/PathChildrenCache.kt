@@ -18,9 +18,9 @@
 
 package io.etcd.recipes.cache
 
+import com.github.pambrose.common.delegate.AtomicDelegates.nullableReference
+import com.github.pambrose.common.time.timeUnitToDuration
 import com.google.common.collect.Maps.newConcurrentMap
-import com.sudothought.common.delegate.AtomicDelegates.nullableReference
-import com.sudothought.common.time.timeUnitToDuration
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch

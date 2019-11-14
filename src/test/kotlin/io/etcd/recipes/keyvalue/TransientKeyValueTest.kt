@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.keyvalue
 
-import com.sudothought.common.util.randomId
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.util.randomId
+import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount

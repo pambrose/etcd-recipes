@@ -18,11 +18,11 @@
 
 package io.etcd.recipes.election
 
-import com.sudothought.common.concurrent.BooleanMonitor
-import com.sudothought.common.delegate.AtomicDelegates.atomicBoolean
-import com.sudothought.common.time.timeUnitToDuration
-import com.sudothought.common.util.randomId
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.concurrent.BooleanMonitor
+import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
+import com.github.pambrose.common.time.timeUnitToDuration
+import com.github.pambrose.common.util.randomId
+import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT

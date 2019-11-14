@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.barrier
 
-import com.sudothought.common.time.timeUnitToDuration
-import com.sudothought.common.util.randomId
+import com.github.pambrose.common.time.timeUnitToDuration
+import com.github.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength

@@ -18,9 +18,9 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.sudothought.common.concurrent.thread
-import com.sudothought.common.util.repeatWithSleep
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.concurrent.thread
+import com.github.pambrose.common.util.repeatWithSleep
+import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.watch.WatchResponse
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd

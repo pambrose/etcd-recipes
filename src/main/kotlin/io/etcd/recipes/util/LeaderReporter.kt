@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.util
 
-import com.sudothought.common.util.sleep
+import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.election.LeaderListener
 import io.etcd.recipes.election.LeaderSelector
 import java.util.concurrent.Executors

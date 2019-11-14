@@ -53,7 +53,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.pambrose:etcd-recipes:0.9.3"
+    implementation "com.github.pambrose:etcd-recipes:0.9.14"
 }
 ```
 

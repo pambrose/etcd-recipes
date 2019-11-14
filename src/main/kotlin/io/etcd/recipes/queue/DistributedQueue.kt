@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.queue
 
-import com.sudothought.common.util.length
-import com.sudothought.common.util.randomId
+import com.github.pambrose.common.util.length
+import com.github.pambrose.common.util.randomId
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.GetOption.SortTarget
@@ -44,6 +44,6 @@ class DistributedQueue(client: Client, queuePath: String) : AbstractQueue(client
     }
 
     companion object {
-        private val keyFormat = "%s/%0${Long.MAX_VALUE.length()}d-%s"
+        private val keyFormat = "%s/%0${Long.MAX_VALUE.length}d-%s"
     }
 }
