@@ -32,37 +32,37 @@ import static java.lang.String.format;
 
 public class ServiceCacheExample {
 
-    public static void main(String[] args) throws EtcdRecipeException {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        CountDownLatch latch = new CountDownLatch(1);
+  public static void main(String[] args) throws EtcdRecipeException {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    CountDownLatch latch = new CountDownLatch(1);
 
-        executor.submit(() -> {
-            try (Client client = connectToEtcd(urls);
-                 ServiceDiscovery sd = new ServiceDiscovery(client, ServiceDiscoveryExample.path);
-                 ServiceCache cache = sd.serviceCache(ServiceDiscoveryExample.serviceName)) {
-                cache.addListenerForChanges(
-                        (eventType, isAdd, name, serviceInstance) -> {
-                            String action = isAdd ? "added" : "updated";
-                            System.out.println(format("Change %s %s %s", eventType, action, name));
-                            if (serviceInstance != null)
-                                System.out.println("Payload = " + IntPayload.toObject(serviceInstance.getJsonPayload()));
-                            //System.out.println(cache.getInstances());
-                        }
-                );
-
-                cache.start();
-
-                try {
-                    latch.await();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+    executor.submit(() -> {
+      try (Client client = connectToEtcd(urls);
+           ServiceDiscovery sd = new ServiceDiscovery(client, ServiceDiscoveryExample.path);
+           ServiceCache cache = sd.serviceCache(ServiceDiscoveryExample.serviceName)) {
+        cache.addListenerForChanges(
+            (eventType, isAdd, name, serviceInstance) -> {
+              String action = isAdd ? "added" : "updated";
+              System.out.println(format("Change %s %s %s", eventType, action, name));
+              if (serviceInstance != null)
+                System.out.println("Payload = " + IntPayload.toObject(serviceInstance.getJsonPayload()));
+              //System.out.println(cache.getInstances());
             }
-        });
+        );
 
-        ServiceDiscoveryExample.serviceExample(false);
-        latch.countDown();
-        sleepSecs(1);
-        executor.shutdown();
-    }
+        cache.start();
+
+        try {
+          latch.await();
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+    });
+
+    ServiceDiscoveryExample.serviceExample(false);
+    latch.countDown();
+    sleepSecs(1);
+    executor.shutdown();
+  }
 }

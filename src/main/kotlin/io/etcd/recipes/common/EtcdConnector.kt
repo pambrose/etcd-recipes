@@ -49,7 +49,7 @@ open class EtcdConnector(val client: Client) : Closeable {
 
     @Synchronized
     override fun close() {
-            closeCalled = true
+        closeCalled = true
     }
 
     companion object {

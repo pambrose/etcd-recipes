@@ -30,52 +30,52 @@ import static java.lang.String.format;
 
 public class LeaderSelectorExample {
 
-    public static void main(String[] args) throws InterruptedException {
-        List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String electionPath = "/election/LeaderSelectorExample";
-        int count = 5;
+  public static void main(String[] args) throws InterruptedException {
+    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    String electionPath = "/election/LeaderSelectorExample";
+    int count = 5;
 
-        LeaderSelectorListener listener =
-                new LeaderSelectorListener() {
-                    @Override
-                    public void takeLeadership(LeaderSelector selector) {
-                        System.out.println(selector.getClientId() + " elected leader");
-                        long pause = random(5);
-                        sleepSecs(pause);
-                        System.out.println(format("%s surrendering after %s seconds", selector.getClientId(), pause));
-                    }
+    LeaderSelectorListener listener =
+        new LeaderSelectorListener() {
+          @Override
+          public void takeLeadership(LeaderSelector selector) {
+            System.out.println(selector.getClientId() + " elected leader");
+            long pause = random(5);
+            sleepSecs(pause);
+            System.out.println(format("%s surrendering after %s seconds", selector.getClientId(), pause));
+          }
 
-                    @Override
-                    public void relinquishLeadership(LeaderSelector selector) {
-                        System.out.println(format("%s relinquished leadership", selector.getClientId()));
-                    }
-                };
+          @Override
+          public void relinquishLeadership(LeaderSelector selector) {
+            System.out.println(format("%s relinquished leadership", selector.getClientId()));
+          }
+        };
 
-        try (Client client = connectToEtcd(urls)) {
-            System.out.println("Single leader is created and repeatedly runs for election");
-            try (LeaderSelector selector = new LeaderSelector(client, electionPath, listener)) {
-                for (int i = 0; i < count; i++) {
-                    selector.start();
+    try (Client client = connectToEtcd(urls)) {
+      System.out.println("Single leader is created and repeatedly runs for election");
+      try (LeaderSelector selector = new LeaderSelector(client, electionPath, listener)) {
+        for (int i = 0; i < count; i++) {
+          selector.start();
 
-                    selector.waitOnLeadershipComplete();
-                }
-            }
-
-            System.out.println("\nMultiple leaders are created and each runs for election once");
-            List<LeaderSelector> selectors = Lists.newArrayList();
-            for (int i = 0; i < count; i++)
-                selectors.add(new LeaderSelector(client, electionPath, listener));
-
-            for (LeaderSelector selector : selectors)
-                selector.start();
-
-            System.out.println(format("Participants: %s", LeaderSelector.getParticipants(client, electionPath)));
-
-            for (LeaderSelector selector : selectors)
-                selector.waitOnLeadershipComplete();
-
-            for (LeaderSelector selector : selectors)
-                selector.close();
+          selector.waitOnLeadershipComplete();
         }
+      }
+
+      System.out.println("\nMultiple leaders are created and each runs for election once");
+      List<LeaderSelector> selectors = Lists.newArrayList();
+      for (int i = 0; i < count; i++)
+        selectors.add(new LeaderSelector(client, electionPath, listener));
+
+      for (LeaderSelector selector : selectors)
+        selector.start();
+
+      System.out.println(format("Participants: %s", LeaderSelector.getParticipants(client, electionPath)));
+
+      for (LeaderSelector selector : selectors)
+        selector.waitOnLeadershipComplete();
+
+      for (LeaderSelector selector : selectors)
+        selector.close();
     }
+  }
 }

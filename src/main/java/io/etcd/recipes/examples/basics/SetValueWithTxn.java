@@ -32,31 +32,31 @@ import static io.etcd.recipes.common.TxnUtils.transaction;
 import static java.lang.String.format;
 
 public class SetValueWithTxn {
-    private static final List<String> urls = Lists.newArrayList("http://localhost:2379");
-    private static final String path = "/txnexample";
-    private static final String keyval = "foobar";
+  private static final List<String> urls = Lists.newArrayList("http://localhost:2379");
+  private static final String path = "/txnexample";
+  private static final String keyval = "foobar";
 
-    public static void main(String[] args) {
-        try (Client client = connectToEtcd(urls)) {
-            System.out.println("Deleting keys");
-            deleteKeys(client, path, keyval);
+  public static void main(String[] args) {
+    try (Client client = connectToEtcd(urls)) {
+      System.out.println("Deleting keys");
+      deleteKeys(client, path, keyval);
 
-            System.out.println(format("Key present: %s", isKeyPresent(client, keyval)));
-            checkForKey(client);
-            System.out.println(format("Key present: %s", isKeyPresent(client, keyval)));
-            putValue(client, path, "Something");
-            checkForKey(client);
-        }
+      System.out.println(format("Key present: %s", isKeyPresent(client, keyval)));
+      checkForKey(client);
+      System.out.println(format("Key present: %s", isKeyPresent(client, keyval)));
+      putValue(client, path, "Something");
+      checkForKey(client);
     }
+  }
 
-    private static void checkForKey(Client client) {
-        transaction(client, (txn) -> {
-            txn.If(getDoesExist(path));
-            txn.Then(setTo(keyval, format("Key %s found", path)));
-            txn.Else(setTo(keyval, format("Key %s not found", path)));
-            return txn;
-        });
+  private static void checkForKey(Client client) {
+    transaction(client, (txn) -> {
+      txn.If(getDoesExist(path));
+      txn.Then(setTo(keyval, format("Key %s found", path)));
+      txn.Else(setTo(keyval, format("Key %s not found", path)));
+      return txn;
+    });
 
-        System.out.println(format("Debug value: %s", getValue(client, keyval, "not_used")));
-    }
+    System.out.println(format("Debug value: %s", getValue(client, keyval, "not_used")));
+  }
 }

@@ -41,70 +41,70 @@ import static java.lang.String.format;
 
 public class WatchKeyRange {
 
-    public static void main(String[] args) {
-        List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String path = "/watchkeyrange";
+  public static void main(String[] args) {
+    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    String path = "/watchkeyrange";
 
-        ByteSequence pathBS = getAsByteSequence(path);
-        WatchOption watchOption = watchOption((WatchOption.Builder builder) -> builder.withPrefix(pathBS));
+    ByteSequence pathBS = getAsByteSequence(path);
+    WatchOption watchOption = watchOption((WatchOption.Builder builder) -> builder.withPrefix(pathBS));
 
-        try (Client client = connectToEtcd(urls);
-             Watcher watcher =
-                     watcher(client,
-                             path,
-                             watchOption,
-                             (watchResponse) -> {
-                                 watchResponse.getEvents().forEach((event) ->
-                                         System.out.println(format("%s for %s",
-                                                 event.getEventType(),
-                                                 getAsString(event.getKeyValue())
-                                         )));
-                                 return Unit.INSTANCE;
-                             })) {
+    try (Client client = connectToEtcd(urls);
+         Watcher watcher =
+             watcher(client,
+                 path,
+                 watchOption,
+                 (watchResponse) -> {
+                   watchResponse.getEvents().forEach((event) ->
+                       System.out.println(format("%s for %s",
+                           event.getEventType(),
+                           getAsString(event.getKeyValue())
+                       )));
+                   return Unit.INSTANCE;
+                 })) {
 
-            // Create empty root
-            putValue(client, path, "root");
+      // Create empty root
+      putValue(client, path, "root");
 
-            System.out.println("After creation:");
-            System.out.println(getAsString(getChildren(client, path)));
-            System.out.println(getChildCount(client, path));
+      System.out.println("After creation:");
+      System.out.println(getAsString(getChildren(client, path)));
+      System.out.println(getChildCount(client, path));
 
-            sleepSecs(5);
+      sleepSecs(5);
 
-            // Add children
-            putValue(client, path + "/election/a", "a");
-            putValue(client, path + "/election/b", "bb");
-            putValue(client, path + "/waiting/c", "ccc");
-            putValue(client, path + "/waiting/d", "dddd");
+      // Add children
+      putValue(client, path + "/election/a", "a");
+      putValue(client, path + "/election/b", "bb");
+      putValue(client, path + "/waiting/c", "ccc");
+      putValue(client, path + "/waiting/d", "dddd");
 
-            System.out.println("\nAfter putValues:");
-            System.out.println(getAsString(getChildren(client, path)));
-            System.out.println(getChildCount(client, path));
+      System.out.println("\nAfter putValues:");
+      System.out.println(getAsString(getChildren(client, path)));
+      System.out.println(getChildCount(client, path));
 
-            System.out.println("\nElections only:");
-            System.out.println(getAsString(getChildren(client, path + "/election")));
-            System.out.println(getChildCount(client, path + "/election"));
+      System.out.println("\nElections only:");
+      System.out.println(getAsString(getChildren(client, path + "/election")));
+      System.out.println(getChildCount(client, path + "/election"));
 
-            System.out.println("\nWaitings only:");
-            System.out.println(getAsString(getChildren(client, path + "/waiting")));
-            System.out.println(getChildCount(client, path + "/waiting"));
+      System.out.println("\nWaitings only:");
+      System.out.println(getAsString(getChildren(client, path + "/waiting")));
+      System.out.println(getChildCount(client, path + "/waiting"));
 
-            sleepSecs(5);
+      sleepSecs(5);
 
-            // Delete root
-            KVUtils.deleteKey(client, path);
+      // Delete root
+      KVUtils.deleteKey(client, path);
 
-            // Delete children
-            ChildrenUtils.getChildrenKeys(client, path).forEach((keyName) -> {
-                System.out.println(format("Deleting key: %s", keyName));
-                KVUtils.deleteKey(client, keyName);
-            });
+      // Delete children
+      ChildrenUtils.getChildrenKeys(client, path).forEach((keyName) -> {
+        System.out.println(format("Deleting key: %s", keyName));
+        KVUtils.deleteKey(client, keyName);
+      });
 
-            System.out.println("\nAfter delete:");
-            System.out.println(getAsString(getChildren(client, path)));
-            System.out.println(getChildCount(client, path));
+      System.out.println("\nAfter delete:");
+      System.out.println(getAsString(getChildren(client, path)));
+      System.out.println(getChildCount(client, path));
 
-            sleepSecs(5);
-        }
+      sleepSecs(5);
     }
+  }
 }
