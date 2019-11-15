@@ -6,6 +6,8 @@ clean:
 compile:
 	./gradlew build -xtest
 
+build: compile
+
 tests:
 	./gradlew check
 
