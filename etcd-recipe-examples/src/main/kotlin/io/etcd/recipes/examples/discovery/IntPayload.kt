@@ -20,7 +20,6 @@ package io.etcd.recipes.examples.discovery
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
 
 @Serializable
 data class IntPayload(var intval: Int) {
@@ -28,7 +27,7 @@ data class IntPayload(var intval: Int) {
 
     companion object {
         @JvmStatic
-        fun toObject(json: String): IntPayload = Json.parse(serializer(), json)
+        fun toObject(json: String) = Json.parse(serializer(), json)
     }
 }
 

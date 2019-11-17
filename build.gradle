@@ -18,6 +18,7 @@ allprojects {
 
 subprojects {
   apply plugin: 'org.jetbrains.kotlin.jvm'
+  apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
   apply plugin: 'com.github.ben-manes.versions'
 
   group 'com.github.pambrose.etcd-recipes'
@@ -49,10 +50,8 @@ subprojects {
         reflect       : "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}",
         serialization : "org.jetbrains.kotlinx:kotlinx-serialization-runtime:${serializationVersion}",
 
-        guava         : "com.google.guava:guava:${guavaVersion}",
-
         jetcd         : "io.etcd:jetcd-all:${jetcdVersion}",
-
+        guava         : "com.google.guava:guava:${guavaVersion}",
         core_utils    : "com.github.pambrose.common-utils:core-utils:${utilsVersion}",
         guava_utils   : "com.github.pambrose.common-utils:guava-utils:${utilsVersion}",
 
@@ -60,7 +59,6 @@ subprojects {
         slf4j_simple  : "org.slf4j:slf4j-simple:${slf4jVersion}",
 
         kluent        : "org.amshove.kluent:kluent:$kluentVersion",
-
         jupiter_api   : "org.junit.jupiter:junit-jupiter-api:$junitVersion",
         jupiter_engine: "org.junit.jupiter:junit-jupiter-engine:$junitVersion"
 

@@ -23,7 +23,6 @@ import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
 import io.etcd.recipes.discovery.ServiceInstance.Companion.ServiceInstanceBuilder
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
 import java.time.Instant
 
 @Serializable
@@ -46,9 +45,8 @@ data class ServiceInstance(val name: String,
     fun toJson() = Json.stringify(serializer(), this)
 
     companion object {
-
         @JvmStatic
-        fun toObject(json: String): ServiceInstance = Json.parse(serializer(), json)
+        fun toObject(json: String) = Json.parse(serializer(), json)
 
         class ServiceInstanceBuilder(val name: String, val jsonPayload: String) {
             var address: String = ""
