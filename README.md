@@ -75,15 +75,9 @@ dependencies {
 
 <dependencies>
     <dependency>
-      <groupId>com.github.pambrose</groupId>
+      <groupId>com.github.pambrose.etcd-recipes</groupId>
       <artifactId>etcd-recipes</artifactId>
-      <version>0.9.3</version>
+      <version>0.9.17</version>
     </dependency>
 </dependencies>
-```
-
-## Running tests
-   
-```bash
-./gradlew check
 ```
