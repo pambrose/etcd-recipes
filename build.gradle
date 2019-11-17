@@ -20,7 +20,7 @@ subprojects {
   apply plugin: 'org.jetbrains.kotlin.jvm'
   apply plugin: 'com.github.ben-manes.versions'
 
-  group 'io.etcd.etcd-recipes'
+  group 'com.github.pambrose.etcd-recipes'
   version '0.9.17'
 
   sourceCompatibility = 1.8

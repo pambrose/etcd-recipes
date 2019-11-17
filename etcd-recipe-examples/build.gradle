@@ -46,7 +46,6 @@ compileKotlin {
     kotlinOptions {
         jvmTarget = "1.8"
         freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
-                             '-Xuse-experimental=kotlin.ExperimentalUnsignedTypes',
                              '-Xuse-experimental=kotlinx.serialization.ImplicitReflectionSerializer',
                              '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
     }
@@ -56,7 +55,6 @@ compileTestKotlin {
     kotlinOptions {
         jvmTarget = "1.8"
         freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
-                             '-Xuse-experimental=kotlin.ExperimentalUnsignedTypes',
                              '-Xuse-experimental=kotlinx.serialization.ImplicitReflectionSerializer',
                              '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
     }
