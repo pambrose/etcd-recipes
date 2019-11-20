@@ -42,7 +42,7 @@ class ThreadedLeaderSelectorTests {
         blockingThreads(count) {
             val takeAction =
                 { selector: LeaderSelector ->
-                    val pause = 3.random.seconds
+                    val pause = 3.random().seconds
                     logger.debug { "${selector.clientId} elected leader for $pause" }
                     takeLeadershiptCounter.incrementAndGet()
                     sleep(pause)
@@ -74,7 +74,7 @@ class ThreadedLeaderSelectorTests {
 
         val takeAction =
             { selector: LeaderSelector ->
-                val pause = 3.random.seconds
+                val pause = 3.random().seconds
                 logger.debug { "${selector.clientId} elected leader for $pause" }
                 takeLeadershiptCounter.incrementAndGet()
                 sleep(pause)

@@ -55,7 +55,7 @@ class DistributedBarrierWithCountTests {
 
         fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
 
-            sleep(5.random.seconds)
+            sleep(5.random().seconds)
             logger.debug { "#$id Waiting on barrier" }
 
             repeat(retryCount) {

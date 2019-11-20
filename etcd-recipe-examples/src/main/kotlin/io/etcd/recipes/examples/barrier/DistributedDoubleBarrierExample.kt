@@ -37,7 +37,7 @@ fun main() {
     val doneLatch = CountDownLatch(count)
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-        sleep(10.random.seconds)
+        sleep(10.random().seconds)
 
         repeat(retryCount) {
             println("#$id Waiting to enter barrier")
@@ -53,7 +53,7 @@ fun main() {
     }
 
     fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-        sleep(10.random.seconds)
+        sleep(10.random().seconds)
 
         repeat(retryCount) {
             println("#$id Waiting to leave barrier")
@@ -78,7 +78,7 @@ fun main() {
             connectToEtcd(urls) { client ->
                 withDistributedDoubleBarrier(client, barrierPath, count) {
                     enterBarrier(i, this, 2)
-                    sleep(5.random.seconds)
+                    sleep(5.random().seconds)
                     leaveBarrier(i, this, 2)
                 }
             }

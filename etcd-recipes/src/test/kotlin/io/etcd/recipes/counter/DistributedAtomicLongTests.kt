@@ -152,7 +152,7 @@ class DistributedAtomicLongTests {
                         threadWithExceptionCheck {
                             logger.debug { "Begin increments for counter #$i" }
                             repeat(count) { increment() }
-                            sleep(maxPause.random.milliseconds)
+                            sleep(maxPause.random().milliseconds)
                             logger.debug { "Completed increments for counter #$i" }
                         }
                     latchList += latch0
@@ -162,7 +162,7 @@ class DistributedAtomicLongTests {
                         threadWithExceptionCheck {
                             logger.debug { "Begin decrements for counter #$i" }
                             repeat(count) { decrement() }
-                            sleep(maxPause.random.milliseconds)
+                            sleep(maxPause.random().milliseconds)
                             logger.debug { "Completed decrements for counter #$i" }
                         }
                     latchList += latch1
@@ -172,7 +172,7 @@ class DistributedAtomicLongTests {
                         threadWithExceptionCheck {
                             logger.debug { "Begin adds for counter #$i" }
                             repeat(count) { add(5) }
-                            sleep(maxPause.random.milliseconds)
+                            sleep(maxPause.random().milliseconds)
                             logger.debug { "Completed adds for counter #$i" }
                         }
                     latchList += latch2
@@ -182,7 +182,7 @@ class DistributedAtomicLongTests {
                         threadWithExceptionCheck {
                             logger.debug { "Begin subtracts for counter #$i" }
                             repeat(count) { subtract(5) }
-                            sleep(maxPause.random.milliseconds)
+                            sleep(maxPause.random().milliseconds)
                             logger.debug { "Completed subtracts for counter #$i" }
                         }
                     latchList += latch3

@@ -39,7 +39,7 @@ fun main() {
             val takeLeadershipAction =
                 { selector: LeaderSelector ->
                     println("${selector.clientId} elected leader")
-                    val pause = 3.random.seconds
+                    val pause = 3.random().seconds
                     sleep(pause)
                     println("${selector.clientId} surrendering after $pause")
                 }
