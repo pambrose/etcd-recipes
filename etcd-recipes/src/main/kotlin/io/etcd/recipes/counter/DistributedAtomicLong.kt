@@ -80,7 +80,7 @@ constructor(client: Client,
             if (!txnResponse.isSucceeded) {
                 //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
                 // Crude backoff for retry
-                sleep((count * 100).random.milliseconds)
+                sleep((count * 100).random().milliseconds)
                 count++
             }
         } while (!txnResponse.isSucceeded)

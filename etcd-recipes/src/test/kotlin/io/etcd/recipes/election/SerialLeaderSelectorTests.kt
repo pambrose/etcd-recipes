@@ -47,7 +47,7 @@ class SerialLeaderSelectorTests {
         val relinquishLeadershiptCounter = AtomicInteger(0)
 
         val leadershipAction = { selector: LeaderSelector ->
-            val pause = 3.random.seconds
+            val pause = 3.random().seconds
             logger.debug { "${selector.clientId} elected leader for $pause" }
             sleep(pause)
             takeLeadershiptCounter.incrementAndGet()

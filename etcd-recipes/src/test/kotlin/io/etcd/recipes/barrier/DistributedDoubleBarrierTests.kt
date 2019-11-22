@@ -61,12 +61,12 @@ class DistributedDoubleBarrierTests {
         val leaveCounter = AtomicInteger(0)
 
         fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-            sleep(5.random.seconds)
+            sleep(5.random().seconds)
 
             repeat(retryCount) {
                 logger.debug { "#$id Waiting to enter barrier" }
                 if (it % 2 == 0)
-                    barrier.enter(1000.random.milliseconds)
+                    barrier.enter(1000.random().milliseconds)
                 else
                     barrier.enter(1000, TimeUnit.MILLISECONDS)
                 enterRetryCounter.incrementAndGet()
@@ -82,12 +82,12 @@ class DistributedDoubleBarrierTests {
         }
 
         fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-            sleep(10.random.seconds)
+            sleep(10.random().seconds)
 
             repeat(retryCount) {
                 logger.debug { "#$id Waiting to leave barrier" }
                 if (it % 2 == 0)
-                    barrier.leave(1000.random.milliseconds)
+                    barrier.leave(1000.random().milliseconds)
                 else
                     barrier.leave(1000, TimeUnit.MILLISECONDS)
                 leaveRetryCounter.incrementAndGet()
@@ -111,7 +111,7 @@ class DistributedDoubleBarrierTests {
                 nonblockingThreads(count - 1) { i ->
                     withDistributedDoubleBarrier(client, path, count) {
                         enterBarrier(i, this, retryAttempts)
-                        sleep(5.random.seconds)
+                        sleep(5.random().seconds)
                         leaveBarrier(i, this, retryAttempts)
                     }
                 }

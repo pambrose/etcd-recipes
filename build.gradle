@@ -22,7 +22,7 @@ subprojects {
   apply plugin: 'com.github.ben-manes.versions'
 
   group 'com.github.pambrose.etcd-recipes'
-  version '0.9.17'
+  version '0.9.18'
 
   sourceCompatibility = 1.8
   targetCompatibility = 1.8
@@ -39,7 +39,7 @@ subprojects {
     def serializationVersion = '0.13.0'
     def jetcdVersion = '0.4.1'
     def guavaVersion = '28.1-android'
-    def utilsVersion = '1.1.5'
+    def utilsVersion = '1.1.8'
     def loggingVersion = '1.7.7'
     def slf4jVersion = '1.7.28'
     def kluentVersion = '1.57'
