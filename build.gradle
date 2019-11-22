@@ -22,7 +22,7 @@ subprojects {
   apply plugin: 'com.github.ben-manes.versions'
 
   group 'com.github.pambrose.etcd-recipes'
-  version '0.9.18'
+  version '0.9.19'
 
   sourceCompatibility = 1.8
   targetCompatibility = 1.8
