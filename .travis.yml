@@ -5,9 +5,9 @@ jdk:
   #- openjdk11
   - openjdk8
 
-branches:
-  only:
-    - master
+#branches:
+#  only:
+#    - master
 
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
