@@ -47,6 +47,7 @@ subprojects {
     def junitVersion = '5.5.2'
 
     libraries = [
+        bom           : "org.jetbrains.kotlin:kotlin-bom",
         stdlib        : "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinVersion}",
         reflect       : "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}",
         serialization : "org.jetbrains.kotlinx:kotlinx-serialization-runtime:${serializationVersion}",

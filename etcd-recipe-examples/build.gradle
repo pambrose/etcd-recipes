@@ -25,6 +25,8 @@ targetCompatibility = 1.8
 dependencies {
     implementation project(':etcd-recipes')
 
+    implementation platform(libraries.bom)
+
     implementation libraries.stdlib
     implementation libraries.reflect
     implementation libraries.serialization
