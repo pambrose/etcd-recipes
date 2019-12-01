@@ -8,9 +8,8 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=pambrose_etcd-recipes&metric=alert_status)](https://sonarcloud.io/dashboard?id=pambrose_etcd-recipes)
 [![Maintainability](https://api.codeclimate.com/v1/badges/b183ced841479fbdb242/maintainability)](https://codeclimate.com/github/pambrose/etcd-recipes/maintainability)
 [![Known Vulnerabilities](https://snyk.io/test/github/pambrose/etcd-recipes/badge.svg)](https://snyk.io/test/github/pambrose/etcd-recipes)
-[![Java](https://img.shields.io/badge/%20language-Java-red.svg)](https://kotlinlang.org/)
 [![Kotlin](https://img.shields.io/badge/%20language-Kotlin-red.svg)](https://kotlinlang.org/)
-
+[![Java](https://img.shields.io/badge/%20language-Java-red.svg)](https://kotlinlang.org/)
 
 [etcd-recipes](https://github.com/pambrose/etcd-recipes) is a Kotlin/Java/JVM client library 
 for [etcd](https://etcd.io) v3, a distributed, reliable key-value store. It attempts to provide the same 
