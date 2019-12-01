@@ -24,7 +24,7 @@ import io.etcd.recipes.discovery.ServiceInstance;
 
 import java.util.List;
 
-import static com.github.pambrose.common.util.JavaFuncs.sleepSecs;
+import static com.github.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 
 public class ServiceDiscoveryExample {

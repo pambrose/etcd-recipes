@@ -23,8 +23,8 @@ import io.etcd.recipes.election.LeaderSelectorListener;
 
 import java.util.List;
 
-import static com.github.pambrose.common.util.JavaFuncs.random;
-import static com.github.pambrose.common.util.JavaFuncs.sleepSecs;
+import static com.github.pambrose.common.util.MiscJavaFuncs.random;
+import static com.github.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static java.lang.String.format;
 

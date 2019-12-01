@@ -19,45 +19,6 @@
 
 description = 'etcd-recipe-examples'
 
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
-
 dependencies {
   implementation project(':etcd-recipes')
-
-  implementation platform(libraries.bom)
-
-  implementation libraries.stdlib
-  implementation libraries.reflect
-  implementation libraries.serialization
-
-  implementation libraries.jetcd
-  implementation libraries.core_utils
-  implementation libraries.guava_utils
-  implementation libraries.guava
-
-  implementation libraries.logging
-  implementation libraries.slf4j_simple
-
-  testImplementation libraries.kluent
-  testImplementation libraries.jupiter_api
-  testRuntimeOnly libraries.jupiter_engine
-}
-
-compileKotlin {
-  kotlinOptions {
-    jvmTarget = "1.8"
-    freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
-                         '-Xuse-experimental=kotlinx.serialization.ImplicitReflectionSerializer',
-                         '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
-  }
-}
-
-compileTestKotlin {
-  kotlinOptions {
-    jvmTarget = "1.8"
-    freeCompilerArgs += ['-Xuse-experimental=kotlin.time.ExperimentalTime',
-                         '-Xuse-experimental=kotlinx.serialization.ImplicitReflectionSerializer',
-                         '-Xuse-experimental=kotlinx.serialization.UnstableDefault']
-  }
 }
