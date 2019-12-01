@@ -6,7 +6,6 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e185b9c637b040bab55bdecf38b0de76)](https://www.codacy.com/manual/pambrose/etcd-recipes?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pambrose/etcd-recipes&amp;utm_campaign=Badge_Grade)
 [![codebeat badge](https://codebeat.co/badges/d61556d4-22e8-44c3-b8f8-db7613fae7fc)](https://codebeat.co/projects/github-com-pambrose-etcd-recipes-master)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=pambrose_etcd-recipes&metric=alert_status)](https://sonarcloud.io/dashboard?id=pambrose_etcd-recipes)
-[![Maintainability](https://api.codeclimate.com/v1/badges/b183ced841479fbdb242/maintainability)](https://codeclimate.com/github/pambrose/etcd-recipes/maintainability)
 [![Known Vulnerabilities](https://snyk.io/test/github/pambrose/etcd-recipes/badge.svg)](https://snyk.io/test/github/pambrose/etcd-recipes)
 [![Kotlin](https://img.shields.io/badge/%20language-Kotlin-red.svg)](https://kotlinlang.org/)
 [![Java](https://img.shields.io/badge/%20language-Java-red.svg)](https://kotlinlang.org/)
