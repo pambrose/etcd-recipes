@@ -37,7 +37,7 @@ subprojects {
     maven { url 'https://jitpack.io' }
   }
 
-  def utilsVersion = 'dd6db74'
+  def utilsVersion = '1.1.10'
   def serializationVersion = '0.13.0'
   def jetcdVersion = '0.4.1'
   def guavaVersion = '28.1-android'
