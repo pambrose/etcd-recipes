@@ -37,7 +37,7 @@ subprojects {
     maven { url 'https://jitpack.io' }
   }
 
-  def utilsVersion = '1.1.10'
+  def utilsVersion = '1.1.11'
   def serializationVersion = '0.13.0'
   def jetcdVersion = '0.4.1'
   def guavaVersion = '28.1-android'
@@ -47,8 +47,6 @@ subprojects {
   def junitVersion = '5.5.2'
 
   dependencies {
-    implementation platform("org.jetbrains.kotlin:kotlin-bom")
-
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     implementation "org.jetbrains.kotlin:kotlin-reflect"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-runtime:${serializationVersion}"
