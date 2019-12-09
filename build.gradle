@@ -37,14 +37,14 @@ subprojects {
     maven { url 'https://jitpack.io' }
   }
 
-  def utilsVersion = '1.1.11'
-  def serializationVersion = '0.13.0'
+  def guavaVersion = '28.1-jre'
   def jetcdVersion = '0.4.1'
-  def guavaVersion = '28.1-android'
-  def loggingVersion = '1.7.8'
-  def slf4jVersion = '1.7.28'
-  def kluentVersion = '1.58'
   def junitVersion = '5.5.2'
+  def kluentVersion = '1.58'
+  def loggingVersion = '1.7.8'
+  def serializationVersion = '0.13.0'
+  def slf4jVersion = '1.7.28'
+  def utilsVersion = '1.1.11'
 
   dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
@@ -78,15 +78,6 @@ subprojects {
     reports {
       xml.enabled = true // coveralls plugin depends on xml format report
       html.enabled = true
-    }
-  }
-
-  sourceSets {
-    main {
-      java {
-        srcDirs 'src/main/java'
-        srcDirs 'src/main/kotlin'
-      }
     }
   }
 
