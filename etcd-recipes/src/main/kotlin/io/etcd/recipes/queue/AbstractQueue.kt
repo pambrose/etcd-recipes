@@ -98,9 +98,9 @@ abstract class AbstractQueue(client: Client,
             watchLatch.await()
         }
 
-        val kv: KeyValue = keyFound.get()!!
+        val kv = keyFound.get()
         // If transactional delete fails, then just call self again
-        return if (deleteRevKey(kv)) kv.value else dequeue()
+        return if (kv != null && deleteRevKey(kv)) kv.value else dequeue()
     }
 
     private fun deleteRevKey(kv: KeyValue): Boolean =

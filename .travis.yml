@@ -5,9 +5,9 @@ jdk:
   #- openjdk11
   - openjdk8
 
-branches:
-  only:
-    - master
+#branches:
+#  only:
+#    - master
 
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
@@ -24,7 +24,14 @@ services:
 before_install:
   - docker run --detach -p 2379:2379 -p 2380:2380 --name etcd quay.io/coreos/etcd:latest /usr/local/bin/etcd --advertise-client-urls http://0.0.0.0:2379 --listen-client-urls http://0.0.0.0:2379
 
+before_script:
+  - chmod +x gradlew
+
+script:
+  - ./gradlew check jacocoTestReport
+
 after_success:
+  - bash <(curl -s https://codecov.io/bash)
   - ./gradlew jacocoTestReport coveralls
 
 notifications:
