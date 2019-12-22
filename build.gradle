@@ -7,26 +7,15 @@ plugins {
   id 'com.github.kt3k.coveralls' version '2.8.4' apply false
 }
 
-repositories {
-  maven { url = 'https://maven-central.storage-download.googleapis.com/repos/central/data/' }
-  jcenter()
-}
-
-configurations.all {
-  resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
-}
-
 allprojects {
-
-}
-
-subprojects {
   group 'com.github.pambrose.etcd-recipes'
   version '0.9.19'
 
   apply plugin: 'org.jetbrains.kotlin.jvm'
   apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
   apply plugin: 'com.github.ben-manes.versions'
+  apply plugin: 'jacoco'
+  apply plugin: 'com.github.kt3k.coveralls'
 
   sourceCompatibility = 1.8
   targetCompatibility = 1.8
@@ -37,6 +26,12 @@ subprojects {
     maven { url 'https://jitpack.io' }
   }
 
+  configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+  }
+}
+
+subprojects {
   def guavaVersion = '28.1-jre'
   def jetcdVersion = '0.4.1'
   def junitVersion = '5.5.2'
@@ -44,7 +39,7 @@ subprojects {
   def loggingVersion = '1.7.8'
   def serializationVersion = '0.13.0'
   def slf4jVersion = '1.7.28'
-  def utilsVersion = '1.1.11'
+  def utilsVersion = '1.1.14'
 
   dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
@@ -80,6 +75,8 @@ subprojects {
       html.enabled = true
     }
   }
+
+  check.dependsOn jacocoTestReport
 
   artifacts {
     archives sourcesJar

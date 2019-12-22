@@ -9,7 +9,7 @@ compile:
 build: compile
 
 tests:
-	./gradlew check
+	./gradlew check jacocoTestReport
 
 refresh:
 	./gradlew build --refresh-dependencies
