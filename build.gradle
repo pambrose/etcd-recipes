@@ -9,7 +9,7 @@ plugins {
 
 allprojects {
   group 'com.github.pambrose.etcd-recipes'
-  version '0.9.19'
+  version '0.9.20'
 
   apply plugin: 'org.jetbrains.kotlin.jvm'
   apply plugin: 'org.jetbrains.kotlin.plugin.serialization'

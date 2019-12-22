@@ -52,7 +52,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.pambrose.etcd-recipes:etcd-recipes:0.9.19"
+    implementation "com.github.pambrose.etcd-recipes:etcd-recipes:0.9.20"
 }
 ```
 
@@ -76,7 +76,7 @@ dependencies {
     <dependency>
       <groupId>com.github.pambrose.etcd-recipes</groupId>
       <artifactId>etcd-recipes</artifactId>
-      <version>0.9.19</version>
+      <version>0.9.20</version>
     </dependency>
 </dependencies>
 ```
