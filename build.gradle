@@ -71,7 +71,7 @@ subprojects {
 
   jacocoTestReport {
     reports {
-      xml.enabled = true // coveralls plugin depends on xml format report
+      xml.enabled = true
       html.enabled = true
     }
 
