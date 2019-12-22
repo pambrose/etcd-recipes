@@ -74,6 +74,13 @@ subprojects {
       xml.enabled = true // coveralls plugin depends on xml format report
       html.enabled = true
     }
+
+    afterEvaluate {
+      getClassDirectories().setFrom(files(classDirectories.files.collect {
+        fileTree(dir: it,
+            excludes: ['io/etcd/recipes/examples/**'])
+      }))
+    }
   }
 
   check.dependsOn jacocoTestReport
