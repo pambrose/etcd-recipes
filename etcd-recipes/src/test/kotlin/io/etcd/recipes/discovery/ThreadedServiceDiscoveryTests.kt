@@ -34,9 +34,9 @@ import kotlin.time.seconds
 
 class ThreadedServiceDiscoveryTests {
     val path = "/discovery/${javaClass.simpleName}"
-    val threadCount = 5
-    val serviceCount = 10
-    val contextMap: ConcurrentMap<Int, ServiceDiscoveryContext> = newConcurrentMap()
+    private val threadCount = 5
+    private val serviceCount = 10
+    private val contextMap: ConcurrentMap<Int, ServiceDiscoveryContext> = newConcurrentMap()
 
     class ServiceDiscoveryContext(val serviceDiscovery: ServiceDiscovery) {
         val serviceMap: ConcurrentMap<String, ServiceInstance> = newConcurrentMap()

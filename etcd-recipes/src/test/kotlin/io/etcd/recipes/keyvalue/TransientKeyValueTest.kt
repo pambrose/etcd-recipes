@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test
 import kotlin.time.seconds
 
 class TransientKeyValueTest {
-    val defaultValue = "nothing"
+    private val defaultValue = "nothing"
 
     @Test
     fun singleKVTest() {

@@ -34,9 +34,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
 class DistributedQueueTest {
-    val iterCount = 500
-    val threadCount = 10
-    val testData = List(iterCount) { "V $it" }
+    private val iterCount = 500
+    private val threadCount = 10
+    private val testData = List(iterCount) { "V $it" }
 
     @Test
     fun serialTestNoWait() {
@@ -109,7 +109,7 @@ class DistributedQueueTest {
         threadedTestNoWait(iterCount, threadCount)
     }
 
-    fun threadedTestNoWait(iterCount: Int, threadCount: Int) {
+    private fun threadedTestNoWait(iterCount: Int, threadCount: Int) {
         val queuePath = "/queue/threadedTestNoWait"
         val latch = CountDownLatch(threadCount)
         val dequeuedData = synchronizedList(mutableListOf<String>())
@@ -168,7 +168,7 @@ class DistributedQueueTest {
         threadedTestWithWait(iterCount, threadCount)
     }
 
-    fun threadedTestWithWait(iterCount: Int, threadCount: Int) {
+    private fun threadedTestWithWait(iterCount: Int, threadCount: Int) {
         val queuePath = "/queue/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)
         val dequeuedData = synchronizedList(mutableListOf<String>())

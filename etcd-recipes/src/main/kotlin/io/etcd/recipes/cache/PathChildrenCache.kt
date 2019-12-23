@@ -172,7 +172,7 @@ class PathChildrenCache(client: Client,
                     val (k, v) = event.keyValue.asPair
                     val stripped = k.substring(trailingPath.length)
                     when (event.eventType) {
-                        PUT          -> {
+                        PUT -> {
                             val isAdd = !cacheMap.containsKey(stripped)
                             logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
                             cacheMap[stripped] = v
@@ -188,7 +188,7 @@ class PathChildrenCache(client: Client,
                                 }
                             }
                         }
-                        DELETE       -> {
+                        DELETE -> {
                             logger.debug { "$stripped deleted" }
                             val prevValue = cacheMap.remove(stripped)?.let { it }
                             val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
@@ -202,7 +202,7 @@ class PathChildrenCache(client: Client,
                             }
                         }
                         UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
-                        else         -> logger.error { "Unknown error with $cachePath watch" }
+                        else -> logger.error { "Unknown error with $cachePath watch" }
                     }
                 }
         }

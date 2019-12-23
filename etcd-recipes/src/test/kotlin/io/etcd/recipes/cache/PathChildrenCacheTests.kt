@@ -40,18 +40,18 @@ import kotlin.random.Random
 import kotlin.time.seconds
 
 class PathChildrenCacheTests {
-    val suffix = "update"
+    private val suffix = "update"
 
-    fun generateTestData(count: Int): List<Pair<String, String>> {
+    private fun generateTestData(count: Int): List<Pair<String, String>> {
         val names = List(count) { "Key:%05d".format(it) }
         val vals = List(count) { randomId(Random.nextInt(2, 10)) }
         return names.zip(vals)
     }
 
-    fun compareData(count: Int,
-                    data: List<ChildData>,
-                    origData: List<Pair<String, String>>,
-                    suffix: String = "") {
+    private fun compareData(count: Int,
+                            data: List<ChildData>,
+                            origData: List<Pair<String, String>>,
+                            suffix: String = "") {
         data.size shouldEqual count
         val currData = data.map { it.key to it.value.asString }.sortedBy { it.first }
         val updatedOrigData = origData.map { it.first to (it.second + suffix) }.sortedBy { it.first }
@@ -82,10 +82,10 @@ class PathChildrenCacheTests {
                 addListener { event: PathChildrenCacheEvent ->
                     //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
                     when (event.type) {
-                        CHILD_ADDED   -> addCount.incrementAndGet()
+                        CHILD_ADDED -> addCount.incrementAndGet()
                         CHILD_UPDATED -> updateCount.incrementAndGet()
                         CHILD_REMOVED -> deleteCount.incrementAndGet()
-                        INITIALIZED   -> initCount.incrementAndGet()
+                        INITIALIZED -> initCount.incrementAndGet()
                     }
                 }
 
@@ -149,10 +149,10 @@ class PathChildrenCacheTests {
                 addListener { event: PathChildrenCacheEvent ->
                     //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
                     when (event.type) {
-                        CHILD_ADDED   -> addCount.incrementAndGet()
+                        CHILD_ADDED -> addCount.incrementAndGet()
                         CHILD_UPDATED -> updateCount.incrementAndGet()
                         CHILD_REMOVED -> deleteCount.incrementAndGet()
-                        INITIALIZED   -> initCount.incrementAndGet()
+                        INITIALIZED -> initCount.incrementAndGet()
                     }
                 }
 
@@ -209,10 +209,10 @@ class PathChildrenCacheTests {
                 addListener { event: PathChildrenCacheEvent ->
                     //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
                     when (event.type) {
-                        CHILD_ADDED   -> addCount.incrementAndGet()
+                        CHILD_ADDED -> addCount.incrementAndGet()
                         CHILD_UPDATED -> updateCount.incrementAndGet()
                         CHILD_REMOVED -> deleteCount.incrementAndGet()
-                        INITIALIZED   -> {
+                        INITIALIZED -> {
                             initCount.incrementAndGet()
                             initData = event.initialData
                         }
