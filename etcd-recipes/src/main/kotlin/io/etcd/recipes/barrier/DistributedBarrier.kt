@@ -78,13 +78,12 @@ constructor(client: Client,
     @Synchronized
     fun setBarrier(): Boolean {
         checkCloseNotCalled()
-
-        // Create unique token to avoid collision from clients with same id
-        val uniqueToken = "$clientId:${randomId(tokenLength)}"
-
         return if (client.isKeyPresent(barrierPath))
             false
         else {
+            // Create unique token to avoid collision from clients with same id
+            val uniqueToken = "$clientId:${randomId(tokenLength)}"
+
             // Prime lease with 2 seconds to give keepAlive a chance to get started
             val lease = client.leaseGrant(leaseTtlSecs.seconds)
 
@@ -134,25 +133,26 @@ constructor(client: Client,
         checkCloseNotCalled()
 
         // Check if barrier is present before using watcher
-        if (!waitOnMissingBarriers && !isBarrierSet())
-            return true
+        return if (!waitOnMissingBarriers && !isBarrierSet())
+            true
+        else {
+            val waitLatch = CountDownLatch(1)
+            val watchOption = watchOption { withNoPut(true) }
 
-        val waitLatch = CountDownLatch(1)
+            client.withWatcher(barrierPath,
+                               watchOption,
+                               { watchResponse ->
+                                   for (event in watchResponse.events)
+                                       if (event.eventType == DELETE)
+                                           waitLatch.countDown()
 
-        val watchOption = watchOption { withNoPut(true) }
-        return client.withWatcher(barrierPath,
-                                  watchOption,
-                                  { watchResponse ->
-                                      for (event in watchResponse.events)
-                                          if (event.eventType == DELETE)
-                                              waitLatch.countDown()
+                               }) {
+                // Check one more time in case watch missed the delete just after last check
+                if (!waitOnMissingBarriers && !isBarrierSet())
+                    waitLatch.countDown()
 
-                                  }) {
-            // Check one more time in case watch missed the delete just after last check
-            if (!waitOnMissingBarriers && !isBarrierSet())
-                waitLatch.countDown()
-
-            waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+                waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+            }
         }
     }
 

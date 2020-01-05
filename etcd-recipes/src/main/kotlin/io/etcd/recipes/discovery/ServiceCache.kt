@@ -64,6 +64,7 @@ class ServiceCache internal constructor(client: Client,
         val trailingServicePath = servicePath.ensureSuffix("/")
         val trailingNamesPath = namesPath.ensureSuffix("/")
         val watchOption = watchOption { withPrefix(trailingServicePath) }
+
         watcher = client.watcher(trailingServicePath, watchOption) { watchResponse ->
             // Wait for data to be loaded
             dataPreloaded.waitUntilTrue()
@@ -99,7 +100,7 @@ class ServiceCache internal constructor(client: Client,
                             //println("$stripped deleted")
                         }
                         UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
-                        else         -> logger.error { "Unknown error with $servicePath watch" }
+                        else -> logger.error { "Unknown error with $servicePath watch" }
                     }
                 }
             startThreadComplete.set(true)
@@ -107,8 +108,8 @@ class ServiceCache internal constructor(client: Client,
 
         // Preload with initial data
         val kvs = client.getChildren(trailingServicePath)
-        for (kv in kvs) {
-            val (k, v) = kv
+
+        for ((k, v) in kvs) {
             val stripped = k.substring(trailingNamesPath.length)
             serviceMap[stripped] = v.asString
         }

@@ -32,14 +32,14 @@ allprojects {
 }
 
 subprojects {
-  def guavaVersion = '28.1-jre'
+  def guavaVersion = '28.2-jre'
   def jetcdVersion = '0.4.1'
   def junitVersion = '5.5.2'
-  def kluentVersion = '1.58'
+  def kluentVersion = '1.59'
   def loggingVersion = '1.7.8'
   def serializationVersion = '0.13.0'
   def slf4jVersion = '1.7.28'
-  def utilsVersion = '1.1.14'
+  def utilsVersion = 'e011bfd'
 
   dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
