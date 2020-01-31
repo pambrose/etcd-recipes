@@ -39,7 +39,7 @@ subprojects {
   def loggingVersion = '1.7.8'
   def serializationVersion = '0.13.0'
   def slf4jVersion = '1.7.28'
-  def utilsVersion = 'ccab4c9'
+  def utilsVersion = '9d1057d'
 
   dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
