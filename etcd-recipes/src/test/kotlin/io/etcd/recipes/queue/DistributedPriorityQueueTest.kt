@@ -26,7 +26,7 @@ import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.urls
 import mu.KLogging
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
@@ -44,15 +44,15 @@ class DistributedPriorityQueueTest {
         val dequeuedData = mutableListOf<String>()
 
         connectToEtcd(urls) { client ->
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
         }
 
-        dequeuedData.size shouldEqual testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
-        dequeuedData shouldEqual testData
+        dequeuedData.size shouldBeEqualTo testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
+        dequeuedData shouldBeEqualTo testData
     }
 
     @Test
@@ -62,7 +62,7 @@ class DistributedPriorityQueueTest {
         val latch = CountDownLatch(1)
 
         connectToEtcd(urls) { client ->
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
 
             thread(latch) {
                 withDistributedPriorityQueue(client, queuePath) {
@@ -74,14 +74,14 @@ class DistributedPriorityQueueTest {
 
             latch.await()
 
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
         }
 
         sleep(5.seconds)
 
-        dequeuedData.size shouldEqual testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
-        dequeuedData shouldEqual testData
+        dequeuedData.size shouldBeEqualTo testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
+        dequeuedData shouldBeEqualTo testData
     }
 
     @Test
@@ -113,7 +113,7 @@ class DistributedPriorityQueueTest {
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
 
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
@@ -133,14 +133,14 @@ class DistributedPriorityQueueTest {
 
             latch.await()
 
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
         }
 
         //sleep(5.seconds)
 
-        dequeuedData.size shouldEqual testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
-        dequeuedData shouldEqual testData
+        dequeuedData.size shouldBeEqualTo testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
+        dequeuedData shouldBeEqualTo testData
     }
 
     @Test
@@ -172,7 +172,7 @@ class DistributedPriorityQueueTest {
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
 
             repeat(threadCount) {
                 thread(latch) {
@@ -192,14 +192,14 @@ class DistributedPriorityQueueTest {
 
             latch.await()
 
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
         }
 
         sleep(5.seconds)
 
-        dequeuedData.size shouldEqual testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
-        dequeuedData shouldEqual testData
+        dequeuedData.size shouldBeEqualTo testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
+        dequeuedData shouldBeEqualTo testData
     }
 
     @Test
@@ -219,7 +219,7 @@ class DistributedPriorityQueueTest {
                     withDistributedPriorityQueue(client, queuePath) {
                         repeat(iterCount) {
                             val v = dequeue().asString
-                            v shouldEqual token
+                            v shouldBeEqualTo token
                             enqueue(v, 1u)
                             counter.incrementAndGet()
                         }
@@ -231,11 +231,11 @@ class DistributedPriorityQueueTest {
 
             withDistributedPriorityQueue(client, queuePath) {
                 val v = dequeue().asString
-                v shouldEqual token
+                v shouldBeEqualTo token
             }
         }
 
-        counter.get() shouldEqual threadCount * iterCount
+        counter.get() shouldBeEqualTo threadCount * iterCount
     }
 
     @Test
@@ -245,15 +245,15 @@ class DistributedPriorityQueueTest {
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], i) } }
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
         }
 
-        dequeuedData.size shouldEqual testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[i] }
-        dequeuedData shouldEqual testData
+        dequeuedData.size shouldBeEqualTo testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
+        dequeuedData shouldBeEqualTo testData
     }
 
     @Test
@@ -263,17 +263,17 @@ class DistributedPriorityQueueTest {
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
             withDistributedPriorityQueue(client, queuePath) {
                 repeat(iterCount) { i -> enqueue(testData[i], (iterCount - i)) }
             }
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
-            client.getChildCount(queuePath) shouldEqual 0
+            client.getChildCount(queuePath) shouldBeEqualTo 0
         }
 
-        dequeuedData.size shouldEqual testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldEqual testData[iterCount - i - 1] }
-        dequeuedData shouldEqual testData.reversed()
+        dequeuedData.size shouldBeEqualTo testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[iterCount - i - 1] }
+        dequeuedData shouldBeEqualTo testData.reversed()
     }
 
     companion object : KLogging()

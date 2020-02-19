@@ -28,7 +28,7 @@ import io.etcd.recipes.common.throwExceptionFromList
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -55,14 +55,14 @@ class DistributedAtomicLongTests {
     @Test
     fun defaultInitialValueTest() {
         connectToEtcd(urls) { client ->
-            withDistributedAtomicLong(client, path) { get() shouldEqual 0L }
+            withDistributedAtomicLong(client, path) { get() shouldBeEqualTo 0L }
         }
     }
 
     @Test
     fun nondefaultInitialValueTest() {
         connectToEtcd(urls) { client ->
-            withDistributedAtomicLong(client, path, 100L) { get() shouldEqual 100L }
+            withDistributedAtomicLong(client, path, 100L) { get() shouldBeEqualTo 100L }
         }
     }
 
@@ -75,7 +75,7 @@ class DistributedAtomicLongTests {
                     increment()
                     decrement()
                 }
-                get() shouldEqual 0L
+                get() shouldBeEqualTo 0L
             }
         }
     }
@@ -89,7 +89,7 @@ class DistributedAtomicLongTests {
                     add(5)
                     subtract(5)
                 }
-                get() shouldEqual 0L
+                get() shouldBeEqualTo 0L
             }
         }
     }
@@ -110,7 +110,7 @@ class DistributedAtomicLongTests {
                     .first()
                     .get()
             counters.forEach { it.close() }
-            total shouldEqual 0L
+            total shouldBeEqualTo 0L
         }
     }
 
@@ -130,7 +130,7 @@ class DistributedAtomicLongTests {
                     }
                 }
 
-                get() shouldEqual 0L
+                get() shouldBeEqualTo 0L
             }
         }
     }
@@ -198,7 +198,7 @@ class DistributedAtomicLongTests {
         }
 
         connectToEtcd(urls) { client ->
-            withDistributedAtomicLong(client, path) { get() shouldEqual 0L }
+            withDistributedAtomicLong(client, path) { get() shouldBeEqualTo 0L }
         }
     }
 

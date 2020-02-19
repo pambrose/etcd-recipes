@@ -24,7 +24,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
@@ -70,8 +70,8 @@ class SerialLeaderSelectorTests {
             }
         }
 
-        takeLeadershiptCounter.get() shouldEqual count
-        relinquishLeadershiptCounter.get() shouldEqual count
+        takeLeadershiptCounter.get() shouldBeEqualTo count
+        relinquishLeadershiptCounter.get() shouldBeEqualTo count
 
         // Reset counters
         takeLeadershiptCounter.set(0)
@@ -87,8 +87,8 @@ class SerialLeaderSelectorTests {
             }
         }
 
-        takeLeadershiptCounter.get() shouldEqual count
-        relinquishLeadershiptCounter.get() shouldEqual count
+        takeLeadershiptCounter.get() shouldBeEqualTo count
+        relinquishLeadershiptCounter.get() shouldBeEqualTo count
     }
 
     companion object : KLogging()

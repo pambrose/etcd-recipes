@@ -33,7 +33,7 @@ import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.putValuesWithKeepAlive
 import io.etcd.recipes.common.urls
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
@@ -52,14 +52,14 @@ class PathChildrenCacheTests {
                             data: List<ChildData>,
                             origData: List<Pair<String, String>>,
                             suffix: String = "") {
-        data.size shouldEqual count
+        data.size shouldBeEqualTo count
         val currData = data.map { it.key to it.value.asString }.sortedBy { it.first }
         val updatedOrigData = origData.map { it.first to (it.second + suffix) }.sortedBy { it.first }
         currData.forEachIndexed { i, pair ->
-            pair shouldEqual updatedOrigData[i]
+            pair shouldBeEqualTo updatedOrigData[i]
         }
 
-        currData shouldEqual updatedOrigData
+        currData shouldBeEqualTo updatedOrigData
     }
 
     @Test
@@ -75,7 +75,7 @@ class PathChildrenCacheTests {
 
             // Clear leftover data
             client.deleteChildren(path)
-            client.getChildCount(path) shouldEqual 0
+            client.getChildCount(path) shouldBeEqualTo 0
 
             withPathChildrenCache(client, path) {
 
@@ -91,12 +91,12 @@ class PathChildrenCacheTests {
 
                 start(true)
                 waitOnStartComplete()
-                currentData shouldEqual emptyList()
+                currentData shouldBeEqualTo emptyList()
 
-                addCount.get() shouldEqual 0
-                updateCount.get() shouldEqual 0
-                deleteCount.get() shouldEqual 0
-                initCount.get() shouldEqual 0
+                addCount.get() shouldBeEqualTo 0
+                updateCount.get() shouldBeEqualTo 0
+                deleteCount.get() shouldBeEqualTo 0
+                initCount.get() shouldBeEqualTo 0
 
                 val kvs = generateTestData(count)
 
@@ -111,16 +111,16 @@ class PathChildrenCacheTests {
                 client.deleteChildren(path)
 
                 sleep(5.seconds)
-                currentData shouldEqual emptyList()
+                currentData shouldBeEqualTo emptyList()
             }
         }
 
         sleep(5.seconds)
 
-        addCount.get() shouldEqual count
-        updateCount.get() shouldEqual count
-        deleteCount.get() shouldEqual count
-        initCount.get() shouldEqual 0
+        addCount.get() shouldBeEqualTo count
+        updateCount.get() shouldBeEqualTo count
+        deleteCount.get() shouldBeEqualTo count
+        initCount.get() shouldBeEqualTo 0
     }
 
     @Test
@@ -136,7 +136,7 @@ class PathChildrenCacheTests {
 
             // Clear leftover data
             client.deleteChildren(path)
-            client.getChildCount(path) shouldEqual 0
+            client.getChildCount(path) shouldBeEqualTo 0
 
             val testKvs = generateTestData(count)
 
@@ -162,22 +162,22 @@ class PathChildrenCacheTests {
                 sleep(5.seconds)
                 compareData(count, currentData, testKvs, suffix)
 
-                addCount.get() shouldEqual 0
-                updateCount.get() shouldEqual 0
-                deleteCount.get() shouldEqual 0
-                initCount.get() shouldEqual 0
+                addCount.get() shouldBeEqualTo 0
+                updateCount.get() shouldBeEqualTo 0
+                deleteCount.get() shouldBeEqualTo 0
+                initCount.get() shouldBeEqualTo 0
 
                 client.deleteChildren(path)
 
                 sleep(5.seconds)
-                currentData shouldEqual emptyList()
+                currentData shouldBeEqualTo emptyList()
             }
         }
 
-        addCount.get() shouldEqual 0
-        updateCount.get() shouldEqual 0
-        deleteCount.get() shouldEqual count
-        initCount.get() shouldEqual 0
+        addCount.get() shouldBeEqualTo 0
+        updateCount.get() shouldBeEqualTo 0
+        deleteCount.get() shouldBeEqualTo count
+        initCount.get() shouldBeEqualTo 0
     }
 
     @Test
@@ -193,7 +193,7 @@ class PathChildrenCacheTests {
 
             // Clear leftover data
             client.deleteChildren(path)
-            client.getChildCount(path) shouldEqual 0
+            client.getChildCount(path) shouldBeEqualTo 0
 
             val kvs = generateTestData(count)
 
@@ -228,17 +228,17 @@ class PathChildrenCacheTests {
                 client.deleteChildren(path)
 
                 sleep(5.seconds)
-                currentData shouldEqual emptyList()
+                currentData shouldBeEqualTo emptyList()
             }
 
             compareData(count, initData!!, kvs, suffix)
         }
 
 
-        addCount.get() shouldEqual 0
-        updateCount.get() shouldEqual 0
-        deleteCount.get() shouldEqual count
-        initCount.get() shouldEqual 1
+        addCount.get() shouldBeEqualTo 0
+        updateCount.get() shouldBeEqualTo 0
+        deleteCount.get() shouldBeEqualTo count
+        initCount.get() shouldBeEqualTo 1
     }
 
     @Test
@@ -265,7 +265,7 @@ class PathChildrenCacheTests {
                 }
 
                 sleep(5.seconds)
-                currentData shouldEqual emptyList()
+                currentData shouldBeEqualTo emptyList()
             }
         }
     }

@@ -24,8 +24,8 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
+import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldEndWith
-import org.amshove.kluent.shouldEqual
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import kotlin.time.seconds
@@ -54,10 +54,10 @@ class SerialServiceDiscoveryTests {
                 registerService(service)
 
                 logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
-                queryForInstance(service.name, service.id) shouldEqual service
+                queryForInstance(service.name, service.id) shouldBeEqualTo service
 
                 logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
-                queryForInstances(service.name) shouldEqual listOf(service)
+                queryForInstances(service.name) shouldBeEqualTo listOf(service)
 
                 logger.debug { "Retrieved names: ${queryForNames()}" }
                 queryForNames().first() shouldEndWith service.id
@@ -68,10 +68,10 @@ class SerialServiceDiscoveryTests {
                 updateService(service)
 
                 logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
-                queryForInstance(service.name, service.id) shouldEqual service
+                queryForInstance(service.name, service.id) shouldBeEqualTo service
 
                 logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
-                queryForInstances(service.name) shouldEqual listOf(service)
+                queryForInstances(service.name) shouldBeEqualTo listOf(service)
 
                 logger.debug { "Retrieved names: ${queryForNames()}" }
                 queryForNames().first() shouldEndWith service.id
@@ -81,8 +81,8 @@ class SerialServiceDiscoveryTests {
                 sleep(3.seconds)
 
 
-                queryForNames().size shouldEqual 0
-                queryForInstances(service.name).size shouldEqual 0
+                queryForNames().size shouldBeEqualTo 0
+                queryForInstances(service.name).size shouldBeEqualTo 0
 
                 invoking { queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
 

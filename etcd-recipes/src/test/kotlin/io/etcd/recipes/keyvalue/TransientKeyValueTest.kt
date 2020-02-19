@@ -25,7 +25,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.urls
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import kotlin.time.seconds
 
@@ -39,18 +39,18 @@ class TransientKeyValueTest {
 
         connectToEtcd(urls) { client ->
 
-            client.getValue(path, defaultValue) shouldEqual defaultValue
+            client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
 
             withTransientKeyValue(client, path, id) {
                 repeat(10) {
-                    client.getValue(path)?.asString shouldEqual id
+                    client.getValue(path)?.asString shouldBeEqualTo id
                     sleep(1.seconds)
                 }
             }
 
             // Wait for node to go away
             sleep(5.seconds)
-            client.getValue(path, defaultValue) shouldEqual defaultValue
+            client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
         }
 
         @Test
@@ -64,19 +64,19 @@ class TransientKeyValueTest {
 
                 client.apply {
                     for (p in paths)
-                        getValue(p, defaultValue) shouldEqual defaultValue
+                        getValue(p, defaultValue) shouldBeEqualTo defaultValue
 
-                    getChildCount(prefix) shouldEqual 0
+                    getChildCount(prefix) shouldBeEqualTo 0
 
                     val kvs = List(count) { TransientKeyValue(client, paths[it], ids[it]) }
 
                     repeat(10) {
                         repeat(count) { j ->
-                            getValue(paths[j])?.asString shouldEqual ids[j]
+                            getValue(paths[j])?.asString shouldBeEqualTo ids[j]
                         }
                     }
 
-                    getChildCount(prefix) shouldEqual 25
+                    getChildCount(prefix) shouldBeEqualTo 25
 
                     for (kv in kvs)
                         kv.close()
@@ -84,9 +84,9 @@ class TransientKeyValueTest {
                     // Wait for nodes to go away
                     sleep(5.seconds)
                     for (p in paths)
-                        getValue(p, defaultValue) shouldEqual defaultValue
+                        getValue(p, defaultValue) shouldBeEqualTo defaultValue
 
-                    getChildCount(prefix) shouldEqual 0
+                    getChildCount(prefix) shouldBeEqualTo 0
                 }
             }
         }

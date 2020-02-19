@@ -24,7 +24,7 @@ import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -78,8 +78,8 @@ class ReportLeaderTests {
         // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
         sleep(10.seconds)
 
-        takeLeadershiptCounter.get() shouldEqual count
-        relinquishLeadershiptCounter.get() shouldEqual count
+        takeLeadershiptCounter.get() shouldBeEqualTo count
+        relinquishLeadershiptCounter.get() shouldBeEqualTo count
 
         executor.shutdown()
     }

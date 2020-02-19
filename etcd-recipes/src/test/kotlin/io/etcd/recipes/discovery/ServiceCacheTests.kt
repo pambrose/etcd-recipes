@@ -27,7 +27,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
@@ -54,8 +54,8 @@ class ServiceCacheTests {
                     sleep(2.seconds)
 
                     instances.size shouldEqualTo 0
-                    serviceName shouldEqual name
-                    urls shouldEqual urls
+                    serviceName shouldBeEqualTo name
+                    urls shouldBeEqualTo urls
 
                     addListenerForChanges(object : ServiceCacheListener {
                         override fun cacheChanged(eventType: EventType,
@@ -64,17 +64,17 @@ class ServiceCacheTests {
                                                   serviceInstance: ServiceInstance?) {
                             captureException(holder) {
                                 //println("Comparing $serviceName and $name")
-                                serviceName.split("/").first() shouldEqual name
+                                serviceName.split("/").first() shouldBeEqualTo name
 
                                 if (eventType == EventType.PUT) {
                                     if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
 
-                                    serviceInstance?.name shouldEqual name
+                                    serviceInstance?.name shouldBeEqualTo name
                                 }
 
                                 if (eventType == EventType.DELETE) {
                                     unregisterCounter.incrementAndGet()
-                                    serviceInstance?.name shouldEqual name
+                                    serviceInstance?.name shouldBeEqualTo name
                                 }
                             }
                         }
@@ -117,10 +117,10 @@ class ServiceCacheTests {
         sleep(5.seconds)
 
         holder.checkForException()
-        registerCounter.get() shouldEqual threadCount * serviceCount
-        updateCounter.get() shouldEqual threadCount * serviceCount
-        unregisterCounter.get() shouldEqual threadCount * serviceCount
-        totalCounter.get() shouldEqual (threadCount * serviceCount) * 3
+        registerCounter.get() shouldBeEqualTo threadCount * serviceCount
+        updateCounter.get() shouldBeEqualTo threadCount * serviceCount
+        unregisterCounter.get() shouldBeEqualTo threadCount * serviceCount
+        totalCounter.get() shouldBeEqualTo (threadCount * serviceCount) * 3
     }
 
     companion object : KLogging()

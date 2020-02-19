@@ -27,7 +27,7 @@ import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
@@ -99,8 +99,8 @@ class DistributedBarrierWithCountTests {
             holder.checkForException()
         }
 
-        retryCounter.get() shouldEqual retryAttempts * (count - 1)
-        advancedCounter.get() shouldEqual count
+        retryCounter.get() shouldBeEqualTo retryAttempts * (count - 1)
+        advancedCounter.get() shouldBeEqualTo count
 
         logger.debug { "Done" }
     }

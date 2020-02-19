@@ -24,7 +24,7 @@ import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
@@ -73,7 +73,7 @@ class ParticipantTests {
             sleep(3.seconds)
             var particpants = LeaderSelector.getParticipants(client, path)
             logger.debug { "Found ${particpants.size} participants" }
-            particpants.size shouldEqual count
+            particpants.size shouldBeEqualTo count
 
             holdLatch.countDown()
 
@@ -83,16 +83,16 @@ class ParticipantTests {
 
             particpants = LeaderSelector.getParticipants(client, path)
             logger.debug { "Found ${particpants.size} participants" }
-            particpants.size shouldEqual 0
+            particpants.size shouldBeEqualTo 0
 
             // Compare participant counts
             logger.debug { "participantCounts = $participantCounts" }
-            participantCounts.size shouldEqual count
-            participantCounts shouldEqual (count downTo 1).toList()
+            participantCounts.size shouldBeEqualTo count
+            participantCounts shouldBeEqualTo (count downTo 1).toList()
 
             // Compare leader names
             logger.debug { "leaderNames = $leaderNames" }
-            leaderNames.sorted() shouldEqual List(count) { "Thread$it" }.sorted()
+            leaderNames.sorted() shouldBeEqualTo List(count) { "Thread$it" }.sorted()
         }
     }
 

@@ -27,7 +27,7 @@ import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
@@ -120,13 +120,13 @@ class DistributedDoubleBarrierTests {
                 enterLatch.await()
                 sleep(2.seconds)
 
-                enterWaiterCount.toInt() shouldEqual count - 1
+                enterWaiterCount.toInt() shouldBeEqualTo count - 1
                 enterBarrier(99, this)
 
                 leaveLatch.await()
                 sleep(2.seconds)
 
-                leaveWaiterCount.toInt() shouldEqual count - 1
+                leaveWaiterCount.toInt() shouldBeEqualTo count - 1
                 leaveBarrier(99, this)
             }
 
@@ -136,11 +136,11 @@ class DistributedDoubleBarrierTests {
             holder.checkForException()
         }
 
-        enterRetryCounter.get() shouldEqual retryAttempts * (count - 1)
-        enterCounter.get() shouldEqual count
+        enterRetryCounter.get() shouldBeEqualTo retryAttempts * (count - 1)
+        enterCounter.get() shouldBeEqualTo count
 
-        leaveRetryCounter.get() shouldEqual retryAttempts * (count - 1)
-        leaveCounter.get() shouldEqual count
+        leaveRetryCounter.get() shouldBeEqualTo retryAttempts * (count - 1)
+        leaveCounter.get() shouldBeEqualTo count
 
         logger.debug { "Done" }
     }

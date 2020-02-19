@@ -26,7 +26,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.ConcurrentMap
@@ -68,7 +68,7 @@ class ThreadedServiceDiscoveryTests {
                         context.serviceMap.forEach { (_, service) ->
                             val inst = queryForInstance(service.name, service.id)
                             logger.debug { "Retrieved value: $inst" }
-                            inst shouldEqual service
+                            inst shouldBeEqualTo service
                         }
                     }
                 }
@@ -92,7 +92,7 @@ class ThreadedServiceDiscoveryTests {
                         context.serviceMap.forEach { (_, service) ->
                             val inst = queryForInstance(service.name, service.id)
                             logger.debug { "Retrieved updated value: $inst" }
-                            inst shouldEqual service
+                            inst shouldBeEqualTo service
                         }
                     }
                 }
@@ -101,7 +101,7 @@ class ThreadedServiceDiscoveryTests {
             withServiceDiscovery(client, path) {
                 val size = queryForNames().size
                 logger.debug { "Retrieved all names: $size" }
-                size shouldEqual threadCount * serviceCount
+                size shouldBeEqualTo threadCount * serviceCount
             }
 
             // Delete services

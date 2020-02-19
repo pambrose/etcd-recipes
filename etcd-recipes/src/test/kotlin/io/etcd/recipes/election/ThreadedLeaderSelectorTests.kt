@@ -24,7 +24,7 @@ import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import mu.KLogging
-import org.amshove.kluent.shouldEqual
+import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.atomic.AtomicInteger
@@ -62,8 +62,8 @@ class ThreadedLeaderSelectorTests {
             }
         }
 
-        takeLeadershiptCounter.get() shouldEqual count
-        relinquishLeadershiptCounter.get() shouldEqual count
+        takeLeadershiptCounter.get() shouldBeEqualTo count
+        relinquishLeadershiptCounter.get() shouldBeEqualTo count
     }
 
     @Test
@@ -103,8 +103,8 @@ class ThreadedLeaderSelectorTests {
                 .forEach { it.close() }
         }
 
-        takeLeadershiptCounter.get() shouldEqual count
-        relinquishLeadershiptCounter.get() shouldEqual count
+        takeLeadershiptCounter.get() shouldBeEqualTo count
+        relinquishLeadershiptCounter.get() shouldBeEqualTo count
     }
 
     companion object : KLogging()

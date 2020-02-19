@@ -27,10 +27,10 @@ import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
+import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldBeFalse
 import org.amshove.kluent.shouldBeLessThan
 import org.amshove.kluent.shouldBeTrue
-import org.amshove.kluent.shouldEqual
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
@@ -64,7 +64,7 @@ class DistributedBarrierTests {
 
                 withDistributedBarrier(client, path) {
 
-                    isBarrierSet() shouldEqual false
+                    isBarrierSet() shouldBeEqualTo false
 
                     logger.debug { "Setting Barrier" }
                     val isSet = setBarrier()
@@ -114,8 +114,8 @@ class DistributedBarrierTests {
 
         completeLatch.await()
 
-        timeoutCount.get() shouldEqual count
-        advancedCount.get() shouldEqual count
+        timeoutCount.get() shouldBeEqualTo count
+        advancedCount.get() shouldBeEqualTo count
 
         logger.debug { "Done" }
     }
@@ -153,7 +153,7 @@ class DistributedBarrierTests {
 
             withDistributedBarrier(client, path) {
 
-                isBarrierSet() shouldEqual false
+                isBarrierSet() shouldBeEqualTo false
 
                 logger.debug { "Setting Barrier" }
                 val isSet = setBarrier()
@@ -179,8 +179,8 @@ class DistributedBarrierTests {
             holder.checkForException()
         }
 
-        timeoutCount.get() shouldEqual count
-        advancedCount.get() shouldEqual count
+        timeoutCount.get() shouldBeEqualTo count
+        advancedCount.get() shouldBeEqualTo count
 
         logger.debug { "Done" }
     }
