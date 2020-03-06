@@ -22,7 +22,7 @@ import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.election.LeaderListener
 import io.etcd.recipes.election.LeaderSelector
 import java.util.concurrent.Executors
-import kotlin.time.MonoClock
+import kotlin.time.TimeSource.Monotonic
 import kotlin.time.days
 
 fun main() {
@@ -34,8 +34,8 @@ fun main() {
         LeaderSelector.reportLeader(urls,
                                     electionPath,
                                     object : LeaderListener {
-                                        val electedClock = MonoClock
-                                        val unelectedClock = MonoClock
+                                        val electedClock = Monotonic
+                                        val unelectedClock = Monotonic
                                         var electedTime = electedClock.markNow()
                                         var unelectedTime = unelectedClock.markNow()
                                         var currentLeader = ""
