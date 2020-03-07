@@ -22,13 +22,8 @@ import io.etcd.jetcd.Client;
 import java.util.List;
 
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.deleteKeys;
-import static io.etcd.recipes.common.KVUtils.getValue;
-import static io.etcd.recipes.common.KVUtils.isKeyPresent;
-import static io.etcd.recipes.common.KVUtils.putValue;
-import static io.etcd.recipes.common.TxnUtils.getDoesExist;
-import static io.etcd.recipes.common.TxnUtils.setTo;
-import static io.etcd.recipes.common.TxnUtils.transaction;
+import static io.etcd.recipes.common.KVUtils.*;
+import static io.etcd.recipes.common.TxnUtils.*;
 import static java.lang.String.format;
 
 public class SetValueWithTxn {

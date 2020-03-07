@@ -1,2 +1,2 @@
-include 'etcd-recipe-examples'
+include 'etcd-recipes-examples'
 include 'etcd-recipes'
