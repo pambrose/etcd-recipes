@@ -59,20 +59,28 @@ class DistributedPriorityQueueTest {
     fun serialTestWithWait() {
         val queuePath = "/queue/serialTestWithWait"
         val dequeuedData = mutableListOf<String>()
-        val latch = CountDownLatch(1)
+        val dequeueLatch = CountDownLatch(1)
+        val enqueueLatch = CountDownLatch(1)
 
         connectToEtcd(urls) { client ->
             client.getChildCount(queuePath) shouldBeEqualTo 0
 
-            thread(latch) {
+            // Remove items
+            thread(dequeueLatch) {
                 withDistributedPriorityQueue(client, queuePath) {
                     repeat(iterCount) { dequeuedData += dequeue().asString }
                 }
             }
 
-            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
+            // Add items
+            thread(enqueueLatch) {
+                withDistributedPriorityQueue(client, queuePath) {
+                    repeat(iterCount) { i -> enqueue(testData[i], 1u) }
+                }
+            }
 
-            latch.await()
+            dequeueLatch.await()
+            enqueueLatch.await()
 
             client.getChildCount(queuePath) shouldBeEqualTo 0
         }
@@ -267,7 +275,9 @@ class DistributedPriorityQueueTest {
             withDistributedPriorityQueue(client, queuePath) {
                 repeat(iterCount) { i -> enqueue(testData[i], (iterCount - i)) }
             }
-            withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
+            withDistributedPriorityQueue(client, queuePath) {
+                repeat(iterCount) { dequeuedData += dequeue().asString }
+            }
             client.getChildCount(queuePath) shouldBeEqualTo 0
         }
 

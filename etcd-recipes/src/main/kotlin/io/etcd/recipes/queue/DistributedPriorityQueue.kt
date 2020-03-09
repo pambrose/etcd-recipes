@@ -72,5 +72,4 @@ class DistributedPriorityQueue(client: Client, queuePath: String) : AbstractQueu
         if (!txn.isSucceeded)
             newSequentialKV(prefix, value)
     }
-
 }
