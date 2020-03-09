@@ -35,7 +35,7 @@ open class EtcdConnector(val client: Client) : Closeable {
         if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
     }
 
-    val exceptions get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList<Throwable>()
+    val exceptions: List<Throwable> get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList()
 
     val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.size > 0
 

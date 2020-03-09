@@ -28,7 +28,6 @@ import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
@@ -53,7 +52,7 @@ class ServiceCacheTests {
                     start()
                     sleep(2.seconds)
 
-                    instances.size shouldEqualTo 0
+                    instances.size shouldBeEqualTo 0
                     serviceName shouldBeEqualTo name
                     urls shouldBeEqualTo urls
 

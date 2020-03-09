@@ -190,7 +190,7 @@ class PathChildrenCache(client: Client,
                         }
                         DELETE -> {
                             logger.debug { "$stripped deleted" }
-                            val prevValue = cacheMap.remove(stripped)?.let { it }
+                            val prevValue = cacheMap.remove(stripped)
                             val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
                             listeners.forEach { listener ->
                                 try {

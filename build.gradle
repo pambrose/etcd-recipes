@@ -33,7 +33,7 @@ allprojects {
 
 subprojects {
   def guavaVersion = '28.2-jre'
-  def jetcdVersion = '0.4.1'
+  def jetcdVersion = '0.5.0'
   def junitVersion = '5.6.0'
   def kluentVersion = '1.60'
   def loggingVersion = '1.7.8'
