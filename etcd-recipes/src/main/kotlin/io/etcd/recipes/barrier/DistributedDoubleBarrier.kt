@@ -83,5 +83,3 @@ constructor(client: Client,
         internal fun defaultClientId() = "${DistributedDoubleBarrier::class.simpleName}:${randomId(tokenLength)}"
     }
 }
-
-

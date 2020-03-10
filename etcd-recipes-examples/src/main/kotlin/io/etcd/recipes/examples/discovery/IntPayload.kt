@@ -30,4 +30,3 @@ data class IntPayload(var intval: Int) {
         fun toObject(json: String) = Json.parse(serializer(), json)
     }
 }
-

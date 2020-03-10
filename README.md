@@ -18,9 +18,9 @@ kind of support for [etcd](https://etcd.io) that
 
 ## Examples
 
-[Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples) 
+The repo includes [Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples) 
 and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples) 
-examples are included in the repo.
+examples.
 
 ## Usage
 ```kotlin
