@@ -1,7 +1,7 @@
 plugins {
   id 'java'
-  id 'org.jetbrains.kotlin.jvm' version '1.3.70' apply false
-  id 'org.jetbrains.kotlin.plugin.serialization' version '1.3.70' apply false
+  id 'org.jetbrains.kotlin.jvm' version '1.3.71' apply false
+  id 'org.jetbrains.kotlin.plugin.serialization' version '1.3.71' apply false
   id "com.github.ben-manes.versions" version "0.28.0" apply false
   id 'jacoco'
   id 'com.github.kt3k.coveralls' version '2.10.1' apply false
@@ -23,7 +23,7 @@ allprojects {
   repositories {
     maven { url = 'https://maven-central.storage-download.googleapis.com/repos/central/data/' }
     jcenter()
-    maven { url 'https://jitpack.io' }
+    maven { url = 'https://jitpack.io' }
   }
 
   configurations.all {
@@ -34,12 +34,12 @@ allprojects {
 subprojects {
   def guavaVersion = '28.2-jre'
   def jetcdVersion = '0.5.0'
-  def junitVersion = '5.6.0'
+  def junitVersion = '5.6.1'
   def kluentVersion = '1.60'
-  def loggingVersion = '1.7.8'
+  def loggingVersion = '1.7.9'
   def serializationVersion = '0.20.0-1.3.70-eap-274-2'
   def slf4jVersion = '1.7.28'
-  def utilsVersion = '1.1.15'
+  def utilsVersion = '16bc567'
 
   dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"

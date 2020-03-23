@@ -12,7 +12,7 @@ tests:
 	./gradlew check jacocoTestReport
 
 refresh:
-	./gradlew build --refresh-dependencies
+	./gradlew --refresh-dependencies
 
 versioncheck:
 	./gradlew dependencyUpdates
