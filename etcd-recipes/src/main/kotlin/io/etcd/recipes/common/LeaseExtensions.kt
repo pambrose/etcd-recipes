@@ -20,9 +20,9 @@
 package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.CloseableClient
-import io.etcd.jetcd.Observers
 import io.etcd.jetcd.lease.LeaseGrantResponse
+import io.etcd.jetcd.support.CloseableClient
+import io.etcd.jetcd.support.Observers
 import kotlin.time.Duration
 
 fun <T> Client.keepAliveWith(lease: LeaseGrantResponse, block: () -> T): T =

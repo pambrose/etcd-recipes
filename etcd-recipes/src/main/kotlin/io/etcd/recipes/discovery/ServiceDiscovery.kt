@@ -22,8 +22,8 @@ import com.github.pambrose.common.delegate.AtomicDelegates.nonNullableReference
 import com.github.pambrose.common.util.randomId
 import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.CloseableClient
 import io.etcd.jetcd.lease.LeaseGrantResponse
+import io.etcd.jetcd.support.CloseableClient
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs

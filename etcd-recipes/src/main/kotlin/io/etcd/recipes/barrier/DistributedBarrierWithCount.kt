@@ -22,7 +22,7 @@ import com.github.pambrose.common.concurrent.BooleanMonitor
 import com.github.pambrose.common.time.timeUnitToDuration
 import com.github.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.CloseableClient
+import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.barrier.DistributedBarrierWithCount.Companion.defaultClientId
