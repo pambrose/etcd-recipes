@@ -23,11 +23,11 @@ import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
+import kotlinx.atomicfu.atomic
 import mu.KLogging
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
 class ThreadedLeaderSelectorTests {
@@ -36,8 +36,8 @@ class ThreadedLeaderSelectorTests {
 
     @Test
     fun threadedElection1Test() {
-        val takeLeadershiptCounter = AtomicInteger(0)
-        val relinquishLeadershiptCounter = AtomicInteger(0)
+        val takeLeadershiptCounter = atomic(0)
+        val relinquishLeadershiptCounter = atomic(0)
 
         blockingThreads(count) {
             val takeAction =
@@ -62,14 +62,14 @@ class ThreadedLeaderSelectorTests {
             }
         }
 
-        takeLeadershiptCounter.get() shouldBeEqualTo count
-        relinquishLeadershiptCounter.get() shouldBeEqualTo count
+        takeLeadershiptCounter.value shouldBeEqualTo count
+        relinquishLeadershiptCounter.value shouldBeEqualTo count
     }
 
     @Test
     fun threadedElection2Test() {
-        val takeLeadershiptCounter = AtomicInteger(0)
-        val relinquishLeadershiptCounter = AtomicInteger(0)
+        val takeLeadershiptCounter = atomic(0)
+        val relinquishLeadershiptCounter = atomic(0)
         val electionList: MutableList<LeaderSelector> = synchronizedList(mutableListOf())
 
         val takeAction =
@@ -103,8 +103,8 @@ class ThreadedLeaderSelectorTests {
                 .forEach { it.close() }
         }
 
-        takeLeadershiptCounter.get() shouldBeEqualTo count
-        relinquishLeadershiptCounter.get() shouldBeEqualTo count
+        takeLeadershiptCounter.value shouldBeEqualTo count
+        relinquishLeadershiptCounter.value shouldBeEqualTo count
     }
 
     companion object : KLogging()

@@ -22,12 +22,12 @@ import com.github.pambrose.common.util.random
 import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
+import kotlinx.atomicfu.atomic
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
 class SerialLeaderSelectorTests {
@@ -43,8 +43,8 @@ class SerialLeaderSelectorTests {
     @Test
     fun serialElectionTest() {
         val count = 10
-        val takeLeadershiptCounter = AtomicInteger(0)
-        val relinquishLeadershiptCounter = AtomicInteger(0)
+        val takeLeadershiptCounter = atomic(0)
+        val relinquishLeadershiptCounter = atomic(0)
 
         val leadershipAction = { selector: LeaderSelector ->
             val pause = 3.random().seconds
@@ -70,12 +70,12 @@ class SerialLeaderSelectorTests {
             }
         }
 
-        takeLeadershiptCounter.get() shouldBeEqualTo count
-        relinquishLeadershiptCounter.get() shouldBeEqualTo count
+        takeLeadershiptCounter.value shouldBeEqualTo count
+        relinquishLeadershiptCounter.value shouldBeEqualTo count
 
         // Reset counters
-        takeLeadershiptCounter.set(0)
-        relinquishLeadershiptCounter.set(0)
+        takeLeadershiptCounter.value = 0
+        relinquishLeadershiptCounter.value = 0
 
         connectToEtcd(urls) { client ->
             repeat(count) {
@@ -87,8 +87,8 @@ class SerialLeaderSelectorTests {
             }
         }
 
-        takeLeadershiptCounter.get() shouldBeEqualTo count
-        relinquishLeadershiptCounter.get() shouldBeEqualTo count
+        takeLeadershiptCounter.value shouldBeEqualTo count
+        relinquishLeadershiptCounter.value shouldBeEqualTo count
     }
 
     companion object : KLogging()

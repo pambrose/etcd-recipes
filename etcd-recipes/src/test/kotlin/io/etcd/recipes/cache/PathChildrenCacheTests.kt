@@ -33,9 +33,9 @@ import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.putValuesWithKeepAlive
 import io.etcd.recipes.common.urls
+import kotlinx.atomicfu.atomic
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 import kotlin.time.seconds
 
@@ -66,10 +66,10 @@ class PathChildrenCacheTests {
     fun listenerTestNoInitialData() {
         val count = 25
         val path = "/cache/listenerTestNoInitialData"
-        val addCount = AtomicInteger(0)
-        val updateCount = AtomicInteger(0)
-        val deleteCount = AtomicInteger(0)
-        val initCount = AtomicInteger(0)
+        val addCount = atomic(0)
+        val updateCount = atomic(0)
+        val deleteCount = atomic(0)
+        val initCount = atomic(0)
 
         connectToEtcd(urls) { client ->
 
@@ -93,10 +93,10 @@ class PathChildrenCacheTests {
                 waitOnStartComplete()
                 currentData shouldBeEqualTo emptyList()
 
-                addCount.get() shouldBeEqualTo 0
-                updateCount.get() shouldBeEqualTo 0
-                deleteCount.get() shouldBeEqualTo 0
-                initCount.get() shouldBeEqualTo 0
+                addCount.value shouldBeEqualTo 0
+                updateCount.value shouldBeEqualTo 0
+                deleteCount.value shouldBeEqualTo 0
+                initCount.value shouldBeEqualTo 0
 
                 val kvs = generateTestData(count)
 
@@ -117,20 +117,20 @@ class PathChildrenCacheTests {
 
         sleep(5.seconds)
 
-        addCount.get() shouldBeEqualTo count
-        updateCount.get() shouldBeEqualTo count
-        deleteCount.get() shouldBeEqualTo count
-        initCount.get() shouldBeEqualTo 0
+        addCount.value shouldBeEqualTo count
+        updateCount.value shouldBeEqualTo count
+        deleteCount.value shouldBeEqualTo count
+        initCount.value shouldBeEqualTo 0
     }
 
     @Test
     fun listenerTestWithInitialData() {
         val count = 25
         val path = "/cache/listenerTestWithInitialData"
-        val addCount = AtomicInteger(0)
-        val updateCount = AtomicInteger(0)
-        val deleteCount = AtomicInteger(0)
-        val initCount = AtomicInteger(0)
+        val addCount = atomic(0)
+        val updateCount = atomic(0)
+        val deleteCount = atomic(0)
+        val initCount = atomic(0)
 
         connectToEtcd(urls) { client ->
 
@@ -162,10 +162,10 @@ class PathChildrenCacheTests {
                 sleep(5.seconds)
                 compareData(count, currentData, testKvs, suffix)
 
-                addCount.get() shouldBeEqualTo 0
-                updateCount.get() shouldBeEqualTo 0
-                deleteCount.get() shouldBeEqualTo 0
-                initCount.get() shouldBeEqualTo 0
+                addCount.value shouldBeEqualTo 0
+                updateCount.value shouldBeEqualTo 0
+                deleteCount.value shouldBeEqualTo 0
+                initCount.value shouldBeEqualTo 0
 
                 client.deleteChildren(path)
 
@@ -174,20 +174,20 @@ class PathChildrenCacheTests {
             }
         }
 
-        addCount.get() shouldBeEqualTo 0
-        updateCount.get() shouldBeEqualTo 0
-        deleteCount.get() shouldBeEqualTo count
-        initCount.get() shouldBeEqualTo 0
+        addCount.value shouldBeEqualTo 0
+        updateCount.value shouldBeEqualTo 0
+        deleteCount.value shouldBeEqualTo count
+        initCount.value shouldBeEqualTo 0
     }
 
     @Test
     fun withInitialEventTest() {
         val count = 25
         val path = "/cache/noInitialDataTest"
-        val addCount = AtomicInteger(0)
-        val updateCount = AtomicInteger(0)
-        val deleteCount = AtomicInteger(0)
-        val initCount = AtomicInteger(0)
+        val addCount = atomic(0)
+        val updateCount = atomic(0)
+        val deleteCount = atomic(0)
+        val initCount = atomic(0)
 
         connectToEtcd(urls) { client ->
 
@@ -235,10 +235,10 @@ class PathChildrenCacheTests {
         }
 
 
-        addCount.get() shouldBeEqualTo 0
-        updateCount.get() shouldBeEqualTo 0
-        deleteCount.get() shouldBeEqualTo count
-        initCount.get() shouldBeEqualTo 1
+        addCount.value shouldBeEqualTo 0
+        updateCount.value shouldBeEqualTo 0
+        deleteCount.value shouldBeEqualTo count
+        initCount.value shouldBeEqualTo 1
     }
 
     @Test
