@@ -26,12 +26,12 @@ import io.etcd.jetcd.support.Observers
 import kotlin.time.Duration
 
 fun <T> Client.keepAliveWith(lease: LeaseGrantResponse, block: () -> T): T =
-    keepAlive(lease).use { block.invoke() }
+  keepAlive(lease).use { block.invoke() }
 
 fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
-    leaseClient.keepAlive(lease.id,
-                          Observers.observer(
-                              { /*println("KeepAlive next resp: $next")*/ },
-                              { /*println("KeepAlive err resp: $err")*/ }))
+  leaseClient.keepAlive(lease.id,
+                        Observers.observer(
+                          { /*println("KeepAlive next resp: $next")*/ },
+                          { /*println("KeepAlive err resp: $err")*/ }))
 
 fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse = leaseClient.grant(ttl.inSeconds.toLong()).get()

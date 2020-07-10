@@ -31,65 +31,65 @@ import org.junit.jupiter.api.Test
 import kotlin.time.seconds
 
 class SerialLeaderSelectorTests {
-    val path = "/election/${javaClass.simpleName}"
+  val path = "/election/${javaClass.simpleName}"
 
-    @Test
-    fun badArgsTest() {
-        connectToEtcd(urls) { client ->
-            invoking { LeaderSelector(client, "") } shouldThrow IllegalArgumentException::class
-        }
+  @Test
+  fun badArgsTest() {
+    connectToEtcd(urls) { client ->
+      invoking { LeaderSelector(client, "") } shouldThrow IllegalArgumentException::class
+    }
+  }
+
+  @Test
+  fun serialElectionTest() {
+    val count = 10
+    val takeLeadershiptCounter = atomic(0)
+    val relinquishLeadershiptCounter = atomic(0)
+
+    val leadershipAction = { selector: LeaderSelector ->
+      val pause = 3.random().seconds
+      logger.debug { "${selector.clientId} elected leader for $pause" }
+      sleep(pause)
+      takeLeadershiptCounter.incrementAndGet()
+      Unit
     }
 
-    @Test
-    fun serialElectionTest() {
-        val count = 10
-        val takeLeadershiptCounter = atomic(0)
-        val relinquishLeadershiptCounter = atomic(0)
-
-        val leadershipAction = { selector: LeaderSelector ->
-            val pause = 3.random().seconds
-            logger.debug { "${selector.clientId} elected leader for $pause" }
-            sleep(pause)
-            takeLeadershiptCounter.incrementAndGet()
-            Unit
-        }
-
-        val relinquishAction = { selector: LeaderSelector ->
-            logger.debug { "${selector.clientId} relinquished" }
-            relinquishLeadershiptCounter.incrementAndGet()
-            Unit
-        }
-
-        connectToEtcd(urls) { client ->
-            withLeaderSelector(client, path, leadershipAction, relinquishAction) {
-                repeat(count) {
-                    logger.debug { "First iteration: $it" }
-                    start()
-                    waitOnLeadershipComplete()
-                }
-            }
-        }
-
-        takeLeadershiptCounter.value shouldBeEqualTo count
-        relinquishLeadershiptCounter.value shouldBeEqualTo count
-
-        // Reset counters
-        takeLeadershiptCounter.value = 0
-        relinquishLeadershiptCounter.value = 0
-
-        connectToEtcd(urls) { client ->
-            repeat(count) {
-                logger.debug { "Second iteration: $it" }
-                withLeaderSelector(client, path, leadershipAction, relinquishAction) {
-                    start()
-                    waitOnLeadershipComplete()
-                }
-            }
-        }
-
-        takeLeadershiptCounter.value shouldBeEqualTo count
-        relinquishLeadershiptCounter.value shouldBeEqualTo count
+    val relinquishAction = { selector: LeaderSelector ->
+      logger.debug { "${selector.clientId} relinquished" }
+      relinquishLeadershiptCounter.incrementAndGet()
+      Unit
     }
 
-    companion object : KLogging()
+    connectToEtcd(urls) { client ->
+      withLeaderSelector(client, path, leadershipAction, relinquishAction) {
+        repeat(count) {
+          logger.debug { "First iteration: $it" }
+          start()
+          waitOnLeadershipComplete()
+        }
+      }
+    }
+
+    takeLeadershiptCounter.value shouldBeEqualTo count
+    relinquishLeadershiptCounter.value shouldBeEqualTo count
+
+    // Reset counters
+    takeLeadershiptCounter.value = 0
+    relinquishLeadershiptCounter.value = 0
+
+    connectToEtcd(urls) { client ->
+      repeat(count) {
+        logger.debug { "Second iteration: $it" }
+        withLeaderSelector(client, path, leadershipAction, relinquishAction) {
+          start()
+          waitOnLeadershipComplete()
+        }
+      }
+    }
+
+    takeLeadershiptCounter.value shouldBeEqualTo count
+    relinquishLeadershiptCounter.value shouldBeEqualTo count
+  }
+
+  companion object : KLogging()
 }

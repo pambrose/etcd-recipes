@@ -30,65 +30,65 @@ import org.junit.jupiter.api.Test
 import kotlin.time.seconds
 
 class TransientKeyValueTest {
-    private val defaultValue = "nothing"
+  private val defaultValue = "nothing"
+
+  @Test
+  fun singleKVTest() {
+    val path = "/keyvalue/singleKVTest"
+    val id = randomId(8)
+
+    connectToEtcd(urls) { client ->
+
+      client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
+
+      withTransientKeyValue(client, path, id) {
+        repeat(10) {
+          client.getValue(path)?.asString shouldBeEqualTo id
+          sleep(1.seconds)
+        }
+      }
+
+      // Wait for node to go away
+      sleep(5.seconds)
+      client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
+    }
 
     @Test
-    fun singleKVTest() {
-        val path = "/keyvalue/singleKVTest"
-        val id = randomId(8)
+    fun multiKVTest() {
+      val count = 25
+      val prefix = "/keyvalue"
+      val paths = List(count) { "$prefix/multiKVTest$it" }
+      val ids = List(count) { randomId(8) }
 
-        connectToEtcd(urls) { client ->
+      connectToEtcd(urls) { client ->
 
-            client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
+        client.apply {
+          for (p in paths)
+            getValue(p, defaultValue) shouldBeEqualTo defaultValue
 
-            withTransientKeyValue(client, path, id) {
-                repeat(10) {
-                    client.getValue(path)?.asString shouldBeEqualTo id
-                    sleep(1.seconds)
-                }
+          getChildCount(prefix) shouldBeEqualTo 0
+
+          val kvs = List(count) { TransientKeyValue(client, paths[it], ids[it]) }
+
+          repeat(10) {
+            repeat(count) { j ->
+              getValue(paths[j])?.asString shouldBeEqualTo ids[j]
             }
+          }
 
-            // Wait for node to go away
-            sleep(5.seconds)
-            client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
+          getChildCount(prefix) shouldBeEqualTo 25
+
+          for (kv in kvs)
+            kv.close()
+
+          // Wait for nodes to go away
+          sleep(5.seconds)
+          for (p in paths)
+            getValue(p, defaultValue) shouldBeEqualTo defaultValue
+
+          getChildCount(prefix) shouldBeEqualTo 0
         }
-
-        @Test
-        fun multiKVTest() {
-            val count = 25
-            val prefix = "/keyvalue"
-            val paths = List(count) { "$prefix/multiKVTest$it" }
-            val ids = List(count) { randomId(8) }
-
-            connectToEtcd(urls) { client ->
-
-                client.apply {
-                    for (p in paths)
-                        getValue(p, defaultValue) shouldBeEqualTo defaultValue
-
-                    getChildCount(prefix) shouldBeEqualTo 0
-
-                    val kvs = List(count) { TransientKeyValue(client, paths[it], ids[it]) }
-
-                    repeat(10) {
-                        repeat(count) { j ->
-                            getValue(paths[j])?.asString shouldBeEqualTo ids[j]
-                        }
-                    }
-
-                    getChildCount(prefix) shouldBeEqualTo 25
-
-                    for (kv in kvs)
-                        kv.close()
-
-                    // Wait for nodes to go away
-                    sleep(5.seconds)
-                    for (p in paths)
-                        getValue(p, defaultValue) shouldBeEqualTo defaultValue
-
-                    getChildCount(prefix) shouldBeEqualTo 0
-                }
-            }
-        }
+      }
     }
+  }
 }

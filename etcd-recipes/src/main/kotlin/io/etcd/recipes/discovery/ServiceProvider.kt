@@ -26,16 +26,16 @@ class ServiceProvider internal constructor(client: Client,
                                            namesPath: String,
                                            val serviceName: String) : Closeable {
 
-    val serviceDiscovery = lazy { ServiceDiscovery(client, namesPath) }
+  val serviceDiscovery = lazy { ServiceDiscovery(client, namesPath) }
 
-    fun getInstance(): ServiceInstance = getAllInstances()[Random.nextInt(0, getAllInstances().size)]
+  fun getInstance(): ServiceInstance = getAllInstances()[Random.nextInt(0, getAllInstances().size)]
 
-    fun getAllInstances(): List<ServiceInstance> {
-        return serviceDiscovery.value.queryForInstances(serviceName)
-    }
+  fun getAllInstances(): List<ServiceInstance> {
+    return serviceDiscovery.value.queryForInstances(serviceName)
+  }
 
-    override fun close() {
-        if (serviceDiscovery.isInitialized())
-            serviceDiscovery.value.close()
-    }
+  override fun close() {
+    if (serviceDiscovery.isInitialized())
+      serviceDiscovery.value.close()
+  }
 }

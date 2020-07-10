@@ -21,8 +21,8 @@ package io.etcd.recipes.discovery
 import io.etcd.jetcd.watch.WatchEvent
 
 interface ServiceCacheListener {
-    fun cacheChanged(eventType: WatchEvent.EventType,
-                     isAdd: Boolean,
-                     serviceName: String,
-                     serviceInstance: ServiceInstance?)
+  fun cacheChanged(eventType: WatchEvent.EventType,
+                   isAdd: Boolean,
+                   serviceName: String,
+                   serviceInstance: ServiceInstance?)
 }

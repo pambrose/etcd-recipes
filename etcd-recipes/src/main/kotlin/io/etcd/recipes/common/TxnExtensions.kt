@@ -30,10 +30,10 @@ import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.PutOption
 
 fun Client.transaction(reciever: Txn.() -> Txn): TxnResponse =
-    kvClient.txn().run {
-        reciever()
-        commit()
-    }.get()
+  kvClient.txn().run {
+    reciever()
+    commit()
+  }.get()
 
 fun <T> equalTo(bytes: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(bytes, Cmp.Op.EQUAL, target)
 fun <T> lessThan(bytes: ByteSequence, target: CmpTarget<T>): Cmp = Cmp(bytes, Cmp.Op.LESS, target)
@@ -59,19 +59,19 @@ fun deleteOp(key: ByteSequence, option: DeleteOption = DeleteOption.DEFAULT): Op
 
 @JvmOverloads
 fun deleteOp(key: String, option: DeleteOption = DeleteOption.DEFAULT): Op.DeleteOp =
-    deleteOp(key.asByteSequence, option)
+  deleteOp(key.asByteSequence, option)
 
 fun String.setTo(value: ByteSequence, putOption: PutOption): Op.PutOp =
-    Op.put(asByteSequence, value, putOption)
+  Op.put(asByteSequence, value, putOption)
 
 fun String.setTo(keyval: String, putOption: PutOption): Op.PutOp =
-    Op.put(asByteSequence, keyval.asByteSequence, putOption)
+  Op.put(asByteSequence, keyval.asByteSequence, putOption)
 
 fun String.setTo(keyval: Int, putOption: PutOption): Op.PutOp =
-    Op.put(asByteSequence, keyval.asByteSequence, putOption)
+  Op.put(asByteSequence, keyval.asByteSequence, putOption)
 
 fun String.setTo(keyval: Long, putOption: PutOption): Op.PutOp =
-    Op.put(asByteSequence, keyval.asByteSequence, putOption)
+  Op.put(asByteSequence, keyval.asByteSequence, putOption)
 
 infix fun String.setTo(value: ByteSequence): Op.PutOp = setTo(value, PutOption.DEFAULT)
 infix fun String.setTo(keyval: String): Op.PutOp = setTo(keyval, PutOption.DEFAULT)

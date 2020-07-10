@@ -36,7 +36,7 @@ fun <T> withDistributedDoubleBarrier(client: Client,
                                      memberCount: Int,
                                      clientId: String = defaultClientId(),
                                      receiver: DistributedDoubleBarrier.() -> T): T =
-    DistributedDoubleBarrier(client, barrierPath, memberCount, clientId).use { it.receiver() }
+  DistributedDoubleBarrier(client, barrierPath, memberCount, clientId).use { it.receiver() }
 
 class DistributedDoubleBarrier
 @JvmOverloads
@@ -45,41 +45,41 @@ constructor(client: Client,
             memberCount: Int,
             val clientId: String = defaultClientId()) : Closeable {
 
-    private val enterBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("enter"), memberCount)
-    private val leaveBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("leave"), memberCount)
+  private val enterBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("enter"), memberCount)
+  private val leaveBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("leave"), memberCount)
 
-    init {
-        require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-    }
+  init {
+    require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
+  }
 
-    val enterWaiterCount: Long get() = enterBarrier.waiterCount
+  val enterWaiterCount: Long get() = enterBarrier.waiterCount
 
-    val leaveWaiterCount: Long get() = leaveBarrier.waiterCount
+  val leaveWaiterCount: Long get() = leaveBarrier.waiterCount
 
-    @Throws(InterruptedException::class, EtcdRecipeException::class)
-    fun enter(): Boolean = enter(Long.MAX_VALUE.days)
+  @Throws(InterruptedException::class, EtcdRecipeException::class)
+  fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 
-    @Throws(InterruptedException::class, EtcdRecipeException::class)
-    fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
+  @Throws(InterruptedException::class, EtcdRecipeException::class)
+  fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
 
-    @Throws(InterruptedException::class, EtcdRecipeException::class)
-    fun enter(timeout: Duration): Boolean = enterBarrier.waitOnBarrier(timeout)
+  @Throws(InterruptedException::class, EtcdRecipeException::class)
+  fun enter(timeout: Duration): Boolean = enterBarrier.waitOnBarrier(timeout)
 
-    @Throws(InterruptedException::class, EtcdRecipeException::class)
-    fun leave(): Boolean = leave(Long.MAX_VALUE.days)
+  @Throws(InterruptedException::class, EtcdRecipeException::class)
+  fun leave(): Boolean = leave(Long.MAX_VALUE.days)
 
-    @Throws(InterruptedException::class, EtcdRecipeException::class)
-    fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))
+  @Throws(InterruptedException::class, EtcdRecipeException::class)
+  fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))
 
-    @Throws(InterruptedException::class, EtcdRecipeException::class)
-    fun leave(timeout: Duration): Boolean = leaveBarrier.waitOnBarrier(timeout)
+  @Throws(InterruptedException::class, EtcdRecipeException::class)
+  fun leave(timeout: Duration): Boolean = leaveBarrier.waitOnBarrier(timeout)
 
-    override fun close() {
-        enterBarrier.close()
-        leaveBarrier.close()
-    }
+  override fun close() {
+    enterBarrier.close()
+    leaveBarrier.close()
+  }
 
-    companion object {
-        internal fun defaultClientId() = "${DistributedDoubleBarrier::class.simpleName}:${randomId(tokenLength)}"
-    }
+  companion object {
+    internal fun defaultClientId() = "${DistributedDoubleBarrier::class.simpleName}:${randomId(tokenLength)}"
+  }
 }

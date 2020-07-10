@@ -56,204 +56,207 @@ fun <T> withPathChildrenCache(client: Client,
                               cachePath: String,
                               userExecutor: Executor? = null,
                               receiver: PathChildrenCache.() -> T): T =
-    PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
+  PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
 
 class PathChildrenCache(client: Client,
                         val cachePath: String,
                         private val userExecutor: Executor? = null) : EtcdConnector(client) {
 
-    private var watcher: Watch.Watcher? by nullableReference()
-    private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
-    private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
-    // Use a single threaded executor to maintain order
-    private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
+  private var watcher: Watch.Watcher? by nullableReference()
+  private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
+  private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
 
-    enum class StartMode {
-        /**
-         * cache will _not_ be primed. i.e. it will start empty and you will receive
-         * events for all nodes added, etc.
-         */
-        NORMAL,
-        /**
-         * rebuild() will be called before this method returns in
-         * order to get an initial view of the node.
-         */
-        BUILD_INITIAL_CACHE,
-        /**
-         * After cache is primed with initial values (in the background) a
-         * PathChildrenCacheEvent.Type.INITIALIZED event will be posted
-         */
-        POST_INITIALIZED_EVENT
-    }
+  // Use a single threaded executor to maintain order
+  private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
 
-    @JvmOverloads
-    fun start(buildInitial: Boolean = false, waitOnStartComplete: Boolean = true): PathChildrenCache =
-        start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL, waitOnStartComplete)
+  enum class StartMode {
+    /**
+     * cache will _not_ be primed. i.e. it will start empty and you will receive
+     * events for all nodes added, etc.
+     */
+    NORMAL,
 
-    @JvmOverloads
-    @Synchronized
-    fun start(mode: StartMode, waitOnStartComplete: Boolean = true): PathChildrenCache {
-        if (startCalled)
-            throw EtcdRecipeRuntimeException("start() already called")
-        checkCloseNotCalled()
+    /**
+     * rebuild() will be called before this method returns in
+     * order to get an initial view of the node.
+     */
+    BUILD_INITIAL_CACHE,
 
-        // Preload with initial data
-        if (mode == BUILD_INITIAL_CACHE || mode == POST_INITIALIZED_EVENT) {
-            executor.execute {
-                try {
-                    setupWatcher()
-                    loadData()
-                } finally {
-                    if (mode == POST_INITIALIZED_EVENT)
-                        listeners.forEach { listener ->
-                            try {
-                                val cacheEvent =
-                                    PathChildrenCacheEvent("", INITIALIZED, null).apply {
-                                        initialDataVal = currentData
-                                    }
-                                listener.childEvent(cacheEvent)
-                            } catch (e: Throwable) {
-                                logger.error(e) { "Exception in cacheChanged()" }
-                                exceptionList.value += e
-                            }
-                        }
-                    startThreadComplete.set(true)
-                }
-            }
-        } else {
-            setupWatcher()
-            startThreadComplete.set(true)
-        }
+    /**
+     * After cache is primed with initial values (in the background) a
+     * PathChildrenCacheEvent.Type.INITIALIZED event will be posted
+     */
+    POST_INITIALIZED_EVENT
+  }
 
-        startCalled = true
+  @JvmOverloads
+  fun start(buildInitial: Boolean = false, waitOnStartComplete: Boolean = true): PathChildrenCache =
+    start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL, waitOnStartComplete)
 
-        if (waitOnStartComplete)
-            waitOnStartComplete()
+  @JvmOverloads
+  @Synchronized
+  fun start(mode: StartMode, waitOnStartComplete: Boolean = true): PathChildrenCache {
+    if (startCalled)
+      throw EtcdRecipeRuntimeException("start() already called")
+    checkCloseNotCalled()
 
-        return this
-    }
-
-    fun addListener(listener: PathChildrenCacheListener) {
-        listeners += listener
-    }
-
-    fun addListener(block: (PathChildrenCacheEvent) -> Unit) {
-        addListener(
-            object : PathChildrenCacheListener {
-                override fun childEvent(event: PathChildrenCacheEvent) {
-                    block(event)
-                }
-            })
-    }
-
-    fun clearListeners() = listeners.clear()
-
-    private fun loadData() {
+    // Preload with initial data
+    if (mode == BUILD_INITIAL_CACHE || mode == POST_INITIALIZED_EVENT) {
+      executor.execute {
         try {
-            val kvs = client.getChildren(cachePath)
-            for (kv in kvs) {
-                val (k, v) = kv
-                val s = k.substring(cachePath.length + 1)
-                cacheMap[s] = v
+          setupWatcher()
+          loadData()
+        } finally {
+          if (mode == POST_INITIALIZED_EVENT)
+            listeners.forEach { listener ->
+              try {
+                val cacheEvent =
+                  PathChildrenCacheEvent("", INITIALIZED, null).apply {
+                    initialDataVal = currentData
+                  }
+                listener.childEvent(cacheEvent)
+              } catch (e: Throwable) {
+                logger.error(e) { "Exception in cacheChanged()" }
+                exceptionList.value += e
+              }
             }
-        } catch (e: Throwable) {
-            logger.error(e) { "Exception in loadData()" }
-            exceptionList.value += e
+          startThreadComplete.set(true)
         }
+      }
+    } else {
+      setupWatcher()
+      startThreadComplete.set(true)
     }
 
-    private fun setupWatcher() {
-        val trailingPath = cachePath.ensureSuffix("/")
-        logger.debug { "Setting up watch for $trailingPath" }
-        val watchOption = watchOption { withPrefix(trailingPath) }
-        watcher = client.watcher(trailingPath, watchOption) { watchResponse ->
-            watchResponse.events
-                .forEach { event ->
-                    val (k, v) = event.keyValue.asPair
-                    val stripped = k.substring(trailingPath.length)
-                    when (event.eventType) {
-                        PUT -> {
-                            val isAdd = !cacheMap.containsKey(stripped)
-                            logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
-                            cacheMap[stripped] = v
+    startCalled = true
 
-                            val cacheEvent =
-                                PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
-                            listeners.forEach { listener ->
-                                try {
-                                    listener.childEvent(cacheEvent)
-                                } catch (e: Throwable) {
-                                    logger.error(e) { "Exception in cacheChanged()" }
-                                    exceptionList.value += e
-                                }
-                            }
-                        }
-                        DELETE -> {
-                            logger.debug { "$stripped deleted" }
-                            val prevValue = cacheMap.remove(stripped)
-                            val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
-                            listeners.forEach { listener ->
-                                try {
-                                    listener.childEvent(cacheEvent)
-                                } catch (e: Throwable) {
-                                    logger.error(e) { "Exception in cacheChanged()" }
-                                    exceptionList.value += e
-                                }
-                            }
-                        }
-                        UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
-                        else -> logger.error { "Unknown error with $cachePath watch" }
-                    }
+    if (waitOnStartComplete)
+      waitOnStartComplete()
+
+    return this
+  }
+
+  fun addListener(listener: PathChildrenCacheListener) {
+    listeners += listener
+  }
+
+  fun addListener(block: (PathChildrenCacheEvent) -> Unit) {
+    addListener(
+      object : PathChildrenCacheListener {
+        override fun childEvent(event: PathChildrenCacheEvent) {
+          block(event)
+        }
+      })
+  }
+
+  fun clearListeners() = listeners.clear()
+
+  private fun loadData() {
+    try {
+      val kvs = client.getChildren(cachePath)
+      for (kv in kvs) {
+        val (k, v) = kv
+        val s = k.substring(cachePath.length + 1)
+        cacheMap[s] = v
+      }
+    } catch (e: Throwable) {
+      logger.error(e) { "Exception in loadData()" }
+      exceptionList.value += e
+    }
+  }
+
+  private fun setupWatcher() {
+    val trailingPath = cachePath.ensureSuffix("/")
+    logger.debug { "Setting up watch for $trailingPath" }
+    val watchOption = watchOption { withPrefix(trailingPath) }
+    watcher = client.watcher(trailingPath, watchOption) { watchResponse ->
+      watchResponse.events
+        .forEach { event ->
+          val (k, v) = event.keyValue.asPair
+          val stripped = k.substring(trailingPath.length)
+          when (event.eventType) {
+            PUT -> {
+              val isAdd = !cacheMap.containsKey(stripped)
+              logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
+              cacheMap[stripped] = v
+
+              val cacheEvent =
+                PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
+              listeners.forEach { listener ->
+                try {
+                  listener.childEvent(cacheEvent)
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in cacheChanged()" }
+                  exceptionList.value += e
                 }
+              }
+            }
+            DELETE -> {
+              logger.debug { "$stripped deleted" }
+              val prevValue = cacheMap.remove(stripped)
+              val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
+              listeners.forEach { listener ->
+                try {
+                  listener.childEvent(cacheEvent)
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in cacheChanged()" }
+                  exceptionList.value += e
+                }
+              }
+            }
+            UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
+            else -> logger.error { "Unknown error with $cachePath watch" }
+          }
         }
     }
+  }
 
-    @Throws(InterruptedException::class)
-    fun waitOnStartComplete(): Boolean = waitOnStartComplete(Long.MAX_VALUE.days)
+  @Throws(InterruptedException::class)
+  fun waitOnStartComplete(): Boolean = waitOnStartComplete(Long.MAX_VALUE.days)
 
-    @Throws(InterruptedException::class)
-    fun waitOnStartComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
-        waitOnStartComplete(timeUnitToDuration(timeout, timeUnit))
+  @Throws(InterruptedException::class)
+  fun waitOnStartComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
+    waitOnStartComplete(timeUnitToDuration(timeout, timeUnit))
 
-    @Throws(InterruptedException::class)
-    fun waitOnStartComplete(timeout: Duration): Boolean {
-        checkStartCalled()
-        checkCloseNotCalled()
-        return startThreadComplete.waitUntilTrue(timeout)
-    }
+  @Throws(InterruptedException::class)
+  fun waitOnStartComplete(timeout: Duration): Boolean {
+    checkStartCalled()
+    checkCloseNotCalled()
+    return startThreadComplete.waitUntilTrue(timeout)
+  }
 
-    fun rebuild() {
-        clear()
-        loadData()
-    }
+  fun rebuild() {
+    clear()
+    loadData()
+  }
 
-    // For consistency with Curator
-    val currentData: List<ChildData> get() = cacheMap.map { (k, v) -> ChildData(k, v) }.sortedBy { it.key }
+  // For consistency with Curator
+  val currentData: List<ChildData> get() = cacheMap.map { (k, v) -> ChildData(k, v) }.sortedBy { it.key }
 
-    // For consistency with Curator
-    fun getCurrentData(path: String): ByteSequence? = cacheMap[path]
+  // For consistency with Curator
+  fun getCurrentData(path: String): ByteSequence? = cacheMap[path]
 
-    val currentDataAsMap: Map<String, ByteSequence> get() = cacheMap.toMap()
+  val currentDataAsMap: Map<String, ByteSequence> get() = cacheMap.toMap()
 
 
-    fun clear() = cacheMap.clear()
+  fun clear() = cacheMap.clear()
 
-    @Synchronized
-    override fun close() {
-        if (closeCalled)
-            return
+  @Synchronized
+  override fun close() {
+    if (closeCalled)
+      return
 
-        checkStartCalled()
+    checkStartCalled()
 
-        watcher?.close()
+    watcher?.close()
 
-        listeners.clear()
-        startThreadComplete.waitUntilTrue()
+    listeners.clear()
+    startThreadComplete.waitUntilTrue()
 
-        if (userExecutor == null) (executor as ExecutorService).shutdown()
+    if (userExecutor == null) (executor as ExecutorService).shutdown()
 
-        super.close()
-    }
+    super.close()
+  }
 
-    companion object : KLogging()
+  companion object : KLogging()
 }

@@ -32,44 +32,44 @@ import io.etcd.recipes.common.transaction
 fun <T> withDistributedPriorityQueue(client: Client,
                                      queuePath: String,
                                      receiver: DistributedPriorityQueue.() -> T): T =
-    DistributedPriorityQueue(client, queuePath).use { it.receiver() }
+  DistributedPriorityQueue(client, queuePath).use { it.receiver() }
 
 class DistributedPriorityQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.KEY) {
 
-    fun enqueue(value: String, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
-    fun enqueue(value: Int, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
-    fun enqueue(value: Long, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
-    fun enqueue(value: ByteSequence, priority: Int) = enqueue(value, priority.toUShort())
+  fun enqueue(value: String, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
+  fun enqueue(value: Int, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
+  fun enqueue(value: Long, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
+  fun enqueue(value: ByteSequence, priority: Int) = enqueue(value, priority.toUShort())
 
-    fun enqueue(value: String, priority: UShort) = enqueue(value.asByteSequence, priority)
-    fun enqueue(value: Int, priority: UShort) = enqueue(value.asByteSequence, priority)
-    fun enqueue(value: Long, priority: UShort) = enqueue(value.asByteSequence, priority)
+  fun enqueue(value: String, priority: UShort) = enqueue(value.asByteSequence, priority)
+  fun enqueue(value: Int, priority: UShort) = enqueue(value.asByteSequence, priority)
+  fun enqueue(value: Long, priority: UShort) = enqueue(value.asByteSequence, priority)
 
-    fun enqueue(value: ByteSequence, priority: UShort) {
-        checkCloseNotCalled()
-        val prefix = "%s/%05d".format(queuePath, priority.toInt())
-        newSequentialKV(prefix, value)
+  fun enqueue(value: ByteSequence, priority: UShort) {
+    checkCloseNotCalled()
+    val prefix = "%s/%05d".format(queuePath, priority.toInt())
+    newSequentialKV(prefix, value)
+  }
+
+  private fun newSequentialKV(prefix: String, value: ByteSequence) {
+    val resp = client.getLastChild(prefix, SortTarget.KEY)
+    val kvs = resp.kvs
+
+    var newSeqNum = 0
+    if (kvs.isNotEmpty()) {
+      val fields = kvs.first().key.asString.split("/")
+      newSeqNum = fields[(fields.size) - 1].toInt() + 1
     }
 
-    private fun newSequentialKV(prefix: String, value: ByteSequence) {
-        val resp = client.getLastChild(prefix, SortTarget.KEY)
-        val kvs = resp.kvs
+    val txn =
+      client.transaction {
+        val newKey = "%s/%016d".format(prefix, newSeqNum)
+        val baseKey = "__$prefix"
+        If(lessThan(baseKey, CmpTarget.modRevision(resp.header.revision + 1)))
+        Then(baseKey setTo "", newKey setTo value)
+      }
 
-        var newSeqNum = 0
-        if (kvs.isNotEmpty()) {
-            val fields = kvs.first().key.asString.split("/")
-            newSeqNum = fields[(fields.size) - 1].toInt() + 1
-        }
-
-        val txn =
-            client.transaction {
-                val newKey = "%s/%016d".format(prefix, newSeqNum)
-                val baseKey = "__$prefix"
-                If(lessThan(baseKey, CmpTarget.modRevision(resp.header.revision + 1)))
-                Then(baseKey setTo "", newKey setTo value)
-            }
-
-        if (!txn.isSucceeded)
-            newSequentialKV(prefix, value)
-    }
+    if (!txn.isSucceeded)
+      newSequentialKV(prefix, value)
+  }
 }

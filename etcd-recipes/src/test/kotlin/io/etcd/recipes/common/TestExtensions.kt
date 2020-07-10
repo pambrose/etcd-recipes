@@ -28,61 +28,61 @@ val urls = listOf("http://localhost:2379")
 fun nonblockingThreads(threadCount: Int,
                        waitLatch: CountDownLatch? = null,
                        block: (index: Int) -> Unit): Pair<CountDownLatch, ExceptionHolder> {
-    val finishedLatch = CountDownLatch(threadCount)
-    val holder = ExceptionHolder()
-    repeat(threadCount) {
-        thread(finishedLatch) {
-            try {
-                block(it)
-                waitLatch?.await()
-            } catch (e: Throwable) {
-                holder.exception = e
-            }
-        }
+  val finishedLatch = CountDownLatch(threadCount)
+  val holder = ExceptionHolder()
+  repeat(threadCount) {
+    thread(finishedLatch) {
+      try {
+        block(it)
+        waitLatch?.await()
+      } catch (e: Throwable) {
+        holder.exception = e
+      }
     }
-    return Pair(finishedLatch, holder)
+  }
+  return Pair(finishedLatch, holder)
 }
 
 fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
-    val (finishedLatch, exception) = nonblockingThreads(threadCount, block = block)
-    finishedLatch.await()
-    exception.checkForException()
+  val (finishedLatch, exception) = nonblockingThreads(threadCount, block = block)
+  finishedLatch.await()
+  exception.checkForException()
 }
 
 fun ExceptionHolder.checkForException() {
-    if (exception != null)
-        return fail("Exception caught: $exception", exception)
+  if (exception != null)
+    return fail("Exception caught: $exception", exception)
 }
 
 fun List<ExceptionHolder>.throwExceptionFromList() {
-    val e = firstOrNull { it.exception != null }?.exception
-    if (e != null)
-        throw e
+  val e = firstOrNull { it.exception != null }?.exception
+  if (e != null)
+    throw e
 }
 
 fun List<CountDownLatch>.waitForAll() = forEach { it.await() }
 
 fun threadWithExceptionCheck(block: () -> Unit): Pair<CountDownLatch, ExceptionHolder> {
-    val latch = CountDownLatch(1)
-    val holder = ExceptionHolder()
+  val latch = CountDownLatch(1)
+  val holder = ExceptionHolder()
 
-    thread {
-        try {
-            block()
-        } catch (e: Throwable) {
-            holder.exception = e
-        } finally {
-            latch.countDown()
-        }
+  thread {
+    try {
+      block()
+    } catch (e: Throwable) {
+      holder.exception = e
+    } finally {
+      latch.countDown()
     }
+  }
 
-    return Pair(latch, holder)
+  return Pair(latch, holder)
 }
 
 fun captureException(holder: ExceptionHolder, block: () -> Unit) {
-    try {
-        block()
-    } catch (e: Throwable) {
-        holder.exception = e
-    }
+  try {
+    block()
+  } catch (e: Throwable) {
+    holder.exception = e
+  }
 }

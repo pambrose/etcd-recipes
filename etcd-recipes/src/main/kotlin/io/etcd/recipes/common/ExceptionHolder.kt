@@ -22,11 +22,11 @@ import java.util.concurrent.atomic.AtomicReference
 
 class ExceptionHolder {
 
-    private val holder = lazy { AtomicReference<Throwable>() }
+  private val holder = lazy { AtomicReference<Throwable>() }
 
-    var exception: Throwable?
-        get() = if (holder.isInitialized()) holder.value.get() else null
-        set(e) {
-            if (e != null) holder.value.set(e)
-        }
+  var exception: Throwable?
+    get() = if (holder.isInitialized()) holder.value.get() else null
+    set(e) {
+      if (e != null) holder.value.set(e)
+    }
 }

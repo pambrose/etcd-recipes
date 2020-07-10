@@ -24,8 +24,8 @@ import io.etcd.jetcd.ClientBuilder
 
 @JvmOverloads
 fun connectToEtcd(urls: List<String>, initReciever: ClientBuilder.() -> ClientBuilder = { this }): Client {
-    require(urls.isNotEmpty()) { "URLs cannot be empty" }
-    return etcdClient { endpoints(*urls.toTypedArray()).initReciever() }
+  require(urls.isNotEmpty()) { "URLs cannot be empty" }
+  return etcdClient { endpoints(*urls.toTypedArray()).initReciever() }
 }
 
 @JvmOverloads

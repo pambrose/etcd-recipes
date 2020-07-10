@@ -24,4 +24,4 @@ fun String.ensureSuffix(delim: String = "/"): String = if (endsWith(delim)) this
 
 @JvmOverloads
 fun String.appendToPath(suffix: String, delim: String = "/") =
-    "${removeSuffix(delim)}$delim${suffix.removePrefix(delim)}"
+  "${removeSuffix(delim)}$delim${suffix.removePrefix(delim)}"

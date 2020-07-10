@@ -26,34 +26,34 @@ import java.util.Collections.synchronizedList
 
 open class EtcdConnector(val client: Client) : Closeable {
 
-    protected var startCalled by atomicBoolean(false)
-    protected val startThreadComplete = BooleanMonitor(false)
-    protected var closeCalled: Boolean by atomicBoolean(false)
-    protected val exceptionList: Lazy<MutableList<Throwable>> = lazy { synchronizedList(mutableListOf<Throwable>()) }
+  protected var startCalled by atomicBoolean(false)
+  protected val startThreadComplete = BooleanMonitor(false)
+  protected var closeCalled: Boolean by atomicBoolean(false)
+  protected val exceptionList: Lazy<MutableList<Throwable>> = lazy { synchronizedList(mutableListOf<Throwable>()) }
 
-    protected fun checkCloseNotCalled() {
-        if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
-    }
+  protected fun checkCloseNotCalled() {
+    if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
+  }
 
-    val exceptions: List<Throwable> get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList()
+  val exceptions: List<Throwable> get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList()
 
-    val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.size > 0
+  val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.size > 0
 
-    fun clearExceptions() {
-        if (exceptionList.isInitialized()) exceptionList.value.clear()
-    }
+  fun clearExceptions() {
+    if (exceptionList.isInitialized()) exceptionList.value.clear()
+  }
 
-    protected fun checkStartCalled() {
-        if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
-    }
+  protected fun checkStartCalled() {
+    if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
+  }
 
-    @Synchronized
-    override fun close() {
-        closeCalled = true
-    }
+  @Synchronized
+  override fun close() {
+    closeCalled = true
+  }
 
-    companion object {
-        internal const val tokenLength = 7
-        internal const val defaultTtlSecs = 2L
-    }
+  companion object {
+    internal const val tokenLength = 7
+    internal const val defaultTtlSecs = 2L
+  }
 }

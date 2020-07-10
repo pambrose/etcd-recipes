@@ -40,233 +40,233 @@ import kotlin.random.Random
 import kotlin.time.seconds
 
 class PathChildrenCacheTests {
-    private val suffix = "update"
+  private val suffix = "update"
 
-    private fun generateTestData(count: Int): List<Pair<String, String>> {
-        val names = List(count) { "Key:%05d".format(it) }
-        val vals = List(count) { randomId(Random.nextInt(2, 10)) }
-        return names.zip(vals)
+  private fun generateTestData(count: Int): List<Pair<String, String>> {
+    val names = List(count) { "Key:%05d".format(it) }
+    val vals = List(count) { randomId(Random.nextInt(2, 10)) }
+    return names.zip(vals)
+  }
+
+  private fun compareData(count: Int,
+                          data: List<ChildData>,
+                          origData: List<Pair<String, String>>,
+                          suffix: String = "") {
+    data.size shouldBeEqualTo count
+    val currData = data.map { it.key to it.value.asString }.sortedBy { it.first }
+    val updatedOrigData = origData.map { it.first to (it.second + suffix) }.sortedBy { it.first }
+    currData.forEachIndexed { i, pair ->
+      pair shouldBeEqualTo updatedOrigData[i]
     }
 
-    private fun compareData(count: Int,
-                            data: List<ChildData>,
-                            origData: List<Pair<String, String>>,
-                            suffix: String = "") {
-        data.size shouldBeEqualTo count
-        val currData = data.map { it.key to it.value.asString }.sortedBy { it.first }
-        val updatedOrigData = origData.map { it.first to (it.second + suffix) }.sortedBy { it.first }
-        currData.forEachIndexed { i, pair ->
-            pair shouldBeEqualTo updatedOrigData[i]
+    currData shouldBeEqualTo updatedOrigData
+  }
+
+  @Test
+  fun listenerTestNoInitialData() {
+    val count = 25
+    val path = "/cache/listenerTestNoInitialData"
+    val addCount = atomic(0)
+    val updateCount = atomic(0)
+    val deleteCount = atomic(0)
+    val initCount = atomic(0)
+
+    connectToEtcd(urls) { client ->
+
+      // Clear leftover data
+      client.deleteChildren(path)
+      client.getChildCount(path) shouldBeEqualTo 0
+
+      withPathChildrenCache(client, path) {
+
+        addListener { event: PathChildrenCacheEvent ->
+          //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+          when (event.type) {
+            CHILD_ADDED -> addCount.incrementAndGet()
+            CHILD_UPDATED -> updateCount.incrementAndGet()
+            CHILD_REMOVED -> deleteCount.incrementAndGet()
+            INITIALIZED -> initCount.incrementAndGet()
+          }
         }
 
-        currData shouldBeEqualTo updatedOrigData
-    }
+        start(true)
+        waitOnStartComplete()
+        currentData shouldBeEqualTo emptyList()
 
-    @Test
-    fun listenerTestNoInitialData() {
-        val count = 25
-        val path = "/cache/listenerTestNoInitialData"
-        val addCount = atomic(0)
-        val updateCount = atomic(0)
-        val deleteCount = atomic(0)
-        val initCount = atomic(0)
+        addCount.value shouldBeEqualTo 0
+        updateCount.value shouldBeEqualTo 0
+        deleteCount.value shouldBeEqualTo 0
+        initCount.value shouldBeEqualTo 0
 
-        connectToEtcd(urls) { client ->
+        val kvs = generateTestData(count)
 
-            // Clear leftover data
-            client.deleteChildren(path)
-            client.getChildCount(path) shouldBeEqualTo 0
-
-            withPathChildrenCache(client, path) {
-
-                addListener { event: PathChildrenCacheEvent ->
-                    //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                    when (event.type) {
-                        CHILD_ADDED -> addCount.incrementAndGet()
-                        CHILD_UPDATED -> updateCount.incrementAndGet()
-                        CHILD_REMOVED -> deleteCount.incrementAndGet()
-                        INITIALIZED -> initCount.incrementAndGet()
-                    }
-                }
-
-                start(true)
-                waitOnStartComplete()
-                currentData shouldBeEqualTo emptyList()
-
-                addCount.value shouldBeEqualTo 0
-                updateCount.value shouldBeEqualTo 0
-                deleteCount.value shouldBeEqualTo 0
-                initCount.value shouldBeEqualTo 0
-
-                val kvs = generateTestData(count)
-
-                kvs.forEach { kv ->
-                    client.putValue("${path}/${kv.first}", kv.second)
-                    client.putValue("${path}/${kv.first}", kv.second + suffix)
-                }
-
-                sleep(5.seconds)
-                compareData(count, currentData, kvs, suffix)
-
-                client.deleteChildren(path)
-
-                sleep(5.seconds)
-                currentData shouldBeEqualTo emptyList()
-            }
+        kvs.forEach { kv ->
+          client.putValue("${path}/${kv.first}", kv.second)
+          client.putValue("${path}/${kv.first}", kv.second + suffix)
         }
 
         sleep(5.seconds)
+        compareData(count, currentData, kvs, suffix)
 
-        addCount.value shouldBeEqualTo count
-        updateCount.value shouldBeEqualTo count
-        deleteCount.value shouldBeEqualTo count
-        initCount.value shouldBeEqualTo 0
+        client.deleteChildren(path)
+
+        sleep(5.seconds)
+        currentData shouldBeEqualTo emptyList()
+      }
     }
 
-    @Test
-    fun listenerTestWithInitialData() {
-        val count = 25
-        val path = "/cache/listenerTestWithInitialData"
-        val addCount = atomic(0)
-        val updateCount = atomic(0)
-        val deleteCount = atomic(0)
-        val initCount = atomic(0)
+    sleep(5.seconds)
 
-        connectToEtcd(urls) { client ->
+    addCount.value shouldBeEqualTo count
+    updateCount.value shouldBeEqualTo count
+    deleteCount.value shouldBeEqualTo count
+    initCount.value shouldBeEqualTo 0
+  }
 
-            // Clear leftover data
-            client.deleteChildren(path)
-            client.getChildCount(path) shouldBeEqualTo 0
+  @Test
+  fun listenerTestWithInitialData() {
+    val count = 25
+    val path = "/cache/listenerTestWithInitialData"
+    val addCount = atomic(0)
+    val updateCount = atomic(0)
+    val deleteCount = atomic(0)
+    val initCount = atomic(0)
 
-            val testKvs = generateTestData(count)
+    connectToEtcd(urls) { client ->
 
-            testKvs.forEach { kv ->
-                client.putValue("${path}/${kv.first}", kv.second)
-                client.putValue("${path}/${kv.first}", kv.second + suffix)
-            }
+      // Clear leftover data
+      client.deleteChildren(path)
+      client.getChildCount(path) shouldBeEqualTo 0
 
-            withPathChildrenCache(client, path) {
-                addListener { event: PathChildrenCacheEvent ->
-                    //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                    when (event.type) {
-                        CHILD_ADDED -> addCount.incrementAndGet()
-                        CHILD_UPDATED -> updateCount.incrementAndGet()
-                        CHILD_REMOVED -> deleteCount.incrementAndGet()
-                        INITIALIZED -> initCount.incrementAndGet()
-                    }
-                }
+      val testKvs = generateTestData(count)
 
-                start(true)
-                waitOnStartComplete()
+      testKvs.forEach { kv ->
+        client.putValue("${path}/${kv.first}", kv.second)
+        client.putValue("${path}/${kv.first}", kv.second + suffix)
+      }
 
-                sleep(5.seconds)
-                compareData(count, currentData, testKvs, suffix)
-
-                addCount.value shouldBeEqualTo 0
-                updateCount.value shouldBeEqualTo 0
-                deleteCount.value shouldBeEqualTo 0
-                initCount.value shouldBeEqualTo 0
-
-                client.deleteChildren(path)
-
-                sleep(5.seconds)
-                currentData shouldBeEqualTo emptyList()
-            }
+      withPathChildrenCache(client, path) {
+        addListener { event: PathChildrenCacheEvent ->
+          //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+          when (event.type) {
+            CHILD_ADDED -> addCount.incrementAndGet()
+            CHILD_UPDATED -> updateCount.incrementAndGet()
+            CHILD_REMOVED -> deleteCount.incrementAndGet()
+            INITIALIZED -> initCount.incrementAndGet()
+          }
         }
+
+        start(true)
+        waitOnStartComplete()
+
+        sleep(5.seconds)
+        compareData(count, currentData, testKvs, suffix)
 
         addCount.value shouldBeEqualTo 0
         updateCount.value shouldBeEqualTo 0
-        deleteCount.value shouldBeEqualTo count
+        deleteCount.value shouldBeEqualTo 0
         initCount.value shouldBeEqualTo 0
+
+        client.deleteChildren(path)
+
+        sleep(5.seconds)
+        currentData shouldBeEqualTo emptyList()
+      }
     }
 
-    @Test
-    fun withInitialEventTest() {
-        val count = 25
-        val path = "/cache/noInitialDataTest"
-        val addCount = atomic(0)
-        val updateCount = atomic(0)
-        val deleteCount = atomic(0)
-        val initCount = atomic(0)
+    addCount.value shouldBeEqualTo 0
+    updateCount.value shouldBeEqualTo 0
+    deleteCount.value shouldBeEqualTo count
+    initCount.value shouldBeEqualTo 0
+  }
 
-        connectToEtcd(urls) { client ->
+  @Test
+  fun withInitialEventTest() {
+    val count = 25
+    val path = "/cache/noInitialDataTest"
+    val addCount = atomic(0)
+    val updateCount = atomic(0)
+    val deleteCount = atomic(0)
+    val initCount = atomic(0)
 
-            // Clear leftover data
-            client.deleteChildren(path)
-            client.getChildCount(path) shouldBeEqualTo 0
+    connectToEtcd(urls) { client ->
 
-            val kvs = generateTestData(count)
+      // Clear leftover data
+      client.deleteChildren(path)
+      client.getChildCount(path) shouldBeEqualTo 0
 
-            kvs.forEach { kv ->
-                client.putValue("${path}/${kv.first}", kv.second)
-                client.putValue("${path}/${kv.first}", kv.second + suffix)
+      val kvs = generateTestData(count)
+
+      kvs.forEach { kv ->
+        client.putValue("${path}/${kv.first}", kv.second)
+        client.putValue("${path}/${kv.first}", kv.second + suffix)
+      }
+
+      var initData: List<ChildData>? = null
+
+      withPathChildrenCache(client, path) {
+
+        addListener { event: PathChildrenCacheEvent ->
+          //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+          when (event.type) {
+            CHILD_ADDED -> addCount.incrementAndGet()
+            CHILD_UPDATED -> updateCount.incrementAndGet()
+            CHILD_REMOVED -> deleteCount.incrementAndGet()
+            INITIALIZED -> {
+              initCount.incrementAndGet()
+              initData = event.initialData
             }
-
-            var initData: List<ChildData>? = null
-
-            withPathChildrenCache(client, path) {
-
-                addListener { event: PathChildrenCacheEvent ->
-                    //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
-                    when (event.type) {
-                        CHILD_ADDED -> addCount.incrementAndGet()
-                        CHILD_UPDATED -> updateCount.incrementAndGet()
-                        CHILD_REMOVED -> deleteCount.incrementAndGet()
-                        INITIALIZED -> {
-                            initCount.incrementAndGet()
-                            initData = event.initialData
-                        }
-                    }
-                }
-
-                start(POST_INITIALIZED_EVENT)
-                waitOnStartComplete()
-
-                sleep(5.seconds)
-                compareData(count, currentData, kvs, suffix)
-
-                client.deleteChildren(path)
-
-                sleep(5.seconds)
-                currentData shouldBeEqualTo emptyList()
-            }
-
-            compareData(count, initData!!, kvs, suffix)
+          }
         }
 
+        start(POST_INITIALIZED_EVENT)
+        waitOnStartComplete()
 
-        addCount.value shouldBeEqualTo 0
-        updateCount.value shouldBeEqualTo 0
-        deleteCount.value shouldBeEqualTo count
-        initCount.value shouldBeEqualTo 1
+        sleep(5.seconds)
+        compareData(count, currentData, kvs, suffix)
+
+        client.deleteChildren(path)
+
+        sleep(5.seconds)
+        currentData shouldBeEqualTo emptyList()
+      }
+
+      compareData(count, initData!!, kvs, suffix)
     }
 
-    @Test
-    fun leasedValuesTest() {
-        val count = 25
-        val path = "/cache/leasedValuesTest"
-        val kvs = generateTestData(count)
 
-        connectToEtcd(urls) { client ->
+    addCount.value shouldBeEqualTo 0
+    updateCount.value shouldBeEqualTo 0
+    deleteCount.value shouldBeEqualTo count
+    initCount.value shouldBeEqualTo 1
+  }
 
-            withPathChildrenCache(client, path) {
-                start(false)
+  @Test
+  fun leasedValuesTest() {
+    val count = 25
+    val path = "/cache/leasedValuesTest"
+    val kvs = generateTestData(count)
 
-                val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
-                client.putValuesWithKeepAlive(bsvals, 2.seconds) {
+    connectToEtcd(urls) { client ->
 
-                    sleep(5.seconds)
-                    val data = currentData
+      withPathChildrenCache(client, path) {
+        start(false)
 
-                    //println("KVs:  ${kvs.map { it.first }.sorted()}")
-                    //println("Data: ${data.map { it.key }.sorted()}")
+        val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
+        client.putValuesWithKeepAlive(bsvals, 2.seconds) {
 
-                    compareData(count, data, kvs)
-                }
+          sleep(5.seconds)
+          val data = currentData
 
-                sleep(5.seconds)
-                currentData shouldBeEqualTo emptyList()
-            }
+          //println("KVs:  ${kvs.map { it.first }.sorted()}")
+          //println("Data: ${data.map { it.key }.sorted()}")
+
+          compareData(count, data, kvs)
         }
+
+        sleep(5.seconds)
+        currentData shouldBeEqualTo emptyList()
+      }
     }
+  }
 }

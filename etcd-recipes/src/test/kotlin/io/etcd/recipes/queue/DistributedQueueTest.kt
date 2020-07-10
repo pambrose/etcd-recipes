@@ -34,217 +34,217 @@ import java.util.concurrent.CountDownLatch
 import kotlin.time.seconds
 
 class DistributedQueueTest {
-    private val iterCount = 500
-    private val threadCount = 10
-    private val testData = List(iterCount) { "V $it" }
+  private val iterCount = 500
+  private val threadCount = 10
+  private val testData = List(iterCount) { "V $it" }
 
-    @Test
-    fun serialTestNoWait() {
-        val queuePath = "/queue/serialTestNoWait"
-        val dequeuedData = mutableListOf<String>()
+  @Test
+  fun serialTestNoWait() {
+    val queuePath = "/queue/serialTestNoWait"
+    val dequeuedData = mutableListOf<String>()
 
-        connectToEtcd(urls) { client ->
-            client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldBeEqualTo 0
-            withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
-            withDistributedQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+    connectToEtcd(urls) { client ->
+      client.deleteChildren(queuePath)
+      client.getChildCount(queuePath) shouldBeEqualTo 0
+      withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
+      withDistributedQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
+      client.getChildCount(queuePath) shouldBeEqualTo 0
+    }
+
+    dequeuedData.size shouldBeEqualTo testData.size
+    repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
+    dequeuedData shouldBeEqualTo testData
+  }
+
+  @Test
+  fun serialTestWithWait() {
+    val queuePath = "/queue/serialTestWithWait"
+    val dequeuedData = synchronizedList(mutableListOf<String>())
+    val latch = CountDownLatch(1)
+
+    connectToEtcd(urls) { client ->
+      client.deleteChildren(queuePath)
+      client.getChildCount(queuePath) shouldBeEqualTo 0
+
+      thread(latch) {
+        withDistributedQueue(client, queuePath) {
+          repeat(iterCount) { dequeuedData += dequeue().asString }
         }
+      }
 
-        dequeuedData.size shouldBeEqualTo testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-        dequeuedData shouldBeEqualTo testData
+      //sleep(5.seconds)
+
+      withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
+
+      latch.await()
+
+      client.getChildCount(queuePath) shouldBeEqualTo 0
     }
 
-    @Test
-    fun serialTestWithWait() {
-        val queuePath = "/queue/serialTestWithWait"
-        val dequeuedData = synchronizedList(mutableListOf<String>())
-        val latch = CountDownLatch(1)
+    sleep(5.seconds)
 
-        connectToEtcd(urls) { client ->
-            client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+    dequeuedData.size shouldBeEqualTo testData.size
+    repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
+    dequeuedData shouldBeEqualTo testData
+  }
 
-            thread(latch) {
-                withDistributedQueue(client, queuePath) {
-                    repeat(iterCount) { dequeuedData += dequeue().asString }
-                }
+  @Test
+  fun threadedTestNoWait1() {
+    threadedTestNoWait(10, 1)
+    threadedTestNoWait(10, 2)
+    threadedTestNoWait(10, 5)
+    threadedTestNoWait(10, 10)
+  }
+
+  @Test
+  fun threadedTestNoWait2() {
+    threadedTestNoWait(100, 1)
+    threadedTestNoWait(100, 2)
+    threadedTestNoWait(100, 5)
+    threadedTestNoWait(100, 10)
+  }
+
+  @Test
+  fun threadedTestNoWait3() {
+    threadedTestNoWait(iterCount, threadCount)
+  }
+
+  private fun threadedTestNoWait(iterCount: Int, threadCount: Int) {
+    val queuePath = "/queue/threadedTestNoWait"
+    val latch = CountDownLatch(threadCount)
+    val dequeuedData = synchronizedList(mutableListOf<String>())
+    val testData = List(iterCount) { "V %04d".format(it) }
+
+    connectToEtcd(urls) { client ->
+      client.deleteChildren(queuePath)
+      client.getChildCount(queuePath) shouldBeEqualTo 0
+
+      withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
+
+      //sleep(5.seconds)
+
+      repeat(threadCount) {
+        thread(latch) {
+          withDistributedQueue(client, queuePath) {
+            repeat(iterCount / threadCount) {
+              synchronized(dequeuedData) {
+                dequeuedData += dequeue().asString
+              }
             }
-
-            //sleep(5.seconds)
-
-            withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
-
-            latch.await()
-
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+          }
         }
+      }
 
-        sleep(5.seconds)
+      latch.await()
 
-        dequeuedData.size shouldBeEqualTo testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-        dequeuedData shouldBeEqualTo testData
+      client.getChildCount(queuePath) shouldBeEqualTo 0
     }
 
-    @Test
-    fun threadedTestNoWait1() {
-        threadedTestNoWait(10, 1)
-        threadedTestNoWait(10, 2)
-        threadedTestNoWait(10, 5)
-        threadedTestNoWait(10, 10)
-    }
+    //sleep(5.seconds)
 
-    @Test
-    fun threadedTestNoWait2() {
-        threadedTestNoWait(100, 1)
-        threadedTestNoWait(100, 2)
-        threadedTestNoWait(100, 5)
-        threadedTestNoWait(100, 10)
-    }
+    dequeuedData.size shouldBeEqualTo testData.size
+    repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
+    dequeuedData shouldBeEqualTo testData
+  }
 
-    @Test
-    fun threadedTestNoWait3() {
-        threadedTestNoWait(iterCount, threadCount)
-    }
+  @Test
+  fun threadedTestWithWait1() {
+    threadedTestWithWait(10, 1)
+    threadedTestWithWait(10, 2)
+    threadedTestWithWait(10, 5)
+    threadedTestWithWait(10, 10)
+  }
 
-    private fun threadedTestNoWait(iterCount: Int, threadCount: Int) {
-        val queuePath = "/queue/threadedTestNoWait"
-        val latch = CountDownLatch(threadCount)
-        val dequeuedData = synchronizedList(mutableListOf<String>())
-        val testData = List(iterCount) { "V %04d".format(it) }
+  @Test
+  fun threadedTestWithWait2() {
+    threadedTestWithWait(100, 1)
+    threadedTestWithWait(100, 2)
+    threadedTestWithWait(100, 5)
+    threadedTestWithWait(100, 10)
+  }
 
-        connectToEtcd(urls) { client ->
-            client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+  @Test
+  fun threadedTestWithWait3() {
+    threadedTestWithWait(iterCount, threadCount)
+  }
 
-            withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
+  private fun threadedTestWithWait(iterCount: Int, threadCount: Int) {
+    val queuePath = "/queue/threadedTestWithWait"
+    val latch = CountDownLatch(threadCount)
+    val dequeuedData = synchronizedList(mutableListOf<String>())
+    val testData = List(iterCount) { "V %04d".format(it) }
 
-            //sleep(5.seconds)
+    connectToEtcd(urls) { client ->
+      client.deleteChildren(queuePath)
+      client.getChildCount(queuePath) shouldBeEqualTo 0
 
-            repeat(threadCount) {
-                thread(latch) {
-                    withDistributedQueue(client, queuePath) {
-                        repeat(iterCount / threadCount) {
-                            synchronized(dequeuedData) {
-                                dequeuedData += dequeue().asString
-                            }
-                        }
-                    }
-                }
+      repeat(threadCount) {
+        thread(latch) {
+          withDistributedQueue(client, queuePath) {
+            repeat(iterCount / threadCount) {
+              synchronized(dequeuedData) {
+                dequeuedData += dequeue().asString
+              }
             }
-
-            latch.await()
-
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+          }
         }
+      }
 
-        //sleep(5.seconds)
+      //sleep(5.seconds)
 
-        dequeuedData.size shouldBeEqualTo testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-        dequeuedData shouldBeEqualTo testData
-    }
-
-    @Test
-    fun threadedTestWithWait1() {
-        threadedTestWithWait(10, 1)
-        threadedTestWithWait(10, 2)
-        threadedTestWithWait(10, 5)
-        threadedTestWithWait(10, 10)
-    }
-
-    @Test
-    fun threadedTestWithWait2() {
-        threadedTestWithWait(100, 1)
-        threadedTestWithWait(100, 2)
-        threadedTestWithWait(100, 5)
-        threadedTestWithWait(100, 10)
-    }
-
-    @Test
-    fun threadedTestWithWait3() {
-        threadedTestWithWait(iterCount, threadCount)
-    }
-
-    private fun threadedTestWithWait(iterCount: Int, threadCount: Int) {
-        val queuePath = "/queue/threadedTestWithWait"
-        val latch = CountDownLatch(threadCount)
-        val dequeuedData = synchronizedList(mutableListOf<String>())
-        val testData = List(iterCount) { "V %04d".format(it) }
-
-        connectToEtcd(urls) { client ->
-            client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldBeEqualTo 0
-
-            repeat(threadCount) {
-                thread(latch) {
-                    withDistributedQueue(client, queuePath) {
-                        repeat(iterCount / threadCount) {
-                            synchronized(dequeuedData) {
-                                dequeuedData += dequeue().asString
-                            }
-                        }
-                    }
-                }
-            }
-
-            //sleep(5.seconds)
-
-            withDistributedQueue(client, queuePath) {
-                repeat(iterCount) { i ->
-                    enqueue(testData[i])
-                }
-            }
-
-            latch.await()
-
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+      withDistributedQueue(client, queuePath) {
+        repeat(iterCount) { i ->
+          enqueue(testData[i])
         }
+      }
 
-        sleep(5.seconds)
+      latch.await()
 
-        dequeuedData.size shouldBeEqualTo testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-        dequeuedData shouldBeEqualTo testData
+      client.getChildCount(queuePath) shouldBeEqualTo 0
     }
 
-    @Test
-    fun pingPongTest() {
-        val queuePath = "/queue/pingPongTest"
-        val counter = atomic(0)
-        val token = "Pong"
-        val latch = CountDownLatch(threadCount)
-        val iterCount = 100
+    sleep(5.seconds)
 
-        // Prime the queue with a value
-        connectToEtcd(urls) { client ->
-            withDistributedQueue(client, queuePath) { enqueue(token) }
+    dequeuedData.size shouldBeEqualTo testData.size
+    repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
+    dequeuedData shouldBeEqualTo testData
+  }
 
-            repeat(threadCount) {
-                thread(latch) {
-                    withDistributedQueue(client, queuePath) {
-                        repeat(iterCount) {
-                            val v = dequeue().asString
-                            v shouldBeEqualTo token
-                            enqueue(v)
-                            counter.incrementAndGet()
-                        }
-                    }
-                }
+  @Test
+  fun pingPongTest() {
+    val queuePath = "/queue/pingPongTest"
+    val counter = atomic(0)
+    val token = "Pong"
+    val latch = CountDownLatch(threadCount)
+    val iterCount = 100
+
+    // Prime the queue with a value
+    connectToEtcd(urls) { client ->
+      withDistributedQueue(client, queuePath) { enqueue(token) }
+
+      repeat(threadCount) {
+        thread(latch) {
+          withDistributedQueue(client, queuePath) {
+            repeat(iterCount) {
+              val v = dequeue().asString
+              v shouldBeEqualTo token
+              enqueue(v)
+              counter.incrementAndGet()
             }
-
-            latch.await()
-
-            withDistributedQueue(client, queuePath) {
-                val v = dequeue().asString
-                v shouldBeEqualTo token
-            }
+          }
         }
+      }
 
-        counter.value shouldBeEqualTo threadCount * iterCount
+      latch.await()
+
+      withDistributedQueue(client, queuePath) {
+        val v = dequeue().asString
+        v shouldBeEqualTo token
+      }
     }
 
-    companion object : KLogging()
+    counter.value shouldBeEqualTo threadCount * iterCount
+  }
+
+  companion object : KLogging()
 }

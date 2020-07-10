@@ -42,7 +42,7 @@ fun WatchOption.Builder.withPrefix(prefix: String): WatchOption.Builder = withPr
 fun Client.watcher(keyName: String,
                    option: WatchOption = WatchOption.DEFAULT,
                    block: (WatchResponse) -> Unit): Watch.Watcher =
-    watchClient.watch(keyName.asByteSequence, option) { block(it) }
+  watchClient.watch(keyName.asByteSequence, option) { block(it) }
 
 
 @JvmOverloads
@@ -57,23 +57,23 @@ fun Client.watcherWithLatch(keyName: String,
                             onPut: (WatchEvent) -> Unit,
                             onDelete: (WatchEvent) -> Unit,
                             option: WatchOption = WatchOption.DEFAULT) {
-    withWatcher(keyName,
-                option,
-                { watchResponse ->
-                    watchResponse.events
-                        .forEach { event ->
-                            when (event.eventType) {
-                                EventType.PUT          -> onPut(event)
-                                EventType.DELETE       -> onDelete(event)
-                                EventType.UNRECOGNIZED -> { // Ignore
-                                }
-                                else                   -> { // Ignore
-                                }
-                            }
-                        }
-                }) {
-        endWatchLatch.await()
-    }
+  withWatcher(keyName,
+              option,
+              { watchResponse ->
+                watchResponse.events
+                  .forEach { event ->
+                    when (event.eventType) {
+                      EventType.PUT -> onPut(event)
+                      EventType.DELETE -> onDelete(event)
+                      EventType.UNRECOGNIZED -> { // Ignore
+                      }
+                      else -> { // Ignore
+                      }
+                    }
+                  }
+              }) {
+    endWatchLatch.await()
+  }
 }
 
 private val nullWatchOption: WatchOption = watchOption { withRange(ByteSequence.from(ByteArray(1))) }

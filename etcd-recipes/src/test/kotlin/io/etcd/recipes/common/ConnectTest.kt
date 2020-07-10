@@ -24,9 +24,9 @@ import org.junit.jupiter.api.Test
 
 class ConnectTest {
 
-    @Test
-    fun badArgsTest() {
-        invoking { connectToEtcd(emptyList()) { this } } shouldThrow IllegalArgumentException::class
-    }
+  @Test
+  fun badArgsTest() {
+    invoking { connectToEtcd(emptyList()) { this } } shouldThrow IllegalArgumentException::class
+  }
 
 }

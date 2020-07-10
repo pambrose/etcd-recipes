@@ -29,21 +29,21 @@ import io.etcd.recipes.common.putValue
 fun <T> withDistributedQueue(client: Client,
                              queuePath: String,
                              receiver: DistributedQueue.() -> T): T =
-    DistributedQueue(client, queuePath).use { it.receiver() }
+  DistributedQueue(client, queuePath).use { it.receiver() }
 
 class DistributedQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.MOD) {
 
-    fun enqueue(value: String) = enqueue(value.asByteSequence)
-    fun enqueue(value: Int) = enqueue(value.asByteSequence)
-    fun enqueue(value: Long) = enqueue(value.asByteSequence)
+  fun enqueue(value: String) = enqueue(value.asByteSequence)
+  fun enqueue(value: Int) = enqueue(value.asByteSequence)
+  fun enqueue(value: Long) = enqueue(value.asByteSequence)
 
-    fun enqueue(value: ByteSequence) {
-        checkCloseNotCalled()
-        val key = keyFormat.format(queuePath, System.currentTimeMillis(), randomId(3))
-        client.putValue(key, value)
-    }
+  fun enqueue(value: ByteSequence) {
+    checkCloseNotCalled()
+    val key = keyFormat.format(queuePath, System.currentTimeMillis(), randomId(3))
+    client.putValue(key, value)
+  }
 
-    companion object {
-        private val keyFormat = "%s/%0${Long.MAX_VALUE.length}d-%s"
-    }
+  companion object {
+    private val keyFormat = "%s/%0${Long.MAX_VALUE.length}d-%s"
+  }
 }

@@ -66,7 +66,7 @@ fun <T> withDistributedBarrierWithCount(client: Client,
                                         leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
                                         clientId: String = defaultClientId(),
                                         receiver: DistributedBarrierWithCount.() -> T): T =
-    DistributedBarrierWithCount(client, barrierPath, memberCount, leaseTtlSecs, clientId).use { it.receiver() }
+  DistributedBarrierWithCount(client, barrierPath, memberCount, leaseTtlSecs, clientId).use { it.receiver() }
 
 class DistributedBarrierWithCount
 @JvmOverloads
@@ -76,130 +76,130 @@ constructor(client: Client,
             val leaseTtlSecs: Long = defaultTtlSecs,
             val clientId: String = defaultClientId()) : EtcdConnector(client) {
 
-    private val readyPath = barrierPath.appendToPath("ready")
-    private val waitingPath = barrierPath.appendToPath("waiting")
+  private val readyPath = barrierPath.appendToPath("ready")
+  private val waitingPath = barrierPath.appendToPath("waiting")
 
-    init {
-        require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-        require(memberCount > 0) { "Member count must be > 0" }
+  init {
+    require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
+    require(memberCount > 0) { "Member count must be > 0" }
+  }
+
+  private val isReadySet: Boolean
+    get() {
+      checkCloseNotCalled()
+      return client.isKeyPresent(readyPath)
     }
 
-    private val isReadySet: Boolean
-        get() {
-            checkCloseNotCalled()
-            return client.isKeyPresent(readyPath)
-        }
-
-    val waiterCount: Long
-        get() {
-            checkCloseNotCalled()
-            return client.getChildCount(waitingPath)
-        }
-
-    @Throws(InterruptedException::class, EtcdRecipeException::class)
-    fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
-
-    @Throws(InterruptedException::class, EtcdRecipeException::class)
-    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
-        waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
-
-    @Throws(InterruptedException::class, EtcdRecipeException::class)
-    fun waitOnBarrier(timeout: Duration): Boolean {
-        var keepAliveLease: CloseableClient? = null
-        val keepAliveClosed = BooleanMonitor(false)
-        val uniqueToken = "$clientId:${randomId(tokenLength)}"
-        val waitingPath = waitingPath.appendToPath(uniqueToken)
-
-        checkCloseNotCalled()
-
-        fun closeKeepAlive() {
-            if (!keepAliveClosed.get()) {
-                keepAliveLease?.close()
-                keepAliveLease = null
-                client.deleteKey(waitingPath)
-                keepAliveClosed.set(true)
-            }
-        }
-
-        fun checkWaiterCount() {
-            // First see if /ready is missing
-            if (!isReadySet) {
-                closeKeepAlive()
-            } else {
-                if (waiterCount >= memberCount) {
-
-                    closeKeepAlive()
-
-                    // Delete /ready key
-                    client.transaction {
-                        If(readyPath.doesExist)
-                        Then(deleteOp(readyPath))
-                    }
-                }
-            }
-        }
-
-        // Do a CAS on the /ready name. If it is not found, then set it
-        client.transaction {
-            If(readyPath.doesNotExist)
-            Then(readyPath setTo uniqueToken)
-        }
-
-        val lease = client.leaseGrant(leaseTtlSecs.seconds)
-
-        val txn =
-            client.transaction {
-                If(waitingPath.doesNotExist)
-                Then(waitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
-            }
-
-        when {
-            !txn.isSucceeded                                      -> throw EtcdRecipeException("Failed to set waitingPath")
-            client.getValue(waitingPath)?.asString != uniqueToken -> throw EtcdRecipeException("Failed to assign waitingPath unique value")
-            else                                                  -> {
-                // Keep key alive
-                keepAliveLease = client.keepAlive(lease)
-
-                checkWaiterCount()
-
-                // Do not bother starting watcher if latch is already done
-                return if (keepAliveClosed.get()) {
-                    true
-                } else {
-                    // Watch for DELETE of /ready and PUTS on /waiters/*
-                    val trailingKey = barrierPath.ensureSuffix("/")
-                    val watchOption = watchOption { withPrefix(trailingKey) }
-                    client.withWatcher(trailingKey,
-                                       watchOption,
-                                       { watchResponse ->
-                                           watchResponse.events
-                                               .forEach { watchEvent ->
-                                                   val key = watchEvent.keyValue.key.asString
-                                                   when {
-                                                       key.startsWith(waitingPath) && watchEvent.eventType == PUT  -> checkWaiterCount()
-                                                       key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
-                                                   }
-                                               }
-
-                                       }) {
-                        // Check one more time in case watch missed the delete just after last check
-                        checkWaiterCount()
-
-                        val success = keepAliveClosed.waitUntilTrue(timeout)
-                        // Cleanup if a time-out occurred
-                        if (!success) {
-                            closeKeepAlive()
-                            client.deleteKey(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
-                        }
-
-                        success
-                    }
-                }
-            }
-        }
+  val waiterCount: Long
+    get() {
+      checkCloseNotCalled()
+      return client.getChildCount(waitingPath)
     }
 
-    companion object {
-        internal fun defaultClientId() = "${DistributedBarrierWithCount::class.simpleName}:${randomId(tokenLength)}"
+  @Throws(InterruptedException::class, EtcdRecipeException::class)
+  fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
+
+  @Throws(InterruptedException::class, EtcdRecipeException::class)
+  fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
+    waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
+
+  @Throws(InterruptedException::class, EtcdRecipeException::class)
+  fun waitOnBarrier(timeout: Duration): Boolean {
+    var keepAliveLease: CloseableClient? = null
+    val keepAliveClosed = BooleanMonitor(false)
+    val uniqueToken = "$clientId:${randomId(tokenLength)}"
+    val waitingPath = waitingPath.appendToPath(uniqueToken)
+
+    checkCloseNotCalled()
+
+    fun closeKeepAlive() {
+      if (!keepAliveClosed.get()) {
+        keepAliveLease?.close()
+        keepAliveLease = null
+        client.deleteKey(waitingPath)
+        keepAliveClosed.set(true)
+      }
     }
+
+    fun checkWaiterCount() {
+      // First see if /ready is missing
+      if (!isReadySet) {
+        closeKeepAlive()
+      } else {
+        if (waiterCount >= memberCount) {
+
+          closeKeepAlive()
+
+          // Delete /ready key
+          client.transaction {
+            If(readyPath.doesExist)
+            Then(deleteOp(readyPath))
+          }
+        }
+      }
+    }
+
+    // Do a CAS on the /ready name. If it is not found, then set it
+    client.transaction {
+      If(readyPath.doesNotExist)
+      Then(readyPath setTo uniqueToken)
+    }
+
+    val lease = client.leaseGrant(leaseTtlSecs.seconds)
+
+    val txn =
+      client.transaction {
+        If(waitingPath.doesNotExist)
+        Then(waitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+      }
+
+    when {
+      !txn.isSucceeded -> throw EtcdRecipeException("Failed to set waitingPath")
+      client.getValue(waitingPath)?.asString != uniqueToken -> throw EtcdRecipeException("Failed to assign waitingPath unique value")
+      else -> {
+        // Keep key alive
+        keepAliveLease = client.keepAlive(lease)
+
+        checkWaiterCount()
+
+        // Do not bother starting watcher if latch is already done
+        return if (keepAliveClosed.get()) {
+          true
+        } else {
+          // Watch for DELETE of /ready and PUTS on /waiters/*
+          val trailingKey = barrierPath.ensureSuffix("/")
+          val watchOption = watchOption { withPrefix(trailingKey) }
+          client.withWatcher(trailingKey,
+                             watchOption,
+                             { watchResponse ->
+                               watchResponse.events
+                                 .forEach { watchEvent ->
+                                   val key = watchEvent.keyValue.key.asString
+                                   when {
+                                     key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
+                                     key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
+                                   }
+                                 }
+
+                             }) {
+            // Check one more time in case watch missed the delete just after last check
+            checkWaiterCount()
+
+            val success = keepAliveClosed.waitUntilTrue(timeout)
+            // Cleanup if a time-out occurred
+            if (!success) {
+              closeKeepAlive()
+              client.deleteKey(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
+            }
+
+            success
+          }
+        }
+      }
+    }
+  }
+
+  companion object {
+    internal fun defaultClientId() = "${DistributedBarrierWithCount::class.simpleName}:${randomId(tokenLength)}"
+  }
 }

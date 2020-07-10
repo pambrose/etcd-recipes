@@ -53,7 +53,7 @@ fun <T> withDistributedBarrier(client: Client,
                                waitOnMissingBarriers: Boolean = true,
                                clientId: String = defaultClientId(),
                                receiver: DistributedBarrier.() -> T): T =
-    DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
+  DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
 
 class DistributedBarrier
 @JvmOverloads
@@ -63,111 +63,111 @@ constructor(client: Client,
             private val waitOnMissingBarriers: Boolean = true,
             val clientId: String = defaultClientId()) : EtcdConnector(client) {
 
-    private var keepAliveLease by nullableReference<CloseableClient?>(null)
-    private var barrierRemoved by atomicBoolean(false)
+  private var keepAliveLease by nullableReference<CloseableClient?>(null)
+  private var barrierRemoved by atomicBoolean(false)
 
-    init {
-        require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
-    }
+  init {
+    require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
+  }
 
-    fun isBarrierSet(): Boolean {
-        checkCloseNotCalled()
-        return client.isKeyPresent(barrierPath)
-    }
+  fun isBarrierSet(): Boolean {
+    checkCloseNotCalled()
+    return client.isKeyPresent(barrierPath)
+  }
 
-    @Synchronized
-    fun setBarrier(): Boolean {
-        checkCloseNotCalled()
-        return if (client.isKeyPresent(barrierPath))
-            false
-        else {
-            // Create unique token to avoid collision from clients with same id
-            val uniqueToken = "$clientId:${randomId(tokenLength)}"
+  @Synchronized
+  fun setBarrier(): Boolean {
+    checkCloseNotCalled()
+    return if (client.isKeyPresent(barrierPath))
+      false
+    else {
+      // Create unique token to avoid collision from clients with same id
+      val uniqueToken = "$clientId:${randomId(tokenLength)}"
 
-            // Prime lease with 2 seconds to give keepAlive a chance to get started
-            val lease = client.leaseGrant(leaseTtlSecs.seconds)
+      // Prime lease with 2 seconds to give keepAlive a chance to get started
+      val lease = client.leaseGrant(leaseTtlSecs.seconds)
 
-            // Do a CAS on the key name. If it is not found, then set it
-            val txn =
-                client.transaction {
-                    If(barrierPath.doesNotExist)
-                    Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
-                }
-
-            // Check to see if unique value was successfully set in the CAS step
-            if (txn.isSucceeded && client.getValue(barrierPath)?.asString == uniqueToken) {
-                keepAliveLease = client.keepAlive(lease)
-                true
-            } else {
-                false
-            }
+      // Do a CAS on the key name. If it is not found, then set it
+      val txn =
+        client.transaction {
+          If(barrierPath.doesNotExist)
+          Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
         }
+
+      // Check to see if unique value was successfully set in the CAS step
+      if (txn.isSucceeded && client.getValue(barrierPath)?.asString == uniqueToken) {
+        keepAliveLease = client.keepAlive(lease)
+        true
+      } else {
+        false
+      }
     }
+  }
 
-    @Synchronized
-    fun removeBarrier(): Boolean {
-        checkCloseNotCalled()
-        return if (barrierRemoved) {
-            false
-        } else {
-            keepAliveLease?.close()
-            keepAliveLease = null
+  @Synchronized
+  fun removeBarrier(): Boolean {
+    checkCloseNotCalled()
+    return if (barrierRemoved) {
+      false
+    } else {
+      keepAliveLease?.close()
+      keepAliveLease = null
 
-            client.deleteKey(barrierPath)
+      client.deleteKey(barrierPath)
 
-            barrierRemoved = true
+      barrierRemoved = true
 
-            true
-        }
+      true
     }
+  }
 
-    @Throws(InterruptedException::class)
-    fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
+  @Throws(InterruptedException::class)
+  fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
-    @Throws(InterruptedException::class)
-    fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
-        waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
+  @Throws(InterruptedException::class)
+  fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
+    waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
-    @Throws(InterruptedException::class)
-    fun waitOnBarrier(timeout: Duration): Boolean {
-        checkCloseNotCalled()
+  @Throws(InterruptedException::class)
+  fun waitOnBarrier(timeout: Duration): Boolean {
+    checkCloseNotCalled()
 
-        // Check if barrier is present before using watcher
-        return if (!waitOnMissingBarriers && !isBarrierSet())
-            true
-        else {
-            val waitLatch = CountDownLatch(1)
-            val watchOption = watchOption { withNoPut(true) }
+    // Check if barrier is present before using watcher
+    return if (!waitOnMissingBarriers && !isBarrierSet())
+      true
+    else {
+      val waitLatch = CountDownLatch(1)
+      val watchOption = watchOption { withNoPut(true) }
 
-            client.withWatcher(barrierPath,
-                               watchOption,
-                               { watchResponse ->
-                                   for (event in watchResponse.events)
-                                       if (event.eventType == DELETE)
-                                           waitLatch.countDown()
+      client.withWatcher(barrierPath,
+                         watchOption,
+                         { watchResponse ->
+                           for (event in watchResponse.events)
+                             if (event.eventType == DELETE)
+                               waitLatch.countDown()
 
-                               }) {
-                // Check one more time in case watch missed the delete just after last check
-                if (!waitOnMissingBarriers && !isBarrierSet())
-                    waitLatch.countDown()
+                         }) {
+        // Check one more time in case watch missed the delete just after last check
+        if (!waitOnMissingBarriers && !isBarrierSet())
+          waitLatch.countDown()
 
-                waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
-            }
-        }
+        waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+      }
     }
+  }
 
-    @Synchronized
-    override fun close() {
-        if (closeCalled)
-            return
+  @Synchronized
+  override fun close() {
+    if (closeCalled)
+      return
 
-        keepAliveLease?.close()
-        keepAliveLease = null
+    keepAliveLease?.close()
+    keepAliveLease = null
 
-        super.close()
-    }
+    super.close()
+  }
 
-    companion object : KLogging() {
-        internal fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(tokenLength)}"
-    }
+  companion object : KLogging() {
+    internal fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(tokenLength)}"
+  }
 }

@@ -41,7 +41,7 @@ fun <T> withDistributedAtomicLong(client: Client,
                                   counterPath: String,
                                   default: Long = 0L,
                                   receiver: DistributedAtomicLong.() -> T): T =
-    DistributedAtomicLong(client, counterPath, default).use { it.receiver() }
+  DistributedAtomicLong(client, counterPath, default).use { it.receiver() }
 
 class DistributedAtomicLong
 @JvmOverloads
@@ -49,76 +49,76 @@ constructor(client: Client,
             val counterPath: String,
             private val default: Long = 0L) : EtcdConnector(client) {
 
-    init {
-        require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
+  init {
+    require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
 
-        // Create counter if first time through
-        createCounterIfNotPresent()
-    }
+    // Create counter if first time through
+    createCounterIfNotPresent()
+  }
 
-    @Synchronized
-    fun get(): Long {
-        checkCloseNotCalled()
-        return client.getValue(counterPath, -1L)
-    }
+  @Synchronized
+  fun get(): Long {
+    checkCloseNotCalled()
+    return client.getValue(counterPath, -1L)
+  }
 
-    fun increment(): Long = modifyCounterValue(1L)
+  fun increment(): Long = modifyCounterValue(1L)
 
-    fun decrement(): Long = modifyCounterValue(-1L)
+  fun decrement(): Long = modifyCounterValue(-1L)
 
-    fun add(value: Long): Long = modifyCounterValue(value)
+  fun add(value: Long): Long = modifyCounterValue(value)
 
-    fun subtract(value: Long): Long = modifyCounterValue(-value)
+  fun subtract(value: Long): Long = modifyCounterValue(-value)
 
-    @Synchronized
-    private fun modifyCounterValue(value: Long): Long {
-        checkCloseNotCalled()
-        var count = 1
-        //totalCount.incrementAndGet()
-        do {
-            val txnResponse = applyCounterTransaction(value)
-            if (!txnResponse.isSucceeded) {
-                //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
-                // Crude backoff for retry
-                sleep((count * 100).random().milliseconds)
-                count++
-            }
-        } while (!txnResponse.isSucceeded)
+  @Synchronized
+  private fun modifyCounterValue(value: Long): Long {
+    checkCloseNotCalled()
+    var count = 1
+    //totalCount.incrementAndGet()
+    do {
+      val txnResponse = applyCounterTransaction(value)
+      if (!txnResponse.isSucceeded) {
+        //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
+        // Crude backoff for retry
+        sleep((count * 100).random().milliseconds)
+        count++
+      }
+    } while (!txnResponse.isSucceeded)
 
-        // Return the latest value
-        return client.getValue(counterPath, -1L)
-    }
+    // Return the latest value
+    return client.getValue(counterPath, -1L)
+  }
 
-    private fun createCounterIfNotPresent(): Boolean =
-        // Run the transaction if the counter is not present
-        if (client.getResponse(counterPath).kvs.isEmpty()) {
-            val txn =
-                client.transaction {
-                    If(counterPath.doesNotExist)
-                    Then(counterPath setTo default)
-                }
-            txn.isSucceeded
-        } else {
-            false
-        }
-
-    private fun applyCounterTransaction(amount: Long): TxnResponse =
+  private fun createCounterIfNotPresent(): Boolean =
+    // Run the transaction if the counter is not present
+    if (client.getResponse(counterPath).kvs.isEmpty()) {
+      val txn =
         client.transaction {
-            val kvList: List<KeyValue> = client.getResponse(counterPath).kvs
-            check(kvList.isNotEmpty()) { "Empty KeyValue list" }
-            val kv = kvList.first()
-            If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
-            Then(counterPath setTo kv.value.asLong + amount)
+          If(counterPath.doesNotExist)
+          Then(counterPath setTo default)
         }
-
-    companion object : KLogging() {
-        //val collisionCount = AtomicLong()
-        //val totalCount = AtomicLong()
-
-        @JvmStatic
-        fun delete(client: Client, counterPath: String) {
-            require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
-            client.deleteKey(counterPath)
-        }
+      txn.isSucceeded
+    } else {
+      false
     }
+
+  private fun applyCounterTransaction(amount: Long): TxnResponse =
+    client.transaction {
+      val kvList: List<KeyValue> = client.getResponse(counterPath).kvs
+      check(kvList.isNotEmpty()) { "Empty KeyValue list" }
+      val kv = kvList.first()
+      If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
+      Then(counterPath setTo kv.value.asLong + amount)
+    }
+
+  companion object : KLogging() {
+    //val collisionCount = AtomicLong()
+    //val totalCount = AtomicLong()
+
+    @JvmStatic
+    fun delete(client: Client, counterPath: String) {
+      require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
+      client.deleteKey(counterPath)
+    }
+  }
 }

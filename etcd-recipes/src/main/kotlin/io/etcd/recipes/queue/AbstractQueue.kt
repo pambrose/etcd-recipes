@@ -40,72 +40,72 @@ abstract class AbstractQueue(client: Client,
                              val queuePath: String,
                              private val target: SortTarget) : EtcdConnector(client) {
 
-    init {
-        require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
+  init {
+    require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
+  }
+
+  fun dequeue(): ByteSequence {
+    checkCloseNotCalled()
+
+    /*
+    println(client.getFirstChild(queuePath, target = target).kvs
+                .map { p -> p.key.asString to p.value.asString }
+                .joinToString("\n"))
+    */
+
+    val childList = client.getFirstChild(queuePath, target).kvs
+
+    if (childList.isNotEmpty()) {
+      val child = childList.first()
+      // If transactional delete fails, then just call self again
+      return if (deleteRevKey(child)) child.value else dequeue()
     }
 
-    fun dequeue(): ByteSequence {
-        checkCloseNotCalled()
+    // No values available, so wait on them
+    val watchLatch = CountDownLatch(1)
+    val trailingPath = queuePath.ensureSuffix("/")
+    val watchOption =
+      watchOption {
+        withPrefix(trailingPath)
+        withNoDelete(true)
+      }
+    val keyFound = AtomicReference<KeyValue?>()
 
-        /*
-        println(client.getFirstChild(queuePath, target = target).kvs
-                    .map { p -> p.key.asString to p.value.asString }
-                    .joinToString("\n"))
-        */
-
-        val childList = client.getFirstChild(queuePath, target).kvs
-
-        if (childList.isNotEmpty()) {
-            val child = childList.first()
-            // If transactional delete fails, then just call self again
-            return if (deleteRevKey(child)) child.value else dequeue()
-        }
-
-        // No values available, so wait on them
-        val watchLatch = CountDownLatch(1)
-        val trailingPath = queuePath.ensureSuffix("/")
-        val watchOption =
-            watchOption {
-                withPrefix(trailingPath)
-                withNoDelete(true)
-            }
-        val keyFound = AtomicReference<KeyValue?>()
-
-        client.withWatcher(queuePath,
-                           watchOption,
-                           { watchResponse ->
-                               synchronized(watchLatch) {
-                                   if (watchLatch.count > 0)
-                                       for (watchEvent in watchResponse.events) {
-                                           if (watchEvent.eventType == WatchEvent.EventType.PUT) {
-                                               keyFound.compareAndSet(null, watchEvent.keyValue)
-                                               watchLatch.countDown()
-                                           }
-                                       }
+    client.withWatcher(queuePath,
+                       watchOption,
+                       { watchResponse ->
+                         synchronized(watchLatch) {
+                           if (watchLatch.count > 0)
+                             for (watchEvent in watchResponse.events) {
+                               if (watchEvent.eventType == WatchEvent.EventType.PUT) {
+                                 keyFound.compareAndSet(null, watchEvent.keyValue)
+                                 watchLatch.countDown()
                                }
+                             }
+                         }
 
-                           }) {
-            // Query again in case a value arrived just before watch was created
-            synchronized(watchLatch) {
-                if (watchLatch.count > 0) {
-                    val waitingChildList = client.getFirstChild(queuePath, target).kvs
-                    if (waitingChildList.isNotEmpty()) {
-                        keyFound.compareAndSet(null, waitingChildList.first())
-                        watchLatch.countDown()
-                    }
-                }
-            }
-            watchLatch.await()
+                       }) {
+      // Query again in case a value arrived just before watch was created
+      synchronized(watchLatch) {
+        if (watchLatch.count > 0) {
+          val waitingChildList = client.getFirstChild(queuePath, target).kvs
+          if (waitingChildList.isNotEmpty()) {
+            keyFound.compareAndSet(null, waitingChildList.first())
+            watchLatch.countDown()
+          }
         }
-
-        val kv = keyFound.get()
-        // If transactional delete fails, then just call self again
-        return if (kv != null && deleteRevKey(kv)) kv.value else dequeue()
+      }
+      watchLatch.await()
     }
 
-    private fun deleteRevKey(kv: KeyValue): Boolean =
-        client.transaction {
-            If(equalTo(kv.key, CmpTarget.modRevision(kv.modRevision)))
-            Then(deleteOp(kv.key))
-        }.isSucceeded
+    val kv = keyFound.get()
+    // If transactional delete fails, then just call self again
+    return if (kv != null && deleteRevKey(kv)) kv.value else dequeue()
+  }
+
+  private fun deleteRevKey(kv: KeyValue): Boolean =
+    client.transaction {
+      If(equalTo(kv.key, CmpTarget.modRevision(kv.modRevision)))
+      Then(deleteOp(kv.key))
+    }.isSucceeded
 }

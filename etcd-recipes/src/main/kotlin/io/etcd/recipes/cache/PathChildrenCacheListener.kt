@@ -19,5 +19,5 @@
 package io.etcd.recipes.cache
 
 interface PathChildrenCacheListener {
-    fun childEvent(event: PathChildrenCacheEvent)
+  fun childEvent(event: PathChildrenCacheEvent)
 }

@@ -36,74 +36,74 @@ import kotlin.time.seconds
 
 class DistributedBarrierWithCountTests {
 
-    @Test
-    fun badArgsTest() {
-        connectToEtcd(urls) { client ->
-            invoking { DistributedBarrierWithCount(client, "something", 0) } shouldThrow IllegalArgumentException::class
-            invoking { DistributedBarrierWithCount(client, "", 1) } shouldThrow IllegalArgumentException::class
-        }
+  @Test
+  fun badArgsTest() {
+    connectToEtcd(urls) { client ->
+      invoking { DistributedBarrierWithCount(client, "something", 0) } shouldThrow IllegalArgumentException::class
+      invoking { DistributedBarrierWithCount(client, "", 1) } shouldThrow IllegalArgumentException::class
+    }
+  }
+
+  @Test
+  fun barrierWithCountTest() {
+    val path = "/barriers/${javaClass.simpleName}"
+    val count = 30
+    val retryAttempts = 5
+    val retryLatch = CountDownLatch(count - 1)
+    val retryCounter = atomic(0)
+    val advancedCounter = atomic(0)
+
+    fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
+
+      sleep(5.random().seconds)
+      logger.debug { "#$id Waiting on barrier" }
+
+      repeat(retryCount) {
+        barrier.waitOnBarrier(1.seconds)
+        logger.debug { "#$id Timed out waiting on barrier, waiting again" }
+        retryCounter.incrementAndGet()
+      }
+
+      retryLatch.countDown()
+
+      logger.debug { "#$id Waiter count = ${barrier.waiterCount}" }
+      barrier.waitOnBarrier()
+
+      advancedCounter.incrementAndGet()
+
+      logger.debug { "#$id Done waiting on barrier" }
     }
 
-    @Test
-    fun barrierWithCountTest() {
-        val path = "/barriers/${javaClass.simpleName}"
-        val count = 30
-        val retryAttempts = 5
-        val retryLatch = CountDownLatch(count - 1)
-        val retryCounter = atomic(0)
-        val advancedCounter = atomic(0)
+    connectToEtcd(urls) { client ->
 
-        fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
+      client.deleteChildren(path)
 
-            sleep(5.random().seconds)
-            logger.debug { "#$id Waiting on barrier" }
-
-            repeat(retryCount) {
-                barrier.waitOnBarrier(1.seconds)
-                logger.debug { "#$id Timed out waiting on barrier, waiting again" }
-                retryCounter.incrementAndGet()
-            }
-
-            retryLatch.countDown()
-
-            logger.debug { "#$id Waiter count = ${barrier.waiterCount}" }
-            barrier.waitOnBarrier()
-
-            advancedCounter.incrementAndGet()
-
-            logger.debug { "#$id Done waiting on barrier" }
-        }
-
-        connectToEtcd(urls) { client ->
-
-            client.deleteChildren(path)
-
-            val (finishedLatch, holder) =
-                nonblockingThreads(count - 1) { i ->
-                    connectToEtcd(urls) { client ->
-                        withDistributedBarrierWithCount(client, path, count) {
-                            waiter(i, this, retryAttempts)
-                        }
-                    }
-                }
-
-            retryLatch.await()
-            sleep(2.seconds)
-
+      val (finishedLatch, holder) =
+        nonblockingThreads(count - 1) { i ->
+          connectToEtcd(urls) { client ->
             withDistributedBarrierWithCount(client, path, count) {
-                waiter(99, this)
+              waiter(i, this, retryAttempts)
             }
-
-            finishedLatch.await()
-
-            holder.checkForException()
+          }
         }
 
-        retryCounter.value shouldBeEqualTo retryAttempts * (count - 1)
-        advancedCounter.value shouldBeEqualTo count
+      retryLatch.await()
+      sleep(2.seconds)
 
-        logger.debug { "Done" }
+      withDistributedBarrierWithCount(client, path, count) {
+        waiter(99, this)
+      }
+
+      finishedLatch.await()
+
+      holder.checkForException()
     }
 
-    companion object : KLogging()
+    retryCounter.value shouldBeEqualTo retryAttempts * (count - 1)
+    advancedCounter.value shouldBeEqualTo count
+
+    logger.debug { "Done" }
+  }
+
+  companion object : KLogging()
 }

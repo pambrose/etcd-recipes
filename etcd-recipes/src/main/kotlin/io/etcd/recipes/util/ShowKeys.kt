@@ -26,14 +26,14 @@ import io.etcd.recipes.common.getChildren
 import kotlin.time.seconds
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val path = "/"
+  val urls = listOf("http://localhost:2379")
+  val path = "/"
 
-    connectToEtcd(urls) { client ->
-        repeat(600) {
-            println(client.getChildren(path).asString)
-            println(client.getChildCount(path))
-            sleep(1.seconds)
-        }
+  connectToEtcd(urls) { client ->
+    repeat(600) {
+      println(client.getChildren(path).asString)
+      println(client.getChildCount(path))
+      sleep(1.seconds)
     }
+  }
 }

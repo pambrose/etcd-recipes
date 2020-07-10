@@ -26,34 +26,34 @@ import kotlin.time.TimeSource.Monotonic
 import kotlin.time.days
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val electionPath = "/election/threaded"
-    val executor = Executors.newSingleThreadExecutor()
+  val urls = listOf("http://localhost:2379")
+  val electionPath = "/election/threaded"
+  val executor = Executors.newSingleThreadExecutor()
 
-    val latch =
-        LeaderSelector.reportLeader(urls,
-                                    electionPath,
-                                    object : LeaderListener {
-                                        val electedClock = Monotonic
-                                        val unelectedClock = Monotonic
-                                        var electedTime = electedClock.markNow()
-                                        var unelectedTime = unelectedClock.markNow()
-                                        var currentLeader = ""
+  val latch =
+    LeaderSelector.reportLeader(urls,
+                                electionPath,
+                                object : LeaderListener {
+                                  val electedClock = Monotonic
+                                  val unelectedClock = Monotonic
+                                  var electedTime = electedClock.markNow()
+                                  var unelectedTime = unelectedClock.markNow()
+                                  var currentLeader = ""
 
-                                        override fun takeLeadership(leaderName: String) {
-                                            println("$leaderName is now the leader [Break time: ${unelectedTime.elapsedNow()}]")
-                                            currentLeader = leaderName
-                                            electedTime = electedClock.markNow()
-                                        }
+                                  override fun takeLeadership(leaderName: String) {
+                                    println("$leaderName is now the leader [Break time: ${unelectedTime.elapsedNow()}]")
+                                    currentLeader = leaderName
+                                    electedTime = electedClock.markNow()
+                                  }
 
-                                        override fun relinquishLeadership() {
-                                            println("$currentLeader is no longer the leader, after being leader for: ${electedTime.elapsedNow()}")
-                                            unelectedTime = unelectedClock.markNow()
-                                        }
-                                    },
-                                    executor)
+                                  override fun relinquishLeadership() {
+                                    println("$currentLeader is no longer the leader, after being leader for: ${electedTime.elapsedNow()}")
+                                    unelectedTime = unelectedClock.markNow()
+                                  }
+                                },
+                                executor)
 
-    sleep(1.days)
-    latch.countDown()
-    executor.shutdown()
+  sleep(1.days)
+  latch.countDown()
+  executor.shutdown()
 }

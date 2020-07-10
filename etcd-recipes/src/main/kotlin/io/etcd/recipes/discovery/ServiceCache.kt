@@ -45,121 +45,121 @@ class ServiceCache internal constructor(client: Client,
                                         val namesPath: String,
                                         val serviceName: String) : EtcdConnector(client) {
 
-    private var watcher: Watch.Watcher? by AtomicDelegates.nullableReference()
-    private var dataPreloaded = BooleanMonitor(false)
-    private val servicePath = namesPath.appendToPath(serviceName)
-    private val serviceMap: ConcurrentMap<String, String> = newConcurrentMap()
-    private val listeners: MutableList<ServiceCacheListener> = synchronizedList(mutableListOf())
+  private var watcher: Watch.Watcher? by AtomicDelegates.nullableReference()
+  private var dataPreloaded = BooleanMonitor(false)
+  private val servicePath = namesPath.appendToPath(serviceName)
+  private val serviceMap: ConcurrentMap<String, String> = newConcurrentMap()
+  private val listeners: MutableList<ServiceCacheListener> = synchronizedList(mutableListOf())
 
-    init {
-        require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }
-    }
+  init {
+    require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }
+  }
 
-    @Synchronized
-    fun start(): ServiceCache {
-        if (startCalled)
-            throw EtcdRecipeRuntimeException("start() already called")
-        checkCloseNotCalled()
+  @Synchronized
+  fun start(): ServiceCache {
+    if (startCalled)
+      throw EtcdRecipeRuntimeException("start() already called")
+    checkCloseNotCalled()
 
-        val trailingServicePath = servicePath.ensureSuffix("/")
-        val trailingNamesPath = namesPath.ensureSuffix("/")
-        val watchOption = watchOption { withPrefix(trailingServicePath) }
+    val trailingServicePath = servicePath.ensureSuffix("/")
+    val trailingNamesPath = namesPath.ensureSuffix("/")
+    val watchOption = watchOption { withPrefix(trailingServicePath) }
 
-        watcher = client.watcher(trailingServicePath, watchOption) { watchResponse ->
-            // Wait for data to be loaded
-            dataPreloaded.waitUntilTrue()
+    watcher = client.watcher(trailingServicePath, watchOption) { watchResponse ->
+      // Wait for data to be loaded
+      dataPreloaded.waitUntilTrue()
 
-            watchResponse.events
-                .forEach { event ->
-                    val (k, v) = event.keyValue.asPair.asString
-                    val stripped = k.substring(trailingNamesPath.length)
-                    when (event.eventType) {
-                        PUT          -> {
-                            val isAdd = !serviceMap.containsKey(stripped)
-                            serviceMap[stripped] = v
-                            listeners.forEach { listener ->
-                                try {
-                                    listener.cacheChanged(PUT, isAdd, stripped, ServiceInstance.toObject(v))
-                                } catch (e: Throwable) {
-                                    logger.error(e) { "Exception in cacheChanged()" }
-                                    exceptionList.value += e
-                                }
-                            }
-                            //println("$k $v ${if (newKey) "added" else "updated"}")
-                        }
-                        DELETE       -> {
-                            val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
-                            listeners.forEach { listener ->
-                                try {
-                                    listener.cacheChanged(DELETE, false, stripped, prevValue)
-                                } catch (e: Throwable) {
-                                    logger.error(e) { "Exception in cacheChanged()" }
-                                    exceptionList.value += e
-                                }
-                            }
-                            //println("$stripped deleted")
-                        }
-                        UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
-                        else -> logger.error { "Unknown error with $servicePath watch" }
-                    }
+      watchResponse.events
+        .forEach { event ->
+          val (k, v) = event.keyValue.asPair.asString
+          val stripped = k.substring(trailingNamesPath.length)
+          when (event.eventType) {
+            PUT -> {
+              val isAdd = !serviceMap.containsKey(stripped)
+              serviceMap[stripped] = v
+              listeners.forEach { listener ->
+                try {
+                  listener.cacheChanged(PUT, isAdd, stripped, ServiceInstance.toObject(v))
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in cacheChanged()" }
+                  exceptionList.value += e
                 }
-            startThreadComplete.set(true)
-        }
-
-        // Preload with initial data
-        val kvs = client.getChildren(trailingServicePath)
-
-        for ((k, v) in kvs) {
-            val stripped = k.substring(trailingNamesPath.length)
-            serviceMap[stripped] = v.asString
-        }
-
-        dataPreloaded.set(true)
-        startCalled = true
-
-        return this
-    }
-
-    val instances: List<ServiceInstance>
-        get() {
-            checkCloseNotCalled()
-            return serviceMap.values.map { ServiceInstance.toObject(it) }
-        }
-
-    fun addListenerForChanges(listener: (eventType: WatchEvent.EventType,
-                                         isAdd: Boolean,
-                                         serviceName: String,
-                                         serviceInstance: ServiceInstance?) -> Unit) {
-        addListenerForChanges(
-            object : ServiceCacheListener {
-                override fun cacheChanged(eventType: WatchEvent.EventType,
-                                          isAdd: Boolean,
-                                          serviceName: String,
-                                          serviceInstance: ServiceInstance?) {
-                    listener.invoke(eventType, isAdd, serviceName, serviceInstance)
+              }
+              //println("$k $v ${if (newKey) "added" else "updated"}")
+            }
+            DELETE -> {
+              val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
+              listeners.forEach { listener ->
+                try {
+                  listener.cacheChanged(DELETE, false, stripped, prevValue)
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in cacheChanged()" }
+                  exceptionList.value += e
                 }
-            })
+              }
+              //println("$stripped deleted")
+            }
+            UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
+            else -> logger.error { "Unknown error with $servicePath watch" }
+          }
+        }
+      startThreadComplete.set(true)
     }
 
-    fun addListenerForChanges(listener: ServiceCacheListener) {
-        checkCloseNotCalled()
-        listeners += listener
+    // Preload with initial data
+    val kvs = client.getChildren(trailingServicePath)
+
+    for ((k, v) in kvs) {
+      val stripped = k.substring(trailingNamesPath.length)
+      serviceMap[stripped] = v.asString
     }
 
-    @Synchronized
-    override fun close() {
-        if (closeCalled)
-            return
+    dataPreloaded.set(true)
+    startCalled = true
 
-        checkStartCalled()
+    return this
+  }
 
-        watcher?.close()
-
-        listeners.clear()
-        startThreadComplete.waitUntilTrue()
-
-        super.close()
+  val instances: List<ServiceInstance>
+    get() {
+      checkCloseNotCalled()
+      return serviceMap.values.map { ServiceInstance.toObject(it) }
     }
 
-    companion object : KLogging()
+  fun addListenerForChanges(listener: (eventType: WatchEvent.EventType,
+                                       isAdd: Boolean,
+                                       serviceName: String,
+                                       serviceInstance: ServiceInstance?) -> Unit) {
+    addListenerForChanges(
+      object : ServiceCacheListener {
+        override fun cacheChanged(eventType: WatchEvent.EventType,
+                                  isAdd: Boolean,
+                                  serviceName: String,
+                                  serviceInstance: ServiceInstance?) {
+          listener.invoke(eventType, isAdd, serviceName, serviceInstance)
+        }
+      })
+  }
+
+  fun addListenerForChanges(listener: ServiceCacheListener) {
+    checkCloseNotCalled()
+    listeners += listener
+  }
+
+  @Synchronized
+  override fun close() {
+    if (closeCalled)
+      return
+
+    checkStartCalled()
+
+    watcher?.close()
+
+    listeners.clear()
+    startThreadComplete.waitUntilTrue()
+
+    super.close()
+  }
+
+  companion object : KLogging()
 }
