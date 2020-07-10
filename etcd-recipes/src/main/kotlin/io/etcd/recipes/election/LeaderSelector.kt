@@ -101,20 +101,21 @@ constructor(client: Client,
               relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
               leaseTtlSecs: Long = defaultTtlSecs,
               executorService: ExecutorService? = null,
-              clientId: String = defaultClientId()) : this(client,
-                                                           electionPath,
-                                                           object : LeaderSelectorListener {
-                                                             override fun takeLeadership(selector: LeaderSelector) {
-                                                               takeLeadershipBlock.invoke(selector)
-                                                             }
+              clientId: String = defaultClientId()) :
+      this(client,
+           electionPath,
+           object : LeaderSelectorListener {
+             override fun takeLeadership(selector: LeaderSelector) {
+               takeLeadershipBlock.invoke(selector)
+             }
 
-                                                             override fun relinquishLeadership(selector: LeaderSelector) {
-                                                               relinquishLeadershipBlock.invoke(selector)
-                                                             }
-                                                           },
-                                                           leaseTtlSecs,
-                                                           executorService,
-                                                           clientId)
+             override fun relinquishLeadership(selector: LeaderSelector) {
+               relinquishLeadershipBlock.invoke(selector)
+             }
+           },
+           leaseTtlSecs,
+           executorService,
+           clientId)
 
   private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
   private val terminateWatch = BooleanMonitor(false)
