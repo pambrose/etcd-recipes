@@ -25,7 +25,6 @@ import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
-import kotlinx.atomicfu.atomic
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
@@ -36,6 +35,8 @@ import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.seconds
 
 class DistributedBarrierTests {
@@ -53,9 +54,9 @@ class DistributedBarrierTests {
     val count = 10
     val setBarrierLatch = CountDownLatch(1)
     val completeLatch = CountDownLatch(1)
-    val removeBarrierTime = atomic(0L)
-    val timeoutCount = atomic(0)
-    val advancedCount = atomic(0)
+    val removeBarrierTime = AtomicLong(0L)
+    val timeoutCount = AtomicInteger(0)
+    val advancedCount = AtomicInteger(0)
 
     connectToEtcd(urls) { client ->
 
@@ -79,7 +80,7 @@ class DistributedBarrierTests {
           sleep(6.seconds)
 
           logger.debug { "Removing Barrier" }
-          removeBarrierTime.value = System.currentTimeMillis()
+          removeBarrierTime.set(System.currentTimeMillis())
           val isRemoved = removeBarrier()
           isRemoved.shouldBeTrue()
 
@@ -103,7 +104,7 @@ class DistributedBarrierTests {
           waitOnBarrier()
 
           // Make sure the waiter advanced quickly
-          System.currentTimeMillis() - removeBarrierTime.value shouldBeLessThan 500
+          System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500
           advancedCount.incrementAndGet()
 
           logger.debug { "$i Done Waiting on Barrier" }
@@ -113,8 +114,8 @@ class DistributedBarrierTests {
 
     completeLatch.await()
 
-    timeoutCount.value shouldBeEqualTo count
-    advancedCount.value shouldBeEqualTo count
+    timeoutCount.get() shouldBeEqualTo count
+    advancedCount.get() shouldBeEqualTo count
 
     logger.debug { "Done" }
   }
@@ -123,9 +124,9 @@ class DistributedBarrierTests {
   fun earlySetBarrierTest() {
     val path = "/barriers/early${javaClass.simpleName}"
     val count = 10
-    val removeBarrierTime = atomic(0L)
-    val timeoutCount = atomic(0)
-    val advancedCount = atomic(0)
+    val removeBarrierTime = AtomicLong(0L)
+    val timeoutCount = AtomicInteger(0)
+    val advancedCount = AtomicInteger(0)
 
     connectToEtcd(urls) { client ->
 
@@ -141,7 +142,7 @@ class DistributedBarrierTests {
             waitOnBarrier()
 
             // Make sure the waiter advanced quickly
-            System.currentTimeMillis() - removeBarrierTime.value shouldBeLessThan 500
+            System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500
             advancedCount.incrementAndGet()
 
             logger.debug { "$i Done Waiting on Barrier" }
@@ -167,7 +168,7 @@ class DistributedBarrierTests {
         sleep(6.seconds)
 
         logger.debug { "Removing Barrier" }
-        removeBarrierTime.value = System.currentTimeMillis()
+        removeBarrierTime.set(System.currentTimeMillis())
         removeBarrier()
 
         sleep(3.seconds)
@@ -178,8 +179,8 @@ class DistributedBarrierTests {
       holder.checkForException()
     }
 
-    timeoutCount.value shouldBeEqualTo count
-    advancedCount.value shouldBeEqualTo count
+    timeoutCount.get() shouldBeEqualTo count
+    advancedCount.get() shouldBeEqualTo count
 
     logger.debug { "Done" }
   }

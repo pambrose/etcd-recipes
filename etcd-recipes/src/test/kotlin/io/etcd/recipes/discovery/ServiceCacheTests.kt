@@ -26,10 +26,10 @@ import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
-import kotlinx.atomicfu.atomic
 import mu.KLogging
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
 class ServiceCacheTests {
@@ -41,10 +41,10 @@ class ServiceCacheTests {
     val serviceCount = 10
     val name = "ServiceCacheTest"
     val holder = ExceptionHolder()
-    val registerCounter = atomic(0)
-    val updateCounter = atomic(0)
-    val unregisterCounter = atomic(0)
-    val totalCounter = atomic(0)
+    val registerCounter = AtomicInteger(0)
+    val updateCounter = AtomicInteger(0)
+    val unregisterCounter = AtomicInteger(0)
+    val totalCounter = AtomicInteger(0)
 
     connectToEtcd(urls) { client ->
       withServiceDiscovery(client, path) {
@@ -116,10 +116,10 @@ class ServiceCacheTests {
     sleep(5.seconds)
 
     holder.checkForException()
-    registerCounter.value shouldBeEqualTo threadCount * serviceCount
-    updateCounter.value shouldBeEqualTo threadCount * serviceCount
-    unregisterCounter.value shouldBeEqualTo threadCount * serviceCount
-    totalCounter.value shouldBeEqualTo (threadCount * serviceCount) * 3
+    registerCounter.get() shouldBeEqualTo threadCount * serviceCount
+    updateCounter.get() shouldBeEqualTo threadCount * serviceCount
+    unregisterCounter.get() shouldBeEqualTo threadCount * serviceCount
+    totalCounter.get() shouldBeEqualTo (threadCount * serviceCount) * 3
   }
 
   companion object : KLogging()

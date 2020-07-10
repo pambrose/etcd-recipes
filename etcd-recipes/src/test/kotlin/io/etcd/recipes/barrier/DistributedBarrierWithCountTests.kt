@@ -25,13 +25,13 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
-import kotlinx.atomicfu.atomic
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
 class DistributedBarrierWithCountTests {
@@ -50,8 +50,8 @@ class DistributedBarrierWithCountTests {
     val count = 30
     val retryAttempts = 5
     val retryLatch = CountDownLatch(count - 1)
-    val retryCounter = atomic(0)
-    val advancedCounter = atomic(0)
+    val retryCounter = AtomicInteger(0)
+    val advancedCounter = AtomicInteger(0)
 
     fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
 
@@ -99,8 +99,8 @@ class DistributedBarrierWithCountTests {
       holder.checkForException()
     }
 
-    retryCounter.value shouldBeEqualTo retryAttempts * (count - 1)
-    advancedCounter.value shouldBeEqualTo count
+    retryCounter.get() shouldBeEqualTo retryAttempts * (count - 1)
+    advancedCounter.get() shouldBeEqualTo count
 
     logger.debug { "Done" }
   }

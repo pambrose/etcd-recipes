@@ -25,7 +25,6 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
-import kotlinx.atomicfu.atomic
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
@@ -33,6 +32,7 @@ import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.milliseconds
 import kotlin.time.seconds
 
@@ -55,10 +55,10 @@ class DistributedDoubleBarrierTests {
     val leaveLatch = CountDownLatch(count - 1)
     val doneLatch = CountDownLatch(count)
 
-    val enterRetryCounter = atomic(0)
-    val leaveRetryCounter = atomic(0)
-    val enterCounter = atomic(0)
-    val leaveCounter = atomic(0)
+    val enterRetryCounter = AtomicInteger(0)
+    val leaveRetryCounter = AtomicInteger(0)
+    val enterCounter = AtomicInteger(0)
+    val leaveCounter = AtomicInteger(0)
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
       sleep(5.random().seconds)
@@ -136,11 +136,11 @@ class DistributedDoubleBarrierTests {
       holder.checkForException()
     }
 
-    enterRetryCounter.value shouldBeEqualTo retryAttempts * (count - 1)
-    enterCounter.value shouldBeEqualTo count
+    enterRetryCounter.get() shouldBeEqualTo retryAttempts * (count - 1)
+    enterCounter.get() shouldBeEqualTo count
 
-    leaveRetryCounter.value shouldBeEqualTo retryAttempts * (count - 1)
-    leaveCounter.value shouldBeEqualTo count
+    leaveRetryCounter.get() shouldBeEqualTo retryAttempts * (count - 1)
+    leaveCounter.get() shouldBeEqualTo count
 
     logger.debug { "Done" }
   }

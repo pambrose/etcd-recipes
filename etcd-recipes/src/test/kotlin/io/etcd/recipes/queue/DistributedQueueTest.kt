@@ -25,12 +25,12 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.urls
-import kotlinx.atomicfu.atomic
 import mu.KLogging
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
 class DistributedQueueTest {
@@ -213,7 +213,7 @@ class DistributedQueueTest {
   @Test
   fun pingPongTest() {
     val queuePath = "/queue/pingPongTest"
-    val counter = atomic(0)
+    val counter = AtomicInteger(0)
     val token = "Pong"
     val latch = CountDownLatch(threadCount)
     val iterCount = 100
@@ -243,7 +243,7 @@ class DistributedQueueTest {
       }
     }
 
-    counter.value shouldBeEqualTo threadCount * iterCount
+    counter.get() shouldBeEqualTo threadCount * iterCount
   }
 
   companion object : KLogging()

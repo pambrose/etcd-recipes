@@ -23,11 +23,11 @@ import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
-import kotlinx.atomicfu.atomic
 import mu.KLogging
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.seconds
 
 class ReportLeaderTests {
@@ -37,8 +37,8 @@ class ReportLeaderTests {
     @Test
     fun reportLeaderTest() {
         val count = 25
-        val takeLeadershiptCounter = atomic(0)
-        val relinquishLeadershiptCounter = atomic(0)
+        val takeLeadershiptCounter = AtomicInteger(0)
+        val relinquishLeadershiptCounter = AtomicInteger(0)
 
         val executor = Executors.newSingleThreadExecutor()
         LeaderSelector.reportLeader(urls,
@@ -78,8 +78,8 @@ class ReportLeaderTests {
         // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
         sleep(10.seconds)
 
-        takeLeadershiptCounter.value shouldBeEqualTo count
-        relinquishLeadershiptCounter.value shouldBeEqualTo count
+        takeLeadershiptCounter.get() shouldBeEqualTo count
+        relinquishLeadershiptCounter.get() shouldBeEqualTo count
 
         executor.shutdown()
     }
