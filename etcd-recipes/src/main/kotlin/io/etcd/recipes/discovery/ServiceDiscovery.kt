@@ -19,6 +19,7 @@
 package io.etcd.recipes.discovery
 
 import com.github.pambrose.common.delegate.AtomicDelegates.nonNullableReference
+import com.github.pambrose.common.util.isNotNull
 import com.github.pambrose.common.util.randomId
 import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.Client
@@ -136,7 +137,7 @@ constructor(client: Client,
     val context = serviceContextMap[service.id]
     context?.close()
     serviceContextMap.remove(service.id)
-    return context != null
+    return context.isNotNull()
   }
 
   fun serviceCache(name: String): ServiceCache {

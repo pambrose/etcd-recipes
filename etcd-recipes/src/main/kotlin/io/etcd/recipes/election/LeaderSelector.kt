@@ -21,6 +21,7 @@ package io.etcd.recipes.election
 import com.github.pambrose.common.concurrent.BooleanMonitor
 import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
 import com.github.pambrose.common.time.timeUnitToDuration
+import com.github.pambrose.common.util.isNull
 import com.github.pambrose.common.util.randomId
 import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
@@ -252,7 +253,7 @@ constructor(client: Client,
     markLeadershipComplete()
     startThreadComplete.waitUntilTrue()
 
-    if (userExecutor == null) (executor as ExecutorService).shutdown()
+    if (userExecutor.isNull()) (executor as ExecutorService).shutdown()
 
     super.close()
   }

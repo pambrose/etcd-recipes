@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.common
 
+import com.github.pambrose.common.util.isNotNull
 import java.util.concurrent.atomic.AtomicReference
 
 class ExceptionHolder {
@@ -27,6 +28,6 @@ class ExceptionHolder {
   var exception: Throwable?
     get() = if (holder.isInitialized()) holder.value.get() else null
     set(e) {
-      if (e != null) holder.value.set(e)
+      if (e.isNotNull()) holder.value.set(e)
     }
 }

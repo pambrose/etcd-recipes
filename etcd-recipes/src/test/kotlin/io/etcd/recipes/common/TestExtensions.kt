@@ -19,6 +19,7 @@
 package io.etcd.recipes.common
 
 import com.github.pambrose.common.concurrent.thread
+import com.github.pambrose.common.util.isNotNull
 import org.junit.jupiter.api.Assertions.fail
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
@@ -50,13 +51,13 @@ fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
 }
 
 fun ExceptionHolder.checkForException() {
-  if (exception != null)
+  if (exception.isNotNull())
     return fail("Exception caught: $exception", exception)
 }
 
 fun List<ExceptionHolder>.throwExceptionFromList() {
-  val e = firstOrNull { it.exception != null }?.exception
-  if (e != null)
+  val e = firstOrNull { it.exception.isNotNull() }?.exception
+  if (e.isNotNull())
     throw e
 }
 

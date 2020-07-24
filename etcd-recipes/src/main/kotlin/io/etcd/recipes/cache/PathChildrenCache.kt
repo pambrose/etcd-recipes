@@ -20,6 +20,7 @@ package io.etcd.recipes.cache
 
 import com.github.pambrose.common.delegate.AtomicDelegates.nullableReference
 import com.github.pambrose.common.time.timeUnitToDuration
+import com.github.pambrose.common.util.isNull
 import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
@@ -253,7 +254,7 @@ class PathChildrenCache(client: Client,
     listeners.clear()
     startThreadComplete.waitUntilTrue()
 
-    if (userExecutor == null) (executor as ExecutorService).shutdown()
+    if (userExecutor.isNull()) (executor as ExecutorService).shutdown()
 
     super.close()
   }
