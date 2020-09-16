@@ -23,10 +23,10 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class TestPayload(var testval: Int) {
-  fun toJson() = Json.stringify(serializer(), this)
+  fun toJson() = Json.encodeToString(serializer(), this)
 
   companion object {
     @JvmStatic
-    fun toObject(json: String) = Json.parse(serializer(), json)
+    fun toObject(json: String) = Json.decodeFromString(serializer(), json)
   }
 }
