@@ -42,11 +42,11 @@ data class ServiceInstance(val name: String,
     require(name.isNotEmpty()) { "Name cannot be empty" }
   }
 
-  fun toJson() = Json.stringify(serializer(), this)
+  fun toJson() = Json.encodeToString(serializer(), this)
 
   companion object {
     @JvmStatic
-    fun toObject(json: String) = Json.parse(serializer(), json)
+    fun toObject(json: String) = Json.decodeFromString(serializer(), json)
 
     class ServiceInstanceBuilder(val name: String, val jsonPayload: String) {
       var address: String = ""
