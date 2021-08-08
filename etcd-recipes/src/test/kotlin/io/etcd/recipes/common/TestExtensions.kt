@@ -1,11 +1,11 @@
 /*
- * Copyright © 2019 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,70 +19,73 @@
 package io.etcd.recipes.common
 
 import com.github.pambrose.common.concurrent.thread
+import com.github.pambrose.common.util.isNotNull
 import org.junit.jupiter.api.Assertions.fail
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 
 val urls = listOf("http://localhost:2379")
 
-fun nonblockingThreads(threadCount: Int,
-                       waitLatch: CountDownLatch? = null,
-                       block: (index: Int) -> Unit): Pair<CountDownLatch, ExceptionHolder> {
-    val finishedLatch = CountDownLatch(threadCount)
-    val holder = ExceptionHolder()
-    repeat(threadCount) {
-        thread(finishedLatch) {
-            try {
-                block(it)
-                waitLatch?.await()
-            } catch (e: Throwable) {
-                holder.exception = e
-            }
-        }
+fun nonblockingThreads(
+  threadCount: Int,
+  waitLatch: CountDownLatch? = null,
+  block: (index: Int) -> Unit
+): Pair<CountDownLatch, ExceptionHolder> {
+  val finishedLatch = CountDownLatch(threadCount)
+  val holder = ExceptionHolder()
+  repeat(threadCount) {
+    thread(finishedLatch) {
+      try {
+        block(it)
+        waitLatch?.await()
+      } catch (e: Throwable) {
+        holder.exception = e
+      }
     }
-    return Pair(finishedLatch, holder)
+  }
+  return Pair(finishedLatch, holder)
 }
 
 fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
-    val (finishedLatch, exception) = nonblockingThreads(threadCount, block = block)
-    finishedLatch.await()
-    exception.checkForException()
+  val (finishedLatch, exception) = nonblockingThreads(threadCount, block = block)
+  finishedLatch.await()
+  exception.checkForException()
 }
 
 fun ExceptionHolder.checkForException() {
-    if (exception != null)
-        return fail("Exception caught: $exception", exception)
+  if (exception.isNotNull())
+    return fail("Exception caught: $exception", exception)
 }
 
 fun List<ExceptionHolder>.throwExceptionFromList() {
-    val e = firstOrNull { it.exception != null }?.exception
-    if (e != null)
-        throw e
+  val e = firstOrNull { it.exception.isNotNull() }?.exception
+  if (e.isNotNull())
+    throw e
 }
 
 fun List<CountDownLatch>.waitForAll() = forEach { it.await() }
 
 fun threadWithExceptionCheck(block: () -> Unit): Pair<CountDownLatch, ExceptionHolder> {
-    val latch = CountDownLatch(1)
-    val holder = ExceptionHolder()
+  val latch = CountDownLatch(1)
+  val holder = ExceptionHolder()
 
-    thread {
-        try {
-            block()
-        } catch (e: Throwable) {
-            holder.exception = e
-        } finally {
-            latch.countDown()
-        }
+  thread {
+    try {
+      block()
+    } catch (e: Throwable) {
+      holder.exception = e
+    } finally {
+      latch.countDown()
     }
+  }
 
-    return Pair(latch, holder)
+  return Pair(latch, holder)
 }
 
 fun captureException(holder: ExceptionHolder, block: () -> Unit) {
-    try {
-        block()
-    } catch (e: Throwable) {
-        holder.exception = e
-    }
+  try {
+    block()
+  } catch (e: Throwable) {
+    holder.exception = e
+  }
 }

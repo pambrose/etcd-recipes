@@ -1,11 +1,11 @@
 /*
- * Copyright © 2019 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.keyvalue
 
+import com.github.pambrose.common.util.isNull
 import com.github.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
@@ -29,91 +30,97 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 @JvmOverloads
-fun <T> withTransientKeyValue(client: Client,
-                              keyPath: String,
-                              keyValue: String,
-                              leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
-                              autoStart: Boolean = true,
-                              userExecutor: Executor? = null,
-                              clientId: String = defaultClientId(),
-                              receiver: TransientKeyValue.() -> T): T =
-    TransientKeyValue(client,
-                      keyPath,
-                      keyValue,
-                      leaseTtlSecs,
-                      autoStart,
-                      userExecutor,
-                      clientId).use { it.receiver() }
+fun <T> withTransientKeyValue(
+  client: Client,
+  keyPath: String,
+  keyValue: String,
+  leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+  autoStart: Boolean = true,
+  userExecutor: Executor? = null,
+  clientId: String = defaultClientId(),
+  receiver: TransientKeyValue.() -> T
+): T =
+  TransientKeyValue(
+    client,
+    keyPath,
+    keyValue,
+    leaseTtlSecs,
+    autoStart,
+    userExecutor,
+    clientId
+  ).use { it.receiver() }
 
 class TransientKeyValue
 @JvmOverloads
-constructor(client: Client,
-            val keyPath: String,
-            val keyValue: String,
-            val leaseTtlSecs: Long = defaultTtlSecs,
-            autoStart: Boolean = true,
-            private val userExecutor: Executor? = null,
-            val clientId: String = defaultClientId()) : EtcdConnector(client) {
+constructor(
+  client: Client,
+  val keyPath: String,
+  val keyValue: String,
+  val leaseTtlSecs: Long = defaultTtlSecs,
+  autoStart: Boolean = true,
+  private val userExecutor: Executor? = null,
+  val clientId: String = defaultClientId()
+) : EtcdConnector(client) {
 
-    private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
-    private val keepAliveWaitLatch = CountDownLatch(1)
-    private val keepAliveStartedLatch = CountDownLatch(1)
+  private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
+  private val keepAliveWaitLatch = CountDownLatch(1)
+  private val keepAliveStartedLatch = CountDownLatch(1)
 
-    init {
-        require(keyPath.isNotEmpty()) { "Key path cannot be empty" }
+  init {
+    require(keyPath.isNotEmpty()) { "Key path cannot be empty" }
 
-        if (autoStart)
-            start()
-    }
+    if (autoStart)
+      start()
+  }
 
-    @Synchronized
-    fun start(): TransientKeyValue {
-        if (startCalled)
-            throw EtcdRecipeRuntimeException("start() already called")
-        checkCloseNotCalled()
+  @Synchronized
+  fun start(): TransientKeyValue {
+    if (startCalled)
+      throw EtcdRecipeRuntimeException("start() already called")
+    checkCloseNotCalled()
 
-        executor.execute {
-            try {
-                val leaseTtl = leaseTtlSecs.seconds
-                logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
-                client.putValueWithKeepAlive(keyPath, keyValue, leaseTtl) {
-                    keepAliveStartedLatch.countDown()
-                    keepAliveWaitLatch.await()
-                    logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
-                }
-            } catch (e: Throwable) {
-                logger.error(e) { "In start()" }
-                exceptionList.value += e
-            } finally {
-                startThreadComplete.set(true)
-            }
+    executor.execute {
+      try {
+        val leaseTtl = Duration.seconds(leaseTtlSecs)
+        logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
+        client.putValueWithKeepAlive(keyPath, keyValue, leaseTtl) {
+          keepAliveStartedLatch.countDown()
+          keepAliveWaitLatch.await()
+          logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
         }
-
-        keepAliveStartedLatch.await()
-        startCalled = true
-
-        return this
+      } catch (e: Throwable) {
+        logger.error(e) { "In start()" }
+        exceptionList.value += e
+      } finally {
+        startThreadComplete.set(true)
+      }
     }
 
-    @Synchronized
-    override fun close() {
-        if (closeCalled)
-            return
+    keepAliveStartedLatch.await()
+    startCalled = true
 
-        checkStartCalled()
+    return this
+  }
 
-        keepAliveWaitLatch.countDown()
-        startThreadComplete.waitUntilTrue()
+  @Synchronized
+  override fun close() {
+    if (closeCalled)
+      return
 
-        if (userExecutor == null) (executor as ExecutorService).shutdown()
+    checkStartCalled()
 
-        super.close()
-    }
+    keepAliveWaitLatch.countDown()
+    startThreadComplete.waitUntilTrue()
 
-    companion object : KLogging() {
-        internal fun defaultClientId() = "${TransientKeyValue::class.simpleName}:${randomId(tokenLength)}"
-    }
+    if (userExecutor.isNull()) (executor as ExecutorService).shutdown()
+
+    super.close()
+  }
+
+  companion object : KLogging() {
+    internal fun defaultClientId() = "${TransientKeyValue::class.simpleName}:${randomId(tokenLength)}"
+  }
 }

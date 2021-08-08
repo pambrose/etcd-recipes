@@ -1,11 +1,11 @@
 /*
- * Copyright © 2019 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,17 +23,17 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getChildren
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val path = "/"
+  val urls = listOf("http://localhost:2379")
+  val path = "/"
 
-    connectToEtcd(urls) { client ->
-        repeat(600) {
-            println(client.getChildren(path).asString)
-            println(client.getChildCount(path))
-            sleep(1.seconds)
-        }
+  connectToEtcd(urls) { client ->
+    repeat(600) {
+      println(client.getChildren(path).asString)
+      println(client.getChildCount(path))
+      sleep(Duration.seconds(1))
     }
+  }
 }

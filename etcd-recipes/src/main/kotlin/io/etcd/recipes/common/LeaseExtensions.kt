@@ -1,11 +1,11 @@
 /*
- * Copyright © 2019 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,18 +20,22 @@
 package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.CloseableClient
-import io.etcd.jetcd.Observers
 import io.etcd.jetcd.lease.LeaseGrantResponse
+import io.etcd.jetcd.support.CloseableClient
+import io.etcd.jetcd.support.Observers
 import kotlin.time.Duration
+import kotlin.time.DurationUnit
 
 fun <T> Client.keepAliveWith(lease: LeaseGrantResponse, block: () -> T): T =
-    keepAlive(lease).use { block.invoke() }
+  keepAlive(lease).use { block.invoke() }
 
 fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
-    leaseClient.keepAlive(lease.id,
-                          Observers.observer(
-                              { /*println("KeepAlive next resp: $next")*/ },
-                              { /*println("KeepAlive err resp: $err")*/ }))
+  leaseClient.keepAlive(
+    lease.id,
+    Observers.observer(
+      { /*println("KeepAlive next resp: $next")*/ },
+      { /*println("KeepAlive err resp: $err")*/ })
+  )
 
-fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse = leaseClient.grant(ttl.inSeconds.toLong()).get()
+fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse =
+  leaseClient.grant(ttl.toDouble(DurationUnit.SECONDS).toLong()).get()

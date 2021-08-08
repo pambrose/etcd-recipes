@@ -18,9 +18,9 @@ kind of support for [etcd](https://etcd.io) that
 
 ## Examples
 
-[Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipe-examples/src/main/java/io/etcd/recipes/examples) 
-and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipe-examples/src/main/kotlin/io/etcd/recipes/examples) 
-examples are included in the repo.
+The repo includes [Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples) 
+and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples) 
+examples.
 
 ## Usage
 ```kotlin
@@ -52,7 +52,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.pambrose.etcd-recipes:etcd-recipes:0.9.19"
+    implementation "com.github.pambrose.etcd-recipes:etcd-recipes:0.9.20"
 }
 ```
 
@@ -76,7 +76,7 @@ dependencies {
     <dependency>
       <groupId>com.github.pambrose.etcd-recipes</groupId>
       <artifactId>etcd-recipes</artifactId>
-      <version>0.9.19</version>
+      <version>0.9.20</version>
     </dependency>
 </dependencies>
 ```

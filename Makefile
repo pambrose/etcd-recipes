@@ -11,8 +11,15 @@ build: compile
 tests:
 	./gradlew check jacocoTestReport
 
+lint:
+	./gradlew lintKotlinMain
+	./gradlew lintKotlinTest
+
 refresh:
-	./gradlew build --refresh-dependencies
+	./gradlew --refresh-dependencies
 
 versioncheck:
 	./gradlew dependencyUpdates
+
+upgrade-wrapper:
+	./gradlew wrapper --gradle-version=6.8.3 --distribution-type=bin

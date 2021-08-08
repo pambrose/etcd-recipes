@@ -1,11 +1,11 @@
 /*
- * Copyright © 2019 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,19 +29,19 @@ import io.etcd.jetcd.options.PutOption
 
 @JvmOverloads
 fun Client.putValue(keyName: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): PutResponse =
-    kvClient.put(keyName.asByteSequence, keyval, option).get()
+  kvClient.put(keyName.asByteSequence, keyval, option).get()
 
 @JvmOverloads
 fun Client.putValue(keyName: String, keyval: String, option: PutOption = PutOption.DEFAULT): PutResponse =
-    kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
+  kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
 
 @JvmOverloads
 fun Client.putValue(keyName: String, keyval: Int, option: PutOption = PutOption.DEFAULT): PutResponse =
-    kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
+  kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
 
 @JvmOverloads
 fun Client.putValue(keyName: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
-    kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
+  kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
 
 // Delete keys
 fun Client.deleteKeys(vararg keyNames: String) = keyNames.forEach { deleteKey(it) }
@@ -49,34 +49,36 @@ fun Client.deleteKeys(vararg keyNames: String) = keyNames.forEach { deleteKey(it
 fun Client.deleteKey(keyName: String): DeleteResponse = kvClient.delete(keyName.asByteSequence).get()
 
 // Get responses
-internal fun Client.getResponse(keyName: ByteSequence,
-                                option: GetOption = GetOption.DEFAULT,
-                                iteration: Int = 0): GetResponse {
-    val response = kvClient.get(keyName, option).get()
-    return if (response.kvs.isEmpty() && response.isMore) {
-        if (iteration == 10)
-            throw EtcdRecipeRuntimeException("Unable to fulfill call to getResponse after multiple attempts")
-        getResponse(keyName, option, iteration + 1)
-    } else {
-        response
-    }
+internal fun Client.getResponse(
+  keyName: ByteSequence,
+  option: GetOption = GetOption.DEFAULT,
+  iteration: Int = 0
+): GetResponse {
+  val response = kvClient.get(keyName, option).get()
+  return if (response.kvs.isEmpty() && response.isMore) {
+    if (iteration == 10)
+      throw EtcdRecipeRuntimeException("Unable to fulfill call to getResponse after multiple attempts")
+    getResponse(keyName, option, iteration + 1)
+  } else {
+    response
+  }
 }
 
 @JvmOverloads
 fun Client.getResponse(keyName: String, option: GetOption = GetOption.DEFAULT): GetResponse =
-    getResponse(keyName.asByteSequence, option)
+  getResponse(keyName.asByteSequence, option)
 
 // Get children key value pairs
 fun Client.getKeyValuePairs(keyName: ByteSequence, getOption: GetOption): List<Pair<String, ByteSequence>> =
-    getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
+  getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
 
 fun Client.getKeyValuePairs(keyName: String, getOption: GetOption): List<Pair<String, ByteSequence>> =
-    getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
+  getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
 
 // Get single key value
 fun Client.getValue(keyName: String): ByteSequence? {
-    val getOption = getOption { withLimit(1) }
-    return getResponse(keyName, getOption).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value
+  val getOption = getOption { withLimit(1) }
+  return getResponse(keyName, getOption).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value
 }
 
 // Get single key value with default
