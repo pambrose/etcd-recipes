@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,24 +20,15 @@ package io.etcd.recipes.barrier
 
 import com.github.pambrose.common.concurrent.thread
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.blockingThreads
-import io.etcd.recipes.common.checkForException
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.nonblockingThreads
-import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.*
 import mu.KLogging
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldBeFalse
-import org.amshove.kluent.shouldBeLessThan
-import org.amshove.kluent.shouldBeTrue
-import org.amshove.kluent.shouldThrow
+import org.amshove.kluent.*
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class DistributedBarrierTests {
 
@@ -77,7 +68,7 @@ class DistributedBarrierTests {
           isSet2.shouldBeFalse()
 
           // Pause to give time-outs a chance
-          sleep(6.seconds)
+          sleep(Duration.seconds(6))
 
           logger.debug { "Removing Barrier" }
           removeBarrierTime.set(System.currentTimeMillis())
@@ -88,7 +79,7 @@ class DistributedBarrierTests {
           val isRemoved2 = removeBarrier()
           isRemoved2.shouldBeFalse()
 
-          sleep(3.seconds)
+          sleep(Duration.seconds(3))
         }
       }
 
@@ -96,7 +87,7 @@ class DistributedBarrierTests {
         setBarrierLatch.await()
         withDistributedBarrier(client, path) {
           logger.debug { "$i Waiting on Barrier" }
-          waitOnBarrier(1.seconds)
+          waitOnBarrier(Duration.seconds(1))
 
           timeoutCount.incrementAndGet()
 
@@ -149,7 +140,7 @@ class DistributedBarrierTests {
           }
         }
 
-      sleep(5.seconds)
+      sleep(Duration.seconds(5))
 
       withDistributedBarrier(client, path) {
 
@@ -165,13 +156,13 @@ class DistributedBarrierTests {
         isSet2.shouldBeFalse()
 
         // Pause to give time-outs a chance
-        sleep(6.seconds)
+        sleep(Duration.seconds(6))
 
         logger.debug { "Removing Barrier" }
         removeBarrierTime.set(System.currentTimeMillis())
         removeBarrier()
 
-        sleep(3.seconds)
+        sleep(Duration.seconds(3))
       }
 
       finishedLatch.await()

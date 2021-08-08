@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,84 +28,83 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class ThreadedLeaderSelectorTests {
-    val path = "/election/${javaClass.simpleName}"
-    val count = 10
+  val path = "/election/${javaClass.simpleName}"
+  val count = 10
 
-    @Test
-    fun threadedElection1Test() {
-        val takeLeadershiptCounter = AtomicInteger(0)
-        val relinquishLeadershiptCounter = AtomicInteger(0)
+  @Test
+  fun threadedElection1Test() {
+    val takeLeadershiptCounter = AtomicInteger(0)
+    val relinquishLeadershiptCounter = AtomicInteger(0)
 
-        blockingThreads(count) {
-            val takeAction =
-                { selector: LeaderSelector ->
-                    val pause = 3.random().seconds
-                    logger.debug { "${selector.clientId} elected leader for $pause" }
-                    takeLeadershiptCounter.incrementAndGet()
-                    sleep(pause)
-                }
-
-            val relinquishAction =
-                { selector: LeaderSelector ->
-                    relinquishLeadershiptCounter.incrementAndGet()
-                    logger.debug { "${selector.clientId} relinquished leadership" }
-                }
-
-            connectToEtcd(urls) { client ->
-                withLeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it") {
-                    start()
-                    waitOnLeadershipComplete()
-                }
-            }
+    blockingThreads(count) {
+      val takeAction =
+        { selector: LeaderSelector ->
+          val pause = Duration.seconds(3.random())
+          logger.debug { "${selector.clientId} elected leader for $pause" }
+          takeLeadershiptCounter.incrementAndGet()
+          sleep(pause)
         }
 
-        takeLeadershiptCounter.get() shouldBeEqualTo count
-        relinquishLeadershiptCounter.get() shouldBeEqualTo count
-    }
-
-    @Test
-    fun threadedElection2Test() {
-        val takeLeadershiptCounter = AtomicInteger(0)
-        val relinquishLeadershiptCounter = AtomicInteger(0)
-        val electionList: MutableList<LeaderSelector> = synchronizedList(mutableListOf())
-
-        val takeAction =
-            { selector: LeaderSelector ->
-                val pause = 3.random().seconds
-                logger.debug { "${selector.clientId} elected leader for $pause" }
-                takeLeadershiptCounter.incrementAndGet()
-                sleep(pause)
-            }
-
-        val relinquishAction =
-            { selector: LeaderSelector ->
-                relinquishLeadershiptCounter.incrementAndGet()
-                logger.debug { "${selector.clientId} relinquished leadership" }
-            }
-
-        connectToEtcd(urls) { client ->
-            blockingThreads(count) {
-                logger.debug { "Creating Thread$it" }
-
-                val election = LeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it")
-                electionList += election
-                election.start()
-
-            }
-
-            logger.debug { "Size = ${electionList.size}" }
-
-            electionList
-                .onEach { it.waitOnLeadershipComplete() }
-                .forEach { it.close() }
+      val relinquishAction =
+        { selector: LeaderSelector ->
+          relinquishLeadershiptCounter.incrementAndGet()
+          logger.debug { "${selector.clientId} relinquished leadership" }
         }
 
-        takeLeadershiptCounter.get() shouldBeEqualTo count
-        relinquishLeadershiptCounter.get() shouldBeEqualTo count
+      connectToEtcd(urls) { client ->
+        withLeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it") {
+          start()
+          waitOnLeadershipComplete()
+        }
+      }
     }
 
-    companion object : KLogging()
+    takeLeadershiptCounter.get() shouldBeEqualTo count
+    relinquishLeadershiptCounter.get() shouldBeEqualTo count
+  }
+
+  @Test
+  fun threadedElection2Test() {
+    val takeLeadershiptCounter = AtomicInteger(0)
+    val relinquishLeadershiptCounter = AtomicInteger(0)
+    val electionList: MutableList<LeaderSelector> = synchronizedList(mutableListOf())
+
+    val takeAction =
+      { selector: LeaderSelector ->
+        val pause = Duration.seconds(3.random())
+        logger.debug { "${selector.clientId} elected leader for $pause" }
+        takeLeadershiptCounter.incrementAndGet()
+        sleep(pause)
+      }
+
+    val relinquishAction =
+      { selector: LeaderSelector ->
+        relinquishLeadershiptCounter.incrementAndGet()
+        logger.debug { "${selector.clientId} relinquished leadership" }
+      }
+
+    connectToEtcd(urls) { client ->
+      blockingThreads(count) {
+        logger.debug { "Creating Thread$it" }
+
+        val election = LeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it")
+        electionList += election
+        election.start()
+      }
+
+      logger.debug { "Size = ${electionList.size}" }
+
+      electionList
+        .onEach { it.waitOnLeadershipComplete() }
+        .forEach { it.close() }
+    }
+
+    takeLeadershiptCounter.get() shouldBeEqualTo count
+    relinquishLeadershiptCounter.get() shouldBeEqualTo count
+  }
+
+  companion object : KLogging()
 }

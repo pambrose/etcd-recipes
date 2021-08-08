@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,14 +26,16 @@ import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.GetOption.SortOrder
 
 @JvmOverloads
-fun Client.getChildren(keyName: String,
-                       target: GetOption.SortTarget = GetOption.SortTarget.KEY,
-                       order: SortOrder = SortOrder.ASCEND,
-                       keysOnly: Boolean = false): List<Pair<String, ByteSequence>> {
+fun Client.getChildren(
+  keyName: String,
+  target: GetOption.SortTarget = GetOption.SortTarget.KEY,
+  order: SortOrder = SortOrder.ASCEND,
+  keysOnly: Boolean = false
+): List<Pair<String, ByteSequence>> {
   val trailingKey = keyName.ensureSuffix("/")
   val getOption =
     getOption {
-      withPrefix(trailingKey)
+      isPrefix(true)
       withSortField(target)
       withSortOrder(order)
       withKeysOnly(keysOnly)
@@ -47,15 +49,17 @@ fun Client.getFirstChild(keyName: String, target: GetOption.SortTarget): GetResp
 fun Client.getLastChild(keyName: String, target: GetOption.SortTarget): GetResponse =
   getSingleChild(keyName, target, SortOrder.DESCEND)
 
-fun GetOption.Builder.withPrefix(prefix: String): GetOption.Builder = withPrefix(prefix.asByteSequence)
+//fun GetOption.Builder.withPrefix(prefix: String): GetOption.Builder = withPrefix(prefix.asByteSequence)
 
-private fun Client.getSingleChild(keyName: String,
-                                  target: GetOption.SortTarget,
-                                  order: SortOrder): GetResponse {
+private fun Client.getSingleChild(
+  keyName: String,
+  target: GetOption.SortTarget,
+  order: SortOrder
+): GetResponse {
   val trailingKey = keyName.ensureSuffix("/")
   val getOption =
     getOption {
-      withPrefix(trailingKey)
+      isPrefix(true)
       withSortField(target)
       withSortOrder(order)
       withLimit(1)
@@ -64,17 +68,20 @@ private fun Client.getSingleChild(keyName: String,
 }
 
 @JvmOverloads
-fun Client.getChildrenKeys(keyName: String,
-                           target: GetOption.SortTarget = GetOption.SortTarget.KEY,
-                           order: SortOrder = SortOrder.ASCEND): List<String> =
+fun Client.getChildrenKeys(
+  keyName: String,
+  target: GetOption.SortTarget = GetOption.SortTarget.KEY,
+  order: SortOrder = SortOrder.ASCEND
+): List<String> =
   getChildren(keyName, target, order, true).keys
 
 @JvmOverloads
-fun Client.getChildrenValues(keyName: String,
-                             target: GetOption.SortTarget = GetOption.SortTarget.KEY,
-                             order: SortOrder = SortOrder.ASCEND): List<ByteSequence> =
+fun Client.getChildrenValues(
+  keyName: String,
+  target: GetOption.SortTarget = GetOption.SortTarget.KEY,
+  order: SortOrder = SortOrder.ASCEND
+): List<ByteSequence> =
   getChildren(keyName, target, order).values
-
 
 // Delete children keys
 fun Client.deleteChildren(keyName: String): List<String> {
@@ -87,9 +94,9 @@ fun Client.deleteChildren(keyName: String): List<String> {
 // Count children keys
 fun Client.getChildCount(keyName: String): Long {
   val trailingKey = keyName.ensureSuffix("/")
-  val getOption: GetOption =
+  val getOption =
     getOption {
-      withPrefix(trailingKey)
+      isPrefix(true)
       withCountOnly(true)
     }
   return getResponse(trailingKey, getOption).count

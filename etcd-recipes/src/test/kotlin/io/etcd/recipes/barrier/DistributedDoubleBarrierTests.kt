@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,7 @@ package io.etcd.recipes.barrier
 
 import com.github.pambrose.common.util.random
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.checkForException
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.deleteChildren
-import io.etcd.recipes.common.nonblockingThreads
-import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.*
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
@@ -33,8 +29,7 @@ import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.milliseconds
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class DistributedDoubleBarrierTests {
 
@@ -61,12 +56,12 @@ class DistributedDoubleBarrierTests {
     val leaveCounter = AtomicInteger(0)
 
     fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-      sleep(5.random().seconds)
+      sleep(Duration.seconds(5.random()))
 
       repeat(retryCount) {
         logger.debug { "#$id Waiting to enter barrier" }
         if (it % 2 == 0)
-          barrier.enter(1000.random().milliseconds)
+          barrier.enter(Duration.milliseconds(1000.random()))
         else
           barrier.enter(1000, TimeUnit.MILLISECONDS)
         enterRetryCounter.incrementAndGet()
@@ -82,12 +77,12 @@ class DistributedDoubleBarrierTests {
     }
 
     fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
-      sleep(10.random().seconds)
+      sleep(Duration.seconds(10.random()))
 
       repeat(retryCount) {
         logger.debug { "#$id Waiting to leave barrier" }
         if (it % 2 == 0)
-          barrier.leave(1000.random().milliseconds)
+          barrier.leave(Duration.milliseconds(1000.random()))
         else
           barrier.leave(1000, TimeUnit.MILLISECONDS)
         leaveRetryCounter.incrementAndGet()
@@ -111,20 +106,20 @@ class DistributedDoubleBarrierTests {
         nonblockingThreads(count - 1) { i ->
           withDistributedDoubleBarrier(client, path, count) {
             enterBarrier(i, this, retryAttempts)
-            sleep(5.random().seconds)
+            sleep(Duration.seconds(5.random()))
             leaveBarrier(i, this, retryAttempts)
           }
         }
 
       withDistributedDoubleBarrier(client, path, count) {
         enterLatch.await()
-        sleep(2.seconds)
+        sleep(Duration.seconds(2))
 
         enterWaiterCount.toInt() shouldBeEqualTo count - 1
         enterBarrier(99, this)
 
         leaveLatch.await()
-        sleep(2.seconds)
+        sleep(Duration.seconds(2))
 
         leaveWaiterCount.toInt() shouldBeEqualTo count - 1
         leaveBarrier(99, this)

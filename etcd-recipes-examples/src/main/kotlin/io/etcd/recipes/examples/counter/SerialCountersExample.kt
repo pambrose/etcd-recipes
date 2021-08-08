@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,31 +23,31 @@ import io.etcd.recipes.counter.DistributedAtomicLong
 import kotlin.time.measureTimedValue
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val counterPath = "counter2"
+  val urls = listOf("http://localhost:2379")
+  val counterPath = "counter2"
 
-    connectToEtcd(urls) { client ->
+  connectToEtcd(urls) { client ->
 
-        DistributedAtomicLong.delete(client, counterPath)
+    DistributedAtomicLong.delete(client, counterPath)
 
-        val counters = List(30) { DistributedAtomicLong(client, counterPath) }
+    val counters = List(30) { DistributedAtomicLong(client, counterPath) }
 
-        val (total, dur) =
-            measureTimedValue {
-                val count = 25
-                counters
-                    .onEach { counter ->
-                        repeat(count) { counter.increment() }
-                        repeat(count) { counter.decrement() }
-                        repeat(count) { counter.add(5) }
-                        repeat(count) { counter.subtract(5) }
-                    }
-                    .first()
-                    .get()
-            }
+    val (total, dur) =
+      measureTimedValue {
+        val count = 25
+        counters
+          .onEach { counter ->
+            repeat(count) { counter.increment() }
+            repeat(count) { counter.decrement() }
+            repeat(count) { counter.add(5) }
+            repeat(count) { counter.subtract(5) }
+          }
+          .first()
+          .get()
+      }
 
-        println("Total: $total in $dur")
+    println("Total: $total in $dur")
 
-        counters.forEach { it.close() }
-    }
+    counters.forEach { it.close() }
+  }
 }

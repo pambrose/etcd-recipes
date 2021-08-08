@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,38 +19,31 @@
 package io.etcd.recipes.examples.basics
 
 import io.etcd.jetcd.Client
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.deleteKeys
-import io.etcd.recipes.common.doesExist
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.putValue
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.*
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val path = "/txnexample"
-    val keyval = "debug"
+  val urls = listOf("http://localhost:2379")
+  val path = "/txnexample"
+  val keyval = "debug"
 
-    fun checkForKey(client: Client) {
-        client.transaction {
-            If(path.doesExist)
-            Then(keyval setTo "Key $path found")
-            Else(keyval setTo "Key $path not found")
-        }
-
-        println("Debug value: ${client.getValue(keyval, "not_used")}")
+  fun checkForKey(client: Client) {
+    client.transaction {
+      If(path.doesExist)
+      Then(keyval setTo "Key $path found")
+      Else(keyval setTo "Key $path not found")
     }
 
-    connectToEtcd(urls) { client ->
-        println("Deleting keys")
-        client.deleteKeys(path, keyval)
+    println("Debug value: ${client.getValue(keyval, "not_used")}")
+  }
 
-        println("Key present: ${client.isKeyPresent(keyval)}")
-        checkForKey(client)
-        println("Key present: ${client.isKeyPresent(keyval)}")
-        client.putValue(path, "Something")
-        checkForKey(client)
-    }
+  connectToEtcd(urls) { client ->
+    println("Deleting keys")
+    client.deleteKeys(path, keyval)
+
+    println("Key present: ${client.isKeyPresent(keyval)}")
+    checkForKey(client)
+    println("Key present: ${client.isKeyPresent(keyval)}")
+    client.putValue(path, "Something")
+    checkForKey(client)
+  }
 }

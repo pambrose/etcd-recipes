@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,5 +28,4 @@ class ConnectTest {
   fun badArgsTest() {
     invoking { connectToEtcd(emptyList()) { this } } shouldThrow IllegalArgumentException::class
   }
-
 }

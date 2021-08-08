@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,15 +26,17 @@ import kotlinx.serialization.json.Json
 import java.time.Instant
 
 @Serializable
-data class ServiceInstance(val name: String,
-                           var jsonPayload: String,
-                           var address: String = "",
-                           var port: Int = -1,
-                           var sslPort: Int = -1,
-                           var registrationTimeUTC: Long = Instant.now().toEpochMilli(),
-                           var serviceType: ServiceType = ServiceType.DYNAMIC,
-                           var uri: String = "",
-                           var enabled: Boolean = true) {
+data class ServiceInstance(
+  val name: String,
+  var jsonPayload: String,
+  var address: String = "",
+  var port: Int = -1,
+  var sslPort: Int = -1,
+  var registrationTimeUTC: Long = Instant.now().toEpochMilli(),
+  var serviceType: ServiceType = ServiceType.DYNAMIC,
+  var uri: String = "",
+  var enabled: Boolean = true
+) {
 
   val id: String = randomId(tokenLength)
 
@@ -58,15 +60,17 @@ data class ServiceInstance(val name: String,
       var enabled: Boolean = true
 
       fun build(): ServiceInstance =
-        ServiceInstance(name,
-                        jsonPayload,
-                        address,
-                        port,
-                        sslPort,
-                        registrationTimeUTC,
-                        serviceType,
-                        uri,
-                        enabled)
+        ServiceInstance(
+          name,
+          jsonPayload,
+          address,
+          port,
+          sslPort,
+          registrationTimeUTC,
+          serviceType,
+          uri,
+          enabled
+        )
     }
 
     @JvmStatic
@@ -75,7 +79,9 @@ data class ServiceInstance(val name: String,
 }
 
 @JvmOverloads
-fun serviceInstance(name: String,
-                    jsonPayload: String,
-                    initReciever: ServiceInstanceBuilder.() -> ServiceInstanceBuilder = { this }): ServiceInstance =
+fun serviceInstance(
+  name: String,
+  jsonPayload: String,
+  initReciever: ServiceInstanceBuilder.() -> ServiceInstanceBuilder = { this }
+): ServiceInstance =
   ServiceInstance.newBuilder(name, jsonPayload).initReciever().build()

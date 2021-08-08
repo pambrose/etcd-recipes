@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,7 @@ package io.etcd.recipes.counter
 
 import com.github.pambrose.common.util.random
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.ExceptionHolder
-import io.etcd.recipes.common.blockingThreads
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.threadWithExceptionCheck
-import io.etcd.recipes.common.throwExceptionFromList
-import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.*
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
@@ -33,7 +28,7 @@ import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
-import kotlin.time.milliseconds
+import kotlin.time.Duration
 
 class DistributedAtomicLongTests {
   val path = "/counters/${javaClass.simpleName}"
@@ -152,7 +147,7 @@ class DistributedAtomicLongTests {
             threadWithExceptionCheck {
               logger.debug { "Begin increments for counter #$i" }
               repeat(count) { increment() }
-              sleep(maxPause.random().milliseconds)
+              sleep(Duration.milliseconds(maxPause.random()))
               logger.debug { "Completed increments for counter #$i" }
             }
           latchList += latch0
@@ -162,7 +157,7 @@ class DistributedAtomicLongTests {
             threadWithExceptionCheck {
               logger.debug { "Begin decrements for counter #$i" }
               repeat(count) { decrement() }
-              sleep(maxPause.random().milliseconds)
+              sleep(Duration.milliseconds(maxPause.random()))
               logger.debug { "Completed decrements for counter #$i" }
             }
           latchList += latch1
@@ -172,7 +167,7 @@ class DistributedAtomicLongTests {
             threadWithExceptionCheck {
               logger.debug { "Begin adds for counter #$i" }
               repeat(count) { add(5) }
-              sleep(maxPause.random().milliseconds)
+              sleep(Duration.milliseconds(maxPause.random()))
               logger.debug { "Completed adds for counter #$i" }
             }
           latchList += latch2
@@ -182,7 +177,7 @@ class DistributedAtomicLongTests {
             threadWithExceptionCheck {
               logger.debug { "Begin subtracts for counter #$i" }
               repeat(count) { subtract(5) }
-              sleep(maxPause.random().milliseconds)
+              sleep(Duration.milliseconds(maxPause.random()))
               logger.debug { "Completed subtracts for counter #$i" }
             }
           latchList += latch3
@@ -204,4 +199,3 @@ class DistributedAtomicLongTests {
 
   companion object : KLogging()
 }
-

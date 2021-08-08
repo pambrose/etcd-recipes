@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,32 +26,32 @@ import java.util.concurrent.CountDownLatch
 import kotlin.time.measureTimedValue
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val path = "/counters"
-    val threadCount = 5
-    val repeatCount = 10
-    val latch = CountDownLatch(threadCount)
+  val urls = listOf("http://localhost:2379")
+  val path = "/counters"
+  val threadCount = 5
+  val repeatCount = 10
+  val latch = CountDownLatch(threadCount)
 
-    connectToEtcd(urls) { client ->
+  connectToEtcd(urls) { client ->
 
-        DistributedAtomicLong.delete(client, path)
+    DistributedAtomicLong.delete(client, path)
 
-        val (_, dur) =
-            measureTimedValue {
-                repeat(threadCount) { i ->
-                    thread(latch) {
-                        println("Creating counter #$i")
-                        withDistributedAtomicLong(client, path) {
-                            repeat(repeatCount) { increment() }
-                            repeat(repeatCount) { decrement() }
-                            repeat(repeatCount) { add(5) }
-                            repeat(repeatCount) { subtract(5) }
-                        }
-                    }
-                }
-                latch.await()
+    val (_, dur) =
+      measureTimedValue {
+        repeat(threadCount) { i ->
+          thread(latch) {
+            println("Creating counter #$i")
+            withDistributedAtomicLong(client, path) {
+              repeat(repeatCount) { increment() }
+              repeat(repeatCount) { decrement() }
+              repeat(repeatCount) { add(5) }
+              repeat(repeatCount) { subtract(5) }
             }
+          }
+        }
+        latch.await()
+      }
 
-        withDistributedAtomicLong(client, path) { println("Counter value = ${get()} in $dur") }
-    }
+    withDistributedAtomicLong(client, path) { println("Counter value = ${get()} in $dur") }
+  }
 }

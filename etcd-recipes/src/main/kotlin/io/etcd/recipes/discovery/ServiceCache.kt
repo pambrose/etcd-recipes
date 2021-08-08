@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,26 +24,17 @@ import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.watch.WatchEvent
-import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asPair
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.ensureSuffix
-import io.etcd.recipes.common.getChildren
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.watcher
-import io.etcd.recipes.common.withPrefix
+import io.etcd.jetcd.watch.WatchEvent.EventType.*
+import io.etcd.recipes.common.*
 import mu.KLogging
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
 
-class ServiceCache internal constructor(client: Client,
-                                        val namesPath: String,
-                                        val serviceName: String) : EtcdConnector(client) {
+class ServiceCache internal constructor(
+  client: Client,
+  val namesPath: String,
+  val serviceName: String
+) : EtcdConnector(client) {
 
   private var watcher: Watch.Watcher? by AtomicDelegates.nullableReference()
   private var dataPreloaded = BooleanMonitor(false)
@@ -63,7 +54,7 @@ class ServiceCache internal constructor(client: Client,
 
     val trailingServicePath = servicePath.ensureSuffix("/")
     val trailingNamesPath = namesPath.ensureSuffix("/")
-    val watchOption = watchOption { withPrefix(trailingServicePath) }
+    val watchOption = watchOption { isPrefix(true) }
 
     watcher = client.watcher(trailingServicePath, watchOption) { watchResponse ->
       // Wait for data to be loaded
@@ -126,16 +117,22 @@ class ServiceCache internal constructor(client: Client,
       return serviceMap.values.map { ServiceInstance.toObject(it) }
     }
 
-  fun addListenerForChanges(listener: (eventType: WatchEvent.EventType,
-                                       isAdd: Boolean,
-                                       serviceName: String,
-                                       serviceInstance: ServiceInstance?) -> Unit) {
+  fun addListenerForChanges(
+    listener: (
+      eventType: WatchEvent.EventType,
+      isAdd: Boolean,
+      serviceName: String,
+      serviceInstance: ServiceInstance?
+    ) -> Unit
+  ) {
     addListenerForChanges(
       object : ServiceCacheListener {
-        override fun cacheChanged(eventType: WatchEvent.EventType,
-                                  isAdd: Boolean,
-                                  serviceName: String,
-                                  serviceInstance: ServiceInstance?) {
+        override fun cacheChanged(
+          eventType: WatchEvent.EventType,
+          isAdd: Boolean,
+          serviceName: String,
+          serviceInstance: ServiceInstance?
+        ) {
           listener.invoke(eventType, isAdd, serviceName, serviceInstance)
         }
       })

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ fun connectToEtcd(urls: List<String>, initReciever: ClientBuilder.() -> ClientBu
 }
 
 @JvmOverloads
-fun <T> connectToEtcd(urls: List<String>,
-                      initReciever: ClientBuilder.() -> ClientBuilder = { this },
-                      block: (client: Client) -> T): T = connectToEtcd(urls, initReciever).use { block(it) }
+fun <T> connectToEtcd(
+  urls: List<String>,
+  initReciever: ClientBuilder.() -> ClientBuilder = { this },
+  block: (client: Client) -> T
+): T = connectToEtcd(urls, initReciever).use { block(it) }

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,42 +36,47 @@ val WatchEvent.valueAsString get() = keyValue.value.asString
 val WatchEvent.valueAsInt get() = keyValue.value.asInt
 val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
-fun WatchOption.Builder.withPrefix(prefix: String): WatchOption.Builder = withPrefix(prefix.asByteSequence)
+//fun WatchOption.Builder.withPrefix(prefix: String): WatchOption.Builder = withPrefix(prefix.asByteSequence)
 
 @JvmOverloads
-fun Client.watcher(keyName: String,
-                   option: WatchOption = WatchOption.DEFAULT,
-                   block: (WatchResponse) -> Unit): Watch.Watcher =
+fun Client.watcher(
+  keyName: String,
+  option: WatchOption = WatchOption.DEFAULT,
+  block: (WatchResponse) -> Unit
+): Watch.Watcher =
   watchClient.watch(keyName.asByteSequence, option) { block(it) }
 
+@JvmOverloads
+fun <T> Client.withWatcher(
+  keyName: String,
+  option: WatchOption = WatchOption.DEFAULT,
+  block: (WatchResponse) -> Unit,
+  receiver: Watch.Watcher.() -> T
+): T = watcher(keyName, option, block).use { it.receiver() }
 
 @JvmOverloads
-fun <T> Client.withWatcher(keyName: String,
-                           option: WatchOption = WatchOption.DEFAULT,
-                           block: (WatchResponse) -> Unit,
-                           receiver: Watch.Watcher.() -> T): T = watcher(keyName, option, block).use { it.receiver() }
-
-@JvmOverloads
-fun Client.watcherWithLatch(keyName: String,
-                            endWatchLatch: CountDownLatch,
-                            onPut: (WatchEvent) -> Unit,
-                            onDelete: (WatchEvent) -> Unit,
-                            option: WatchOption = WatchOption.DEFAULT) {
+fun Client.watcherWithLatch(
+  keyName: String,
+  endWatchLatch: CountDownLatch,
+  onPut: (WatchEvent) -> Unit,
+  onDelete: (WatchEvent) -> Unit,
+  option: WatchOption = WatchOption.DEFAULT
+) {
   withWatcher(keyName,
-              option,
-              { watchResponse ->
-                watchResponse.events
-                  .forEach { event ->
-                    when (event.eventType) {
-                      EventType.PUT -> onPut(event)
-                      EventType.DELETE -> onDelete(event)
-                      EventType.UNRECOGNIZED -> { // Ignore
-                      }
-                      else -> { // Ignore
-                      }
-                    }
-                  }
-              }) {
+    option,
+    { watchResponse ->
+      watchResponse.events
+        .forEach { event ->
+          when (event.eventType) {
+            EventType.PUT -> onPut(event)
+            EventType.DELETE -> onDelete(event)
+            EventType.UNRECOGNIZED -> { // Ignore
+            }
+            else -> { // Ignore
+            }
+          }
+        }
+    }) {
     endWatchLatch.await()
   }
 }

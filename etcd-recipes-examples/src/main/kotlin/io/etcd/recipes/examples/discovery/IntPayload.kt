@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class IntPayload(var intval: Int) {
-    fun toJson() = Json.encodeToString(serializer(), this)
+  fun toJson() = Json.encodeToString(serializer(), this)
 
-    companion object {
-        @JvmStatic
-        fun toObject(json: String) = Json.decodeFromString(serializer(), json)
-    }
+  companion object {
+    @JvmStatic
+    fun toObject(json: String) = Json.decodeFromString(serializer(), json)
+  }
 }

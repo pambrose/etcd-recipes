@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,30 +26,9 @@ import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.barrier.DistributedBarrierWithCount.Companion.defaultClientId
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdRecipeException
-import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.deleteKey
-import io.etcd.recipes.common.deleteOp
-import io.etcd.recipes.common.doesExist
-import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.ensureSuffix
-import io.etcd.recipes.common.getChildCount
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.keepAlive
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.putOption
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.withPrefix
-import io.etcd.recipes.common.withWatcher
+import io.etcd.recipes.common.*
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
-import kotlin.time.days
-import kotlin.time.seconds
 
 /*
     First node creates subnode /ready
@@ -60,21 +39,25 @@ import kotlin.time.seconds
 */
 
 @JvmOverloads
-fun <T> withDistributedBarrierWithCount(client: Client,
-                                        barrierPath: String,
-                                        memberCount: Int,
-                                        leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
-                                        clientId: String = defaultClientId(),
-                                        receiver: DistributedBarrierWithCount.() -> T): T =
+fun <T> withDistributedBarrierWithCount(
+  client: Client,
+  barrierPath: String,
+  memberCount: Int,
+  leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+  clientId: String = defaultClientId(),
+  receiver: DistributedBarrierWithCount.() -> T
+): T =
   DistributedBarrierWithCount(client, barrierPath, memberCount, leaseTtlSecs, clientId).use { it.receiver() }
 
 class DistributedBarrierWithCount
 @JvmOverloads
-constructor(client: Client,
-            val barrierPath: String,
-            val memberCount: Int,
-            val leaseTtlSecs: Long = defaultTtlSecs,
-            val clientId: String = defaultClientId()) : EtcdConnector(client) {
+constructor(
+  client: Client,
+  val barrierPath: String,
+  val memberCount: Int,
+  val leaseTtlSecs: Long = defaultTtlSecs,
+  val clientId: String = defaultClientId()
+) : EtcdConnector(client) {
 
   private val readyPath = barrierPath.appendToPath("ready")
   private val waitingPath = barrierPath.appendToPath("waiting")
@@ -97,7 +80,7 @@ constructor(client: Client,
     }
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
-  fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
+  fun waitOnBarrier(): Boolean = waitOnBarrier(Duration.days(Long.MAX_VALUE))
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
@@ -145,7 +128,7 @@ constructor(client: Client,
       Then(readyPath setTo uniqueToken)
     }
 
-    val lease = client.leaseGrant(leaseTtlSecs.seconds)
+    val lease = client.leaseGrant(Duration.seconds(leaseTtlSecs))
 
     val txn =
       client.transaction {
@@ -168,20 +151,19 @@ constructor(client: Client,
         } else {
           // Watch for DELETE of /ready and PUTS on /waiters/*
           val trailingKey = barrierPath.ensureSuffix("/")
-          val watchOption = watchOption { withPrefix(trailingKey) }
+          val watchOption = watchOption { isPrefix(true) }
           client.withWatcher(trailingKey,
-                             watchOption,
-                             { watchResponse ->
-                               watchResponse.events
-                                 .forEach { watchEvent ->
-                                   val key = watchEvent.keyValue.key.asString
-                                   when {
-                                     key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
-                                     key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
-                                   }
-                                 }
-
-                             }) {
+            watchOption,
+            { watchResponse ->
+              watchResponse.events
+                .forEach { watchEvent ->
+                  val key = watchEvent.keyValue.key.asString
+                  when {
+                    key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
+                    key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
+                  }
+                }
+            }) {
             // Check one more time in case watch missed the delete just after last check
             checkWaiterCount()
 

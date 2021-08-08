@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,42 +26,32 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.deleteKey
-import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.keepAlive
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.putOption
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.withWatcher
+import io.etcd.recipes.common.*
 import mu.KLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
-import kotlin.time.days
-import kotlin.time.seconds
 
 @JvmOverloads
-fun <T> withDistributedBarrier(client: Client,
-                               barrierPath: String,
-                               leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
-                               waitOnMissingBarriers: Boolean = true,
-                               clientId: String = defaultClientId(),
-                               receiver: DistributedBarrier.() -> T): T =
+fun <T> withDistributedBarrier(
+  client: Client,
+  barrierPath: String,
+  leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+  waitOnMissingBarriers: Boolean = true,
+  clientId: String = defaultClientId(),
+  receiver: DistributedBarrier.() -> T
+): T =
   DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
 
 class DistributedBarrier
 @JvmOverloads
-constructor(client: Client,
-            val barrierPath: String,
-            val leaseTtlSecs: Long = defaultTtlSecs,
-            private val waitOnMissingBarriers: Boolean = true,
-            val clientId: String = defaultClientId()) : EtcdConnector(client) {
+constructor(
+  client: Client,
+  val barrierPath: String,
+  val leaseTtlSecs: Long = defaultTtlSecs,
+  private val waitOnMissingBarriers: Boolean = true,
+  val clientId: String = defaultClientId()
+) : EtcdConnector(client) {
 
   private var keepAliveLease by nullableReference<CloseableClient?>(null)
   private var barrierRemoved by atomicBoolean(false)
@@ -85,7 +75,7 @@ constructor(client: Client,
       val uniqueToken = "$clientId:${randomId(tokenLength)}"
 
       // Prime lease with 2 seconds to give keepAlive a chance to get started
-      val lease = client.leaseGrant(leaseTtlSecs.seconds)
+      val lease = client.leaseGrant(Duration.seconds(leaseTtlSecs))
 
       // Do a CAS on the key name. If it is not found, then set it
       val txn =
@@ -122,7 +112,7 @@ constructor(client: Client,
   }
 
   @Throws(InterruptedException::class)
-  fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
+  fun waitOnBarrier(): Boolean = waitOnBarrier(Duration.days(Long.MAX_VALUE))
 
   @Throws(InterruptedException::class)
   fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
@@ -140,18 +130,17 @@ constructor(client: Client,
       val watchOption = watchOption { withNoPut(true) }
 
       client.withWatcher(barrierPath,
-                         watchOption,
-                         { watchResponse ->
-                           for (event in watchResponse.events)
-                             if (event.eventType == DELETE)
-                               waitLatch.countDown()
-
-                         }) {
+        watchOption,
+        { watchResponse ->
+          for (event in watchResponse.events)
+            if (event.eventType == DELETE)
+              waitLatch.countDown()
+        }) {
         // Check one more time in case watch missed the delete just after last check
         if (!waitOnMissingBarriers && !isBarrierSet())
           waitLatch.countDown()
 
-        waitLatch.await(timeout.toLongMilliseconds(), TimeUnit.MILLISECONDS)
+        waitLatch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
       }
     }
   }

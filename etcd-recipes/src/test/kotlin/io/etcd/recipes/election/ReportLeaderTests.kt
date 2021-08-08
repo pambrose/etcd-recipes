@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,61 +28,65 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class ReportLeaderTests {
 
-    val path = "/election/${javaClass.simpleName}"
+  val path = "/election/${javaClass.simpleName}"
 
-    @Test
-    fun reportLeaderTest() {
-        val count = 25
-        val takeLeadershiptCounter = AtomicInteger(0)
-        val relinquishLeadershiptCounter = AtomicInteger(0)
+  @Test
+  fun reportLeaderTest() {
+    val count = 25
+    val takeLeadershiptCounter = AtomicInteger(0)
+    val relinquishLeadershiptCounter = AtomicInteger(0)
 
-        val executor = Executors.newSingleThreadExecutor()
-        LeaderSelector.reportLeader(urls,
-                                    path,
-                                    object : LeaderListener {
-                                        override fun takeLeadership(leaderName: String) {
-                                            logger.debug { "$leaderName elected leader" }
-                                            takeLeadershiptCounter.incrementAndGet()
-                                        }
-
-                                        override fun relinquishLeadership() {
-                                            relinquishLeadershiptCounter.incrementAndGet()
-                                        }
-                                    },
-                                    executor)
-
-        sleep(5.seconds)
-
-        blockingThreads(count) {
-            connectToEtcd(urls) { client ->
-                withLeaderSelector(client,
-                                   path,
-                                   object : LeaderSelectorListenerAdapter() {
-                                       override fun takeLeadership(selector: LeaderSelector) {
-                                           val pause = 2.random().seconds
-                                           logger.debug { "${selector.clientId} elected leader for $pause" }
-                                           sleep(pause)
-                                       }
-                                   },
-                                   clientId = "Thread$it") {
-                    start()
-                    waitOnLeadershipComplete()
-                }
-            }
+    val executor = Executors.newSingleThreadExecutor()
+    LeaderSelector.reportLeader(
+      urls,
+      path,
+      object : LeaderListener {
+        override fun takeLeadership(leaderName: String) {
+          logger.debug { "$leaderName elected leader" }
+          takeLeadershiptCounter.incrementAndGet()
         }
 
-        // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
-        sleep(10.seconds)
+        override fun relinquishLeadership() {
+          relinquishLeadershiptCounter.incrementAndGet()
+        }
+      },
+      executor
+    )
 
-        takeLeadershiptCounter.get() shouldBeEqualTo count
-        relinquishLeadershiptCounter.get() shouldBeEqualTo count
+    sleep(Duration.seconds(5))
 
-        executor.shutdown()
+    blockingThreads(count) {
+      connectToEtcd(urls) { client ->
+        withLeaderSelector(
+          client,
+          path,
+          object : LeaderSelectorListenerAdapter() {
+            override fun takeLeadership(selector: LeaderSelector) {
+              val pause = Duration.seconds(2.random())
+              logger.debug { "${selector.clientId} elected leader for $pause" }
+              sleep(pause)
+            }
+          },
+          clientId = "Thread$it"
+        ) {
+          start()
+          waitOnLeadershipComplete()
+        }
+      }
     }
 
-    companion object : KLogging()
+    // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
+    sleep(Duration.seconds(10))
+
+    takeLeadershiptCounter.get() shouldBeEqualTo count
+    relinquishLeadershiptCounter.get() shouldBeEqualTo count
+
+    executor.shutdown()
+  }
+
+  companion object : KLogging()
 }

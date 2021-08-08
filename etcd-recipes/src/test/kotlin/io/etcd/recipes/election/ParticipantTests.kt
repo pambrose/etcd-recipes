@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class ParticipantTests {
   val path = "/election/${javaClass.simpleName}"
@@ -45,21 +45,23 @@ class ParticipantTests {
     connectToEtcd(urls) { client ->
       blockingThreads(count) {
         thread(finishedLatch) {
-          withLeaderSelector(client,
-                             path,
-                             object : LeaderSelectorListenerAdapter() {
-                               override fun takeLeadership(selector: LeaderSelector) {
-                                 val pause = 2.seconds
-                                 logger.debug { "${selector.clientId} elected leader for $pause" }
-                                 sleep(pause)
+          withLeaderSelector(
+            client,
+            path,
+            object : LeaderSelectorListenerAdapter() {
+              override fun takeLeadership(selector: LeaderSelector) {
+                val pause = Duration.seconds(2)
+                logger.debug { "${selector.clientId} elected leader for $pause" }
+                sleep(pause)
 
-                                 // Wait until participation count has been taken
-                                 holdLatch.await()
-                                 participantCounts += LeaderSelector.getParticipants(client, path).size
-                                 leaderNames += selector.clientId
-                               }
-                             },
-                             clientId = "Thread$it") {
+                // Wait until participation count has been taken
+                holdLatch.await()
+                participantCounts += LeaderSelector.getParticipants(client, path).size
+                leaderNames += selector.clientId
+              }
+            },
+            clientId = "Thread$it"
+          ) {
             start()
             startedLatch.countDown()
             waitOnLeadershipComplete()
@@ -70,7 +72,7 @@ class ParticipantTests {
       startedLatch.await()
 
       // Wait for participants to register
-      sleep(3.seconds)
+      sleep(Duration.seconds(3))
       var particpants = LeaderSelector.getParticipants(client, path)
       logger.debug { "Found ${particpants.size} participants" }
       particpants.size shouldBeEqualTo count
@@ -79,7 +81,7 @@ class ParticipantTests {
 
       finishedLatch.await()
 
-      sleep(5.seconds)
+      sleep(Duration.seconds(5))
 
       particpants = LeaderSelector.getParticipants(client, path)
       logger.debug { "Found ${particpants.size} participants" }

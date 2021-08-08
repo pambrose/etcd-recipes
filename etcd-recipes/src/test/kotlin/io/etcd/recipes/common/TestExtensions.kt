@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,11 @@ import kotlin.concurrent.thread
 
 val urls = listOf("http://localhost:2379")
 
-fun nonblockingThreads(threadCount: Int,
-                       waitLatch: CountDownLatch? = null,
-                       block: (index: Int) -> Unit): Pair<CountDownLatch, ExceptionHolder> {
+fun nonblockingThreads(
+  threadCount: Int,
+  waitLatch: CountDownLatch? = null,
+  block: (index: Int) -> Unit
+): Pair<CountDownLatch, ExceptionHolder> {
   val finishedLatch = CountDownLatch(threadCount)
   val holder = ExceptionHolder()
   repeat(threadCount) {

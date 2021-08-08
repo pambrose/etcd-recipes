@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,30 +21,30 @@ package io.etcd.recipes.examples.discovery
 import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.withServiceDiscovery
-import kotlin.time.days
+import kotlin.time.Duration
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val servicePath = "/services/test"
+  val urls = listOf("http://localhost:2379")
+  val servicePath = "/services/test"
 
-    connectToEtcd(urls) { client ->
-        withServiceDiscovery(client, servicePath) {
-            withServiceCache("TestName") {
-                addListenerForChanges { eventType,
-                                        isAdd,
-                                        serviceName,
-                                        serviceInstance ->
-                    println("Change $isAdd $eventType $serviceName $serviceInstance")
-                    serviceInstance?.let {
-                        println("Payload: ${IntPayload.toObject(it.jsonPayload)}")
-                    }
-                    println("Instances: $instances")
-                }
-
-                start()
-
-                sleep(1.days)
-            }
+  connectToEtcd(urls) { client ->
+    withServiceDiscovery(client, servicePath) {
+      withServiceCache("TestName") {
+        addListenerForChanges { eventType,
+                                isAdd,
+                                serviceName,
+                                serviceInstance ->
+          println("Change $isAdd $eventType $serviceName $serviceInstance")
+          serviceInstance?.let {
+            println("Payload: ${IntPayload.toObject(it.jsonPayload)}")
+          }
+          println("Instances: $instances")
         }
+
+        start()
+
+        sleep(Duration.days(1))
+      }
     }
+  }
 }

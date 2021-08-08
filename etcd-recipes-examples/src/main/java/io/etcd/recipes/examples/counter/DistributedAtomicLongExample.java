@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,44 +27,43 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static java.lang.String.format;
 
 public class DistributedAtomicLongExample {
 
-  public static void main(String[] args) throws InterruptedException {
-    List<String> urls = Lists.newArrayList("http://localhost:2379");
-    String path = "/counter/counterdemo";
-    int threadCount = 10;
-    int repeatCount = 25;
-    CountDownLatch latch = new CountDownLatch(threadCount);
-    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    public static void main(String[] args) throws InterruptedException {
+        List<String> urls = Lists.newArrayList("http://localhost:2379");
+        String path = "/counter/counterdemo";
+        int threadCount = 10;
+        int repeatCount = 25;
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
-    try (Client client = connectToEtcd(urls)) {
+        try (Client client = connectToEtcd(urls)) {
 
-      DistributedAtomicLong.delete(client, path);
+            DistributedAtomicLong.delete(client, path);
 
-      for (int i = 0; i < threadCount; i++) {
-        final int id = i;
-        executor.submit(() -> {
-          try (DistributedAtomicLong counter = new DistributedAtomicLong(client, path)) {
-            System.out.println(format("Creating counter #%d", id));
-            for (int j = 0; j < repeatCount; j++) counter.increment();
-            for (int j = 0; j < repeatCount; j++) counter.decrement();
-            for (int j = 0; j < repeatCount; j++) counter.add(5);
-            for (int j = 0; j < repeatCount; j++) counter.subtract(5);
-          } finally {
-            latch.countDown();
-          }
-        });
-      }
+            for (int i = 0; i < threadCount; i++) {
+                final int id = i;
+                executor.submit(() -> {
+                    try (DistributedAtomicLong counter = new DistributedAtomicLong(client, path)) {
+                        System.out.printf("Creating counter #%d%n", id);
+                        for (int j = 0; j < repeatCount; j++) counter.increment();
+                        for (int j = 0; j < repeatCount; j++) counter.decrement();
+                        for (int j = 0; j < repeatCount; j++) counter.add(5);
+                        for (int j = 0; j < repeatCount; j++) counter.subtract(5);
+                    } finally {
+                        latch.countDown();
+                    }
+                });
+            }
 
-      latch.await();
+            latch.await();
 
-      try (DistributedAtomicLong counter = new DistributedAtomicLong(client, path)) {
-        System.out.println(format("Counter value = %d", counter.get()));
-      }
+            try (DistributedAtomicLong counter = new DistributedAtomicLong(client, path)) {
+                System.out.printf("Counter value = %d%n", counter.get());
+            }
+        }
+
+        executor.shutdown();
     }
-
-    executor.shutdown();
-  }
 }

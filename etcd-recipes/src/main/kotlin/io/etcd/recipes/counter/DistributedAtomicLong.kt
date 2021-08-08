@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,30 +24,26 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.asLong
-import io.etcd.recipes.common.deleteKey
-import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.equalTo
-import io.etcd.recipes.common.getResponse
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.*
 import mu.KLogging
-import kotlin.time.milliseconds
+import kotlin.time.Duration
 
 @JvmOverloads
-fun <T> withDistributedAtomicLong(client: Client,
-                                  counterPath: String,
-                                  default: Long = 0L,
-                                  receiver: DistributedAtomicLong.() -> T): T =
+fun <T> withDistributedAtomicLong(
+  client: Client,
+  counterPath: String,
+  default: Long = 0L,
+  receiver: DistributedAtomicLong.() -> T
+): T =
   DistributedAtomicLong(client, counterPath, default).use { it.receiver() }
 
 class DistributedAtomicLong
 @JvmOverloads
-constructor(client: Client,
-            val counterPath: String,
-            private val default: Long = 0L) : EtcdConnector(client) {
+constructor(
+  client: Client,
+  val counterPath: String,
+  private val default: Long = 0L
+) : EtcdConnector(client) {
 
   init {
     require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
@@ -80,7 +76,7 @@ constructor(client: Client,
       if (!txnResponse.isSucceeded) {
         //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
         // Crude backoff for retry
-        sleep((count * 100).random().milliseconds)
+        sleep(Duration.milliseconds((count * 100).random()))
         count++
       }
     } while (!txnResponse.isSucceeded)

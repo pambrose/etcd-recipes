@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,44 +22,53 @@ package io.etcd.recipes.common
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import kotlin.time.Duration
-import kotlin.time.seconds
 
 fun Client.putValueWithKeepAlive(keyName: String, keyval: String, ttlSecs: Long, block: () -> Unit) =
-  putValueWithKeepAlive(keyName, keyval, ttlSecs.seconds, block)
+  putValueWithKeepAlive(keyName, keyval, Duration.seconds(ttlSecs), block)
 
 fun Client.putValueWithKeepAlive(keyName: String, keyval: Int, ttlSecs: Long, block: () -> Unit) =
-  putValueWithKeepAlive(keyName, keyval, ttlSecs.seconds, block)
+  putValueWithKeepAlive(keyName, keyval, Duration.seconds(ttlSecs), block)
 
 fun Client.putValueWithKeepAlive(keyName: String, keyval: Long, ttlSecs: Long, block: () -> Unit) =
-  putValueWithKeepAlive(keyName, keyval, ttlSecs.seconds, block)
+  putValueWithKeepAlive(keyName, keyval, Duration.seconds(ttlSecs), block)
 
 fun Client.putValueWithKeepAlive(keyName: String, keyval: ByteSequence, ttlSecs: Long, block: () -> Unit) =
   putValuesWithKeepAlive(listOf(keyName to keyval), ttlSecs, block)
 
+@JvmName("putValueWithKeepAliveDur")
 fun Client.putValueWithKeepAlive(keyName: String, keyval: String, ttl: Duration, block: () -> Unit) =
   putValueWithKeepAlive(keyName, keyval.asByteSequence, ttl, block)
 
+@JvmName("putValueWithKeepAliveDur")
 fun Client.putValueWithKeepAlive(keyName: String, keyval: Int, ttl: Duration, block: () -> Unit) =
   putValueWithKeepAlive(keyName, keyval.asByteSequence, ttl, block)
 
-fun Client.putValueWithKeepAlive(keyName: String,
-                                 keyval: Long,
-                                 ttl: Duration,
-                                 block: () -> Unit) =
+@JvmName("putValueWithKeepAliveDur")
+fun Client.putValueWithKeepAlive(
+  keyName: String,
+  keyval: Long,
+  ttl: Duration,
+  block: () -> Unit
+) =
   putValueWithKeepAlive(keyName, keyval.asByteSequence, ttl, block)
 
-fun Client.putValueWithKeepAlive(keyName: String,
-                                 keyval: ByteSequence,
-                                 ttl: Duration,
-                                 block: () -> Unit) =
+@JvmName("putValueWithKeepAliveDur")
+fun Client.putValueWithKeepAlive(
+  keyName: String,
+  keyval: ByteSequence,
+  ttl: Duration,
+  block: () -> Unit
+) =
   putValuesWithKeepAlive(listOf(keyName to keyval), ttl, block)
 
 fun Client.putValuesWithKeepAlive(kvs: Collection<Pair<String, ByteSequence>>, ttlSecs: Long, block: () -> Unit) =
-  putValuesWithKeepAlive(kvs, ttlSecs.seconds, block)
+  putValuesWithKeepAlive(kvs, Duration.seconds(ttlSecs), block)
 
-fun Client.putValuesWithKeepAlive(kvs: Collection<Pair<String, ByteSequence>>,
-                                  ttl: Duration,
-                                  block: () -> Unit) {
+fun Client.putValuesWithKeepAlive(
+  kvs: Collection<Pair<String, ByteSequence>>,
+  ttl: Duration,
+  block: () -> Unit
+) {
   val lease = leaseGrant(ttl)
   for (kv in kvs)
     putValue(kv.first, kv.second, putOption { withLeaseId(lease.id) })

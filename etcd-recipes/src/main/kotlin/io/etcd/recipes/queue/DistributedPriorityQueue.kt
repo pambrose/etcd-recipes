@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,16 +22,13 @@ import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
-import io.etcd.recipes.common.asByteSequence
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.getLastChild
-import io.etcd.recipes.common.lessThan
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.*
 
-fun <T> withDistributedPriorityQueue(client: Client,
-                                     queuePath: String,
-                                     receiver: DistributedPriorityQueue.() -> T): T =
+fun <T> withDistributedPriorityQueue(
+  client: Client,
+  queuePath: String,
+  receiver: DistributedPriorityQueue.() -> T
+): T =
   DistributedPriorityQueue(client, queuePath).use { it.receiver() }
 
 class DistributedPriorityQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.KEY) {

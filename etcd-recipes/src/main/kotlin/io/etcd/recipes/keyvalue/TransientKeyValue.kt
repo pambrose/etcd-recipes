@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,34 +30,40 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 @JvmOverloads
-fun <T> withTransientKeyValue(client: Client,
-                              keyPath: String,
-                              keyValue: String,
-                              leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
-                              autoStart: Boolean = true,
-                              userExecutor: Executor? = null,
-                              clientId: String = defaultClientId(),
-                              receiver: TransientKeyValue.() -> T): T =
-  TransientKeyValue(client,
-                    keyPath,
-                    keyValue,
-                    leaseTtlSecs,
-                    autoStart,
-                    userExecutor,
-                    clientId).use { it.receiver() }
+fun <T> withTransientKeyValue(
+  client: Client,
+  keyPath: String,
+  keyValue: String,
+  leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+  autoStart: Boolean = true,
+  userExecutor: Executor? = null,
+  clientId: String = defaultClientId(),
+  receiver: TransientKeyValue.() -> T
+): T =
+  TransientKeyValue(
+    client,
+    keyPath,
+    keyValue,
+    leaseTtlSecs,
+    autoStart,
+    userExecutor,
+    clientId
+  ).use { it.receiver() }
 
 class TransientKeyValue
 @JvmOverloads
-constructor(client: Client,
-            val keyPath: String,
-            val keyValue: String,
-            val leaseTtlSecs: Long = defaultTtlSecs,
-            autoStart: Boolean = true,
-            private val userExecutor: Executor? = null,
-            val clientId: String = defaultClientId()) : EtcdConnector(client) {
+constructor(
+  client: Client,
+  val keyPath: String,
+  val keyValue: String,
+  val leaseTtlSecs: Long = defaultTtlSecs,
+  autoStart: Boolean = true,
+  private val userExecutor: Executor? = null,
+  val clientId: String = defaultClientId()
+) : EtcdConnector(client) {
 
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
   private val keepAliveWaitLatch = CountDownLatch(1)
@@ -78,7 +84,7 @@ constructor(client: Client,
 
     executor.execute {
       try {
-        val leaseTtl = leaseTtlSecs.seconds
+        val leaseTtl = Duration.seconds(leaseTtlSecs)
         logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
         client.putValueWithKeepAlive(keyPath, keyValue, leaseTtl) {
           keepAliveStartedLatch.countDown()

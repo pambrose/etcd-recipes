@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,98 +25,86 @@ import com.github.pambrose.common.util.isNull
 import com.github.pambrose.common.util.randomId
 import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.jetcd.watch.WatchEvent.EventType.*
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.*
 import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
-import io.etcd.recipes.common.EtcdRecipeException
-import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.getChildrenValues
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.keepAliveWith
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.putOption
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.withWatcher
 import mu.KLogging
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import kotlin.time.Duration
-import kotlin.time.days
-import kotlin.time.seconds
 
 @JvmOverloads
-fun <T> withLeaderSelector(client: Client,
-                           electionPath: String,
-                           listener: LeaderSelectorListener,
-                           leaseTtlSecs: Long = defaultTtlSecs,
-                           userExecutor: Executor? = null,
-                           clientId: String = defaultClientId(),
-                           receiver: LeaderSelector.() -> T): T =
+fun <T> withLeaderSelector(
+  client: Client,
+  electionPath: String,
+  listener: LeaderSelectorListener,
+  leaseTtlSecs: Long = defaultTtlSecs,
+  userExecutor: Executor? = null,
+  clientId: String = defaultClientId(),
+  receiver: LeaderSelector.() -> T
+): T =
   LeaderSelector(client, electionPath, listener, leaseTtlSecs, userExecutor, clientId).use { it.receiver() }
 
 @JvmOverloads
-fun <T> withLeaderSelector(client: Client,
-                           electionPath: String,
-                           takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-                           relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-                           leaseTtlSecs: Long = defaultTtlSecs,
-                           executorService: ExecutorService? = null,
-                           clientId: String = defaultClientId(),
-                           receiver: LeaderSelector.() -> T): T =
-  LeaderSelector(client,
-                 electionPath,
-                 takeLeadershipBlock,
-                 relinquishLeadershipBlock,
-                 leaseTtlSecs,
-                 executorService,
-                 clientId).use { it.receiver() }
+fun <T> withLeaderSelector(
+  client: Client,
+  electionPath: String,
+  takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+  relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+  leaseTtlSecs: Long = defaultTtlSecs,
+  executorService: ExecutorService? = null,
+  clientId: String = defaultClientId(),
+  receiver: LeaderSelector.() -> T
+): T =
+  LeaderSelector(
+    client,
+    electionPath,
+    takeLeadershipBlock,
+    relinquishLeadershipBlock,
+    leaseTtlSecs,
+    executorService,
+    clientId
+  ).use { it.receiver() }
 
 // For Java clients
 class LeaderSelector
 @JvmOverloads
-constructor(client: Client,
-            val electionPath: String,
-            private val listener: LeaderSelectorListener,
-            val leaseTtlSecs: Long = defaultTtlSecs,
-            private val userExecutor: Executor? = null,
-            val clientId: String = defaultClientId()) : EtcdConnector(client) {
+constructor(
+  client: Client,
+  val electionPath: String,
+  private val listener: LeaderSelectorListener,
+  val leaseTtlSecs: Long = defaultTtlSecs,
+  private val userExecutor: Executor? = null,
+  val clientId: String = defaultClientId()
+) : EtcdConnector(client) {
 
   // For Kotlin clients
   @JvmOverloads
-  constructor(client: Client,
-              electionPath: String,
-              takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-              relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-              leaseTtlSecs: Long = defaultTtlSecs,
-              executorService: ExecutorService? = null,
-              clientId: String = defaultClientId()) :
-      this(client,
-           electionPath,
-           object : LeaderSelectorListener {
-             override fun takeLeadership(selector: LeaderSelector) {
-               takeLeadershipBlock.invoke(selector)
-             }
+  constructor(
+    client: Client,
+    electionPath: String,
+    takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+    relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
+    leaseTtlSecs: Long = defaultTtlSecs,
+    executorService: ExecutorService? = null,
+    clientId: String = defaultClientId()
+  ) :
+      this(
+        client,
+        electionPath,
+        object : LeaderSelectorListener {
+          override fun takeLeadership(selector: LeaderSelector) {
+            takeLeadershipBlock.invoke(selector)
+          }
 
-             override fun relinquishLeadership(selector: LeaderSelector) {
-               relinquishLeadershipBlock.invoke(selector)
-             }
-           },
-           leaseTtlSecs,
-           executorService,
-           clientId)
+          override fun relinquishLeadership(selector: LeaderSelector) {
+            relinquishLeadershipBlock.invoke(selector)
+          }
+        },
+        leaseTtlSecs,
+        executorService,
+        clientId
+      )
 
   private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
   private val terminateWatch = BooleanMonitor(false)
@@ -167,14 +155,14 @@ constructor(client: Client,
           try {
             val watchOption = watchOption { withNoPut(true) }
             client.withWatcher(leaderPath,
-                               watchOption,
-                               { watchResponse ->
-                                 for (event in watchResponse.events)
-                                   if (event.eventType == DELETE) {
-                                     // Run for leader whenever leader key is deleted
-                                     attemptToBecomeLeader(client)
-                                   }
-                               }) {
+              watchOption,
+              { watchResponse ->
+                for (event in watchResponse.events)
+                  if (event.eventType == DELETE) {
+                    // Run for leader whenever leader key is deleted
+                    attemptToBecomeLeader(client)
+                  }
+              }) {
               watchStarted.set(true)
               terminateWatch.waitUntilTrue()
             }
@@ -222,7 +210,7 @@ constructor(client: Client,
   }
 
   @Throws(InterruptedException::class)
-  fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Long.MAX_VALUE.days)
+  fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Duration.days(Long.MAX_VALUE))
 
   @Throws(InterruptedException::class)
   fun waitOnLeadershipComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
@@ -271,11 +259,11 @@ constructor(client: Client,
       if (i == attemptCount - 1)
         logger.error { "Exhausted wait for deletion of participation key $path" }
 
-      sleep(1.seconds)
+      sleep(Duration.seconds(1))
     }
 
     // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
-    val lease = client.leaseGrant(leaseTtlSecs.seconds)
+    val lease = client.leaseGrant(Duration.seconds(leaseTtlSecs))
     val txn =
       client.transaction {
         If(path.doesNotExist)
@@ -358,10 +346,12 @@ constructor(client: Client,
     }
 
     @JvmStatic
-    fun reportLeader(urls: List<String>,
-                     electionPath: String,
-                     listener: LeaderListener,
-                     executor: Executor): CountDownLatch {
+    fun reportLeader(
+      urls: List<String>,
+      electionPath: String,
+      listener: LeaderListener,
+      executor: Executor
+    ): CountDownLatch {
 
       require(urls.isNotEmpty()) { "URLs cannot be empty" }
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
@@ -370,19 +360,19 @@ constructor(client: Client,
       executor.execute {
         connectToEtcd(urls) { client ->
           client.withWatcher(electionPath.withLeaderSuffix,
-                             block = { watchResponse ->
-                               for (event in watchResponse.events)
-                                 try {
-                                   when (event.eventType) {
-                                     PUT -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
-                                     DELETE -> listener.relinquishLeadership()
-                                     UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
-                                     else -> logger.error { "Unknown error with $electionPath watch" }
-                                   }
-                                 } catch (e: Throwable) {
-                                   logger.error(e) { "Exception in reportLeader()" }
-                                 }
-                             }) {
+            block = { watchResponse ->
+              for (event in watchResponse.events)
+                try {
+                  when (event.eventType) {
+                    PUT -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
+                    DELETE -> listener.relinquishLeadership()
+                    UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
+                    else -> logger.error { "Unknown error with $electionPath watch" }
+                  }
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in reportLeader()" }
+                }
+            }) {
             terminateListener.await()
           }
         }

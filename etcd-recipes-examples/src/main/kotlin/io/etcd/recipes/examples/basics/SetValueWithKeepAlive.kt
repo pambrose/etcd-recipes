@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,40 +26,40 @@ import io.etcd.recipes.common.putValueWithKeepAlive
 import io.etcd.recipes.common.watcherWithLatch
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val path = "/foo"
-    val keyval = "foobar"
-    val latch = CountDownLatch(1)
-    val endWatchLatch = CountDownLatch(1)
+  val urls = listOf("http://localhost:2379")
+  val path = "/foo"
+  val keyval = "foobar"
+  val latch = CountDownLatch(1)
+  val endWatchLatch = CountDownLatch(1)
 
-    thread {
-        connectToEtcd(urls) { client ->
-            client.watcherWithLatch(path,
-                                    endWatchLatch,
-                                    { event -> println("Updated key: ${event.keyAsString}") },
-                                    { event -> println("Deleted key: ${event.keyAsString}") })
-        }
+  thread {
+    connectToEtcd(urls) { client ->
+      client.watcherWithLatch(path,
+        endWatchLatch,
+        { event -> println("Updated key: ${event.keyAsString}") },
+        { event -> println("Deleted key: ${event.keyAsString}") })
     }
+  }
 
-    thread(latch) {
-        connectToEtcd(urls) { client ->
-            println("Assigning $path = $keyval")
-            client.putValueWithKeepAlive(path, keyval, 2.seconds) {
-                println("Starting sleep")
-                sleep(5.seconds)
-                println("Finished sleep")
-            }
-            println("Keep-alive is now terminated")
-            sleep(5.seconds)
-        }
-        println("Releasing latch")
+  thread(latch) {
+    connectToEtcd(urls) { client ->
+      println("Assigning $path = $keyval")
+      client.putValueWithKeepAlive(path, keyval, Duration.seconds(2)) {
+        println("Starting sleep")
+        sleep(Duration.seconds(5))
+        println("Finished sleep")
+      }
+      println("Keep-alive is now terminated")
+      sleep(Duration.seconds(5))
     }
+    println("Releasing latch")
+  }
 
-    latch.await()
+  latch.await()
 
-    println("Done")
-    endWatchLatch.countDown()
+  println("Done")
+  endWatchLatch.countDown()
 }

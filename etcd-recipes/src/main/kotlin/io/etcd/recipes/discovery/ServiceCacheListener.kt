@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,10 @@ package io.etcd.recipes.discovery
 import io.etcd.jetcd.watch.WatchEvent
 
 interface ServiceCacheListener {
-  fun cacheChanged(eventType: WatchEvent.EventType,
-                   isAdd: Boolean,
-                   serviceName: String,
-                   serviceInstance: ServiceInstance?)
+  fun cacheChanged(
+    eventType: WatchEvent.EventType,
+    isAdd: Boolean,
+    serviceName: String,
+    serviceInstance: ServiceInstance?
+  )
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class SerialLeaderSelectorTests {
   val path = "/election/${javaClass.simpleName}"
@@ -47,7 +47,7 @@ class SerialLeaderSelectorTests {
     val relinquishLeadershiptCounter = AtomicInteger(0)
 
     val leadershipAction = { selector: LeaderSelector ->
-      val pause = 3.random().seconds
+      val pause = Duration.seconds(3.random())
       logger.debug { "${selector.clientId} elected leader for $pause" }
       sleep(pause)
       takeLeadershiptCounter.incrementAndGet()

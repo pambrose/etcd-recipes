@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,7 @@ package io.etcd.recipes.barrier
 
 import com.github.pambrose.common.util.random
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.checkForException
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.deleteChildren
-import io.etcd.recipes.common.nonblockingThreads
-import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.*
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
@@ -32,7 +28,7 @@ import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class DistributedBarrierWithCountTests {
 
@@ -55,11 +51,11 @@ class DistributedBarrierWithCountTests {
 
     fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
 
-      sleep(5.random().seconds)
+      sleep(Duration.seconds(5.random()))
       logger.debug { "#$id Waiting on barrier" }
 
       repeat(retryCount) {
-        barrier.waitOnBarrier(1.seconds)
+        barrier.waitOnBarrier(Duration.seconds(1))
         logger.debug { "#$id Timed out waiting on barrier, waiting again" }
         retryCounter.incrementAndGet()
       }
@@ -88,7 +84,7 @@ class DistributedBarrierWithCountTests {
         }
 
       retryLatch.await()
-      sleep(2.seconds)
+      sleep(Duration.seconds(2))
 
       withDistributedBarrierWithCount(client, path, count) {
         waiter(99, this)

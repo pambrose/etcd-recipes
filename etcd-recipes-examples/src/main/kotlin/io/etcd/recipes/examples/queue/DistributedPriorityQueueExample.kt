@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,42 +25,44 @@ import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.queue.withDistributedPriorityQueue
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val queuePath = "/priorityqueue/example"
-    val iterCount = 50
-    val threadCount = 5
+  val urls = listOf("http://localhost:2379")
+  val queuePath = "/priorityqueue/example"
+  val iterCount = 50
+  val threadCount = 5
 
-    connectToEtcd(urls) { client ->
-        // client.deleteChildren("/")
-        println("Count: ${client.getChildCount(queuePath)}")
+  connectToEtcd(urls) { client ->
+    // client.deleteChildren("/")
+    println("Count: ${client.getChildCount(queuePath)}")
 
-        // Enqueue some data prior to dequeues
-        withDistributedPriorityQueue(client, queuePath) {
-            repeat(iterCount) { i ->
-                enqueue("Value $i",
-                        iterCount - i)
-            }
-        }
-
-        // println(client.getChildrenKeys("/").sorted().joinToString("\n"))
-
-        val latch = CountDownLatch(threadCount)
-        repeat(threadCount) { i ->
-            thread {
-                withDistributedPriorityQueue(client, queuePath) {
-                    repeat((iterCount / threadCount)) { println("Thread#: $i ${dequeue().asString}") }
-                }
-                latch.countDown()
-            }
-        }
-
-        sleep(2.seconds)
-
-        latch.await()
-
-        println("Count: ${client.getChildCount(queuePath)}")
+    // Enqueue some data prior to dequeues
+    withDistributedPriorityQueue(client, queuePath) {
+      repeat(iterCount) { i ->
+        enqueue(
+          "Value $i",
+          iterCount - i
+        )
+      }
     }
+
+    // println(client.getChildrenKeys("/").sorted().joinToString("\n"))
+
+    val latch = CountDownLatch(threadCount)
+    repeat(threadCount) { i ->
+      thread {
+        withDistributedPriorityQueue(client, queuePath) {
+          repeat((iterCount / threadCount)) { println("Thread#: $i ${dequeue().asString}") }
+        }
+        latch.countDown()
+      }
+    }
+
+    sleep(Duration.seconds(2))
+
+    latch.await()
+
+    println("Count: ${client.getChildCount(queuePath)}")
+  }
 }

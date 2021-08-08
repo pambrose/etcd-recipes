@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getChildren
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -33,7 +33,7 @@ fun main() {
     repeat(600) {
       println(client.getChildren(path).asString)
       println(client.getChildCount(path))
-      sleep(1.seconds)
+      sleep(Duration.seconds(1))
     }
   }
 }

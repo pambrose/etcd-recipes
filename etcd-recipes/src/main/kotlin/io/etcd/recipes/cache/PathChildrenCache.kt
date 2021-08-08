@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,43 +25,28 @@ import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
-import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
-import io.etcd.recipes.cache.PathChildrenCache.StartMode.BUILD_INITIAL_CACHE
-import io.etcd.recipes.cache.PathChildrenCache.StartMode.NORMAL
-import io.etcd.recipes.cache.PathChildrenCache.StartMode.POST_INITIALIZED_EVENT
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.INITIALIZED
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.common.asPair
-import io.etcd.recipes.common.ensureSuffix
-import io.etcd.recipes.common.getChildren
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.watcher
-import io.etcd.recipes.common.withPrefix
+import io.etcd.jetcd.watch.WatchEvent.EventType.*
+import io.etcd.recipes.cache.PathChildrenCache.StartMode.*
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.*
+import io.etcd.recipes.common.*
 import mu.KLogging
-import java.util.concurrent.ConcurrentMap
-import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import kotlin.time.Duration
-import kotlin.time.days
 
 @JvmOverloads
-fun <T> withPathChildrenCache(client: Client,
-                              cachePath: String,
-                              userExecutor: Executor? = null,
-                              receiver: PathChildrenCache.() -> T): T =
+fun <T> withPathChildrenCache(
+  client: Client,
+  cachePath: String,
+  userExecutor: Executor? = null,
+  receiver: PathChildrenCache.() -> T
+): T =
   PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
 
-class PathChildrenCache(client: Client,
-                        val cachePath: String,
-                        private val userExecutor: Executor? = null) : EtcdConnector(client) {
+class PathChildrenCache(
+  client: Client,
+  val cachePath: String,
+  private val userExecutor: Executor? = null
+) : EtcdConnector(client) {
 
   private var watcher: Watch.Watcher? by nullableReference()
   private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
@@ -169,7 +154,7 @@ class PathChildrenCache(client: Client,
   private fun setupWatcher() {
     val trailingPath = cachePath.ensureSuffix("/")
     logger.debug { "Setting up watch for $trailingPath" }
-    val watchOption = watchOption { withPrefix(trailingPath) }
+    val watchOption = watchOption { isPrefix(true) }
     watcher = client.watcher(trailingPath, watchOption) { watchResponse ->
       watchResponse.events
         .forEach { event ->
@@ -213,7 +198,7 @@ class PathChildrenCache(client: Client,
   }
 
   @Throws(InterruptedException::class)
-  fun waitOnStartComplete(): Boolean = waitOnStartComplete(Long.MAX_VALUE.days)
+  fun waitOnStartComplete(): Boolean = waitOnStartComplete(Duration.days(Long.MAX_VALUE))
 
   @Throws(InterruptedException::class)
   fun waitOnStartComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
@@ -238,7 +223,6 @@ class PathChildrenCache(client: Client,
   fun getCurrentData(path: String): ByteSequence? = cacheMap[path]
 
   val currentDataAsMap: Map<String, ByteSequence> get() = cacheMap.toMap()
-
 
   fun clear() = cacheMap.clear()
 

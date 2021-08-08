@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,48 +22,47 @@ import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.ServiceInstance
 import io.etcd.recipes.discovery.withServiceDiscovery
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val servicePath = "/services/test"
+  val urls = listOf("http://localhost:2379")
+  val servicePath = "/services/test"
 
-    connectToEtcd(urls) { client ->
-        withServiceDiscovery(client, servicePath) {
+  connectToEtcd(urls) { client ->
+    withServiceDiscovery(client, servicePath) {
 
-            val payload = IntPayload(-999)
-            val service = ServiceInstance("TestName", payload.toJson())
+      val payload = IntPayload(-999)
+      val service = ServiceInstance("TestName", payload.toJson())
 
-            println(service.toJson())
+      println(service.toJson())
 
-            println("Registering")
-            registerService(service)
-            println("Retrieved value: ${queryForInstance(service.name, service.id)}")
-            println("Retrieved values: ${queryForInstances(service.name)}")
-            println("Retrieved names: ${queryForNames()}")
+      println("Registering")
+      registerService(service)
+      println("Retrieved value: ${queryForInstance(service.name, service.id)}")
+      println("Retrieved values: ${queryForInstances(service.name)}")
+      println("Retrieved names: ${queryForNames()}")
 
+      sleep(Duration.seconds(2))
+      println("Updating")
+      payload.intval = -888
+      service.jsonPayload = payload.toJson()
+      updateService(service)
+      println("Retrieved value: ${queryForInstance(service.name, service.id)}")
+      println("Retrieved values: ${queryForInstances(service.name)}")
+      println("Retrieved names: ${queryForNames()}")
 
-            sleep(2.seconds)
-            println("Updating")
-            payload.intval = -888
-            service.jsonPayload = payload.toJson()
-            updateService(service)
-            println("Retrieved value: ${queryForInstance(service.name, service.id)}")
-            println("Retrieved values: ${queryForInstances(service.name)}")
-            println("Retrieved names: ${queryForNames()}")
+      sleep(Duration.seconds(2))
+      println("Unregistering")
+      unregisterService(service)
+      sleep(Duration.seconds(3))
 
-            sleep(2.seconds)
-            println("Unregistering")
-            unregisterService(service)
-            sleep(3.seconds)
+      try {
+        println("Retrieved value: ${queryForInstance(service.name, service.id)}")
+      } catch (e: Throwable) {
+        println("Exception: $e")
+      }
 
-            try {
-                println("Retrieved value: ${queryForInstance(service.name, service.id)}")
-            } catch (e: Throwable) {
-                println("Exception: $e")
-            }
-
-            sleep(2.seconds)
-        }
+      sleep(Duration.seconds(2))
     }
+  }
 }

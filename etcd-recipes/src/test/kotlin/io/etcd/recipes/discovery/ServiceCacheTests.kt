@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,17 +20,12 @@ package io.etcd.recipes.discovery
 
 import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.watch.WatchEvent.EventType
-import io.etcd.recipes.common.ExceptionHolder
-import io.etcd.recipes.common.captureException
-import io.etcd.recipes.common.checkForException
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.nonblockingThreads
-import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.*
 import mu.KLogging
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class ServiceCacheTests {
 
@@ -50,17 +45,19 @@ class ServiceCacheTests {
       withServiceDiscovery(client, path) {
         withServiceCache(name) {
           start()
-          sleep(2.seconds)
+          sleep(Duration.seconds(2))
 
           instances.size shouldBeEqualTo 0
           serviceName shouldBeEqualTo name
           urls shouldBeEqualTo urls
 
           addListenerForChanges(object : ServiceCacheListener {
-            override fun cacheChanged(eventType: EventType,
-                                      isAdd: Boolean,
-                                      serviceName: String,
-                                      serviceInstance: ServiceInstance?) {
+            override fun cacheChanged(
+              eventType: EventType,
+              isAdd: Boolean,
+              serviceName: String,
+              serviceInstance: ServiceInstance?
+            ) {
               captureException(holder) {
                 //println("Comparing $serviceName and $name")
                 serviceName.split("/").first() shouldBeEqualTo name
@@ -89,7 +86,7 @@ class ServiceCacheTests {
                   logger.debug { "Registering: ${service.name} ${service.id}" }
                   registerService(service)
 
-                  sleep(1.seconds)
+                  sleep(Duration.seconds(1))
 
                   val payload = TestPayload.toObject(service.jsonPayload)
                   payload.testval = payload.testval * -1
@@ -97,12 +94,12 @@ class ServiceCacheTests {
                   logger.debug { "Updating: ${service.name} ${service.id}" }
                   updateService(service)
 
-                  sleep(1.seconds)
+                  sleep(Duration.seconds(1))
 
                   logger.debug { "Unregistering: ${service.name} ${service.id}" }
                   unregisterService(service)
 
-                  sleep(1.seconds)
+                  sleep(Duration.seconds(1))
                 }
               }
             }
@@ -113,7 +110,7 @@ class ServiceCacheTests {
     }
 
     // Wait for deletes to propagate
-    sleep(5.seconds)
+    sleep(Duration.seconds(5))
 
     holder.checkForException()
     registerCounter.get() shouldBeEqualTo threadCount * serviceCount

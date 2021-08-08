@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.ConcurrentMap
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class ThreadedServiceDiscoveryTests {
   val path = "/discovery/${javaClass.simpleName}"
@@ -117,7 +117,7 @@ class ThreadedServiceDiscoveryTests {
     }
 
     // Give unregister a chance to take place
-    sleep(5.seconds)
+    sleep(Duration.seconds(5))
 
     // Query deleted services
     blockingThreads(threadCount) {

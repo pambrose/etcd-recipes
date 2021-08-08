@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldEndWith
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class SerialServiceDiscoveryTests {
   val path = "/discovery/${javaClass.simpleName}"
@@ -78,8 +78,7 @@ class SerialServiceDiscoveryTests {
 
         logger.debug { "Unregistering" }
         unregisterService(service)
-        sleep(3.seconds)
-
+        sleep(Duration.seconds(3))
 
         queryForNames().size shouldBeEqualTo 0
         queryForInstances(service.name).size shouldBeEqualTo 0

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,9 +49,11 @@ fun Client.deleteKeys(vararg keyNames: String) = keyNames.forEach { deleteKey(it
 fun Client.deleteKey(keyName: String): DeleteResponse = kvClient.delete(keyName.asByteSequence).get()
 
 // Get responses
-internal fun Client.getResponse(keyName: ByteSequence,
-                                option: GetOption = GetOption.DEFAULT,
-                                iteration: Int = 0): GetResponse {
+internal fun Client.getResponse(
+  keyName: ByteSequence,
+  option: GetOption = GetOption.DEFAULT,
+  iteration: Int = 0
+): GetResponse {
   val response = kvClient.get(keyName, option).get()
   return if (response.kvs.isEmpty() && response.isMore) {
     if (iteration == 10)

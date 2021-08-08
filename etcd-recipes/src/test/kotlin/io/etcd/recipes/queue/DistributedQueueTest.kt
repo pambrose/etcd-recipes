@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,18 +20,14 @@ package io.etcd.recipes.queue
 
 import com.github.pambrose.common.concurrent.thread
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.deleteChildren
-import io.etcd.recipes.common.getChildCount
-import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.*
 import mu.KLogging
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 class DistributedQueueTest {
   private val iterCount = 500
@@ -81,7 +77,7 @@ class DistributedQueueTest {
       client.getChildCount(queuePath) shouldBeEqualTo 0
     }
 
-    sleep(5.seconds)
+    sleep(Duration.seconds(5))
 
     dequeuedData.size shouldBeEqualTo testData.size
     repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
@@ -203,7 +199,7 @@ class DistributedQueueTest {
       client.getChildCount(queuePath) shouldBeEqualTo 0
     }
 
-    sleep(5.seconds)
+    sleep(Duration.seconds(5))
 
     dequeuedData.size shouldBeEqualTo testData.size
     repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }

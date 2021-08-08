@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,22 +28,25 @@ import io.etcd.recipes.common.appendToPath
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
-import kotlin.time.days
 
 @JvmOverloads
-fun <T> withDistributedDoubleBarrier(client: Client,
-                                     barrierPath: String,
-                                     memberCount: Int,
-                                     clientId: String = defaultClientId(),
-                                     receiver: DistributedDoubleBarrier.() -> T): T =
+fun <T> withDistributedDoubleBarrier(
+  client: Client,
+  barrierPath: String,
+  memberCount: Int,
+  clientId: String = defaultClientId(),
+  receiver: DistributedDoubleBarrier.() -> T
+): T =
   DistributedDoubleBarrier(client, barrierPath, memberCount, clientId).use { it.receiver() }
 
 class DistributedDoubleBarrier
 @JvmOverloads
-constructor(client: Client,
-            barrierPath: String,
-            memberCount: Int,
-            val clientId: String = defaultClientId()) : Closeable {
+constructor(
+  client: Client,
+  barrierPath: String,
+  memberCount: Int,
+  val clientId: String = defaultClientId()
+) : Closeable {
 
   private val enterBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("enter"), memberCount)
   private val leaveBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("leave"), memberCount)
@@ -57,7 +60,7 @@ constructor(client: Client,
   val leaveWaiterCount: Long get() = leaveBarrier.waiterCount
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
-  fun enter(): Boolean = enter(Long.MAX_VALUE.days)
+  fun enter(): Boolean = enter(Duration.days(Long.MAX_VALUE))
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
@@ -66,7 +69,7 @@ constructor(client: Client,
   fun enter(timeout: Duration): Boolean = enterBarrier.waitOnBarrier(timeout)
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
-  fun leave(): Boolean = leave(Long.MAX_VALUE.days)
+  fun leave(): Boolean = leave(Duration.days(Long.MAX_VALUE))
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))

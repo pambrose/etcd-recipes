@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,52 +26,52 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 fun main() {
-    val urls = listOf("http://localhost:2379")
-    val barrierPath = "/barriers/barrierwithcountdemo"
-    val count = 30
-    val waitLatch = CountDownLatch(count)
-    val retryLatch = CountDownLatch(count - 1)
+  val urls = listOf("http://localhost:2379")
+  val barrierPath = "/barriers/barrierwithcountdemo"
+  val count = 30
+  val waitLatch = CountDownLatch(count)
+  val retryLatch = CountDownLatch(count - 1)
 
-    fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
-        sleep(10.random().seconds)
-        println("#$id Waiting on barrier")
+  fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
+    sleep(Duration.seconds(10.random()))
+    println("#$id Waiting on barrier")
 
-        repeat(retryCount) {
-            barrier.waitOnBarrier(2.seconds)
-            println("#$id Timed out waiting on barrier, waiting again")
-        }
-
-        retryLatch.countDown()
-
-        println("#$id Waiter count = ${barrier.waiterCount}")
-        barrier.waitOnBarrier()
-        println("#$id Done waiting on barrier")
-        waitLatch.countDown()
+    repeat(retryCount) {
+      barrier.waitOnBarrier(Duration.seconds(2))
+      println("#$id Timed out waiting on barrier, waiting again")
     }
 
-    connectToEtcd(urls) { client ->
-        client.deleteChildren(barrierPath)
+    retryLatch.countDown()
 
-        repeat(count - 1) { i ->
-            thread {
-                withDistributedBarrierWithCount(client, barrierPath, count) {
-                    waiter(i, this, 5)
-                }
-            }
-        }
+    println("#$id Waiter count = ${barrier.waiterCount}")
+    barrier.waitOnBarrier()
+    println("#$id Done waiting on barrier")
+    waitLatch.countDown()
+  }
 
-        retryLatch.await()
-        sleep(2.seconds)
+  connectToEtcd(urls) { client ->
+    client.deleteChildren(barrierPath)
 
+    repeat(count - 1) { i ->
+      thread {
         withDistributedBarrierWithCount(client, barrierPath, count) {
-            waiter(99, this)
+          waiter(i, this, 5)
         }
+      }
     }
 
-    waitLatch.await()
+    retryLatch.await()
+    sleep(Duration.seconds(2))
 
-    println("Done")
+    withDistributedBarrierWithCount(client, barrierPath, count) {
+      waiter(99, this)
+    }
+  }
+
+  waitLatch.await()
+
+  println("Done")
 }

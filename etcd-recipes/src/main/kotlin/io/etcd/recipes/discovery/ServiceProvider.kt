@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,11 @@ import io.etcd.jetcd.Client
 import java.io.Closeable
 import kotlin.random.Random
 
-class ServiceProvider internal constructor(client: Client,
-                                           namesPath: String,
-                                           val serviceName: String) : Closeable {
+class ServiceProvider internal constructor(
+  client: Client,
+  namesPath: String,
+  val serviceName: String
+) : Closeable {
 
   val serviceDiscovery = lazy { ServiceDiscovery(client, namesPath) }
 

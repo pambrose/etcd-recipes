@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,42 +26,32 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.*
 import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
-import io.etcd.recipes.common.EtcdRecipeException
-import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.deleteKey
-import io.etcd.recipes.common.doesExist
-import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.getChildrenKeys
-import io.etcd.recipes.common.getChildrenValues
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.keepAlive
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.putOption
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
 import mu.KLogging
 import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
-import kotlin.time.seconds
+import kotlin.time.Duration
 
 @JvmOverloads
-fun <T> withServiceDiscovery(client: Client,
-                             servicePath: String,
-                             leaseTtlSecs: Long = defaultTtlSecs,
-                             clientId: String = defaultClientId(),
-                             receiver: ServiceDiscovery.() -> T): T =
+fun <T> withServiceDiscovery(
+  client: Client,
+  servicePath: String,
+  leaseTtlSecs: Long = defaultTtlSecs,
+  clientId: String = defaultClientId(),
+  receiver: ServiceDiscovery.() -> T
+): T =
   ServiceDiscovery(client, servicePath, leaseTtlSecs, clientId).use { it.receiver() }
 
 class ServiceDiscovery
 @JvmOverloads
-constructor(client: Client,
-            val servicePath: String,
-            val leaseTtlSecs: Long = defaultTtlSecs,
-            val clientId: String = defaultClientId()) : EtcdConnector(client) {
+constructor(
+  client: Client,
+  val servicePath: String,
+  val leaseTtlSecs: Long = defaultTtlSecs,
+  val clientId: String = defaultClientId()
+) : EtcdConnector(client) {
 
   private val namesPath = servicePath.appendToPath("/names")
   private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = newConcurrentMap()
@@ -72,9 +62,11 @@ constructor(client: Client,
     require(servicePath.isNotEmpty()) { "Service base path cannot be empty" }
   }
 
-  private class ServiceInstanceContext(val service: ServiceInstance,
-                                       val client: Client,
-                                       val instancePath: String) : Closeable {
+  private class ServiceInstanceContext(
+    val service: ServiceInstance,
+    val client: Client,
+    val instancePath: String
+  ) : Closeable {
     var lease: LeaseGrantResponse by nonNullableReference()
     var keepAlive: CloseableClient by nonNullableReference()
 
@@ -95,7 +87,7 @@ constructor(client: Client,
     serviceContextMap[service.id] = context
 
     // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
-    context.lease = client.leaseGrant(leaseTtlSecs.seconds)
+    context.lease = client.leaseGrant(Duration.seconds(leaseTtlSecs))
 
     val txn =
       client.transaction {
