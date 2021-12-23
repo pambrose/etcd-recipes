@@ -24,9 +24,17 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.asLong
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.equalTo
+import io.etcd.recipes.common.getResponse
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
 import mu.KLogging
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 @JvmOverloads
 fun <T> withDistributedAtomicLong(
@@ -76,7 +84,7 @@ constructor(
       if (!txnResponse.isSucceeded) {
         //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
         // Crude backoff for retry
-        sleep(Duration.milliseconds((count * 100).random()))
+        sleep((count * 100).random().milliseconds)
         count++
       }
     } while (!txnResponse.isSucceeded)

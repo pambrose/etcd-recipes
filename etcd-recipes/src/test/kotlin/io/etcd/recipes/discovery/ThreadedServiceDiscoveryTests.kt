@@ -30,7 +30,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.ConcurrentMap
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class ThreadedServiceDiscoveryTests {
   val path = "/discovery/${javaClass.simpleName}"
@@ -117,7 +117,7 @@ class ThreadedServiceDiscoveryTests {
     }
 
     // Give unregister a chance to take place
-    sleep(Duration.seconds(5))
+    sleep(5.seconds)
 
     // Query deleted services
     blockingThreads(threadCount) {

@@ -26,9 +26,29 @@ import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.barrier.DistributedBarrierWithCount.Companion.defaultClientId
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.deleteOp
+import io.etcd.recipes.common.doesExist
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.ensureSuffix
+import io.etcd.recipes.common.getChildCount
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 
 /*
     First node creates subnode /ready
@@ -80,7 +100,7 @@ constructor(
     }
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
-  fun waitOnBarrier(): Boolean = waitOnBarrier(Duration.days(Long.MAX_VALUE))
+  fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
@@ -128,7 +148,7 @@ constructor(
       Then(readyPath setTo uniqueToken)
     }
 
-    val lease = client.leaseGrant(Duration.seconds(leaseTtlSecs))
+    val lease = client.leaseGrant(leaseTtlSecs.seconds)
 
     val txn =
       client.transaction {
@@ -153,17 +173,17 @@ constructor(
           val trailingKey = barrierPath.ensureSuffix("/")
           val watchOption = watchOption { isPrefix(true) }
           client.withWatcher(trailingKey,
-            watchOption,
-            { watchResponse ->
-              watchResponse.events
-                .forEach { watchEvent ->
-                  val key = watchEvent.keyValue.key.asString
-                  when {
-                    key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
-                    key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
-                  }
-                }
-            }) {
+                             watchOption,
+                             { watchResponse ->
+                               watchResponse.events
+                                 .forEach { watchEvent ->
+                                   val key = watchEvent.keyValue.key.asString
+                                   when {
+                                     key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
+                                     key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
+                                   }
+                                 }
+                             }) {
             // Check one more time in case watch missed the delete just after last check
             checkWaiterCount()
 

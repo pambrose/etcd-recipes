@@ -50,9 +50,11 @@ public class SetValueWithLease {
                 LeaseGrantResponse lease = leaseClient.grant(5).get();
                 PutOption putOption = putOption((PutOption.Builder builder) -> builder.withLeaseId(lease.getID()));
                 putValue(client, path, keyval, putOption);
-            } catch (InterruptedException | ExecutionException e) {
+            }
+            catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
-            } finally {
+            }
+            finally {
                 latch.countDown();
             }
         });

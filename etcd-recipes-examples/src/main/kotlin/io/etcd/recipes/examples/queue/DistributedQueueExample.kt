@@ -25,7 +25,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.queue.withDistributedQueue
 import java.util.concurrent.CountDownLatch
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -53,7 +53,7 @@ fun main() {
       }
     }
 
-    sleep(Duration.seconds(2))
+    sleep(2.seconds)
 
     // Now enqueue some data with dequeues waiting
     withDistributedQueue(client, queuePath) {

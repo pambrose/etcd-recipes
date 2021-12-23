@@ -51,7 +51,8 @@ public class DistributedAtomicLongExample {
                         for (int j = 0; j < repeatCount; j++) counter.decrement();
                         for (int j = 0; j < repeatCount; j++) counter.add(5);
                         for (int j = 0; j < repeatCount; j++) counter.subtract(5);
-                    } finally {
+                    }
+                    finally {
                         latch.countDown();
                     }
                 });

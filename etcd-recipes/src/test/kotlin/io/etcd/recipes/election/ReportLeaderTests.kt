@@ -28,7 +28,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class ReportLeaderTests {
 
@@ -57,7 +57,7 @@ class ReportLeaderTests {
       executor
     )
 
-    sleep(Duration.seconds(5))
+    sleep(5.seconds)
 
     blockingThreads(count) {
       connectToEtcd(urls) { client ->
@@ -66,7 +66,7 @@ class ReportLeaderTests {
           path,
           object : LeaderSelectorListenerAdapter() {
             override fun takeLeadership(selector: LeaderSelector) {
-              val pause = Duration.seconds(2.random())
+              val pause = 2.random().seconds
               logger.debug { "${selector.clientId} elected leader for $pause" }
               sleep(pause)
             }
@@ -80,7 +80,7 @@ class ReportLeaderTests {
     }
 
     // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
-    sleep(Duration.seconds(10))
+    sleep(10.seconds)
 
     takeLeadershiptCounter.get() shouldBeEqualTo count
     relinquishLeadershiptCounter.get() shouldBeEqualTo count

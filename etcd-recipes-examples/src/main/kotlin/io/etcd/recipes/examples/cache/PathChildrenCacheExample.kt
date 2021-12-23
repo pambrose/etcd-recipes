@@ -23,7 +23,7 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.putValue
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -34,7 +34,7 @@ fun main() {
     client.putValue("$cachePath/child1", "a child 1 value")
     client.putValue("$cachePath/child2", "a child 2 value")
 
-    sleep(Duration.seconds(1))
+    sleep(1.seconds)
 
     withPathChildrenCache(client, cachePath) {
       addListener { event: PathChildrenCacheEvent ->
@@ -48,7 +48,7 @@ fun main() {
 
       println("Deleted: ${client.deleteChildren(cachePath)}")
 
-      sleep(Duration.seconds(1))
+      sleep(1.seconds)
     }
   }
 }

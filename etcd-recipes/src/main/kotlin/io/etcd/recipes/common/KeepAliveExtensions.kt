@@ -22,15 +22,16 @@ package io.etcd.recipes.common
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun Client.putValueWithKeepAlive(keyName: String, keyval: String, ttlSecs: Long, block: () -> Unit) =
-  putValueWithKeepAlive(keyName, keyval, Duration.seconds(ttlSecs), block)
+  putValueWithKeepAlive(keyName, keyval, ttlSecs.seconds, block)
 
 fun Client.putValueWithKeepAlive(keyName: String, keyval: Int, ttlSecs: Long, block: () -> Unit) =
-  putValueWithKeepAlive(keyName, keyval, Duration.seconds(ttlSecs), block)
+  putValueWithKeepAlive(keyName, keyval, ttlSecs.seconds, block)
 
 fun Client.putValueWithKeepAlive(keyName: String, keyval: Long, ttlSecs: Long, block: () -> Unit) =
-  putValueWithKeepAlive(keyName, keyval, Duration.seconds(ttlSecs), block)
+  putValueWithKeepAlive(keyName, keyval, ttlSecs.seconds, block)
 
 fun Client.putValueWithKeepAlive(keyName: String, keyval: ByteSequence, ttlSecs: Long, block: () -> Unit) =
   putValuesWithKeepAlive(listOf(keyName to keyval), ttlSecs, block)
@@ -62,7 +63,7 @@ fun Client.putValueWithKeepAlive(
   putValuesWithKeepAlive(listOf(keyName to keyval), ttl, block)
 
 fun Client.putValuesWithKeepAlive(kvs: Collection<Pair<String, ByteSequence>>, ttlSecs: Long, block: () -> Unit) =
-  putValuesWithKeepAlive(kvs, Duration.seconds(ttlSecs), block)
+  putValuesWithKeepAlive(kvs, ttlSecs.seconds, block)
 
 fun Client.putValuesWithKeepAlive(
   kvs: Collection<Pair<String, ByteSequence>>,

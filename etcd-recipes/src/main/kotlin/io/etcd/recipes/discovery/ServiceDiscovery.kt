@@ -26,13 +26,27 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.doesExist
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getChildrenKeys
+import io.etcd.recipes.common.getChildrenValues
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
 import mu.KLogging
 import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 @JvmOverloads
 fun <T> withServiceDiscovery(
@@ -87,7 +101,7 @@ constructor(
     serviceContextMap[service.id] = context
 
     // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
-    context.lease = client.leaseGrant(Duration.seconds(leaseTtlSecs))
+    context.lease = client.leaseGrant(leaseTtlSecs.seconds)
 
     val txn =
       client.transaction {

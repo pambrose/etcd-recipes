@@ -26,7 +26,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -36,11 +36,11 @@ fun main() {
   val retryLatch = CountDownLatch(count - 1)
 
   fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
-    sleep(Duration.seconds(10.random()))
+    sleep(10.random().seconds)
     println("#$id Waiting on barrier")
 
     repeat(retryCount) {
-      barrier.waitOnBarrier(Duration.seconds(2))
+      barrier.waitOnBarrier(2.seconds)
       println("#$id Timed out waiting on barrier, waiting again")
     }
 
@@ -64,7 +64,7 @@ fun main() {
     }
 
     retryLatch.await()
-    sleep(Duration.seconds(2))
+    sleep(2.seconds)
 
     withDistributedBarrierWithCount(client, barrierPath, count) {
       waiter(99, this)

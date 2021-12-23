@@ -21,9 +21,13 @@ package io.etcd.recipes.examples.basics
 import com.github.pambrose.common.concurrent.thread
 import com.github.pambrose.common.util.repeatWithSleep
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.putValue
 import java.util.concurrent.CountDownLatch
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -32,10 +36,10 @@ fun main() {
   val latch = CountDownLatch(2)
 
   thread(latch) {
-    sleep(Duration.seconds(3))
+    sleep(3.seconds)
     connectToEtcd(urls) { client ->
       println("Assigning $path = $keyval")
-      val lease = client.leaseGrant(Duration.seconds(5))
+      val lease = client.leaseGrant(5.seconds)
       client.putValue(path, keyval, putOption { withLeaseId(lease.id) })
     }
   }

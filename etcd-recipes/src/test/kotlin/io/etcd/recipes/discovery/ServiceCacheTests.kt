@@ -20,12 +20,17 @@ package io.etcd.recipes.discovery
 
 import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.watch.WatchEvent.EventType
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.ExceptionHolder
+import io.etcd.recipes.common.captureException
+import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.nonblockingThreads
+import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class ServiceCacheTests {
 
@@ -45,7 +50,7 @@ class ServiceCacheTests {
       withServiceDiscovery(client, path) {
         withServiceCache(name) {
           start()
-          sleep(Duration.seconds(2))
+          sleep(2.seconds)
 
           instances.size shouldBeEqualTo 0
           serviceName shouldBeEqualTo name
@@ -86,7 +91,7 @@ class ServiceCacheTests {
                   logger.debug { "Registering: ${service.name} ${service.id}" }
                   registerService(service)
 
-                  sleep(Duration.seconds(1))
+                  sleep(1.seconds)
 
                   val payload = TestPayload.toObject(service.jsonPayload)
                   payload.testval = payload.testval * -1
@@ -94,12 +99,12 @@ class ServiceCacheTests {
                   logger.debug { "Updating: ${service.name} ${service.id}" }
                   updateService(service)
 
-                  sleep(Duration.seconds(1))
+                  sleep(1.seconds)
 
                   logger.debug { "Unregistering: ${service.name} ${service.id}" }
                   unregisterService(service)
 
-                  sleep(Duration.seconds(1))
+                  sleep(1.seconds)
                 }
               }
             }
@@ -110,7 +115,7 @@ class ServiceCacheTests {
     }
 
     // Wait for deletes to propagate
-    sleep(Duration.seconds(5))
+    sleep(5.seconds)
 
     holder.checkForException()
     registerCounter.get() shouldBeEqualTo threadCount * serviceCount

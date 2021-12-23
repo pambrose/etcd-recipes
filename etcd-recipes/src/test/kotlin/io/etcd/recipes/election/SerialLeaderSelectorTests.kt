@@ -28,7 +28,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class SerialLeaderSelectorTests {
   val path = "/election/${javaClass.simpleName}"
@@ -47,7 +47,7 @@ class SerialLeaderSelectorTests {
     val relinquishLeadershiptCounter = AtomicInteger(0)
 
     val leadershipAction = { selector: LeaderSelector ->
-      val pause = Duration.seconds(3.random())
+      val pause = 3.random().seconds
       logger.debug { "${selector.clientId} elected leader for $pause" }
       sleep(pause)
       takeLeadershiptCounter.incrementAndGet()

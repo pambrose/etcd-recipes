@@ -28,7 +28,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class ParticipantTests {
   val path = "/election/${javaClass.simpleName}"
@@ -50,7 +50,7 @@ class ParticipantTests {
             path,
             object : LeaderSelectorListenerAdapter() {
               override fun takeLeadership(selector: LeaderSelector) {
-                val pause = Duration.seconds(2)
+                val pause = 2.seconds
                 logger.debug { "${selector.clientId} elected leader for $pause" }
                 sleep(pause)
 
@@ -72,7 +72,7 @@ class ParticipantTests {
       startedLatch.await()
 
       // Wait for participants to register
-      sleep(Duration.seconds(3))
+      sleep(3.seconds)
       var particpants = LeaderSelector.getParticipants(client, path)
       logger.debug { "Found ${particpants.size} participants" }
       particpants.size shouldBeEqualTo count
@@ -81,7 +81,7 @@ class ParticipantTests {
 
       finishedLatch.await()
 
-      sleep(Duration.seconds(5))
+      sleep(5.seconds)
 
       particpants = LeaderSelector.getParticipants(client, path)
       logger.debug { "Found ${particpants.size} participants" }

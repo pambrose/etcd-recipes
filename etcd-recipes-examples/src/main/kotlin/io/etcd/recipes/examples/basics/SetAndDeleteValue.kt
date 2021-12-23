@@ -26,7 +26,7 @@ import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.putValue
 import java.util.concurrent.CountDownLatch
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -35,11 +35,11 @@ fun main() {
   val latch = CountDownLatch(2)
 
   thread(latch) {
-    sleep(Duration.seconds(3))
+    sleep(3.seconds)
     connectToEtcd(urls) { client ->
       println("Assigning $path = $keyval")
       client.putValue(path, keyval)
-      sleep(Duration.seconds(5))
+      sleep(5.seconds)
       println("Deleting $path")
       client.deleteKey(path)
     }

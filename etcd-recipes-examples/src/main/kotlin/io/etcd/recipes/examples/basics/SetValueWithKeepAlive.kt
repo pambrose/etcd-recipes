@@ -26,7 +26,7 @@ import io.etcd.recipes.common.putValueWithKeepAlive
 import io.etcd.recipes.common.watcherWithLatch
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -38,22 +38,22 @@ fun main() {
   thread {
     connectToEtcd(urls) { client ->
       client.watcherWithLatch(path,
-        endWatchLatch,
-        { event -> println("Updated key: ${event.keyAsString}") },
-        { event -> println("Deleted key: ${event.keyAsString}") })
+                              endWatchLatch,
+                              { event -> println("Updated key: ${event.keyAsString}") },
+                              { event -> println("Deleted key: ${event.keyAsString}") })
     }
   }
 
   thread(latch) {
     connectToEtcd(urls) { client ->
       println("Assigning $path = $keyval")
-      client.putValueWithKeepAlive(path, keyval, Duration.seconds(2)) {
+      client.putValueWithKeepAlive(path, keyval, 2.seconds) {
         println("Starting sleep")
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
         println("Finished sleep")
       }
       println("Keep-alive is now terminated")
-      sleep(Duration.seconds(5))
+      sleep(5.seconds)
     }
     println("Releasing latch")
   }

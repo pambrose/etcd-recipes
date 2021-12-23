@@ -25,7 +25,13 @@ import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.jetcd.watch.WatchEvent
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.deleteOp
+import io.etcd.recipes.common.equalTo
+import io.etcd.recipes.common.getFirstChild
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 
@@ -67,18 +73,18 @@ abstract class AbstractQueue(
     val keyFound = AtomicReference<KeyValue?>()
 
     client.withWatcher(queuePath,
-      watchOption,
-      { watchResponse ->
-        synchronized(watchLatch) {
-          if (watchLatch.count > 0)
-            for (watchEvent in watchResponse.events) {
-              if (watchEvent.eventType == WatchEvent.EventType.PUT) {
-                keyFound.compareAndSet(null, watchEvent.keyValue)
-                watchLatch.countDown()
-              }
-            }
-        }
-      }) {
+                       watchOption,
+                       { watchResponse ->
+                         synchronized(watchLatch) {
+                           if (watchLatch.count > 0)
+                             for (watchEvent in watchResponse.events) {
+                               if (watchEvent.eventType == WatchEvent.EventType.PUT) {
+                                 keyFound.compareAndSet(null, watchEvent.keyValue)
+                                 watchLatch.countDown()
+                               }
+                             }
+                         }
+                       }) {
       // Query again in case a value arrived just before watch was created
       synchronized(watchLatch) {
         if (watchLatch.count > 0) {

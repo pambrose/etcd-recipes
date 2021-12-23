@@ -21,7 +21,7 @@ package io.etcd.recipes.examples.discovery
 import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.withServiceDiscovery
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -42,8 +42,7 @@ fun main() {
         }
 
         start()
-
-        sleep(Duration.days(1))
+        sleep(1.days)
       }
     }
   }

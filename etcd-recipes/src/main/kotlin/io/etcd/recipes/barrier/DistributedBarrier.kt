@@ -26,11 +26,25 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAlive
+import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.withWatcher
 import mu.KLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 
 @JvmOverloads
 fun <T> withDistributedBarrier(
@@ -75,7 +89,7 @@ constructor(
       val uniqueToken = "$clientId:${randomId(tokenLength)}"
 
       // Prime lease with 2 seconds to give keepAlive a chance to get started
-      val lease = client.leaseGrant(Duration.seconds(leaseTtlSecs))
+      val lease = client.leaseGrant(leaseTtlSecs.seconds)
 
       // Do a CAS on the key name. If it is not found, then set it
       val txn =
@@ -112,7 +126,7 @@ constructor(
   }
 
   @Throws(InterruptedException::class)
-  fun waitOnBarrier(): Boolean = waitOnBarrier(Duration.days(Long.MAX_VALUE))
+  fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class)
   fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
@@ -130,12 +144,12 @@ constructor(
       val watchOption = watchOption { withNoPut(true) }
 
       client.withWatcher(barrierPath,
-        watchOption,
-        { watchResponse ->
-          for (event in watchResponse.events)
-            if (event.eventType == DELETE)
-              waitLatch.countDown()
-        }) {
+                         watchOption,
+                         { watchResponse ->
+                           for (event in watchResponse.events)
+                             if (event.eventType == DELETE)
+                               waitLatch.countDown()
+                         }) {
         // Check one more time in case watch missed the delete just after last check
         if (!waitOnMissingBarriers && !isBarrierSet())
           waitLatch.countDown()

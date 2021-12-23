@@ -57,23 +57,24 @@ public class DistributedBarrierExample {
         for (int i = 0; i < threadCount; i++) {
             final int id = i;
             executor.submit(() -> {
-                        try {
-                            goLatch.await();
-                            try (Client client = connectToEtcd(urls);
-                                 DistributedBarrier barrier = new DistributedBarrier(client, path)) {
-                                System.out.printf("%d Waiting on Barrier%n", id);
-                                barrier.waitOnBarrier(1, TimeUnit.SECONDS);
+                                try {
+                                    goLatch.await();
+                                    try (Client client = connectToEtcd(urls);
+                                         DistributedBarrier barrier = new DistributedBarrier(client, path)) {
+                                        System.out.printf("%d Waiting on Barrier%n", id);
+                                        barrier.waitOnBarrier(1, TimeUnit.SECONDS);
 
-                                System.out.printf("%d Timed out waiting on barrier, waiting again%n", id);
-                                barrier.waitOnBarrier();
+                                        System.out.printf("%d Timed out waiting on barrier, waiting again%n", id);
+                                        barrier.waitOnBarrier();
 
-                                System.out.printf("%d Done Waiting on Barrier%n", id);
-                                waitLatch.countDown();
+                                        System.out.printf("%d Done Waiting on Barrier%n", id);
+                                        waitLatch.countDown();
+                                    }
+                                }
+                                catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
                             }
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
             );
         }
 

@@ -52,10 +52,10 @@ public class WatchKeyRange {
                              watchOption,
                              (watchResponse) -> {
                                  watchResponse.getEvents().forEach((event) ->
-                                         System.out.printf("%s for %s%n",
-                                                 event.getEventType(),
-                                                 getAsString(event.getKeyValue())
-                                         ));
+                                                                           System.out.printf("%s for %s%n",
+                                                                                             event.getEventType(),
+                                                                                             getAsString(event.getKeyValue())
+                                                                           ));
                                  return Unit.INSTANCE;
                              })) {
 

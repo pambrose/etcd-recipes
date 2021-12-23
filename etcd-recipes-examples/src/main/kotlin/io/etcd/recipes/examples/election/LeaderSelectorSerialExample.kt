@@ -22,7 +22,7 @@ import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.election.withLeaderSelector
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -30,7 +30,7 @@ fun main() {
 
   val leadershipAction = { selector: LeaderSelector ->
     println("${selector.clientId} elected leader")
-    val pause = Duration.seconds(0) //Random.nextInt(1, 3).seconds
+    val pause = 0.seconds //Random.nextInt(1, 3).seconds
     sleep(pause)
     println("${selector.clientId} surrendering after $pause")
   }

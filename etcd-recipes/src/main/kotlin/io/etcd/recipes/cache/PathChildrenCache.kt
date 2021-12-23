@@ -25,13 +25,31 @@ import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.cache.PathChildrenCache.StartMode.*
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.*
-import io.etcd.recipes.common.*
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.cache.PathChildrenCache.StartMode.BUILD_INITIAL_CACHE
+import io.etcd.recipes.cache.PathChildrenCache.StartMode.NORMAL
+import io.etcd.recipes.cache.PathChildrenCache.StartMode.POST_INITIALIZED_EVENT
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.INITIALIZED
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.asPair
+import io.etcd.recipes.common.ensureSuffix
+import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.watcher
 import mu.KLogging
-import java.util.concurrent.*
+import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 
 @JvmOverloads
 fun <T> withPathChildrenCache(
@@ -198,7 +216,7 @@ class PathChildrenCache(
   }
 
   @Throws(InterruptedException::class)
-  fun waitOnStartComplete(): Boolean = waitOnStartComplete(Duration.days(Long.MAX_VALUE))
+  fun waitOnStartComplete(): Boolean = waitOnStartComplete(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class)
   fun waitOnStartComplete(timeout: Long, timeUnit: TimeUnit): Boolean =

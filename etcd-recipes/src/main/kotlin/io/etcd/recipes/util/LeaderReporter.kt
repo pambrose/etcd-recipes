@@ -22,7 +22,7 @@ import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.election.LeaderListener
 import io.etcd.recipes.election.LeaderSelector
 import java.util.concurrent.Executors
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import kotlin.time.TimeSource.Monotonic
 
 fun main() {
@@ -55,7 +55,7 @@ fun main() {
       executor
     )
 
-  sleep(Duration.days(1))
+  sleep(1.days)
   latch.countDown()
   executor.shutdown()
 }

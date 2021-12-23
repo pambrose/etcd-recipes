@@ -30,7 +30,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 @JvmOverloads
 fun <T> withTransientKeyValue(
@@ -84,7 +84,7 @@ constructor(
 
     executor.execute {
       try {
-        val leaseTtl = Duration.seconds(leaseTtlSecs)
+          val leaseTtl = leaseTtlSecs.seconds
         logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
         client.putValueWithKeepAlive(keyPath, keyValue, leaseTtl) {
           keepAliveStartedLatch.countDown()

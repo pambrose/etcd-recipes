@@ -44,16 +44,16 @@ public class SetValueWithKeepAlive {
         executor.submit(() -> {
             try (Client client = connectToEtcd(urls)) {
                 watcherWithLatch(client,
-                        path,
-                        endWatchLatch,
-                        (event) -> {
-                            System.out.printf("Updated key: %s%n", getKeyAsString(event));
-                            return Unit.INSTANCE;
-                        },
-                        (event) -> {
-                            System.out.printf("Deleted key: %s%n", getKeyAsString(event));
-                            return Unit.INSTANCE;
-                        }
+                                 path,
+                                 endWatchLatch,
+                                 (event) -> {
+                                     System.out.printf("Updated key: %s%n", getKeyAsString(event));
+                                     return Unit.INSTANCE;
+                                 },
+                                 (event) -> {
+                                     System.out.printf("Deleted key: %s%n", getKeyAsString(event));
+                                     return Unit.INSTANCE;
+                                 }
                 );
             }
         });
@@ -62,15 +62,16 @@ public class SetValueWithKeepAlive {
             try (Client client = connectToEtcd(urls)) {
                 System.out.printf("Assigning %s = %s%n", path, keyval);
                 putValueWithKeepAlive(client, path, keyval, 2,
-                        () -> {
-                            System.out.println("Starting sleep");
-                            sleepSecs(5);
-                            System.out.println("Finished sleep");
-                            return Unit.INSTANCE;
-                        });
+                                      () -> {
+                                          System.out.println("Starting sleep");
+                                          sleepSecs(5);
+                                          System.out.println("Finished sleep");
+                                          return Unit.INSTANCE;
+                                      });
                 System.out.println("Keep-alive is now terminated");
                 sleepSecs(5);
-            } finally {
+            }
+            finally {
                 System.out.println("Releasing latch");
                 latch.countDown();
             }

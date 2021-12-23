@@ -28,7 +28,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class ThreadedLeaderSelectorTests {
   val path = "/election/${javaClass.simpleName}"
@@ -42,7 +42,7 @@ class ThreadedLeaderSelectorTests {
     blockingThreads(count) {
       val takeAction =
         { selector: LeaderSelector ->
-          val pause = Duration.seconds(3.random())
+          val pause = 3.random().seconds
           logger.debug { "${selector.clientId} elected leader for $pause" }
           takeLeadershiptCounter.incrementAndGet()
           sleep(pause)
@@ -74,7 +74,7 @@ class ThreadedLeaderSelectorTests {
 
     val takeAction =
       { selector: LeaderSelector ->
-        val pause = Duration.seconds(3.random())
+        val pause = 3.random().seconds
         logger.debug { "${selector.clientId} elected leader for $pause" }
         takeLeadershiptCounter.incrementAndGet()
         sleep(pause)

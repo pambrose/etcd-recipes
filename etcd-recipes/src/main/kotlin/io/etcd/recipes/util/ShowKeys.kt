@@ -23,7 +23,7 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getChildren
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -33,7 +33,7 @@ fun main() {
     repeat(600) {
       println(client.getChildren(path).asString)
       println(client.getChildCount(path))
-      sleep(Duration.seconds(1))
+      sleep(1.seconds)
     }
   }
 }

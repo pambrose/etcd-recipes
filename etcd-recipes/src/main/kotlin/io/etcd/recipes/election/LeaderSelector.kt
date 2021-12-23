@@ -25,13 +25,37 @@ import com.github.pambrose.common.util.isNull
 import com.github.pambrose.common.util.randomId
 import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getChildrenValues
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAliveWith
+import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.withWatcher
 import mu.KLogging
-import java.util.concurrent.*
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 
 @JvmOverloads
 fun <T> withLeaderSelector(
@@ -155,14 +179,14 @@ constructor(
           try {
             val watchOption = watchOption { withNoPut(true) }
             client.withWatcher(leaderPath,
-              watchOption,
-              { watchResponse ->
-                for (event in watchResponse.events)
-                  if (event.eventType == DELETE) {
-                    // Run for leader whenever leader key is deleted
-                    attemptToBecomeLeader(client)
-                  }
-              }) {
+                               watchOption,
+                               { watchResponse ->
+                                 for (event in watchResponse.events)
+                                   if (event.eventType == DELETE) {
+                                     // Run for leader whenever leader key is deleted
+                                     attemptToBecomeLeader(client)
+                                   }
+                               }) {
               watchStarted.set(true)
               terminateWatch.waitUntilTrue()
             }
@@ -210,7 +234,7 @@ constructor(
   }
 
   @Throws(InterruptedException::class)
-  fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Duration.days(Long.MAX_VALUE))
+  fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class)
   fun waitOnLeadershipComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
@@ -259,11 +283,11 @@ constructor(
       if (i == attemptCount - 1)
         logger.error { "Exhausted wait for deletion of participation key $path" }
 
-      sleep(Duration.seconds(1))
+      sleep(1.seconds)
     }
 
     // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
-    val lease = client.leaseGrant(Duration.seconds(leaseTtlSecs))
+    val lease = client.leaseGrant(leaseTtlSecs.seconds)
     val txn =
       client.transaction {
         If(path.doesNotExist)
@@ -360,19 +384,19 @@ constructor(
       executor.execute {
         connectToEtcd(urls) { client ->
           client.withWatcher(electionPath.withLeaderSuffix,
-            block = { watchResponse ->
-              for (event in watchResponse.events)
-                try {
-                  when (event.eventType) {
-                    PUT -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
-                    DELETE -> listener.relinquishLeadership()
-                    UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
-                    else -> logger.error { "Unknown error with $electionPath watch" }
-                  }
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in reportLeader()" }
-                }
-            }) {
+                             block = { watchResponse ->
+                               for (event in watchResponse.events)
+                                 try {
+                                   when (event.eventType) {
+                                     PUT -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
+                                     DELETE -> listener.relinquishLeadership()
+                                     UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
+                                     else -> logger.error { "Unknown error with $electionPath watch" }
+                                   }
+                                 } catch (e: Throwable) {
+                                   logger.error(e) { "Exception in reportLeader()" }
+                                 }
+                             }) {
             terminateListener.await()
           }
         }

@@ -53,7 +53,8 @@ public class ServiceCacheExample {
 
                 try {
                     latch.await();
-                } catch (InterruptedException e) {
+                }
+                catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }

@@ -22,7 +22,12 @@ import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.asByteSequence
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.getLastChild
+import io.etcd.recipes.common.lessThan
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
 
 fun <T> withDistributedPriorityQueue(
   client: Client,
