@@ -28,7 +28,7 @@ import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldEndWith
 import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class SerialServiceDiscoveryTests {
   val path = "/discovery/${javaClass.simpleName}"
@@ -78,7 +78,7 @@ class SerialServiceDiscoveryTests {
 
         logger.debug { "Unregistering" }
         unregisterService(service)
-        sleep(Duration.seconds(3))
+        sleep(3.seconds)
 
         queryForNames().size shouldBeEqualTo 0
         queryForInstances(service.name).size shouldBeEqualTo 0

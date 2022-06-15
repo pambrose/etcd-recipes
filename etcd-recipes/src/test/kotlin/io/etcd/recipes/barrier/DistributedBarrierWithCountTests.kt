@@ -20,7 +20,11 @@ package io.etcd.recipes.barrier
 
 import com.github.pambrose.common.util.random
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.nonblockingThreads
+import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
@@ -28,7 +32,7 @@ import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class DistributedBarrierWithCountTests {
 
@@ -51,11 +55,11 @@ class DistributedBarrierWithCountTests {
 
     fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
 
-      sleep(Duration.seconds(5.random()))
+      sleep(5.random().seconds)
       logger.debug { "#$id Waiting on barrier" }
 
       repeat(retryCount) {
-        barrier.waitOnBarrier(Duration.seconds(1))
+        barrier.waitOnBarrier(1.seconds)
         logger.debug { "#$id Timed out waiting on barrier, waiting again" }
         retryCounter.incrementAndGet()
       }
@@ -84,7 +88,7 @@ class DistributedBarrierWithCountTests {
         }
 
       retryLatch.await()
-      sleep(Duration.seconds(2))
+      sleep(2.seconds)
 
       withDistributedBarrierWithCount(client, path, count) {
         waiter(99, this)

@@ -47,7 +47,8 @@ public class SetAndDeleteValue {
                 sleepSecs(5);
                 System.out.printf("Deleting %s%n", path);
                 KVUtils.deleteKey(client, path);
-            } finally {
+            }
+            finally {
                 latch.countDown();
             }
         });
@@ -60,7 +61,8 @@ public class SetAndDeleteValue {
                     System.out.printf("Key %s = %s after %dms%n", path, getValue(client, path, "unset"), elapsed);
                     sleepSecs(1);
                 }
-            } finally {
+            }
+            finally {
                 latch.countDown();
             }
         });

@@ -24,7 +24,7 @@ import io.etcd.recipes.barrier.withDistributedBarrier
 import io.etcd.recipes.common.connectToEtcd
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -39,10 +39,10 @@ fun main() {
         println("Setting Barrier")
         setBarrier()
         goLatch.countDown()
-        sleep(Duration.seconds(6))
+        sleep(6.seconds)
         println("Removing Barrier")
         removeBarrier()
-        sleep(Duration.seconds(3))
+        sleep(3.seconds)
       }
     }
   }
@@ -53,7 +53,7 @@ fun main() {
       connectToEtcd(urls) { client ->
         withDistributedBarrier(client, barrierPath) {
           println("$i Waiting on Barrier")
-          waitOnBarrier(Duration.seconds(1))
+          waitOnBarrier(1.seconds)
 
           println("$i Timed out waiting on barrier, waiting again")
           waitOnBarrier()

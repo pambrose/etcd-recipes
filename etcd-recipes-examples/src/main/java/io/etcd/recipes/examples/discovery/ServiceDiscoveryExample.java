@@ -73,7 +73,8 @@ public class ServiceDiscoveryExample {
 
             try {
                 System.out.println("Retrieved value: " + sd.queryForInstance(service.getName(), service.getId()));
-            } catch (EtcdRecipeException e) {
+            }
+            catch (EtcdRecipeException e) {
                 if (verbose) {
                     System.out.println("Exception: " + e);
                 }

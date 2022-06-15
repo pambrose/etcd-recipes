@@ -19,8 +19,16 @@
 package io.etcd.recipes.examples.basics
 
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.*
-import kotlin.time.Duration
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.getChildCount
+import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.getChildrenKeys
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.withWatcher
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -30,11 +38,11 @@ fun main() {
     client.apply {
       val watchOption = watchOption { isPrefix(true) }
       withWatcher(path,
-        watchOption,
-        { watchResponse ->
-          for (event in watchResponse.events)
-            println("${event.eventType} for ${event.keyValue.asString}")
-        }) {
+                  watchOption,
+                  { watchResponse ->
+                    for (event in watchResponse.events)
+                      println("${event.eventType} for ${event.keyValue.asString}")
+                  }) {
         // Create empty root
         putValue(path, "root")
 
@@ -42,7 +50,7 @@ fun main() {
         println(getChildren(path))
         println(getChildCount(path))
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
 
         // Add children
         putValue("$path/election/a", "a")
@@ -62,7 +70,7 @@ fun main() {
         println(getChildren("$path/waiting").asString)
         println(getChildCount("$path/waiting"))
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
 
         // Delete root
         deleteKey(path)
@@ -77,7 +85,7 @@ fun main() {
         println(getChildren(path).asString)
         println(getChildCount(path))
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
       }
     }
   }

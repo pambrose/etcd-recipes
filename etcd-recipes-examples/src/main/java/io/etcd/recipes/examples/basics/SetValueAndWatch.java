@@ -54,7 +54,8 @@ public class SetValueAndWatch {
                     KVUtils.deleteKey(client, path);
                     sleepSecs(1);
                 }
-            } finally {
+            }
+            finally {
                 latch.countDown();
             }
         });
@@ -68,9 +69,9 @@ public class SetValueAndWatch {
                                      watchResponse.getEvents().forEach((event) -> {
                                          KeyValue keyValue = event.getKeyValue();
                                          System.out.printf("Watch event: %s %s %s%n",
-                                                 event.getEventType(),
-                                                 getAsString(keyValue.getKey()),
-                                                 getAsString(keyValue.getValue()));
+                                                           event.getEventType(),
+                                                           getAsString(keyValue.getKey()),
+                                                           getAsString(keyValue.getValue()));
                                      });
                                      return Unit.INSTANCE;
                                  })) {
@@ -80,7 +81,8 @@ public class SetValueAndWatch {
                     System.out.println("Closing watch");
                 }
                 System.out.println("Closed watch");
-            } finally {
+            }
+            finally {
                 latch.countDown();
             }
         });

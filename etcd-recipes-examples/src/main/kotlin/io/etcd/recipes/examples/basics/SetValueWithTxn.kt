@@ -19,7 +19,14 @@
 package io.etcd.recipes.examples.basics
 
 import io.etcd.jetcd.Client
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteKeys
+import io.etcd.recipes.common.doesExist
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
 
 fun main() {
   val urls = listOf("http://localhost:2379")

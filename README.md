@@ -1,7 +1,7 @@
 # etcd Recipes
 
 [![JitPack](https://jitpack.io/v/pambrose/etcd-recipes.svg)](https://jitpack.io/#pambrose/etcd-recipes)
-[![Build Status](https://travis-ci.org/pambrose/etcd-recipes.svg?branch=master)](https://travis-ci.org/pambrose/etcd-recipes)
+[![Build Status](https://app.travis-ci.com/pambrose/etcd-recipes.svg?branch=master)](https://app.travis-ci.com/pambrose/etcd-recipes)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e185b9c637b040bab55bdecf38b0de76)](https://www.codacy.com/manual/pambrose/etcd-recipes?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pambrose/etcd-recipes&amp;utm_campaign=Badge_Grade)
 [![codebeat badge](https://codebeat.co/badges/d61556d4-22e8-44c3-b8f8-db7613fae7fc)](https://codebeat.co/projects/github-com-pambrose-etcd-recipes-master)
 [![codecov](https://codecov.io/gh/pambrose/etcd-recipes/branch/master/graph/badge.svg)](https://codecov.io/gh/pambrose/etcd-recipes)
@@ -52,7 +52,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.pambrose.etcd-recipes:etcd-recipes:0.9.20"
+    implementation "com.github.pambrose.etcd-recipes:etcd-recipes:0.9.21"
 }
 ```
 
@@ -76,7 +76,7 @@ dependencies {
     <dependency>
       <groupId>com.github.pambrose.etcd-recipes</groupId>
       <artifactId>etcd-recipes</artifactId>
-      <version>0.9.20</version>
+      <version>0.9.21</version>
     </dependency>
 </dependencies>
 ```

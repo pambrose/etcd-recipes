@@ -21,7 +21,12 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.ClientBuilder
-import io.etcd.jetcd.options.*
+import io.etcd.jetcd.options.CompactOption
+import io.etcd.jetcd.options.DeleteOption
+import io.etcd.jetcd.options.GetOption
+import io.etcd.jetcd.options.LeaseOption
+import io.etcd.jetcd.options.PutOption
+import io.etcd.jetcd.options.WatchOption
 
 fun etcdClient(block: ClientBuilder.() -> ClientBuilder): Client = Client.builder().block().build()
 

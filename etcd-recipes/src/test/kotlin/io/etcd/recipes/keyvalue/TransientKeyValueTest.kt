@@ -20,10 +20,14 @@ package io.etcd.recipes.keyvalue
 
 import com.github.pambrose.common.util.randomId
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.getChildCount
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.urls
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class TransientKeyValueTest {
   private val defaultValue = "nothing"
@@ -40,12 +44,12 @@ class TransientKeyValueTest {
       withTransientKeyValue(client, path, id) {
         repeat(10) {
           client.getValue(path)?.asString shouldBeEqualTo id
-          sleep(Duration.seconds(1))
+          sleep(1.seconds)
         }
       }
 
       // Wait for node to go away
-      sleep(Duration.seconds(5))
+      sleep(5.seconds)
       client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
     }
 
@@ -78,7 +82,7 @@ class TransientKeyValueTest {
             kv.close()
 
           // Wait for nodes to go away
-          sleep(Duration.seconds(5))
+          sleep(5.seconds)
           for (p in paths)
             getValue(p, defaultValue) shouldBeEqualTo defaultValue
 

@@ -28,6 +28,7 @@ import io.etcd.recipes.common.appendToPath
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 
 @JvmOverloads
 fun <T> withDistributedDoubleBarrier(
@@ -60,7 +61,7 @@ constructor(
   val leaveWaiterCount: Long get() = leaveBarrier.waiterCount
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
-  fun enter(): Boolean = enter(Duration.days(Long.MAX_VALUE))
+  fun enter(): Boolean = enter(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun enter(timeout: Long, timeUnit: TimeUnit): Boolean = enter(timeUnitToDuration(timeout, timeUnit))
@@ -69,7 +70,7 @@ constructor(
   fun enter(timeout: Duration): Boolean = enterBarrier.waitOnBarrier(timeout)
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
-  fun leave(): Boolean = leave(Duration.days(Long.MAX_VALUE))
+  fun leave(): Boolean = leave(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun leave(timeout: Long, timeUnit: TimeUnit): Boolean = leave(timeUnitToDuration(timeout, timeUnit))

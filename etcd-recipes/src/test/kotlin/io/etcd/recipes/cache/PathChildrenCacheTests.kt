@@ -21,13 +21,23 @@ package io.etcd.recipes.cache
 import com.github.pambrose.common.util.randomId
 import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCache.StartMode.POST_INITIALIZED_EVENT
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.*
-import io.etcd.recipes.common.*
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.INITIALIZED
+import io.etcd.recipes.common.asByteSequence
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.getChildCount
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.putValuesWithKeepAlive
+import io.etcd.recipes.common.urls
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class PathChildrenCacheTests {
   private val suffix = "update"
@@ -97,17 +107,17 @@ class PathChildrenCacheTests {
           client.putValue("$path/${kv.first}", kv.second + suffix)
         }
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
         compareData(count, currentData, kvs, suffix)
 
         client.deleteChildren(path)
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
         currentData shouldBeEqualTo emptyList()
       }
     }
 
-    sleep(Duration.seconds(5))
+    sleep(5.seconds)
 
     addCount.get() shouldBeEqualTo count
     updateCount.get() shouldBeEqualTo count
@@ -151,7 +161,7 @@ class PathChildrenCacheTests {
         start(true)
         waitOnStartComplete()
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
         compareData(count, currentData, testKvs, suffix)
 
         addCount.get() shouldBeEqualTo 0
@@ -161,7 +171,7 @@ class PathChildrenCacheTests {
 
         client.deleteChildren(path)
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
         currentData shouldBeEqualTo emptyList()
       }
     }
@@ -214,12 +224,12 @@ class PathChildrenCacheTests {
         start(POST_INITIALIZED_EVENT)
         waitOnStartComplete()
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
         compareData(count, currentData, kvs, suffix)
 
         client.deleteChildren(path)
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
         currentData shouldBeEqualTo emptyList()
       }
 
@@ -244,9 +254,9 @@ class PathChildrenCacheTests {
         start(false)
 
         val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
-        client.putValuesWithKeepAlive(bsvals, Duration.seconds(2)) {
+        client.putValuesWithKeepAlive(bsvals, 2.seconds) {
 
-          sleep(Duration.seconds(5))
+          sleep(5.seconds)
           val data = currentData
 
           //println("KVs:  ${kvs.map { it.first }.sorted()}")
@@ -255,7 +265,7 @@ class PathChildrenCacheTests {
           compareData(count, data, kvs)
         }
 
-        sleep(Duration.seconds(5))
+        sleep(5.seconds)
         currentData shouldBeEqualTo emptyList()
       }
     }

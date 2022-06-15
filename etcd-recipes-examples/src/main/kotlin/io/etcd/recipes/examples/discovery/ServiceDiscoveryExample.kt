@@ -22,7 +22,7 @@ import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.ServiceInstance
 import io.etcd.recipes.discovery.withServiceDiscovery
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -42,7 +42,7 @@ fun main() {
       println("Retrieved values: ${queryForInstances(service.name)}")
       println("Retrieved names: ${queryForNames()}")
 
-      sleep(Duration.seconds(2))
+      sleep(2.seconds)
       println("Updating")
       payload.intval = -888
       service.jsonPayload = payload.toJson()
@@ -51,10 +51,10 @@ fun main() {
       println("Retrieved values: ${queryForInstances(service.name)}")
       println("Retrieved names: ${queryForNames()}")
 
-      sleep(Duration.seconds(2))
+      sleep(2.seconds)
       println("Unregistering")
       unregisterService(service)
-      sleep(Duration.seconds(3))
+      sleep(3.seconds)
 
       try {
         println("Retrieved value: ${queryForInstance(service.name, service.id)}")
@@ -62,7 +62,7 @@ fun main() {
         println("Exception: $e")
       }
 
-      sleep(Duration.seconds(2))
+      sleep(2.seconds)
     }
   }
 }

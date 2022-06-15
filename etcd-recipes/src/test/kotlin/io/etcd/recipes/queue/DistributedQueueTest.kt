@@ -20,14 +20,18 @@ package io.etcd.recipes.queue
 
 import com.github.pambrose.common.concurrent.thread
 import com.github.pambrose.common.util.sleep
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.getChildCount
+import io.etcd.recipes.common.urls
 import mu.KLogging
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class DistributedQueueTest {
   private val iterCount = 500
@@ -77,7 +81,7 @@ class DistributedQueueTest {
       client.getChildCount(queuePath) shouldBeEqualTo 0
     }
 
-    sleep(Duration.seconds(5))
+    sleep(5.seconds)
 
     dequeuedData.size shouldBeEqualTo testData.size
     repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
@@ -199,7 +203,7 @@ class DistributedQueueTest {
       client.getChildCount(queuePath) shouldBeEqualTo 0
     }
 
-    sleep(Duration.seconds(5))
+    sleep(5.seconds)
 
     dequeuedData.size shouldBeEqualTo testData.size
     repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }

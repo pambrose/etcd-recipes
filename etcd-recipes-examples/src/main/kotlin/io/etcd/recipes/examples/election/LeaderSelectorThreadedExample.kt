@@ -26,7 +26,7 @@ import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.election.LeaderSelector.Companion.getParticipants
 import io.etcd.recipes.election.withLeaderSelector
 import java.util.concurrent.CountDownLatch
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -39,7 +39,7 @@ fun main() {
       val takeLeadershipAction =
         { selector: LeaderSelector ->
           println("${selector.clientId} elected leader")
-          val pause = Duration.seconds(3.random())
+          val pause = 3.random().seconds
           sleep(pause)
           println("${selector.clientId} surrendering after $pause")
         }
@@ -67,7 +67,7 @@ fun main() {
   connectToEtcd(urls) { client ->
     while (latch.count > 0) {
       println("Participants: ${getParticipants(client, electionPath)}")
-      sleep(Duration.seconds(1))
+      sleep(1.seconds)
     }
   }
 

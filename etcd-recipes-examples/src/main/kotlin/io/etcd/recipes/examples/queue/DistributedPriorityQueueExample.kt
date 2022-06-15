@@ -25,7 +25,7 @@ import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.queue.withDistributedPriorityQueue
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -59,7 +59,7 @@ fun main() {
       }
     }
 
-    sleep(Duration.seconds(2))
+    sleep(2.seconds)
 
     latch.await()
 

@@ -18,15 +18,13 @@
 
 package io.etcd.recipes.counter
 
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
-import io.etcd.jetcd.Client
-import io.etcd.jetcd.KeyValue
-import io.etcd.jetcd.kv.TxnResponse
-import io.etcd.jetcd.op.CmpTarget
+import com.github.pambrose.common.util.*
+import io.etcd.jetcd.*
+import io.etcd.jetcd.kv.*
+import io.etcd.jetcd.op.*
 import io.etcd.recipes.common.*
-import mu.KLogging
-import kotlin.time.Duration
+import mu.*
+import kotlin.time.Duration.Companion.milliseconds
 
 @JvmOverloads
 fun <T> withDistributedAtomicLong(
@@ -76,7 +74,7 @@ constructor(
       if (!txnResponse.isSucceeded) {
         //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
         // Crude backoff for retry
-        sleep(Duration.milliseconds((count * 100).random()))
+        sleep((count * 100).random().milliseconds)
         count++
       }
     } while (!txnResponse.isSucceeded)
@@ -87,16 +85,13 @@ constructor(
 
   private fun createCounterIfNotPresent(): Boolean =
     // Run the transaction if the counter is not present
-    if (client.getResponse(counterPath).kvs.isEmpty()) {
-      val txn =
-        client.transaction {
-          If(counterPath.doesNotExist)
-          Then(counterPath setTo default)
-        }
-      txn.isSucceeded
-    } else {
+    if (client.getResponse(counterPath).kvs.isEmpty())
+      client.transaction {
+        If(counterPath.doesNotExist)
+        Then(counterPath setTo default)
+      }.isSucceeded
+    else
       false
-    }
 
   private fun applyCounterTransaction(amount: Long): TxnResponse =
     client.transaction {

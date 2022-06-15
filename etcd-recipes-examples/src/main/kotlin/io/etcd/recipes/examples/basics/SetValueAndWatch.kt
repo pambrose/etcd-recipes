@@ -22,9 +22,13 @@ import com.github.pambrose.common.concurrent.thread
 import com.github.pambrose.common.util.repeatWithSleep
 import com.github.pambrose.common.util.sleep
 import io.etcd.jetcd.watch.WatchResponse
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.CountDownLatch
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val urls = listOf("http://localhost:2379")
@@ -33,13 +37,13 @@ fun main() {
   val latch = CountDownLatch(2)
 
   thread(latch) {
-    sleep(Duration.seconds(3))
+    sleep(3.seconds)
     connectToEtcd(urls) { client ->
       repeatWithSleep(10) { i, _ ->
         val kv = keyval + i
         println("Assigning $path = $kv")
         client.putValue(path, kv)
-        sleep(Duration.seconds(2))
+        sleep(2.seconds)
         println("Deleting $path")
         client.deleteKey(path)
       }
@@ -49,12 +53,12 @@ fun main() {
   thread(latch) {
     connectToEtcd(urls) { client ->
       client.withWatcher(path,
-        block = { watchResponse: WatchResponse ->
-          for (event in watchResponse.events)
-            println("Watch event: ${event.eventType} ${event.keyValue.asString}")
-        }) {
+                         block = { watchResponse: WatchResponse ->
+                           for (event in watchResponse.events)
+                             println("Watch event: ${event.eventType} ${event.keyValue.asString}")
+                         }) {
         println("Started watch")
-        sleep(Duration.seconds(10))
+        sleep(10.seconds)
         println("Closing watch")
       }
       println("Closed watch")
