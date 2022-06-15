@@ -18,42 +18,21 @@
 
 package io.etcd.recipes.election
 
-import com.github.pambrose.common.concurrent.BooleanMonitor
+import com.github.pambrose.common.concurrent.*
 import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
-import com.github.pambrose.common.time.timeUnitToDuration
-import com.github.pambrose.common.util.isNull
-import com.github.pambrose.common.util.randomId
-import com.github.pambrose.common.util.sleep
-import io.etcd.jetcd.Client
+import com.github.pambrose.common.time.*
+import com.github.pambrose.common.util.*
+import io.etcd.jetcd.*
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.*
 import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
-import io.etcd.recipes.common.EtcdRecipeException
-import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.getChildrenValues
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.keepAliveWith
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.putOption
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.withWatcher
-import mu.KLogging
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import kotlin.time.Duration
+import mu.*
+import java.util.concurrent.*
+import java.util.concurrent.atomic.*
+import kotlin.time.*
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
@@ -136,7 +115,7 @@ constructor(
   private val leadershipComplete = BooleanMonitor(false)
   private val attemptLeadership = BooleanMonitor(true)
   private var electedLeader by atomicBoolean(false)
-  private var startCallAllowed by atomicBoolean(true)
+  private var startCallAllowed = AtomicBoolean(true)
   private val leaderPath = electionPath.withLeaderSuffix
 
   init {
@@ -153,7 +132,7 @@ constructor(
     val electionSetup = BooleanMonitor(false)
 
     synchronized(startCallAllowed) {
-      if (!startCallAllowed)
+      if (!startCallAllowed.get())
         throw EtcdRecipeRuntimeException("Previous call to start() not complete")
 
       checkCloseNotCalled()
@@ -166,7 +145,7 @@ constructor(
       startCalled = true
       closeCalled = false
       electedLeader = false
-      startCallAllowed = false
+      startCallAllowed.set(false)
     }
 
     executor.execute {
@@ -342,7 +321,7 @@ constructor(
     } finally {
       // Do this after leadership is complete so the thread does not terminate
       attemptLeadership.set(false)
-      startCallAllowed = true
+      startCallAllowed.set(true)
       electedLeader = false
       markLeadershipComplete()
     }
