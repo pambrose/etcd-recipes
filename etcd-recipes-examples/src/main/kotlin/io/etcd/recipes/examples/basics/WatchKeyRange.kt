@@ -37,12 +37,14 @@ fun main() {
   connectToEtcd(urls) { client ->
     client.apply {
       val watchOption = watchOption { isPrefix(true) }
-      withWatcher(path,
-                  watchOption,
-                  { watchResponse ->
-                    for (event in watchResponse.events)
-                      println("${event.eventType} for ${event.keyValue.asString}")
-                  }) {
+      withWatcher(
+        path,
+        watchOption,
+        { watchResponse ->
+          for (event in watchResponse.events)
+            println("${event.eventType} for ${event.keyValue.asString}")
+        }
+      ) {
         // Create empty root
         putValue(path, "root")
 

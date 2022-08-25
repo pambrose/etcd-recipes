@@ -30,7 +30,6 @@ fun main() {
 
   connectToEtcd(urls) { client ->
     withServiceDiscovery(client, servicePath) {
-
       val payload = IntPayload(-999)
       val service = ServiceInstance("TestName", payload.toJson())
 

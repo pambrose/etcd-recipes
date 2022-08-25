@@ -150,7 +150,8 @@ class PathChildrenCache(
         override fun childEvent(event: PathChildrenCacheEvent) {
           block(event)
         }
-      })
+      }
+    )
   }
 
   fun clearListeners() = listeners.clear()
@@ -195,6 +196,7 @@ class PathChildrenCache(
                 }
               }
             }
+
             DELETE -> {
               logger.debug { "$stripped deleted" }
               val prevValue = cacheMap.remove(stripped)
@@ -208,6 +210,7 @@ class PathChildrenCache(
                 }
               }
             }
+
             UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
             else -> logger.error { "Unknown error with $cachePath watch" }
           }

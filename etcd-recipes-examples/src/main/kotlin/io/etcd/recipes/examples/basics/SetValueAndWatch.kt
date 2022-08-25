@@ -52,11 +52,13 @@ fun main() {
 
   thread(latch) {
     connectToEtcd(urls) { client ->
-      client.withWatcher(path,
-                         block = { watchResponse: WatchResponse ->
-                           for (event in watchResponse.events)
-                             println("Watch event: ${event.eventType} ${event.keyValue.asString}")
-                         }) {
+      client.withWatcher(
+        path,
+        block = { watchResponse: WatchResponse ->
+          for (event in watchResponse.events)
+            println("Watch event: ${event.eventType} ${event.keyValue.asString}")
+        }
+      ) {
         println("Started watch")
         sleep(10.seconds)
         println("Closing watch")

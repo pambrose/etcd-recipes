@@ -72,19 +72,21 @@ abstract class AbstractQueue(
       }
     val keyFound = AtomicReference<KeyValue?>()
 
-    client.withWatcher(queuePath,
-                       watchOption,
-                       { watchResponse ->
-                         synchronized(watchLatch) {
-                           if (watchLatch.count > 0)
-                             for (watchEvent in watchResponse.events) {
-                               if (watchEvent.eventType == WatchEvent.EventType.PUT) {
-                                 keyFound.compareAndSet(null, watchEvent.keyValue)
-                                 watchLatch.countDown()
-                               }
-                             }
-                         }
-                       }) {
+    client.withWatcher(
+      queuePath,
+      watchOption,
+      { watchResponse ->
+        synchronized(watchLatch) {
+          if (watchLatch.count > 0)
+            for (watchEvent in watchResponse.events) {
+              if (watchEvent.eventType == WatchEvent.EventType.PUT) {
+                keyFound.compareAndSet(null, watchEvent.keyValue)
+                watchLatch.countDown()
+              }
+            }
+        }
+      }
+    ) {
       // Query again in case a value arrived just before watch was created
       synchronized(watchLatch) {
         if (watchLatch.count > 0) {

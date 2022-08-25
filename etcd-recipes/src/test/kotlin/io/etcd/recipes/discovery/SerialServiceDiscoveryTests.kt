@@ -44,7 +44,6 @@ class SerialServiceDiscoveryTests {
   fun discoveryTest() {
     connectToEtcd(urls) { client ->
       withServiceDiscovery(client, path) {
-
         val payload = TestPayload(-999)
         val service = ServiceInstance("TestName", payload.toJson())
 

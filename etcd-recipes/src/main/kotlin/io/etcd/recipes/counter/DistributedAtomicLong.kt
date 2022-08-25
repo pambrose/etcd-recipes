@@ -18,12 +18,22 @@
 
 package io.etcd.recipes.counter
 
-import com.github.pambrose.common.util.*
-import io.etcd.jetcd.*
-import io.etcd.jetcd.kv.*
-import io.etcd.jetcd.op.*
-import io.etcd.recipes.common.*
-import mu.*
+import com.github.pambrose.common.util.random
+import com.github.pambrose.common.util.sleep
+import io.etcd.jetcd.Client
+import io.etcd.jetcd.KeyValue
+import io.etcd.jetcd.kv.TxnResponse
+import io.etcd.jetcd.op.CmpTarget
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.asLong
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.equalTo
+import io.etcd.recipes.common.getResponse
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import mu.KLogging
 import kotlin.time.Duration.Companion.milliseconds
 
 @JvmOverloads

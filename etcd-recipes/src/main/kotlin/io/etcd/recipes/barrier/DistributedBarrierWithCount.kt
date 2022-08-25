@@ -130,7 +130,6 @@ constructor(
         closeKeepAlive()
       } else {
         if (waiterCount >= memberCount) {
-
           closeKeepAlive()
 
           // Delete /ready key
@@ -172,18 +171,20 @@ constructor(
           // Watch for DELETE of /ready and PUTS on /waiters/*
           val trailingKey = barrierPath.ensureSuffix("/")
           val watchOption = watchOption { isPrefix(true) }
-          client.withWatcher(trailingKey,
-                             watchOption,
-                             { watchResponse ->
-                               watchResponse.events
-                                 .forEach { watchEvent ->
-                                   val key = watchEvent.keyValue.key.asString
-                                   when {
-                                     key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
-                                     key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
-                                   }
-                                 }
-                             }) {
+          client.withWatcher(
+            trailingKey,
+            watchOption,
+            { watchResponse ->
+              watchResponse.events
+                .forEach { watchEvent ->
+                  val key = watchEvent.keyValue.key.asString
+                  when {
+                    key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
+                    key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
+                  }
+                }
+            }
+          ) {
             // Check one more time in case watch missed the delete just after last check
             checkWaiterCount()
 

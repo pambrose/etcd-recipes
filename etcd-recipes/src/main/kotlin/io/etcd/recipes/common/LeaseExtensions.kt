@@ -34,7 +34,8 @@ fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
     lease.id,
     Observers.observer(
       { /*println("KeepAlive next resp: $next")*/ },
-      { /*println("KeepAlive err resp: $err")*/ })
+      { /*println("KeepAlive err resp: $err")*/ }
+    )
   )
 
 fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse =

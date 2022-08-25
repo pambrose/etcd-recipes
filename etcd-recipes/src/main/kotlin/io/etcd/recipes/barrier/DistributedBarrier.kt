@@ -143,13 +143,15 @@ constructor(
       val waitLatch = CountDownLatch(1)
       val watchOption = watchOption { withNoPut(true) }
 
-      client.withWatcher(barrierPath,
-                         watchOption,
-                         { watchResponse ->
-                           for (event in watchResponse.events)
-                             if (event.eventType == DELETE)
-                               waitLatch.countDown()
-                         }) {
+      client.withWatcher(
+        barrierPath,
+        watchOption,
+        { watchResponse ->
+          for (event in watchResponse.events)
+            if (event.eventType == DELETE)
+              waitLatch.countDown()
+        }
+      ) {
         // Check one more time in case watch missed the delete just after last check
         if (!waitOnMissingBarriers && !isBarrierSet())
           waitLatch.countDown()

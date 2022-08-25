@@ -18,21 +18,43 @@
 
 package io.etcd.recipes.election
 
-import com.github.pambrose.common.concurrent.*
+import com.github.pambrose.common.concurrent.BooleanMonitor
 import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
-import com.github.pambrose.common.time.*
-import com.github.pambrose.common.util.*
-import io.etcd.jetcd.*
+import com.github.pambrose.common.time.timeUnitToDuration
+import com.github.pambrose.common.util.isNull
+import com.github.pambrose.common.util.randomId
+import com.github.pambrose.common.util.sleep
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
-import mu.*
-import java.util.concurrent.*
-import java.util.concurrent.atomic.*
-import kotlin.time.*
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getChildrenValues
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAliveWith
+import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.withWatcher
+import mu.KLogging
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
@@ -128,7 +150,6 @@ constructor(
   val isFinished get() = leadershipComplete.get()
 
   fun start(): LeaderSelector {
-
     val electionSetup = BooleanMonitor(false)
 
     synchronized(startCallAllowed) {
@@ -157,15 +178,17 @@ constructor(
         executor.execute {
           try {
             val watchOption = watchOption { withNoPut(true) }
-            client.withWatcher(leaderPath,
-                               watchOption,
-                               { watchResponse ->
-                                 for (event in watchResponse.events)
-                                   if (event.eventType == DELETE) {
-                                     // Run for leader whenever leader key is deleted
-                                     attemptToBecomeLeader(client)
-                                   }
-                               }) {
+            client.withWatcher(
+              leaderPath,
+              watchOption,
+              { watchResponse ->
+                for (event in watchResponse.events)
+                  if (event.eventType == DELETE) {
+                    // Run for leader whenever leader key is deleted
+                    attemptToBecomeLeader(client)
+                  }
+              }
+            ) {
               watchStarted.set(true)
               terminateWatch.waitUntilTrue()
             }
@@ -338,7 +361,6 @@ constructor(
 
     @JvmStatic
     fun getParticipants(client: Client, electionPath: String): List<Participant> {
-
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 
       val participants = mutableListOf<Participant>()
@@ -355,27 +377,28 @@ constructor(
       listener: LeaderListener,
       executor: Executor
     ): CountDownLatch {
-
       require(urls.isNotEmpty()) { "URLs cannot be empty" }
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 
       val terminateListener = CountDownLatch(1)
       executor.execute {
         connectToEtcd(urls) { client ->
-          client.withWatcher(electionPath.withLeaderSuffix,
-                             block = { watchResponse ->
-                               for (event in watchResponse.events)
-                                 try {
-                                   when (event.eventType) {
-                                     PUT -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
-                                     DELETE -> listener.relinquishLeadership()
-                                     UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
-                                     else -> logger.error { "Unknown error with $electionPath watch" }
-                                   }
-                                 } catch (e: Throwable) {
-                                   logger.error(e) { "Exception in reportLeader()" }
-                                 }
-                             }) {
+          client.withWatcher(
+            electionPath.withLeaderSuffix,
+            block = { watchResponse ->
+              for (event in watchResponse.events)
+                try {
+                  when (event.eventType) {
+                    PUT -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
+                    DELETE -> listener.relinquishLeadership()
+                    UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
+                    else -> logger.error { "Unknown error with $electionPath watch" }
+                  }
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in reportLeader()" }
+                }
+            }
+          ) {
             terminateListener.await()
           }
         }

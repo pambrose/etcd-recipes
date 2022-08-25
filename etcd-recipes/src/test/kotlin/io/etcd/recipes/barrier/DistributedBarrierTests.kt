@@ -61,9 +61,7 @@ class DistributedBarrierTests {
     connectToEtcd(urls) { client ->
 
       thread(completeLatch) {
-
         withDistributedBarrier(client, path) {
-
           isBarrierSet() shouldBeEqualTo false
 
           logger.debug { "Setting Barrier" }
@@ -152,7 +150,6 @@ class DistributedBarrierTests {
       sleep(5.seconds)
 
       withDistributedBarrier(client, path) {
-
         isBarrierSet() shouldBeEqualTo false
 
         logger.debug { "Setting Barrier" }

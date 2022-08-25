@@ -62,21 +62,24 @@ fun Client.watcherWithLatch(
   onDelete: (WatchEvent) -> Unit,
   option: WatchOption = WatchOption.DEFAULT
 ) {
-  withWatcher(keyName,
-              option,
-              { watchResponse ->
-                watchResponse.events
-                  .forEach { event ->
-                    when (event.eventType) {
-                      EventType.PUT -> onPut(event)
-                      EventType.DELETE -> onDelete(event)
-                      EventType.UNRECOGNIZED -> { // Ignore
-                      }
-                      else -> { // Ignore
-                      }
-                    }
-                  }
-              }) {
+  withWatcher(
+    keyName,
+    option,
+    { watchResponse ->
+      watchResponse.events
+        .forEach { event ->
+          when (event.eventType) {
+            EventType.PUT -> onPut(event)
+            EventType.DELETE -> onDelete(event)
+            EventType.UNRECOGNIZED -> { // Ignore
+            }
+
+            else -> { // Ignore
+            }
+          }
+        }
+    }
+  ) {
     endWatchLatch.await()
   }
 }

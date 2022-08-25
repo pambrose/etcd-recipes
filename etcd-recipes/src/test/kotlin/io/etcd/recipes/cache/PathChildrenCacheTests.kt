@@ -80,7 +80,6 @@ class PathChildrenCacheTests {
       client.getChildCount(path) shouldBeEqualTo 0
 
       withPathChildrenCache(client, path) {
-
         addListener { event: PathChildrenCacheEvent ->
           //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
           when (event.type) {
@@ -207,7 +206,6 @@ class PathChildrenCacheTests {
       var initData: List<ChildData>? = null
 
       withPathChildrenCache(client, path) {
-
         addListener { event: PathChildrenCacheEvent ->
           //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
           when (event.type) {
@@ -255,7 +253,6 @@ class PathChildrenCacheTests {
 
         val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
         client.putValuesWithKeepAlive(bsvals, 2.seconds) {
-
           sleep(5.seconds)
           val data = currentData
 

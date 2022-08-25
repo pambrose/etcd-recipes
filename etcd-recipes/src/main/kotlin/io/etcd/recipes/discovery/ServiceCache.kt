@@ -24,8 +24,18 @@ import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.watch.WatchEvent
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.common.*
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asPair
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.ensureSuffix
+import io.etcd.recipes.common.getChildren
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.watcher
 import mu.KLogging
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
@@ -78,6 +88,7 @@ class ServiceCache internal constructor(
               }
               //println("$k $v ${if (newKey) "added" else "updated"}")
             }
+
             DELETE -> {
               val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
               listeners.forEach { listener ->
@@ -90,6 +101,7 @@ class ServiceCache internal constructor(
               }
               //println("$stripped deleted")
             }
+
             UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
             else -> logger.error { "Unknown error with $servicePath watch" }
           }
@@ -135,7 +147,8 @@ class ServiceCache internal constructor(
         ) {
           listener.invoke(eventType, isAdd, serviceName, serviceInstance)
         }
-      })
+      }
+    )
   }
 
   fun addListenerForChanges(listener: ServiceCacheListener) {

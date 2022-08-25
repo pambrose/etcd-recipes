@@ -84,7 +84,7 @@ constructor(
 
     executor.execute {
       try {
-          val leaseTtl = leaseTtlSecs.seconds
+        val leaseTtl = leaseTtlSecs.seconds
         logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
         client.putValueWithKeepAlive(keyPath, keyValue, leaseTtl) {
           keepAliveStartedLatch.countDown()

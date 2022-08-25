@@ -54,7 +54,6 @@ class DistributedBarrierWithCountTests {
     val advancedCounter = AtomicInteger(0)
 
     fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
-
       sleep(5.random().seconds)
       logger.debug { "#$id Waiting on barrier" }
 
