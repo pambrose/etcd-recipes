@@ -42,7 +42,7 @@ import io.etcd.recipes.common.leaseGrant
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
-import mu.KLogging
+import mu.two.KLogging
 import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap

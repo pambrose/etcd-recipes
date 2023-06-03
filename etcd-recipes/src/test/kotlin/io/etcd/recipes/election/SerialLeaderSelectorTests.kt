@@ -22,7 +22,7 @@ import com.github.pambrose.common.util.random
 import com.github.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
-import mu.KLogging
+import mu.two.KLogging
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow

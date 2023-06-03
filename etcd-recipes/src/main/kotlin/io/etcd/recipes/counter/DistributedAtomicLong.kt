@@ -33,7 +33,7 @@ import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
-import mu.KLogging
+import mu.two.KLogging
 import kotlin.time.Duration.Companion.milliseconds
 
 @JvmOverloads

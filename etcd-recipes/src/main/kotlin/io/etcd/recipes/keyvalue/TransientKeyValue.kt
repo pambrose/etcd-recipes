@@ -25,7 +25,7 @@ import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientI
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.putValueWithKeepAlive
-import mu.KLogging
+import mu.two.KLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService

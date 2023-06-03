@@ -42,7 +42,7 @@ import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
-import mu.KLogging
+import mu.two.KLogging
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
