@@ -28,20 +28,32 @@ import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 
 @JvmOverloads
-fun Client.putValue(keyName: String, keyval: ByteSequence, option: PutOption = PutOption.DEFAULT): PutResponse =
-  kvClient.put(keyName.asByteSequence, keyval, option).get()
+fun Client.putValue(
+  keyName: String,
+  keyval: ByteSequence,
+  option: PutOption = PutOption.DEFAULT,
+): PutResponse = kvClient.put(keyName.asByteSequence, keyval, option).get()
 
 @JvmOverloads
-fun Client.putValue(keyName: String, keyval: String, option: PutOption = PutOption.DEFAULT): PutResponse =
-  kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
+fun Client.putValue(
+  keyName: String,
+  keyval: String,
+  option: PutOption = PutOption.DEFAULT,
+): PutResponse = kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
 
 @JvmOverloads
-fun Client.putValue(keyName: String, keyval: Int, option: PutOption = PutOption.DEFAULT): PutResponse =
-  kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
+fun Client.putValue(
+  keyName: String,
+  keyval: Int,
+  option: PutOption = PutOption.DEFAULT,
+): PutResponse = kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
 
 @JvmOverloads
-fun Client.putValue(keyName: String, keyval: Long, option: PutOption = PutOption.DEFAULT): PutResponse =
-  kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
+fun Client.putValue(
+  keyName: String,
+  keyval: Long,
+  option: PutOption = PutOption.DEFAULT,
+): PutResponse = kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
 
 // Delete keys
 fun Client.deleteKeys(vararg keyNames: String) = keyNames.forEach { deleteKey(it) }
@@ -52,7 +64,7 @@ fun Client.deleteKey(keyName: String): DeleteResponse = kvClient.delete(keyName.
 internal fun Client.getResponse(
   keyName: ByteSequence,
   option: GetOption = GetOption.DEFAULT,
-  iteration: Int = 0
+  iteration: Int = 0,
 ): GetResponse {
   val response = kvClient.get(keyName, option).get()
   return if (response.kvs.isEmpty() && response.isMore) {
@@ -65,15 +77,21 @@ internal fun Client.getResponse(
 }
 
 @JvmOverloads
-fun Client.getResponse(keyName: String, option: GetOption = GetOption.DEFAULT): GetResponse =
-  getResponse(keyName.asByteSequence, option)
+fun Client.getResponse(
+  keyName: String,
+  option: GetOption = GetOption.DEFAULT,
+): GetResponse = getResponse(keyName.asByteSequence, option)
 
 // Get children key value pairs
-fun Client.getKeyValuePairs(keyName: ByteSequence, getOption: GetOption): List<Pair<String, ByteSequence>> =
-  getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
+fun Client.getKeyValuePairs(
+  keyName: ByteSequence,
+  getOption: GetOption,
+): List<Pair<String, ByteSequence>> = getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
 
-fun Client.getKeyValuePairs(keyName: String, getOption: GetOption): List<Pair<String, ByteSequence>> =
-  getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
+fun Client.getKeyValuePairs(
+  keyName: String,
+  getOption: GetOption,
+): List<Pair<String, ByteSequence>> = getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
 
 // Get single key value
 fun Client.getValue(keyName: String): ByteSequence? {
@@ -82,11 +100,20 @@ fun Client.getValue(keyName: String): ByteSequence? {
 }
 
 // Get single key value with default
-fun Client.getValue(keyName: String, default: String): String = getValue(keyName)?.asString ?: default
+fun Client.getValue(
+  keyName: String,
+  default: String,
+): String = getValue(keyName)?.asString ?: default
 
-fun Client.getValue(keyName: String, default: Int): Int = getValue(keyName)?.asInt ?: default
+fun Client.getValue(
+  keyName: String,
+  default: Int,
+): Int = getValue(keyName)?.asInt ?: default
 
-fun Client.getValue(keyName: String, default: Long): Long = getValue(keyName)?.asLong ?: default
+fun Client.getValue(
+  keyName: String,
+  default: Long,
+): Long = getValue(keyName)?.asLong ?: default
 
 // Key checking
 fun Client.isKeyPresent(keyName: String) = transaction { If(keyName.doesExist) }.isSucceeded

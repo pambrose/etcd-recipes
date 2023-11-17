@@ -41,18 +41,16 @@ fun <T> withDistributedAtomicLong(
   client: Client,
   counterPath: String,
   default: Long = 0L,
-  receiver: DistributedAtomicLong.() -> T
-): T =
-  DistributedAtomicLong(client, counterPath, default).use { it.receiver() }
+  receiver: DistributedAtomicLong.() -> T,
+): T = DistributedAtomicLong(client, counterPath, default).use { it.receiver() }
 
 class DistributedAtomicLong
 @JvmOverloads
 constructor(
   client: Client,
   val counterPath: String,
-  private val default: Long = 0L
+  private val default: Long = 0L,
 ) : EtcdConnector(client) {
-
   init {
     require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
 
@@ -78,11 +76,11 @@ constructor(
   private fun modifyCounterValue(value: Long): Long {
     checkCloseNotCalled()
     var count = 1
-    //totalCount.incrementAndGet()
+    // totalCount.incrementAndGet()
     do {
       val txnResponse = applyCounterTransaction(value)
       if (!txnResponse.isSucceeded) {
-        //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
+        // println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
         // Crude backoff for retry
         sleep((count * 100).random().milliseconds)
         count++
@@ -95,13 +93,14 @@ constructor(
 
   private fun createCounterIfNotPresent(): Boolean =
     // Run the transaction if the counter is not present
-    if (client.getResponse(counterPath).kvs.isEmpty())
+    if (client.getResponse(counterPath).kvs.isEmpty()) {
       client.transaction {
         If(counterPath.doesNotExist)
         Then(counterPath setTo default)
       }.isSucceeded
-    else
+    } else {
       false
+    }
 
   private fun applyCounterTransaction(amount: Long): TxnResponse =
     client.transaction {
@@ -113,11 +112,14 @@ constructor(
     }
 
   companion object : KLogging() {
-    //val collisionCount = AtomicLong()
-    //val totalCount = AtomicLong()
+    // val collisionCount = AtomicLong()
+    // val totalCount = AtomicLong()
 
     @JvmStatic
-    fun delete(client: Client, counterPath: String) {
+    fun delete(
+      client: Client,
+      counterPath: String,
+    ) {
       require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
       client.deleteKey(counterPath)
     }

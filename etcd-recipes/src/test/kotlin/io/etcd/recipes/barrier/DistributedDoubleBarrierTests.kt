@@ -37,7 +37,6 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class DistributedDoubleBarrierTests {
-
   @Test
   fun badArgsTest() {
     connectToEtcd(urls) { client ->
@@ -60,7 +59,11 @@ class DistributedDoubleBarrierTests {
     val enterCounter = AtomicInteger(0)
     val leaveCounter = AtomicInteger(0)
 
-    fun enterBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
+    fun enterBarrier(
+      id: Int,
+      barrier: DistributedDoubleBarrier,
+      retryCount: Int = 0,
+    ) {
       sleep(5.random().seconds)
 
       repeat(retryCount) {
@@ -81,7 +84,11 @@ class DistributedDoubleBarrierTests {
       logger.debug { "#$id Entered barrier" }
     }
 
-    fun leaveBarrier(id: Int, barrier: DistributedDoubleBarrier, retryCount: Int = 0) {
+    fun leaveBarrier(
+      id: Int,
+      barrier: DistributedDoubleBarrier,
+      retryCount: Int = 0,
+    ) {
       sleep(10.random().seconds)
 
       repeat(retryCount) {

@@ -60,7 +60,7 @@ class ParticipantTests {
                 leaderNames += selector.clientId
               }
             },
-            clientId = "Thread$it"
+            clientId = "Thread$it",
           ) {
             start()
             startedLatch.countDown()

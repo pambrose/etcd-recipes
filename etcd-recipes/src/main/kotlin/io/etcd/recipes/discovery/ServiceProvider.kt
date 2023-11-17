@@ -25,9 +25,8 @@ import kotlin.random.Random
 class ServiceProvider internal constructor(
   client: Client,
   namesPath: String,
-  val serviceName: String
+  val serviceName: String,
 ) : Closeable {
-
   val serviceDiscovery = lazy { ServiceDiscovery(client, namesPath) }
 
   fun getInstance(): ServiceInstance = getAllInstances()[Random.nextInt(0, getAllInstances().size)]

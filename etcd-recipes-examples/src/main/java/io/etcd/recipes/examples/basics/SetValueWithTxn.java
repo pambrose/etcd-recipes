@@ -22,41 +22,36 @@ import io.etcd.jetcd.Client;
 import java.util.List;
 
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
-import static io.etcd.recipes.common.KVUtils.deleteKeys;
-import static io.etcd.recipes.common.KVUtils.getValue;
-import static io.etcd.recipes.common.KVUtils.isKeyPresent;
-import static io.etcd.recipes.common.KVUtils.putValue;
-import static io.etcd.recipes.common.TxnUtils.getDoesExist;
-import static io.etcd.recipes.common.TxnUtils.setTo;
-import static io.etcd.recipes.common.TxnUtils.transaction;
+import static io.etcd.recipes.common.KVUtils.*;
+import static io.etcd.recipes.common.TxnUtils.*;
 import static java.lang.String.format;
 
 public class SetValueWithTxn {
-    private static final List<String> urls = Lists.newArrayList("http://localhost:2379");
-    private static final String path = "/txnexample";
-    private static final String keyval = "foobar";
+  private static final List<String> urls = Lists.newArrayList("http://localhost:2379");
+  private static final String path = "/txnexample";
+  private static final String keyval = "foobar";
 
-    public static void main(String[] args) {
-        try (Client client = connectToEtcd(urls)) {
-            System.out.println("Deleting keys");
-            deleteKeys(client, path, keyval);
+  public static void main(String[] args) {
+    try (Client client = connectToEtcd(urls)) {
+      System.out.println("Deleting keys");
+      deleteKeys(client, path, keyval);
 
-            System.out.printf("Key present: %s%n", isKeyPresent(client, keyval));
-            checkForKey(client);
-            System.out.printf("Key present: %s%n", isKeyPresent(client, keyval));
-            putValue(client, path, "Something");
-            checkForKey(client);
-        }
+      System.out.printf("Key present: %s%n", isKeyPresent(client, keyval));
+      checkForKey(client);
+      System.out.printf("Key present: %s%n", isKeyPresent(client, keyval));
+      putValue(client, path, "Something");
+      checkForKey(client);
     }
+  }
 
-    private static void checkForKey(Client client) {
-        transaction(client, (txn) -> {
-            txn.If(getDoesExist(path));
-            txn.Then(setTo(keyval, format("Key %s found", path)));
-            txn.Else(setTo(keyval, format("Key %s not found", path)));
-            return txn;
-        });
+  private static void checkForKey(Client client) {
+    transaction(client, (txn) -> {
+      txn.If(getDoesExist(path));
+      txn.Then(setTo(keyval, format("Key %s found", path)));
+      txn.Else(setTo(keyval, format("Key %s not found", path)));
+      return txn;
+    });
 
-        System.out.printf("Debug value: %s%n", getValue(client, keyval, "not_used"));
-    }
+    System.out.printf("Debug value: %s%n", getValue(client, keyval, "not_used"));
+  }
 }

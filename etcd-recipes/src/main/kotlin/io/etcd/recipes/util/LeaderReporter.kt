@@ -52,7 +52,7 @@ fun main() {
           unelectedTime = unelectedClock.markNow()
         }
       },
-      executor
+      executor,
     )
 
   sleep(1.days)

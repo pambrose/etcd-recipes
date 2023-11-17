@@ -19,7 +19,6 @@
 package io.etcd.recipes.election
 
 interface LeaderListener {
-
   fun takeLeadership(leaderName: String)
 
   fun relinquishLeadership()

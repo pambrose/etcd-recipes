@@ -52,7 +52,7 @@ class PathChildrenCacheTests {
     count: Int,
     data: List<ChildData>,
     origData: List<Pair<String, String>>,
-    suffix: String = ""
+    suffix: String = "",
   ) {
     data.size shouldBeEqualTo count
     val currData = data.map { it.key to it.value.asString }.sortedBy { it.first }
@@ -81,7 +81,7 @@ class PathChildrenCacheTests {
 
       withPathChildrenCache(client, path) {
         addListener { event: PathChildrenCacheEvent ->
-          //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+          // println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
           when (event.type) {
             CHILD_ADDED -> addCount.incrementAndGet()
             CHILD_UPDATED -> updateCount.incrementAndGet()
@@ -148,7 +148,7 @@ class PathChildrenCacheTests {
 
       withPathChildrenCache(client, path) {
         addListener { event: PathChildrenCacheEvent ->
-          //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+          // println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
           when (event.type) {
             CHILD_ADDED -> addCount.incrementAndGet()
             CHILD_UPDATED -> updateCount.incrementAndGet()
@@ -207,7 +207,7 @@ class PathChildrenCacheTests {
 
       withPathChildrenCache(client, path) {
         addListener { event: PathChildrenCacheEvent ->
-          //println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+          // println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
           when (event.type) {
             CHILD_ADDED -> addCount.incrementAndGet()
             CHILD_UPDATED -> updateCount.incrementAndGet()
@@ -256,8 +256,8 @@ class PathChildrenCacheTests {
           sleep(5.seconds)
           val data = currentData
 
-          //println("KVs:  ${kvs.map { it.first }.sorted()}")
-          //println("Data: ${data.map { it.key }.sorted()}")
+          // println("KVs:  ${kvs.map { it.first }.sorted()}")
+          // println("Data: ${data.map { it.key }.sorted()}")
 
           compareData(count, data, kvs)
         }

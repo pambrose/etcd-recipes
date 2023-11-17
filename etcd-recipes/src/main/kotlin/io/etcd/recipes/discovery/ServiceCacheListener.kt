@@ -25,6 +25,6 @@ interface ServiceCacheListener {
     eventType: WatchEvent.EventType,
     isAdd: Boolean,
     serviceName: String,
-    serviceInstance: ServiceInstance?
+    serviceInstance: ServiceInstance?,
   )
 }

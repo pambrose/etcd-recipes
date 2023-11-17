@@ -42,7 +42,7 @@ fun main() {
       repeat(iterCount) { i ->
         enqueue(
           "Value $i",
-          iterCount - i
+          iterCount - i,
         )
       }
     }

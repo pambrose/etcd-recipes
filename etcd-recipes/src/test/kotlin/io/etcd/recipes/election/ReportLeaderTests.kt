@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
 class ReportLeaderTests {
-
   val path = "/election/${javaClass.simpleName}"
 
   @Test
@@ -54,7 +53,7 @@ class ReportLeaderTests {
           relinquishLeadershiptCounter.incrementAndGet()
         }
       },
-      executor
+      executor,
     )
 
     sleep(5.seconds)
@@ -71,7 +70,7 @@ class ReportLeaderTests {
               sleep(pause)
             }
           },
-          clientId = "Thread$it"
+          clientId = "Thread$it",
         ) {
           start()
           waitOnLeadershipComplete()

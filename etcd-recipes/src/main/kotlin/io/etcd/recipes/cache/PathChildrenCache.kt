@@ -56,16 +56,14 @@ fun <T> withPathChildrenCache(
   client: Client,
   cachePath: String,
   userExecutor: Executor? = null,
-  receiver: PathChildrenCache.() -> T
-): T =
-  PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
+  receiver: PathChildrenCache.() -> T,
+): T = PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
 
 class PathChildrenCache(
   client: Client,
   val cachePath: String,
-  private val userExecutor: Executor? = null
+  private val userExecutor: Executor? = null,
 ) : EtcdConnector(client) {
-
   private var watcher: Watch.Watcher? by nullableReference()
   private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
   private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
@@ -90,16 +88,21 @@ class PathChildrenCache(
      * After cache is primed with initial values (in the background) a
      * PathChildrenCacheEvent.Type.INITIALIZED event will be posted
      */
-    POST_INITIALIZED_EVENT
+    POST_INITIALIZED_EVENT,
   }
 
   @JvmOverloads
-  fun start(buildInitial: Boolean = false, waitOnStartComplete: Boolean = true): PathChildrenCache =
-    start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL, waitOnStartComplete)
+  fun start(
+    buildInitial: Boolean = false,
+    waitOnStartComplete: Boolean = true,
+  ): PathChildrenCache = start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL, waitOnStartComplete)
 
   @JvmOverloads
   @Synchronized
-  fun start(mode: StartMode, waitOnStartComplete: Boolean = true): PathChildrenCache {
+  fun start(
+    mode: StartMode,
+    waitOnStartComplete: Boolean = true,
+  ): PathChildrenCache {
     if (startCalled)
       throw EtcdRecipeRuntimeException("start() already called")
     checkCloseNotCalled()
@@ -150,7 +153,7 @@ class PathChildrenCache(
         override fun childEvent(event: PathChildrenCacheEvent) {
           block(event)
         }
-      }
+      },
     )
   }
 
@@ -222,8 +225,10 @@ class PathChildrenCache(
   fun waitOnStartComplete(): Boolean = waitOnStartComplete(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class)
-  fun waitOnStartComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
-    waitOnStartComplete(timeUnitToDuration(timeout, timeUnit))
+  fun waitOnStartComplete(
+    timeout: Long,
+    timeUnit: TimeUnit,
+  ): Boolean = waitOnStartComplete(timeUnitToDuration(timeout, timeUnit))
 
   @Throws(InterruptedException::class)
   fun waitOnStartComplete(timeout: Duration): Boolean {

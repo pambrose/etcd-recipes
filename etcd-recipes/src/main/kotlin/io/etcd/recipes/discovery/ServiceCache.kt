@@ -43,9 +43,8 @@ import java.util.concurrent.ConcurrentMap
 class ServiceCache internal constructor(
   client: Client,
   val namesPath: String,
-  val serviceName: String
+  val serviceName: String,
 ) : EtcdConnector(client) {
-
   private var watcher: Watch.Watcher? by AtomicDelegates.nullableReference()
   private var dataPreloaded = BooleanMonitor(false)
   private val servicePath = namesPath.appendToPath(serviceName)
@@ -86,7 +85,7 @@ class ServiceCache internal constructor(
                   exceptionList.value += e
                 }
               }
-              //println("$k $v ${if (newKey) "added" else "updated"}")
+              // println("$k $v ${if (newKey) "added" else "updated"}")
             }
 
             DELETE -> {
@@ -99,7 +98,7 @@ class ServiceCache internal constructor(
                   exceptionList.value += e
                 }
               }
-              //println("$stripped deleted")
+              // println("$stripped deleted")
             }
 
             UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
@@ -134,8 +133,8 @@ class ServiceCache internal constructor(
       eventType: WatchEvent.EventType,
       isAdd: Boolean,
       serviceName: String,
-      serviceInstance: ServiceInstance?
-    ) -> Unit
+      serviceInstance: ServiceInstance?,
+    ) -> Unit,
   ) {
     addListenerForChanges(
       object : ServiceCacheListener {
@@ -143,11 +142,11 @@ class ServiceCache internal constructor(
           eventType: WatchEvent.EventType,
           isAdd: Boolean,
           serviceName: String,
-          serviceInstance: ServiceInstance?
+          serviceInstance: ServiceInstance?,
         ) {
           listener.invoke(eventType, isAdd, serviceName, serviceInstance)
         }
-      }
+      },
     )
   }
 

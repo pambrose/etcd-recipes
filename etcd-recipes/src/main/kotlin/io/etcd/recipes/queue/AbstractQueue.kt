@@ -38,9 +38,8 @@ import java.util.concurrent.atomic.AtomicReference
 abstract class AbstractQueue(
   client: Client,
   val queuePath: String,
-  private val target: SortTarget
+  private val target: SortTarget,
 ) : EtcdConnector(client) {
-
   init {
     require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
   }
@@ -48,11 +47,9 @@ abstract class AbstractQueue(
   fun dequeue(): ByteSequence {
     checkCloseNotCalled()
 
-    /*
-    println(client.getFirstChild(queuePath, target = target).kvs
-                .map { p -> p.key.asString to p.value.asString }
-                .joinToString("\n"))
-    */
+    //  println(client.getFirstChild(queuePath, target = target).kvs
+    //           .map { p -> p.key.asString to p.value.asString }
+    //           .joinToString("\n"))
 
     val childList = client.getFirstChild(queuePath, target).kvs
 
@@ -64,7 +61,7 @@ abstract class AbstractQueue(
 
     // No values available, so wait on them
     val watchLatch = CountDownLatch(1)
-    //val trailingPath = queuePath.ensureSuffix("/")
+    // val trailingPath = queuePath.ensureSuffix("/")
     val watchOption =
       watchOption {
         isPrefix(true)
@@ -85,7 +82,7 @@ abstract class AbstractQueue(
               }
             }
         }
-      }
+      },
     ) {
       // Query again in case a value arrived just before watch was created
       synchronized(watchLatch) {

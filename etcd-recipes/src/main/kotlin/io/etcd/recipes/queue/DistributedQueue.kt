@@ -29,14 +29,17 @@ import io.etcd.recipes.common.putValue
 fun <T> withDistributedQueue(
   client: Client,
   queuePath: String,
-  receiver: DistributedQueue.() -> T
-): T =
-  DistributedQueue(client, queuePath).use { it.receiver() }
+  receiver: DistributedQueue.() -> T,
+): T = DistributedQueue(client, queuePath).use { it.receiver() }
 
-class DistributedQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.MOD) {
-
+class DistributedQueue(
+  client: Client,
+  queuePath: String,
+) : AbstractQueue(client, queuePath, SortTarget.MOD) {
   fun enqueue(value: String) = enqueue(value.asByteSequence)
+
   fun enqueue(value: Int) = enqueue(value.asByteSequence)
+
   fun enqueue(value: Long) = enqueue(value.asByteSequence)
 
   fun enqueue(value: ByteSequence) {

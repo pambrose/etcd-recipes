@@ -43,7 +43,7 @@ fun main() {
         { watchResponse ->
           for (event in watchResponse.events)
             println("${event.eventType} for ${event.keyValue.asString}")
-        }
+        },
       ) {
         // Create empty root
         putValue(path, "root")

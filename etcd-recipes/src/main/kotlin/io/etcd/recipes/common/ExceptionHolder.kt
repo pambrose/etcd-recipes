@@ -22,7 +22,6 @@ import com.github.pambrose.common.util.isNotNull
 import java.util.concurrent.atomic.AtomicReference
 
 class ExceptionHolder {
-
   private val holder = lazy { AtomicReference<Throwable>() }
 
   var exception: Throwable?

@@ -41,7 +41,7 @@ fun main() {
         path,
         endWatchLatch,
         { event -> println("Updated key: ${event.keyAsString}") },
-        { event -> println("Deleted key: ${event.keyAsString}") }
+        { event -> println("Deleted key: ${event.keyAsString}") },
       )
     }
   }

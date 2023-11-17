@@ -23,6 +23,9 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.lock.LockResponse
 import io.etcd.jetcd.lock.UnlockResponse
 
-fun Client.lock(keyName: String, leaseId: Long): LockResponse = lockClient.lock(keyName.asByteSequence, leaseId).get()
+fun Client.lock(
+  keyName: String,
+  leaseId: Long,
+): LockResponse = lockClient.lock(keyName.asByteSequence, leaseId).get()
 
 fun Client.unlock(keyName: String): UnlockResponse = lockClient.unlock(keyName.asByteSequence).get()

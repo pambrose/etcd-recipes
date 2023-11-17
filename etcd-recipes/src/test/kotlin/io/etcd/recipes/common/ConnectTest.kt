@@ -23,7 +23,6 @@ import org.amshove.kluent.shouldThrow
 import org.junit.jupiter.api.Test
 
 class ConnectTest {
-
   @Test
   fun badArgsTest() {
     invoking { connectToEtcd(emptyList()) { this } } shouldThrow IllegalArgumentException::class

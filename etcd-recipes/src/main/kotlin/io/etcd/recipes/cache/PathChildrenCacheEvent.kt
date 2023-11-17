@@ -20,13 +20,16 @@ package io.etcd.recipes.cache
 
 import io.etcd.jetcd.ByteSequence
 
-class PathChildrenCacheEvent(val childName: String, val type: Type, val data: ByteSequence?) {
-
+class PathChildrenCacheEvent(
+  val childName: String,
+  val type: Type,
+  val data: ByteSequence?,
+) {
   enum class Type {
     CHILD_ADDED,
     CHILD_UPDATED,
     CHILD_REMOVED,
-    INITIALIZED
+    INITIALIZED,
   }
 
   internal var initialDataVal: List<ChildData> = mutableListOf()

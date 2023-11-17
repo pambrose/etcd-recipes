@@ -31,43 +31,41 @@ import static io.etcd.recipes.common.KVUtils.getValue;
 import static io.etcd.recipes.common.KVUtils.putValue;
 
 public class SetAndDeleteValue {
-    public static void main(String[] args) throws InterruptedException {
-        List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String path = "/foo";
-        String keyval = "foobar";
-        ExecutorService executor = Executors.newCachedThreadPool();
-        CountDownLatch latch = new CountDownLatch(2);
+  public static void main(String[] args) throws InterruptedException {
+    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    String path = "/foo";
+    String keyval = "foobar";
+    ExecutorService executor = Executors.newCachedThreadPool();
+    CountDownLatch latch = new CountDownLatch(2);
 
-        executor.submit(() -> {
-            sleepSecs(3);
+    executor.submit(() -> {
+      sleepSecs(3);
 
-            try (Client client = connectToEtcd(urls)) {
-                System.out.printf("Assigning %s = %s%n", path, keyval);
-                putValue(client, path, keyval);
-                sleepSecs(5);
-                System.out.printf("Deleting %s%n", path);
-                KVUtils.deleteKey(client, path);
-            }
-            finally {
-                latch.countDown();
-            }
-        });
+      try (Client client = connectToEtcd(urls)) {
+        System.out.printf("Assigning %s = %s%n", path, keyval);
+        putValue(client, path, keyval);
+        sleepSecs(5);
+        System.out.printf("Deleting %s%n", path);
+        KVUtils.deleteKey(client, path);
+      } finally {
+        latch.countDown();
+      }
+    });
 
-        executor.submit(() -> {
-            try (Client client = connectToEtcd(urls)) {
-                long start = System.currentTimeMillis();
-                for (int i = 0; i < 12; i++) {
-                    long elapsed = System.currentTimeMillis() - start;
-                    System.out.printf("Key %s = %s after %dms%n", path, getValue(client, path, "unset"), elapsed);
-                    sleepSecs(1);
-                }
-            }
-            finally {
-                latch.countDown();
-            }
-        });
+    executor.submit(() -> {
+      try (Client client = connectToEtcd(urls)) {
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < 12; i++) {
+          long elapsed = System.currentTimeMillis() - start;
+          System.out.printf("Key %s = %s after %dms%n", path, getValue(client, path, "unset"), elapsed);
+          sleepSecs(1);
+        }
+      } finally {
+        latch.countDown();
+      }
+    });
 
-        latch.await();
-        executor.shutdown();
-    }
+    latch.await();
+    executor.shutdown();
+  }
 }

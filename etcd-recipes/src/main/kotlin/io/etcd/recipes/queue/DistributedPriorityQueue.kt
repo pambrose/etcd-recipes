@@ -32,28 +32,61 @@ import io.etcd.recipes.common.transaction
 fun <T> withDistributedPriorityQueue(
   client: Client,
   queuePath: String,
-  receiver: DistributedPriorityQueue.() -> T
-): T =
-  DistributedPriorityQueue(client, queuePath).use { it.receiver() }
+  receiver: DistributedPriorityQueue.() -> T,
+): T = DistributedPriorityQueue(client, queuePath).use { it.receiver() }
 
-class DistributedPriorityQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.KEY) {
+class DistributedPriorityQueue(
+  client: Client,
+  queuePath: String,
+) : AbstractQueue(client, queuePath, SortTarget.KEY) {
+  fun enqueue(
+    value: String,
+    priority: Int,
+  ) = enqueue(value.asByteSequence, priority.toUShort())
 
-  fun enqueue(value: String, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
-  fun enqueue(value: Int, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
-  fun enqueue(value: Long, priority: Int) = enqueue(value.asByteSequence, priority.toUShort())
-  fun enqueue(value: ByteSequence, priority: Int) = enqueue(value, priority.toUShort())
+  fun enqueue(
+    value: Int,
+    priority: Int,
+  ) = enqueue(value.asByteSequence, priority.toUShort())
 
-  fun enqueue(value: String, priority: UShort) = enqueue(value.asByteSequence, priority)
-  fun enqueue(value: Int, priority: UShort) = enqueue(value.asByteSequence, priority)
-  fun enqueue(value: Long, priority: UShort) = enqueue(value.asByteSequence, priority)
+  fun enqueue(
+    value: Long,
+    priority: Int,
+  ) = enqueue(value.asByteSequence, priority.toUShort())
 
-  fun enqueue(value: ByteSequence, priority: UShort) {
+  fun enqueue(
+    value: ByteSequence,
+    priority: Int,
+  ) = enqueue(value, priority.toUShort())
+
+  fun enqueue(
+    value: String,
+    priority: UShort,
+  ) = enqueue(value.asByteSequence, priority)
+
+  fun enqueue(
+    value: Int,
+    priority: UShort,
+  ) = enqueue(value.asByteSequence, priority)
+
+  fun enqueue(
+    value: Long,
+    priority: UShort,
+  ) = enqueue(value.asByteSequence, priority)
+
+  fun enqueue(
+    value: ByteSequence,
+    priority: UShort,
+  ) {
     checkCloseNotCalled()
     val prefix = "%s/%05d".format(queuePath, priority.toInt())
     newSequentialKV(prefix, value)
   }
 
-  private fun newSequentialKV(prefix: String, value: ByteSequence) {
+  private fun newSequentialKV(
+    prefix: String,
+    value: ByteSequence,
+  ) {
     val resp = client.getLastChild(prefix, SortTarget.KEY)
     val kvs = resp.kvs
 

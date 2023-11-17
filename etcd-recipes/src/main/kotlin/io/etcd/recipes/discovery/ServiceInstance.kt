@@ -19,7 +19,7 @@
 package io.etcd.recipes.discovery
 
 import com.github.pambrose.common.util.randomId
-import io.etcd.recipes.common.EtcdConnector.Companion.tokenLength
+import io.etcd.recipes.common.EtcdConnector.Companion.TOKEN_LENGTH
 import io.etcd.recipes.discovery.ServiceInstance.Companion.ServiceInstanceBuilder
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -35,10 +35,9 @@ data class ServiceInstance(
   var registrationTimeUTC: Long = Instant.now().toEpochMilli(),
   var serviceType: ServiceType = ServiceType.DYNAMIC,
   var uri: String = "",
-  var enabled: Boolean = true
+  var enabled: Boolean = true,
 ) {
-
-  val id: String = randomId(tokenLength)
+  val id: String = randomId(TOKEN_LENGTH)
 
   init {
     require(name.isNotEmpty()) { "Name cannot be empty" }
@@ -50,7 +49,10 @@ data class ServiceInstance(
     @JvmStatic
     fun toObject(json: String) = Json.decodeFromString(serializer(), json)
 
-    class ServiceInstanceBuilder(val name: String, val jsonPayload: String) {
+    class ServiceInstanceBuilder(
+      val name: String,
+      val jsonPayload: String,
+    ) {
       var address: String = ""
       var port: Int = -1
       var sslPort: Int = -1
@@ -69,12 +71,15 @@ data class ServiceInstance(
           registrationTimeUTC,
           serviceType,
           uri,
-          enabled
+          enabled,
         )
     }
 
     @JvmStatic
-    fun newBuilder(name: String, jsonPayload: String) = ServiceInstanceBuilder(name, jsonPayload)
+    fun newBuilder(
+      name: String,
+      jsonPayload: String,
+    ) = ServiceInstanceBuilder(name, jsonPayload)
   }
 }
 
@@ -82,6 +87,5 @@ data class ServiceInstance(
 fun serviceInstance(
   name: String,
   jsonPayload: String,
-  initReciever: ServiceInstanceBuilder.() -> ServiceInstanceBuilder = { this }
-): ServiceInstance =
-  ServiceInstance.newBuilder(name, jsonPayload).initReciever().build()
+  initReciever: ServiceInstanceBuilder.() -> ServiceInstanceBuilder = { this },
+): ServiceInstance = ServiceInstance.newBuilder(name, jsonPayload).initReciever().build()

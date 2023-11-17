@@ -30,10 +30,12 @@ fun main() {
   connectToEtcd(urls) { client ->
     withServiceDiscovery(client, servicePath) {
       withServiceCache("TestName") {
-        addListenerForChanges { eventType,
-                                isAdd,
-                                serviceName,
-                                serviceInstance ->
+        addListenerForChanges {
+            eventType,
+            isAdd,
+            serviceName,
+            serviceInstance,
+          ->
           println("Change $isAdd $eventType $serviceName $serviceInstance")
           serviceInstance?.let {
             println("Payload: ${IntPayload.toObject(it.jsonPayload)}")

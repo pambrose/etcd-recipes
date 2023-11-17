@@ -35,7 +35,11 @@ fun main() {
   val waitLatch = CountDownLatch(count)
   val retryLatch = CountDownLatch(count - 1)
 
-  fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
+  fun waiter(
+    id: Int,
+    barrier: DistributedBarrierWithCount,
+    retryCount: Int = 0,
+  ) {
     sleep(10.random().seconds)
     println("#$id Waiting on barrier")
 

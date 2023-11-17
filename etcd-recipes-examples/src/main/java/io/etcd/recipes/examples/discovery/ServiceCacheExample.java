@@ -31,38 +31,37 @@ import static io.etcd.recipes.examples.discovery.ServiceDiscoveryExample.urls;
 
 public class ServiceCacheExample {
 
-    public static void main(String[] args) throws EtcdRecipeException {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        CountDownLatch latch = new CountDownLatch(1);
+  public static void main(String[] args) throws EtcdRecipeException {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    CountDownLatch latch = new CountDownLatch(1);
 
-        executor.submit(() -> {
-            try (Client client = connectToEtcd(urls);
-                 ServiceDiscovery sd = new ServiceDiscovery(client, ServiceDiscoveryExample.path);
-                 ServiceCache cache = sd.serviceCache(ServiceDiscoveryExample.serviceName)) {
-                cache.addListenerForChanges(
-                        (eventType, isAdd, name, serviceInstance) -> {
-                            String action = isAdd ? "added" : "updated";
-                            System.out.printf("Change %s %s %s%n", eventType, action, name);
-                            if (serviceInstance != null)
-                                System.out.println("Payload = " + IntPayload.toObject(serviceInstance.getJsonPayload()));
-                            //System.out.println(cache.getInstances());
-                        }
-                );
+    executor.submit(() -> {
+      try (Client client = connectToEtcd(urls);
+           ServiceDiscovery sd = new ServiceDiscovery(client, ServiceDiscoveryExample.path);
+           ServiceCache cache = sd.serviceCache(ServiceDiscoveryExample.serviceName)) {
+        cache.addListenerForChanges(
+          (eventType, isAdd, name, serviceInstance) -> {
+            String action = isAdd ? "added" : "updated";
+            System.out.printf("Change %s %s %s%n", eventType, action, name);
+            if (serviceInstance != null)
+              System.out.println("Payload = " + IntPayload.toObject(serviceInstance.getJsonPayload()));
+            //System.out.println(cache.getInstances());
+          }
+        );
 
-                cache.start();
+        cache.start();
 
-                try {
-                    latch.await();
-                }
-                catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+        try {
+          latch.await();
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+    });
 
-        ServiceDiscoveryExample.serviceExample(false);
-        latch.countDown();
-        sleepSecs(1);
-        executor.shutdown();
-    }
+    ServiceDiscoveryExample.serviceExample(false);
+    latch.countDown();
+    sleepSecs(1);
+    executor.shutdown();
+  }
 }

@@ -37,11 +37,11 @@ fun <T> withTransientKeyValue(
   client: Client,
   keyPath: String,
   keyValue: String,
-  leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+  leaseTtlSecs: Long = EtcdConnector.DEFAULT_TTL_SECS,
   autoStart: Boolean = true,
   userExecutor: Executor? = null,
   clientId: String = defaultClientId(),
-  receiver: TransientKeyValue.() -> T
+  receiver: TransientKeyValue.() -> T,
 ): T =
   TransientKeyValue(
     client,
@@ -50,7 +50,7 @@ fun <T> withTransientKeyValue(
     leaseTtlSecs,
     autoStart,
     userExecutor,
-    clientId
+    clientId,
   ).use { it.receiver() }
 
 class TransientKeyValue
@@ -59,12 +59,11 @@ constructor(
   client: Client,
   val keyPath: String,
   val keyValue: String,
-  val leaseTtlSecs: Long = defaultTtlSecs,
+  val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   autoStart: Boolean = true,
   private val userExecutor: Executor? = null,
-  val clientId: String = defaultClientId()
+  val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
-
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
   private val keepAliveWaitLatch = CountDownLatch(1)
   private val keepAliveStartedLatch = CountDownLatch(1)
@@ -121,6 +120,6 @@ constructor(
   }
 
   companion object : KLogging() {
-    internal fun defaultClientId() = "${TransientKeyValue::class.simpleName}:${randomId(tokenLength)}"
+    internal fun defaultClientId() = "${TransientKeyValue::class.simpleName}:${randomId(TOKEN_LENGTH)}"
   }
 }

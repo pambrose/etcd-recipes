@@ -29,7 +29,7 @@ val urls = listOf("http://localhost:2379")
 fun nonblockingThreads(
   threadCount: Int,
   waitLatch: CountDownLatch? = null,
-  block: (index: Int) -> Unit
+  block: (index: Int) -> Unit,
 ): Pair<CountDownLatch, ExceptionHolder> {
   val finishedLatch = CountDownLatch(threadCount)
   val holder = ExceptionHolder()
@@ -46,7 +46,10 @@ fun nonblockingThreads(
   return Pair(finishedLatch, holder)
 }
 
-fun blockingThreads(threadCount: Int, block: (index: Int) -> Unit) {
+fun blockingThreads(
+  threadCount: Int,
+  block: (index: Int) -> Unit,
+) {
   val (finishedLatch, exception) = nonblockingThreads(threadCount, block = block)
   finishedLatch.await()
   exception.checkForException()
@@ -82,7 +85,10 @@ fun threadWithExceptionCheck(block: () -> Unit): Pair<CountDownLatch, ExceptionH
   return Pair(latch, holder)
 }
 
-fun captureException(holder: ExceptionHolder, block: () -> Unit) {
+fun captureException(
+  holder: ExceptionHolder,
+  block: () -> Unit,
+) {
   try {
     block()
   } catch (e: Throwable) {

@@ -19,7 +19,11 @@
 package io.etcd.recipes.discovery
 
 enum class ServiceType {
-  DYNAMIC, STATIC, PERMANENT, DYNAMIC_SEQUENTIAL;
+  DYNAMIC,
+  STATIC,
+  PERMANENT,
+  DYNAMIC_SEQUENTIAL,
+  ;
 
   val isDynamic: Boolean
     get() = this == DYNAMIC || this == DYNAMIC_SEQUENTIAL

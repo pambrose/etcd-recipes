@@ -50,23 +50,21 @@ import kotlin.time.Duration.Companion.seconds
 fun <T> withDistributedBarrier(
   client: Client,
   barrierPath: String,
-  leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+  leaseTtlSecs: Long = EtcdConnector.DEFAULT_TTL_SECS,
   waitOnMissingBarriers: Boolean = true,
   clientId: String = defaultClientId(),
-  receiver: DistributedBarrier.() -> T
-): T =
-  DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
+  receiver: DistributedBarrier.() -> T,
+): T = DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
 
 class DistributedBarrier
 @JvmOverloads
 constructor(
   client: Client,
   val barrierPath: String,
-  val leaseTtlSecs: Long = defaultTtlSecs,
+  val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   private val waitOnMissingBarriers: Boolean = true,
-  val clientId: String = defaultClientId()
+  val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
-
   private var keepAliveLease by nullableReference<CloseableClient?>(null)
   private var barrierRemoved by atomicBoolean(false)
 
@@ -82,11 +80,11 @@ constructor(
   @Synchronized
   fun setBarrier(): Boolean {
     checkCloseNotCalled()
-    return if (client.isKeyPresent(barrierPath))
+    return if (client.isKeyPresent(barrierPath)) {
       false
-    else {
+    } else {
       // Create unique token to avoid collision from clients with same id
-      val uniqueToken = "$clientId:${randomId(tokenLength)}"
+      val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
 
       // Prime lease with 2 seconds to give keepAlive a chance to get started
       val lease = client.leaseGrant(leaseTtlSecs.seconds)
@@ -129,17 +127,19 @@ constructor(
   fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class)
-  fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
-    waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
+  fun waitOnBarrier(
+    timeout: Long,
+    timeUnit: TimeUnit,
+  ): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
   @Throws(InterruptedException::class)
   fun waitOnBarrier(timeout: Duration): Boolean {
     checkCloseNotCalled()
 
     // Check if barrier is present before using watcher
-    return if (!waitOnMissingBarriers && !isBarrierSet())
+    return if (!waitOnMissingBarriers && !isBarrierSet()) {
       true
-    else {
+    } else {
       val waitLatch = CountDownLatch(1)
       val watchOption = watchOption { withNoPut(true) }
 
@@ -150,7 +150,7 @@ constructor(
           for (event in watchResponse.events)
             if (event.eventType == DELETE)
               waitLatch.countDown()
-        }
+        },
       ) {
         // Check one more time in case watch missed the delete just after last check
         if (!waitOnMissingBarriers && !isBarrierSet())
@@ -173,6 +173,6 @@ constructor(
   }
 
   companion object : KLogging() {
-    internal fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(tokenLength)}"
+    internal fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(TOKEN_LENGTH)}"
   }
 }

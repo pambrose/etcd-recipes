@@ -55,7 +55,7 @@ fun main() {
           electionPath,
           takeLeadershipAction,
           relinquishLeadershipAction,
-          clientId = "Thread$it"
+          clientId = "Thread$it",
         ) {
           start()
           waitOnLeadershipComplete()

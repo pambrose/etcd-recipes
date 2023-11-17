@@ -25,7 +25,6 @@ import java.io.Closeable
 import java.util.Collections.synchronizedList
 
 open class EtcdConnector(val client: Client) : Closeable {
-
   protected var startCalled by atomicBoolean(false)
   protected val startThreadComplete = BooleanMonitor(false)
   protected var closeCalled: Boolean by atomicBoolean(false)
@@ -53,7 +52,7 @@ open class EtcdConnector(val client: Client) : Closeable {
   }
 
   companion object {
-    internal const val tokenLength = 7
-    internal const val defaultTtlSecs = 2L
+    internal const val TOKEN_LENGTH = 7
+    internal const val DEFAULT_TTL_SECS = 2L
   }
 }

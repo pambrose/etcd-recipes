@@ -23,7 +23,10 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.ClientBuilder
 
 @JvmOverloads
-fun connectToEtcd(urls: List<String>, initReciever: ClientBuilder.() -> ClientBuilder = { this }): Client {
+fun connectToEtcd(
+  urls: List<String>,
+  initReciever: ClientBuilder.() -> ClientBuilder = { this },
+): Client {
   require(urls.isNotEmpty()) { "URLs cannot be empty" }
   return etcdClient { endpoints(*urls.toTypedArray()).initReciever() }
 }
@@ -32,5 +35,5 @@ fun connectToEtcd(urls: List<String>, initReciever: ClientBuilder.() -> ClientBu
 fun <T> connectToEtcd(
   urls: List<String>,
   initReciever: ClientBuilder.() -> ClientBuilder = { this },
-  block: (client: Client) -> T
+  block: (client: Client) -> T,
 ): T = connectToEtcd(urls, initReciever).use { block(it) }

@@ -72,7 +72,7 @@ class DistributedQueueTest {
         }
       }
 
-      //sleep(5.seconds)
+      // sleep(5.seconds)
 
       withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
 
@@ -109,7 +109,10 @@ class DistributedQueueTest {
     threadedTestNoWait(iterCount, threadCount)
   }
 
-  private fun threadedTestNoWait(iterCount: Int, threadCount: Int) {
+  private fun threadedTestNoWait(
+    iterCount: Int,
+    threadCount: Int,
+  ) {
     val queuePath = "/queue/threadedTestNoWait"
     val latch = CountDownLatch(threadCount)
     val dequeuedData = synchronizedList(mutableListOf<String>())
@@ -121,7 +124,7 @@ class DistributedQueueTest {
 
       withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
 
-      //sleep(5.seconds)
+      // sleep(5.seconds)
 
       repeat(threadCount) {
         thread(latch) {
@@ -140,7 +143,7 @@ class DistributedQueueTest {
       client.getChildCount(queuePath) shouldBeEqualTo 0
     }
 
-    //sleep(5.seconds)
+    // sleep(5.seconds)
 
     dequeuedData.size shouldBeEqualTo testData.size
     repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
@@ -168,7 +171,10 @@ class DistributedQueueTest {
     threadedTestWithWait(iterCount, threadCount)
   }
 
-  private fun threadedTestWithWait(iterCount: Int, threadCount: Int) {
+  private fun threadedTestWithWait(
+    iterCount: Int,
+    threadCount: Int,
+  ) {
     val queuePath = "/queue/threadedTestWithWait"
     val latch = CountDownLatch(threadCount)
     val dequeuedData = synchronizedList(mutableListOf<String>())
@@ -190,7 +196,7 @@ class DistributedQueueTest {
         }
       }
 
-      //sleep(5.seconds)
+      // sleep(5.seconds)
 
       withDistributedQueue(client, queuePath) {
         repeat(iterCount) { i ->

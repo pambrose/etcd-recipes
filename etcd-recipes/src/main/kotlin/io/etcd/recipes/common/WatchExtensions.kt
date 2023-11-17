@@ -36,22 +36,21 @@ val WatchEvent.valueAsString get() = keyValue.value.asString
 val WatchEvent.valueAsInt get() = keyValue.value.asInt
 val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
-//fun WatchOption.Builder.withPrefix(prefix: String): WatchOption.Builder = withPrefix(prefix.asByteSequence)
+// fun WatchOption.Builder.withPrefix(prefix: String): WatchOption.Builder = withPrefix(prefix.asByteSequence)
 
 @JvmOverloads
 fun Client.watcher(
   keyName: String,
   option: WatchOption = WatchOption.DEFAULT,
-  block: (WatchResponse) -> Unit
-): Watch.Watcher =
-  watchClient.watch(keyName.asByteSequence, option) { block(it) }
+  block: (WatchResponse) -> Unit,
+): Watch.Watcher = watchClient.watch(keyName.asByteSequence, option) { block(it) }
 
 @JvmOverloads
 fun <T> Client.withWatcher(
   keyName: String,
   option: WatchOption = WatchOption.DEFAULT,
   block: (WatchResponse) -> Unit,
-  receiver: Watch.Watcher.() -> T
+  receiver: Watch.Watcher.() -> T,
 ): T = watcher(keyName, option, block).use { it.receiver() }
 
 @JvmOverloads
@@ -60,7 +59,7 @@ fun Client.watcherWithLatch(
   endWatchLatch: CountDownLatch,
   onPut: (WatchEvent) -> Unit,
   onDelete: (WatchEvent) -> Unit,
-  option: WatchOption = WatchOption.DEFAULT
+  option: WatchOption = WatchOption.DEFAULT,
 ) {
   withWatcher(
     keyName,
@@ -78,7 +77,7 @@ fun Client.watcherWithLatch(
             }
           }
         }
-    }
+    },
   ) {
     endWatchLatch.await()
   }

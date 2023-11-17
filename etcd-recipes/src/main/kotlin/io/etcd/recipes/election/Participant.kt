@@ -18,4 +18,7 @@
 
 package io.etcd.recipes.election
 
-data class Participant(val clientId: String, val isLeader: Boolean)
+data class Participant(
+  val clientId: String,
+  val isLeader: Boolean,
+)

@@ -33,7 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
 class ServiceCacheTests {
-
   @Test
   fun serviceCacheTest() {
     val path = "/discovery/${javaClass.simpleName}"
@@ -61,10 +60,10 @@ class ServiceCacheTests {
               eventType: EventType,
               isAdd: Boolean,
               serviceName: String,
-              serviceInstance: ServiceInstance?
+              serviceInstance: ServiceInstance?,
             ) {
               captureException(holder) {
-                //println("Comparing $serviceName and $name")
+                // println("Comparing $serviceName and $name")
                 serviceName.split("/").first() shouldBeEqualTo name
 
                 if (eventType == EventType.PUT) {

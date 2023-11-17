@@ -40,7 +40,6 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.seconds
 
 class DistributedBarrierTests {
-
   @Test
   fun badArgsTest() {
     connectToEtcd(urls) { client ->

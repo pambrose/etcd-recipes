@@ -31,54 +31,53 @@ import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 
 public class DistributedBarrierExample {
 
-    public static void main(String[] args) throws InterruptedException {
-        List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String path = "/barriers/DistributedBarrierExample";
-        int threadCount = 5;
-        CountDownLatch waitLatch = new CountDownLatch(threadCount);
-        CountDownLatch goLatch = new CountDownLatch(1);
-        ExecutorService executor = Executors.newCachedThreadPool();
+  public static void main(String[] args) throws InterruptedException {
+    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    String path = "/barriers/DistributedBarrierExample";
+    int threadCount = 5;
+    CountDownLatch waitLatch = new CountDownLatch(threadCount);
+    CountDownLatch goLatch = new CountDownLatch(1);
+    ExecutorService executor = Executors.newCachedThreadPool();
 
-        executor.submit(() -> {
+    executor.submit(() -> {
+      try (Client client = connectToEtcd(urls);
+           DistributedBarrier barrier = new DistributedBarrier(client, path)) {
+        System.out.println("Setting Barrier");
+        barrier.setBarrier();
+
+        goLatch.countDown();
+        sleepSecs(6);
+
+        System.out.println("Removing Barrier");
+        barrier.removeBarrier();
+        sleepSecs(3);
+      }
+    });
+
+    for (int i = 0; i < threadCount; i++) {
+      final int id = i;
+      executor.submit(() -> {
+          try {
+            goLatch.await();
             try (Client client = connectToEtcd(urls);
                  DistributedBarrier barrier = new DistributedBarrier(client, path)) {
-                System.out.println("Setting Barrier");
-                barrier.setBarrier();
+              System.out.printf("%d Waiting on Barrier%n", id);
+              barrier.waitOnBarrier(1, TimeUnit.SECONDS);
 
-                goLatch.countDown();
-                sleepSecs(6);
+              System.out.printf("%d Timed out waiting on barrier, waiting again%n", id);
+              barrier.waitOnBarrier();
 
-                System.out.println("Removing Barrier");
-                barrier.removeBarrier();
-                sleepSecs(3);
+              System.out.printf("%d Done Waiting on Barrier%n", id);
+              waitLatch.countDown();
             }
-        });
-
-        for (int i = 0; i < threadCount; i++) {
-            final int id = i;
-            executor.submit(() -> {
-                                try {
-                                    goLatch.await();
-                                    try (Client client = connectToEtcd(urls);
-                                         DistributedBarrier barrier = new DistributedBarrier(client, path)) {
-                                        System.out.printf("%d Waiting on Barrier%n", id);
-                                        barrier.waitOnBarrier(1, TimeUnit.SECONDS);
-
-                                        System.out.printf("%d Timed out waiting on barrier, waiting again%n", id);
-                                        barrier.waitOnBarrier();
-
-                                        System.out.printf("%d Done Waiting on Barrier%n", id);
-                                        waitLatch.countDown();
-                                    }
-                                }
-                                catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-            );
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
         }
-
-        waitLatch.await();
-        executor.shutdown();
+      );
     }
+
+    waitLatch.await();
+    executor.shutdown();
+  }
 }

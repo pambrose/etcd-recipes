@@ -20,4 +20,7 @@ package io.etcd.recipes.cache
 
 import io.etcd.jetcd.ByteSequence
 
-data class ChildData(val key: String, val value: ByteSequence)
+data class ChildData(
+  val key: String,
+  val value: ByteSequence,
+)
