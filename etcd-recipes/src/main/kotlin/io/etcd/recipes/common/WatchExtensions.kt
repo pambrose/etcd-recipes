@@ -27,6 +27,8 @@ import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.jetcd.watch.WatchResponse
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 val WatchEvent.keyAsString get() = keyValue.key.asString
 val WatchEvent.keyAsInt get() = keyValue.key.asInt
@@ -43,7 +45,30 @@ fun Client.watcher(
   keyName: String,
   option: WatchOption = WatchOption.DEFAULT,
   block: (WatchResponse) -> Unit,
-): Watch.Watcher = watchClient.watch(keyName.asByteSequence, option) { block(it) }
+): Watch.Watcher {
+  // jetcd 0.7+ delivers watch events on its Vert.x gRPC event loop. Anything
+  // the callback does that needs another gRPC response — or contends with a
+  // lock the caller is holding while waiting on a gRPC response — would
+  // deadlock the event loop. Hop the callback onto a dedicated single-thread
+  // executor so blocking calls inside it stay off the gRPC threads.
+  val dispatcher = Executors.newSingleThreadExecutor { runnable ->
+    Thread(runnable, "etcd-watch-dispatcher").apply { isDaemon = true }
+  }
+  val delegate = watchClient.watch(keyName.asByteSequence, option) { response ->
+    dispatcher.execute { block(response) }
+  }
+  return DispatchingWatcher(delegate, dispatcher)
+}
+
+private class DispatchingWatcher(
+  private val delegate: Watch.Watcher,
+  private val dispatcher: ExecutorService,
+) : Watch.Watcher by delegate {
+  override fun close() {
+    delegate.close()
+    dispatcher.shutdown()
+  }
+}
 
 @JvmOverloads
 fun <T> Client.withWatcher(
