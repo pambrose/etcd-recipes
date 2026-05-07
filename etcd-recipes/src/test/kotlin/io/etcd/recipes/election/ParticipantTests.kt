@@ -25,7 +25,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.shouldBeEqualTo
+import io.kotest.matchers.shouldBe
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import kotlin.time.Duration.Companion.seconds
@@ -75,7 +75,7 @@ class ParticipantTests : StringSpec() {
                 sleep(3.seconds)
                 var participants = LeaderSelector.getParticipants(client, path)
                 logger.info { "Found ${participants.size} participants" }
-                participants.size shouldBeEqualTo count
+                participants.size shouldBe count
 
                 holdLatch.countDown()
 
@@ -85,16 +85,16 @@ class ParticipantTests : StringSpec() {
 
                 participants = LeaderSelector.getParticipants(client, path)
                 logger.info { "Found ${participants.size} participants" }
-                participants.size shouldBeEqualTo 0
+                participants.size shouldBe 0
 
                 // Compare participant counts
                 logger.info { "participantCounts = $participantCounts" }
-                participantCounts.size shouldBeEqualTo count
-                participantCounts shouldBeEqualTo (count downTo 1).toList()
+                participantCounts.size shouldBe count
+                participantCounts shouldBe (count downTo 1).toList()
 
                 // Compare leader names
                 logger.info { "leaderNames = $leaderNames" }
-                leaderNames.sorted() shouldBeEqualTo List(count) { "Thread$it" }.sorted()
+                leaderNames.sorted() shouldBe List(count) { "Thread$it" }.sorted()
             }
         }
     }

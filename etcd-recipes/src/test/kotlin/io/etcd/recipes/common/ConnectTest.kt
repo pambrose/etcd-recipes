@@ -19,13 +19,12 @@
 package io.etcd.recipes.common
 
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldThrow
+import io.kotest.assertions.throwables.shouldThrow
 
 class ConnectTest : StringSpec() {
     init {
         "badArgsTest" {
-            invoking { connectToEtcd(emptyList()) { this } } shouldThrow IllegalArgumentException::class
+            shouldThrow<IllegalArgumentException> { connectToEtcd(emptyList()) { this } }
         }
     }
 }

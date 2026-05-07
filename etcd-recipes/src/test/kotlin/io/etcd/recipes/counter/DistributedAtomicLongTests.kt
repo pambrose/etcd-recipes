@@ -28,9 +28,8 @@ import io.etcd.recipes.common.throwExceptionFromList
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldThrow
+import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.CountDownLatch
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -46,19 +45,19 @@ class DistributedAtomicLongTests : StringSpec() {
 
         "badArgsTest" {
             connectToEtcd(urls) { client ->
-                invoking { DistributedAtomicLong(client, "") } shouldThrow IllegalArgumentException::class
+                shouldThrow<IllegalArgumentException> { DistributedAtomicLong(client, "") }
             }
         }
 
         "defaultInitialValueTest" {
             connectToEtcd(urls) { client ->
-                withDistributedAtomicLong(client, path) { get() shouldBeEqualTo 0L }
+                withDistributedAtomicLong(client, path) { get() shouldBe 0L }
             }
         }
 
         "nondefaultInitialValueTest" {
             connectToEtcd(urls) { client ->
-                withDistributedAtomicLong(client, path, 100L) { get() shouldBeEqualTo 100L }
+                withDistributedAtomicLong(client, path, 100L) { get() shouldBe 100L }
             }
         }
 
@@ -70,7 +69,7 @@ class DistributedAtomicLongTests : StringSpec() {
                         increment()
                         decrement()
                     }
-                    get() shouldBeEqualTo 0L
+                    get() shouldBe 0L
                 }
             }
         }
@@ -83,7 +82,7 @@ class DistributedAtomicLongTests : StringSpec() {
                         add(5)
                         subtract(5)
                     }
-                    get() shouldBeEqualTo 0L
+                    get() shouldBe 0L
                 }
             }
         }
@@ -103,7 +102,7 @@ class DistributedAtomicLongTests : StringSpec() {
                         .first()
                         .get()
                 counters.forEach { it.close() }
-                total shouldBeEqualTo 0L
+                total shouldBe 0L
             }
         }
 
@@ -122,7 +121,7 @@ class DistributedAtomicLongTests : StringSpec() {
                         }
                     }
 
-                    get() shouldBeEqualTo 0L
+                    get() shouldBe 0L
                 }
             }
         }
@@ -189,7 +188,7 @@ class DistributedAtomicLongTests : StringSpec() {
             }
 
             connectToEtcd(urls) { client ->
-                withDistributedAtomicLong(client, path) { get() shouldBeEqualTo 0L }
+                withDistributedAtomicLong(client, path) { get() shouldBe 0L }
             }
         }
     }

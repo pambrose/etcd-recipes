@@ -27,12 +27,11 @@ import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldBeFalse
-import org.amshove.kluent.shouldBeLessThan
-import org.amshove.kluent.shouldBeTrue
-import org.amshove.kluent.shouldThrow
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.booleans.shouldBeFalse
+import io.kotest.matchers.longs.shouldBeLessThan
+import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -43,7 +42,7 @@ class DistributedBarrierTests : StringSpec() {
     init {
         "badArgsTest" {
             connectToEtcd(urls) { client ->
-                invoking { DistributedBarrier(client, "") } shouldThrow IllegalArgumentException::class
+                shouldThrow<IllegalArgumentException> { DistributedBarrier(client, "") }
             }
         }
 
@@ -60,7 +59,7 @@ class DistributedBarrierTests : StringSpec() {
 
                 thread(completeLatch) {
                     withDistributedBarrier(client, path) {
-                        isBarrierSet() shouldBeEqualTo false
+                        isBarrierSet() shouldBe false
 
                         logger.debug { "Setting Barrier" }
                         val isSet = setBarrier()
@@ -100,7 +99,7 @@ class DistributedBarrierTests : StringSpec() {
                         waitOnBarrier()
 
                         // Make sure the waiter advanced quickly
-                        System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500
+                        System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500L
                         advancedCount.incrementAndGet()
 
                         logger.debug { "$i Done Waiting on Barrier" }
@@ -110,8 +109,8 @@ class DistributedBarrierTests : StringSpec() {
 
             completeLatch.await()
 
-            timeoutCount.get() shouldBeEqualTo count
-            advancedCount.get() shouldBeEqualTo count
+            timeoutCount.get() shouldBe count
+            advancedCount.get() shouldBe count
 
             logger.debug { "Done" }
         }
@@ -137,7 +136,7 @@ class DistributedBarrierTests : StringSpec() {
                             waitOnBarrier()
 
                             // Make sure the waiter advanced quickly
-                            System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500
+                            System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500L
                             advancedCount.incrementAndGet()
 
                             logger.debug { "$i Done Waiting on Barrier" }
@@ -147,7 +146,7 @@ class DistributedBarrierTests : StringSpec() {
                 sleep(5.seconds)
 
                 withDistributedBarrier(client, path) {
-                    isBarrierSet() shouldBeEqualTo false
+                    isBarrierSet() shouldBe false
 
                     logger.debug { "Setting Barrier" }
                     val isSet = setBarrier()
@@ -173,8 +172,8 @@ class DistributedBarrierTests : StringSpec() {
                 holder.checkForException()
             }
 
-            timeoutCount.get() shouldBeEqualTo count
-            advancedCount.get() shouldBeEqualTo count
+            timeoutCount.get() shouldBe count
+            advancedCount.get() shouldBe count
 
             logger.debug { "Done" }
         }

@@ -26,7 +26,7 @@ import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.urls
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.shouldBeEqualTo
+import io.kotest.matchers.shouldBe
 import kotlin.time.Duration.Companion.seconds
 
 class TransientKeyValueTest : StringSpec() {
@@ -38,18 +38,18 @@ class TransientKeyValueTest : StringSpec() {
             val id = randomId(8)
 
             connectToEtcd(urls) { client ->
-                client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
+                client.getValue(path, defaultValue) shouldBe defaultValue
 
                 withTransientKeyValue(client, path, id) {
                     repeat(10) {
-                        client.getValue(path)?.asString shouldBeEqualTo id
+                        client.getValue(path)?.asString shouldBe id
                         sleep(1.seconds)
                     }
                 }
 
                 // Wait for node to go away
                 sleep(5.seconds)
-                client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
+                client.getValue(path, defaultValue) shouldBe defaultValue
             }
         }
 
@@ -63,19 +63,19 @@ class TransientKeyValueTest : StringSpec() {
 
                 client.apply {
                     for (p in paths)
-                        getValue(p, defaultValue) shouldBeEqualTo defaultValue
+                        getValue(p, defaultValue) shouldBe defaultValue
 
-                    getChildCount(prefix) shouldBeEqualTo 0
+                    getChildCount(prefix) shouldBe 0
 
                     val kvs = List(count) { TransientKeyValue(client, paths[it], ids[it]) }
 
                     repeat(10) {
                         repeat(count) { j ->
-                            getValue(paths[j])?.asString shouldBeEqualTo ids[j]
+                            getValue(paths[j])?.asString shouldBe ids[j]
                         }
                     }
 
-                    getChildCount(prefix) shouldBeEqualTo 25
+                    getChildCount(prefix) shouldBe 25
 
                     for (kv in kvs)
                         kv.close()
@@ -83,9 +83,9 @@ class TransientKeyValueTest : StringSpec() {
                     // Wait for nodes to go away
                     sleep(5.seconds)
                     for (p in paths)
-                        getValue(p, defaultValue) shouldBeEqualTo defaultValue
+                        getValue(p, defaultValue) shouldBe defaultValue
 
-                    getChildCount(prefix) shouldBeEqualTo 0
+                    getChildCount(prefix) shouldBe 0
                 }
             }
         }

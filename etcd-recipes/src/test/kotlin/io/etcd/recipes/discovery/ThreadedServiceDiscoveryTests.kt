@@ -26,9 +26,8 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldThrow
+import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.ConcurrentMap
 import kotlin.time.Duration.Companion.seconds
 
@@ -68,7 +67,7 @@ class ThreadedServiceDiscoveryTests : StringSpec() {
                             context.serviceMap.forEach { (_, service) ->
                                 val inst = queryForInstance(service.name, service.id)
                                 logger.info { "Retrieved value: $inst" }
-                                inst shouldBeEqualTo service
+                                inst shouldBe service
                             }
                         }
                     }
@@ -92,7 +91,7 @@ class ThreadedServiceDiscoveryTests : StringSpec() {
                             context.serviceMap.forEach { (_, service) ->
                                 val inst = queryForInstance(service.name, service.id)
                                 logger.info { "Retrieved updated value: $inst" }
-                                inst shouldBeEqualTo service
+                                inst shouldBe service
                             }
                         }
                     }
@@ -101,7 +100,7 @@ class ThreadedServiceDiscoveryTests : StringSpec() {
                 withServiceDiscovery(client, path) {
                     val size = queryForNames().size
                     logger.info { "Retrieved all names: $size" }
-                    size shouldBeEqualTo threadCount * serviceCount
+                    size shouldBe threadCount * serviceCount
                 }
 
                 // Delete services
@@ -127,7 +126,7 @@ class ThreadedServiceDiscoveryTests : StringSpec() {
                             context.serviceMap.forEach { (_, service) ->
                                 val name = service.name
                                 logger.info { "Query deleted service: $name  ${service.id}" }
-                                invoking { queryForInstance(name, service.id) } shouldThrow EtcdRecipeException::class
+                                shouldThrow<EtcdRecipeException> { queryForInstance(name, service.id) }
                             }
                         }
                     }

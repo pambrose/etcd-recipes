@@ -27,7 +27,7 @@ import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.shouldBeEqualTo
+import io.kotest.matchers.shouldBe
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
@@ -49,7 +49,7 @@ class DistributedQueueTest : StringSpec() {
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+            client.getChildCount(queuePath) shouldBe 0
 
             withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
 
@@ -67,12 +67,12 @@ class DistributedQueueTest : StringSpec() {
 
             latch.await()
 
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+            client.getChildCount(queuePath) shouldBe 0
         }
 
-        dequeuedData.size shouldBeEqualTo testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-        dequeuedData shouldBeEqualTo testData
+        dequeuedData.size shouldBe testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
+        dequeuedData shouldBe testData
     }
 
     private fun threadedTestWithWait(
@@ -86,7 +86,7 @@ class DistributedQueueTest : StringSpec() {
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+            client.getChildCount(queuePath) shouldBe 0
 
             repeat(threadCount) {
                 thread(latch) {
@@ -108,14 +108,14 @@ class DistributedQueueTest : StringSpec() {
 
             latch.await()
 
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+            client.getChildCount(queuePath) shouldBe 0
         }
 
         sleep(5.seconds)
 
-        dequeuedData.size shouldBeEqualTo testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-        dequeuedData shouldBeEqualTo testData
+        dequeuedData.size shouldBe testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
+        dequeuedData shouldBe testData
     }
 
     init {
@@ -125,15 +125,15 @@ class DistributedQueueTest : StringSpec() {
 
             connectToEtcd(urls) { client ->
                 client.deleteChildren(queuePath)
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
                 withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
                 withDistributedQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
             }
 
-            dequeuedData.size shouldBeEqualTo testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-            dequeuedData shouldBeEqualTo testData
+            dequeuedData.size shouldBe testData.size
+            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
+            dequeuedData shouldBe testData
         }
 
         // Disabled under Kotest: enqueue+dequeue threads on same client deadlock
@@ -144,7 +144,7 @@ class DistributedQueueTest : StringSpec() {
 
             connectToEtcd(urls) { client ->
                 client.deleteChildren(queuePath)
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
 
                 thread(latch) {
                     withDistributedQueue(client, queuePath) {
@@ -156,14 +156,14 @@ class DistributedQueueTest : StringSpec() {
 
                 latch.await()
 
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
             }
 
             sleep(5.seconds)
 
-            dequeuedData.size shouldBeEqualTo testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-            dequeuedData shouldBeEqualTo testData
+            dequeuedData.size shouldBe testData.size
+            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
+            dequeuedData shouldBe testData
         }
 
         "threadedTestNoWait1" {
@@ -221,7 +221,7 @@ class DistributedQueueTest : StringSpec() {
                         withDistributedQueue(client, queuePath) {
                             repeat(iterCount) {
                                 val v = dequeue().asString
-                                v shouldBeEqualTo token
+                                v shouldBe token
                                 enqueue(v)
                                 counter.incrementAndGet()
                             }
@@ -233,11 +233,11 @@ class DistributedQueueTest : StringSpec() {
 
                 withDistributedQueue(client, queuePath) {
                     val v = dequeue().asString
-                    v shouldBeEqualTo token
+                    v shouldBe token
                 }
             }
 
-            counter.get() shouldBeEqualTo threadCount * iterCount
+            counter.get() shouldBe threadCount * iterCount
         }
     }
 

@@ -34,7 +34,7 @@ import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.putValuesWithKeepAlive
 import io.etcd.recipes.common.urls
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.shouldBeEqualTo
+import io.kotest.matchers.shouldBe
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
@@ -54,14 +54,14 @@ class PathChildrenCacheTests : StringSpec() {
         origData: List<Pair<String, String>>,
         suffix: String = "",
     ) {
-        data.size shouldBeEqualTo count
+        data.size shouldBe count
         val currData = data.map { it.key to it.value.asString }.sortedBy { it.first }
         val updatedOrigData = origData.map { it.first to (it.second + suffix) }.sortedBy { it.first }
         currData.forEachIndexed { i, pair ->
-            pair shouldBeEqualTo updatedOrigData[i]
+            pair shouldBe updatedOrigData[i]
         }
 
-        currData shouldBeEqualTo updatedOrigData
+        currData shouldBe updatedOrigData
     }
 
     init {
@@ -77,7 +77,7 @@ class PathChildrenCacheTests : StringSpec() {
 
                 // Clear leftover data
                 client.deleteChildren(path)
-                client.getChildCount(path) shouldBeEqualTo 0
+                client.getChildCount(path) shouldBe 0
 
                 withPathChildrenCache(client, path) {
                     addListener { event: PathChildrenCacheEvent ->
@@ -91,12 +91,12 @@ class PathChildrenCacheTests : StringSpec() {
 
                     start(true)
                     waitOnStartComplete()
-                    currentData shouldBeEqualTo emptyList()
+                    currentData shouldBe emptyList()
 
-                    addCount.get() shouldBeEqualTo 0
-                    updateCount.get() shouldBeEqualTo 0
-                    deleteCount.get() shouldBeEqualTo 0
-                    initCount.get() shouldBeEqualTo 0
+                    addCount.get() shouldBe 0
+                    updateCount.get() shouldBe 0
+                    deleteCount.get() shouldBe 0
+                    initCount.get() shouldBe 0
 
                     val kvs = generateTestData(count)
 
@@ -111,16 +111,16 @@ class PathChildrenCacheTests : StringSpec() {
                     client.deleteChildren(path)
 
                     sleep(5.seconds)
-                    currentData shouldBeEqualTo emptyList()
+                    currentData shouldBe emptyList()
                 }
             }
 
             sleep(5.seconds)
 
-            addCount.get() shouldBeEqualTo count
-            updateCount.get() shouldBeEqualTo count
-            deleteCount.get() shouldBeEqualTo count
-            initCount.get() shouldBeEqualTo 0
+            addCount.get() shouldBe count
+            updateCount.get() shouldBe count
+            deleteCount.get() shouldBe count
+            initCount.get() shouldBe 0
         }
 
         "listenerTestWithInitialData" {
@@ -135,7 +135,7 @@ class PathChildrenCacheTests : StringSpec() {
 
                 // Clear leftover data
                 client.deleteChildren(path)
-                client.getChildCount(path) shouldBeEqualTo 0
+                client.getChildCount(path) shouldBe 0
 
                 val testKvs = generateTestData(count)
 
@@ -160,22 +160,22 @@ class PathChildrenCacheTests : StringSpec() {
                     sleep(5.seconds)
                     compareData(count, currentData, testKvs, suffix)
 
-                    addCount.get() shouldBeEqualTo 0
-                    updateCount.get() shouldBeEqualTo 0
-                    deleteCount.get() shouldBeEqualTo 0
-                    initCount.get() shouldBeEqualTo 0
+                    addCount.get() shouldBe 0
+                    updateCount.get() shouldBe 0
+                    deleteCount.get() shouldBe 0
+                    initCount.get() shouldBe 0
 
                     client.deleteChildren(path)
 
                     sleep(5.seconds)
-                    currentData shouldBeEqualTo emptyList()
+                    currentData shouldBe emptyList()
                 }
             }
 
-            addCount.get() shouldBeEqualTo 0
-            updateCount.get() shouldBeEqualTo 0
-            deleteCount.get() shouldBeEqualTo count
-            initCount.get() shouldBeEqualTo 0
+            addCount.get() shouldBe 0
+            updateCount.get() shouldBe 0
+            deleteCount.get() shouldBe count
+            initCount.get() shouldBe 0
         }
 
         "withInitialEventTest" {
@@ -190,7 +190,7 @@ class PathChildrenCacheTests : StringSpec() {
 
                 // Clear leftover data
                 client.deleteChildren(path)
-                client.getChildCount(path) shouldBeEqualTo 0
+                client.getChildCount(path) shouldBe 0
 
                 val kvs = generateTestData(count)
 
@@ -223,16 +223,16 @@ class PathChildrenCacheTests : StringSpec() {
                     client.deleteChildren(path)
 
                     sleep(5.seconds)
-                    currentData shouldBeEqualTo emptyList()
+                    currentData shouldBe emptyList()
                 }
 
                 compareData(count, initData!!, kvs, suffix)
             }
 
-            addCount.get() shouldBeEqualTo 0
-            updateCount.get() shouldBeEqualTo 0
-            deleteCount.get() shouldBeEqualTo count
-            initCount.get() shouldBeEqualTo 1
+            addCount.get() shouldBe 0
+            updateCount.get() shouldBe 0
+            deleteCount.get() shouldBe count
+            initCount.get() shouldBe 1
         }
 
         "leasedValuesTest" {
@@ -254,7 +254,7 @@ class PathChildrenCacheTests : StringSpec() {
                     }
 
                     sleep(5.seconds)
-                    currentData shouldBeEqualTo emptyList()
+                    currentData shouldBe emptyList()
                 }
             }
         }

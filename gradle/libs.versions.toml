@@ -8,7 +8,6 @@ utils = "2.8.2"
 kotlin-logging = "8.0.02"
 logback = "1.5.32"
 netty = "4.1.116.Final"
-kluent = "1.73"
 junit = "5.11.4"
 kotest = "5.9.1"
 atomicfu = "0.26.1"
@@ -25,7 +24,6 @@ common-utils-guava = { module = "com.pambrose.common-utils:guava-utils", version
 kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
-kluent = { module = "org.amshove.kluent:kluent", version.ref = "kluent" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }

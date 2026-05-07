@@ -27,9 +27,8 @@ import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldThrow
+import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -40,8 +39,8 @@ class DistributedDoubleBarrierTests : StringSpec() {
     init {
         "badArgsTest" {
             connectToEtcd(urls) { client ->
-                invoking { DistributedDoubleBarrier(client, "something", 0) } shouldThrow IllegalArgumentException::class
-                invoking { DistributedDoubleBarrier(client, "", 1) } shouldThrow IllegalArgumentException::class
+                shouldThrow<IllegalArgumentException> { DistributedDoubleBarrier(client, "something", 0) }
+                shouldThrow<IllegalArgumentException> { DistributedDoubleBarrier(client, "", 1) }
             }
         }
 
@@ -126,13 +125,13 @@ class DistributedDoubleBarrierTests : StringSpec() {
                     enterLatch.await()
                     sleep(2.seconds)
 
-                    enterWaiterCount.toInt() shouldBeEqualTo count - 1
+                    enterWaiterCount.toInt() shouldBe count - 1
                     enterBarrier(99, this)
 
                     leaveLatch.await()
                     sleep(2.seconds)
 
-                    leaveWaiterCount.toInt() shouldBeEqualTo count - 1
+                    leaveWaiterCount.toInt() shouldBe count - 1
                     leaveBarrier(99, this)
                 }
 
@@ -142,11 +141,11 @@ class DistributedDoubleBarrierTests : StringSpec() {
                 holder.checkForException()
             }
 
-            enterRetryCounter.get() shouldBeEqualTo retryAttempts * (count - 1)
-            enterCounter.get() shouldBeEqualTo count
+            enterRetryCounter.get() shouldBe retryAttempts * (count - 1)
+            enterCounter.get() shouldBe count
 
-            leaveRetryCounter.get() shouldBeEqualTo retryAttempts * (count - 1)
-            leaveCounter.get() shouldBeEqualTo count
+            leaveRetryCounter.get() shouldBe retryAttempts * (count - 1)
+            leaveCounter.get() shouldBe count
 
             logger.debug { "Done" }
         }

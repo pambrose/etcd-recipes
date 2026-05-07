@@ -28,7 +28,7 @@ import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.shouldBeEqualTo
+import io.kotest.matchers.shouldBe
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
@@ -51,9 +51,9 @@ class ServiceCacheTests : StringSpec() {
                         start()
                         sleep(2.seconds)
 
-                        instances.size shouldBeEqualTo 0
-                        serviceName shouldBeEqualTo name
-                        urls shouldBeEqualTo urls
+                        instances.size shouldBe 0
+                        serviceName shouldBe name
+                        urls shouldBe urls
 
                         addListenerForChanges(object : ServiceCacheListener {
                             override fun cacheChanged(
@@ -63,17 +63,17 @@ class ServiceCacheTests : StringSpec() {
                                 serviceInstance: ServiceInstance?,
                             ) {
                                 captureException(holder) {
-                                    serviceName.split("/").first() shouldBeEqualTo name
+                                    serviceName.split("/").first() shouldBe name
 
                                     if (eventType == EventType.PUT) {
                                         if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
 
-                                        serviceInstance?.name shouldBeEqualTo name
+                                        serviceInstance?.name shouldBe name
                                     }
 
                                     if (eventType == EventType.DELETE) {
                                         unregisterCounter.incrementAndGet()
-                                        serviceInstance?.name shouldBeEqualTo name
+                                        serviceInstance?.name shouldBe name
                                     }
                                 }
                             }
@@ -116,10 +116,10 @@ class ServiceCacheTests : StringSpec() {
             sleep(5.seconds)
 
             holder.checkForException()
-            registerCounter.get() shouldBeEqualTo threadCount * serviceCount
-            updateCounter.get() shouldBeEqualTo threadCount * serviceCount
-            unregisterCounter.get() shouldBeEqualTo threadCount * serviceCount
-            totalCounter.get() shouldBeEqualTo (threadCount * serviceCount) * 3
+            registerCounter.get() shouldBe threadCount * serviceCount
+            updateCounter.get() shouldBe threadCount * serviceCount
+            unregisterCounter.get() shouldBe threadCount * serviceCount
+            totalCounter.get() shouldBe (threadCount * serviceCount) * 3
         }
     }
 

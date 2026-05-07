@@ -25,7 +25,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.shouldBeEqualTo
+import io.kotest.matchers.shouldBe
 import java.util.Collections.synchronizedList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
@@ -62,8 +62,8 @@ class ThreadedLeaderSelectorTests : StringSpec() {
                 }
             }
 
-            takeLeadershiptCounter.get() shouldBeEqualTo count
-            relinquishLeadershiptCounter.get() shouldBeEqualTo count
+            takeLeadershiptCounter.get() shouldBe count
+            relinquishLeadershiptCounter.get() shouldBe count
         }
 
         "!threadedElection2Test" {
@@ -101,8 +101,8 @@ class ThreadedLeaderSelectorTests : StringSpec() {
                     .forEach { it.close() }
             }
 
-            takeLeadershiptCounter.get() shouldBeEqualTo count
-            relinquishLeadershiptCounter.get() shouldBeEqualTo count
+            takeLeadershiptCounter.get() shouldBe count
+            relinquishLeadershiptCounter.get() shouldBe count
         }
     }
 

@@ -24,10 +24,9 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldEndWith
-import org.amshove.kluent.shouldThrow
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldEndWith
+import io.kotest.assertions.throwables.shouldThrow
 import kotlin.time.Duration.Companion.seconds
 
 class SerialServiceDiscoveryTests : StringSpec() {
@@ -36,7 +35,7 @@ class SerialServiceDiscoveryTests : StringSpec() {
     init {
         "badArgsTest" {
             connectToEtcd(urls) { client ->
-                invoking { ServiceDiscovery(client, "") } shouldThrow IllegalArgumentException::class
+                shouldThrow<IllegalArgumentException> { ServiceDiscovery(client, "") }
             }
         }
 
@@ -52,10 +51,10 @@ class SerialServiceDiscoveryTests : StringSpec() {
                     registerService(service)
 
                     logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
-                    queryForInstance(service.name, service.id) shouldBeEqualTo service
+                    queryForInstance(service.name, service.id) shouldBe service
 
                     logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
-                    queryForInstances(service.name) shouldBeEqualTo listOf(service)
+                    queryForInstances(service.name) shouldBe listOf(service)
 
                     logger.debug { "Retrieved names: ${queryForNames()}" }
                     queryForNames().first() shouldEndWith service.id
@@ -66,10 +65,10 @@ class SerialServiceDiscoveryTests : StringSpec() {
                     updateService(service)
 
                     logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
-                    queryForInstance(service.name, service.id) shouldBeEqualTo service
+                    queryForInstance(service.name, service.id) shouldBe service
 
                     logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
-                    queryForInstances(service.name) shouldBeEqualTo listOf(service)
+                    queryForInstances(service.name) shouldBe listOf(service)
 
                     logger.debug { "Retrieved names: ${queryForNames()}" }
                     queryForNames().first() shouldEndWith service.id
@@ -78,10 +77,10 @@ class SerialServiceDiscoveryTests : StringSpec() {
                     unregisterService(service)
                     sleep(3.seconds)
 
-                    queryForNames().size shouldBeEqualTo 0
-                    queryForInstances(service.name).size shouldBeEqualTo 0
+                    queryForNames().size shouldBe 0
+                    queryForInstances(service.name).size shouldBe 0
 
-                    invoking { queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
+                    shouldThrow<EtcdRecipeException> { queryForInstance(service.name, service.id) }
 
                     try {
                         logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }

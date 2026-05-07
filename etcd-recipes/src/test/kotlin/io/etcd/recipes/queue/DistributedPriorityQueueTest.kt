@@ -27,7 +27,7 @@ import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.shouldBeEqualTo
+import io.kotest.matchers.shouldBe
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
@@ -49,7 +49,7 @@ class DistributedPriorityQueueTest : StringSpec() {
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+            client.getChildCount(queuePath) shouldBe 0
 
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
@@ -67,12 +67,12 @@ class DistributedPriorityQueueTest : StringSpec() {
 
             latch.await()
 
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+            client.getChildCount(queuePath) shouldBe 0
         }
 
-        dequeuedData.size shouldBeEqualTo testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-        dequeuedData shouldBeEqualTo testData
+        dequeuedData.size shouldBe testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
+        dequeuedData shouldBe testData
     }
 
     private fun threadedTestWithWait(
@@ -86,7 +86,7 @@ class DistributedPriorityQueueTest : StringSpec() {
 
         connectToEtcd(urls) { client ->
             client.deleteChildren(queuePath)
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+            client.getChildCount(queuePath) shouldBe 0
 
             repeat(threadCount) {
                 thread(latch) {
@@ -104,14 +104,14 @@ class DistributedPriorityQueueTest : StringSpec() {
 
             latch.await()
 
-            client.getChildCount(queuePath) shouldBeEqualTo 0
+            client.getChildCount(queuePath) shouldBe 0
         }
 
         sleep(5.seconds)
 
-        dequeuedData.size shouldBeEqualTo testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-        dequeuedData shouldBeEqualTo testData
+        dequeuedData.size shouldBe testData.size
+        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
+        dequeuedData shouldBe testData
     }
 
     init {
@@ -120,15 +120,15 @@ class DistributedPriorityQueueTest : StringSpec() {
             val dequeuedData = mutableListOf<String>()
 
             connectToEtcd(urls) { client ->
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
                 withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
                 withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
             }
 
-            dequeuedData.size shouldBeEqualTo testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-            dequeuedData shouldBeEqualTo testData
+            dequeuedData.size shouldBe testData.size
+            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
+            dequeuedData shouldBe testData
         }
 
         "serialTestWithWait" {
@@ -139,7 +139,7 @@ class DistributedPriorityQueueTest : StringSpec() {
 
             connectToEtcd(urls) { client ->
                 client.deleteChildren(queuePath)
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
             }
 
             thread(dequeueLatch) {
@@ -151,7 +151,7 @@ class DistributedPriorityQueueTest : StringSpec() {
                     }
                     logger.info { "Dequeue complete" }
 
-                    client.getChildCount(queuePath) shouldBeEqualTo 0
+                    client.getChildCount(queuePath) shouldBe 0
                 }
             }
 
@@ -170,9 +170,9 @@ class DistributedPriorityQueueTest : StringSpec() {
             dequeueLatch.await()
             enqueueLatch.await()
 
-            dequeuedData.size shouldBeEqualTo testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-            dequeuedData shouldBeEqualTo testData
+            dequeuedData.size shouldBe testData.size
+            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
+            dequeuedData shouldBe testData
         }
 
         "threadedTestNoWait1" {
@@ -230,7 +230,7 @@ class DistributedPriorityQueueTest : StringSpec() {
                         withDistributedPriorityQueue(client, queuePath) {
                             repeat(iterCount) {
                                 val v = dequeue().asString
-                                v shouldBeEqualTo token
+                                v shouldBe token
                                 enqueue(v, 1u)
                                 counter.incrementAndGet()
                             }
@@ -242,11 +242,11 @@ class DistributedPriorityQueueTest : StringSpec() {
 
                 withDistributedPriorityQueue(client, queuePath) {
                     val v = dequeue().asString
-                    v shouldBeEqualTo token
+                    v shouldBe token
                 }
             }
 
-            counter.get() shouldBeEqualTo threadCount * iterCount
+            counter.get() shouldBe threadCount * iterCount
         }
 
         "!serialTestNoWaitWithPriorities" {
@@ -255,15 +255,15 @@ class DistributedPriorityQueueTest : StringSpec() {
 
             connectToEtcd(urls) { client ->
                 client.deleteChildren(queuePath)
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
                 withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], i) } }
                 withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
             }
 
-            dequeuedData.size shouldBeEqualTo testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[i] }
-            dequeuedData shouldBeEqualTo testData
+            dequeuedData.size shouldBe testData.size
+            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
+            dequeuedData shouldBe testData
         }
 
         "serialTestNoWaitWithReversedPriorities" {
@@ -272,19 +272,19 @@ class DistributedPriorityQueueTest : StringSpec() {
 
             connectToEtcd(urls) { client ->
                 client.deleteChildren(queuePath)
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
                 withDistributedPriorityQueue(client, queuePath) {
                     repeat(iterCount) { i -> enqueue(testData[i], (iterCount - i)) }
                 }
                 withDistributedPriorityQueue(client, queuePath) {
                     repeat(iterCount) { dequeuedData += dequeue().asString }
                 }
-                client.getChildCount(queuePath) shouldBeEqualTo 0
+                client.getChildCount(queuePath) shouldBe 0
             }
 
-            dequeuedData.size shouldBeEqualTo testData.size
-            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBeEqualTo testData[iterCount - i - 1] }
-            dequeuedData shouldBeEqualTo testData.reversed()
+            dequeuedData.size shouldBe testData.size
+            repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[iterCount - i - 1] }
+            dequeuedData shouldBe testData.reversed()
         }
     }
 

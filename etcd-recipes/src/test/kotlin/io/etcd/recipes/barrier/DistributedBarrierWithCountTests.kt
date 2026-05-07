@@ -27,9 +27,8 @@ import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldThrow
+import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
@@ -38,8 +37,8 @@ class DistributedBarrierWithCountTests : StringSpec() {
     init {
         "badArgsTest" {
             connectToEtcd(urls) { client ->
-                invoking { DistributedBarrierWithCount(client, "something", 0) } shouldThrow IllegalArgumentException::class
-                invoking { DistributedBarrierWithCount(client, "", 1) } shouldThrow IllegalArgumentException::class
+                shouldThrow<IllegalArgumentException> { DistributedBarrierWithCount(client, "something", 0) }
+                shouldThrow<IllegalArgumentException> { DistributedBarrierWithCount(client, "", 1) }
             }
         }
 
@@ -100,8 +99,8 @@ class DistributedBarrierWithCountTests : StringSpec() {
                 holder.checkForException()
             }
 
-            retryCounter.get() shouldBeEqualTo retryAttempts * (count - 1)
-            advancedCounter.get() shouldBeEqualTo count
+            retryCounter.get() shouldBe retryAttempts * (count - 1)
+            advancedCounter.get() shouldBe count
 
             logger.debug { "Done" }
         }

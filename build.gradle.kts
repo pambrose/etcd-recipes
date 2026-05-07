@@ -37,7 +37,6 @@ subprojects {
 
         "implementation"(rootProject.libs.netty.all)
 
-        "testImplementation"(rootProject.libs.kluent)
         "testImplementation"(rootProject.libs.junit.jupiter.api)
         "testImplementation"(rootProject.libs.kotest.runner.junit5)
         "testImplementation"(rootProject.libs.kotest.assertions.core)

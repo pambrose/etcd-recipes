@@ -25,7 +25,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.shouldBeEqualTo
+import io.kotest.matchers.shouldBe
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
@@ -83,8 +83,8 @@ class ReportLeaderTests : StringSpec() {
             // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
             sleep(10.seconds)
 
-            takeLeadershipCounter.get() shouldBeEqualTo count
-            relinquishLeadershipCounter.get() shouldBeEqualTo count
+            takeLeadershipCounter.get() shouldBe count
+            relinquishLeadershipCounter.get() shouldBe count
 
             executor.shutdown()
         }

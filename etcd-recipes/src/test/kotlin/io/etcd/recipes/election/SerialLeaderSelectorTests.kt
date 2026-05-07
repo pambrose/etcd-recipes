@@ -24,9 +24,8 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldThrow
+import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
@@ -36,7 +35,7 @@ class SerialLeaderSelectorTests : StringSpec() {
     init {
         "badArgsTest" {
             connectToEtcd(urls) { client ->
-                invoking { LeaderSelector(client, "") } shouldThrow IllegalArgumentException::class
+                shouldThrow<IllegalArgumentException> { LeaderSelector(client, "") }
             }
         }
 
@@ -69,8 +68,8 @@ class SerialLeaderSelectorTests : StringSpec() {
                 }
             }
 
-            takeLeadershiptCounter.get() shouldBeEqualTo count
-            relinquishLeadershiptCounter.get() shouldBeEqualTo count
+            takeLeadershiptCounter.get() shouldBe count
+            relinquishLeadershiptCounter.get() shouldBe count
 
             // Reset counters
             takeLeadershiptCounter.set(0)
@@ -86,8 +85,8 @@ class SerialLeaderSelectorTests : StringSpec() {
                 }
             }
 
-            takeLeadershiptCounter.get() shouldBeEqualTo count
-            relinquishLeadershiptCounter.get() shouldBeEqualTo count
+            takeLeadershiptCounter.get() shouldBe count
+            relinquishLeadershiptCounter.get() shouldBe count
         }
     }
 
