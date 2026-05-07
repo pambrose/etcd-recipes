@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@
 
 package io.etcd.recipes.barrier
 
-import com.github.pambrose.common.concurrent.BooleanMonitor
-import com.github.pambrose.common.time.timeUnitToDuration
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.concurrent.BooleanMonitor
+import com.pambrose.common.time.timeUnitToDuration
+import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
@@ -63,11 +63,10 @@ fun <T> withDistributedBarrierWithCount(
   client: Client,
   barrierPath: String,
   memberCount: Int,
-  leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+  leaseTtlSecs: Long = EtcdConnector.DEFAULT_TTL_SECS,
   clientId: String = defaultClientId(),
-  receiver: DistributedBarrierWithCount.() -> T
-): T =
-  DistributedBarrierWithCount(client, barrierPath, memberCount, leaseTtlSecs, clientId).use { it.receiver() }
+  receiver: DistributedBarrierWithCount.() -> T,
+): T = DistributedBarrierWithCount(client, barrierPath, memberCount, leaseTtlSecs, clientId).use { it.receiver() }
 
 class DistributedBarrierWithCount
 @JvmOverloads
@@ -75,10 +74,9 @@ constructor(
   client: Client,
   val barrierPath: String,
   val memberCount: Int,
-  val leaseTtlSecs: Long = defaultTtlSecs,
-  val clientId: String = defaultClientId()
+  val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
+  val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
-
   private val readyPath = barrierPath.appendToPath("ready")
   private val waitingPath = barrierPath.appendToPath("waiting")
 
@@ -103,14 +101,16 @@ constructor(
   fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
-  fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
-    waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
+  fun waitOnBarrier(
+    timeout: Long,
+    timeUnit: TimeUnit,
+  ): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun waitOnBarrier(timeout: Duration): Boolean {
     var keepAliveLease: CloseableClient? = null
     val keepAliveClosed = BooleanMonitor(false)
-    val uniqueToken = "$clientId:${randomId(tokenLength)}"
+    val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
     val waitingPath = waitingPath.appendToPath(uniqueToken)
 
     checkCloseNotCalled()
@@ -130,7 +130,6 @@ constructor(
         closeKeepAlive()
       } else {
         if (waiterCount >= memberCount) {
-
           closeKeepAlive()
 
           // Delete /ready key
@@ -157,8 +156,12 @@ constructor(
       }
 
     when {
-      !txn.isSucceeded -> throw EtcdRecipeException("Failed to set waitingPath")
-      client.getValue(waitingPath)?.asString != uniqueToken -> throw EtcdRecipeException("Failed to assign waitingPath unique value")
+      !txn.isSucceeded ->
+        throw EtcdRecipeException("Failed to set waitingPath")
+
+      client.getValue(waitingPath)?.asString != uniqueToken ->
+        throw EtcdRecipeException("Failed to assign waitingPath unique value")
+
       else -> {
         // Keep key alive
         keepAliveLease = client.keepAlive(lease)
@@ -172,18 +175,20 @@ constructor(
           // Watch for DELETE of /ready and PUTS on /waiters/*
           val trailingKey = barrierPath.ensureSuffix("/")
           val watchOption = watchOption { isPrefix(true) }
-          client.withWatcher(trailingKey,
-                             watchOption,
-                             { watchResponse ->
-                               watchResponse.events
-                                 .forEach { watchEvent ->
-                                   val key = watchEvent.keyValue.key.asString
-                                   when {
-                                     key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
-                                     key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
-                                   }
-                                 }
-                             }) {
+          client.withWatcher(
+            trailingKey,
+            watchOption,
+            { watchResponse ->
+              watchResponse.events
+                .forEach { watchEvent ->
+                  val key = watchEvent.keyValue.key.asString
+                  when {
+                    key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
+                    key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
+                  }
+                }
+            },
+          ) {
             // Check one more time in case watch missed the delete just after last check
             checkWaiterCount()
 
@@ -202,6 +207,6 @@ constructor(
   }
 
   companion object {
-    internal fun defaultClientId() = "${DistributedBarrierWithCount::class.simpleName}:${randomId(tokenLength)}"
+    internal fun defaultClientId() = "${DistributedBarrierWithCount::class.simpleName}:${randomId(TOKEN_LENGTH)}"
   }
 }

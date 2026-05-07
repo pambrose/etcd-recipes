@@ -3,23 +3,23 @@ default: versioncheck
 clean:
 	./gradlew clean
 
-compile:
-	./gradlew build -xtest
+stop:
+	./gradlew --stop
 
-build: compile
+build: clean
+	./gradlew build -xtest
 
 tests:
 	./gradlew check jacocoTestReport
 
 lint:
-	./gradlew lintKotlinMain
-	./gradlew lintKotlinTest
+	./gradlew lintKotlinMain lintKotlinTest
 
 refresh:
 	./gradlew --refresh-dependencies
 
 versioncheck:
-	./gradlew dependencyUpdates
+	./gradlew dependencyUpdates --no-parallel
 
 upgrade-wrapper:
-	./gradlew wrapper --gradle-version=7.5-rc-2 --distribution-type=bin
+	./gradlew wrapper --gradle-version=9.5.0 --distribution-type=bin

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,14 +23,17 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.ClientBuilder
 
 @JvmOverloads
-fun connectToEtcd(urls: List<String>, initReciever: ClientBuilder.() -> ClientBuilder = { this }): Client {
+fun connectToEtcd(
+  urls: List<String>,
+  initReceiver: ClientBuilder.() -> ClientBuilder = { this },
+): Client {
   require(urls.isNotEmpty()) { "URLs cannot be empty" }
-  return etcdClient { endpoints(*urls.toTypedArray()).initReciever() }
+  return etcdClient { endpoints(*urls.toTypedArray()).initReceiver() }
 }
 
 @JvmOverloads
 fun <T> connectToEtcd(
   urls: List<String>,
-  initReciever: ClientBuilder.() -> ClientBuilder = { this },
-  block: (client: Client) -> T
-): T = connectToEtcd(urls, initReciever).use { block(it) }
+  initReceiver: ClientBuilder.() -> ClientBuilder = { this },
+  block: (client: Client) -> T,
+): T = connectToEtcd(urls, initReceiver).use { block(it) }

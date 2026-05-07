@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,17 +18,19 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.github.pambrose.common.concurrent.thread
-import com.github.pambrose.common.util.repeatWithSleep
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.concurrent.thread
+import com.pambrose.common.util.repeatWithSleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.putValue
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val path = "/foo"
   val keyval = "foobar"
@@ -37,10 +39,10 @@ fun main() {
   thread(latch) {
     sleep(3.seconds)
     connectToEtcd(urls) { client ->
-      println("Assigning $path = $keyval")
+      logger.info {"Assigning $path = $keyval"}
       client.putValue(path, keyval)
       sleep(5.seconds)
-      println("Deleting $path")
+      logger.info {"Deleting $path"}
       client.deleteKey(path)
     }
   }
@@ -49,7 +51,7 @@ fun main() {
     connectToEtcd(urls) { client ->
       repeatWithSleep(12) { _, start ->
         val elapsed = System.currentTimeMillis() - start
-        println("Key $path = ${client.getValue(path, "unset")} after ${elapsed}ms")
+        logger.info {"Key $path = ${client.getValue(path, "unset")} after ${elapsed}ms"}
       }
     }
   }

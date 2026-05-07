@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,81 +18,81 @@
 
 package io.etcd.recipes.discovery
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
-import mu.KLogging
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldBeEqualTo
-import org.amshove.kluent.shouldEndWith
-import org.amshove.kluent.shouldThrow
-import org.junit.jupiter.api.Test
+import io.github.oshai.kotlinlogging.KotlinLogging
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldEndWith
+import io.kotest.assertions.throwables.shouldThrow
 import kotlin.time.Duration.Companion.seconds
 
-class SerialServiceDiscoveryTests {
-  val path = "/discovery/${javaClass.simpleName}"
+class SerialServiceDiscoveryTests : StringSpec() {
+    val path = "/discovery/${javaClass.simpleName}"
 
-  @Test
-  fun badArgsTest() {
-    connectToEtcd(urls) { client ->
-      invoking { ServiceDiscovery(client, "") } shouldThrow IllegalArgumentException::class
-    }
-  }
-
-  @Test
-  fun discoveryTest() {
-    connectToEtcd(urls) { client ->
-      withServiceDiscovery(client, path) {
-
-        val payload = TestPayload(-999)
-        val service = ServiceInstance("TestName", payload.toJson())
-
-        logger.debug { service.toJson() }
-
-        logger.debug { "Registering" }
-        registerService(service)
-
-        logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
-        queryForInstance(service.name, service.id) shouldBeEqualTo service
-
-        logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
-        queryForInstances(service.name) shouldBeEqualTo listOf(service)
-
-        logger.debug { "Retrieved names: ${queryForNames()}" }
-        queryForNames().first() shouldEndWith service.id
-
-        logger.debug { "Updating payload" }
-        payload.testval = -888
-        service.jsonPayload = payload.toJson()
-        updateService(service)
-
-        logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
-        queryForInstance(service.name, service.id) shouldBeEqualTo service
-
-        logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
-        queryForInstances(service.name) shouldBeEqualTo listOf(service)
-
-        logger.debug { "Retrieved names: ${queryForNames()}" }
-        queryForNames().first() shouldEndWith service.id
-
-        logger.debug { "Unregistering" }
-        unregisterService(service)
-        sleep(3.seconds)
-
-        queryForNames().size shouldBeEqualTo 0
-        queryForInstances(service.name).size shouldBeEqualTo 0
-
-        invoking { queryForInstance(service.name, service.id) } shouldThrow EtcdRecipeException::class
-
-        try {
-          logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
-        } catch (e: EtcdRecipeException) {
-          logger.debug { "Exception: $e" }
+    init {
+        "badArgsTest" {
+            connectToEtcd(urls) { client ->
+                shouldThrow<IllegalArgumentException> { ServiceDiscovery(client, "") }
+            }
         }
-      }
-    }
-  }
 
-  companion object : KLogging()
+        "discoveryTest" {
+            connectToEtcd(urls) { client ->
+                withServiceDiscovery(client, path) {
+                    val payload = TestPayload(-999)
+                    val service = ServiceInstance("TestName", payload.toJson())
+
+                    logger.debug { service.toJson() }
+
+                    logger.debug { "Registering" }
+                    registerService(service)
+
+                    logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
+                    queryForInstance(service.name, service.id) shouldBe service
+
+                    logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
+                    queryForInstances(service.name) shouldBe listOf(service)
+
+                    logger.debug { "Retrieved names: ${queryForNames()}" }
+                    queryForNames().first() shouldEndWith service.id
+
+                    logger.debug { "Updating payload" }
+                    payload.testval = -888
+                    service.jsonPayload = payload.toJson()
+                    updateService(service)
+
+                    logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
+                    queryForInstance(service.name, service.id) shouldBe service
+
+                    logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
+                    queryForInstances(service.name) shouldBe listOf(service)
+
+                    logger.debug { "Retrieved names: ${queryForNames()}" }
+                    queryForNames().first() shouldEndWith service.id
+
+                    logger.debug { "Unregistering" }
+                    unregisterService(service)
+                    sleep(3.seconds)
+
+                    queryForNames().size shouldBe 0
+                    queryForInstances(service.name).size shouldBe 0
+
+                    shouldThrow<EtcdRecipeException> { queryForInstance(service.name, service.id) }
+
+                    try {
+                        logger.debug { "Retrieved value: ${queryForInstance(service.name, service.id)}" }
+                    } catch (e: EtcdRecipeException) {
+                        logger.debug { "Exception: $e" }
+                    }
+                }
+            }
+        }
+    }
+
+    companion object {
+        private val logger = KotlinLogging.logger {}
+    }
 }

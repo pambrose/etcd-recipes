@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.queue
 
-import com.github.pambrose.common.util.length
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.util.length
+import com.pambrose.common.util.randomId
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.GetOption.SortTarget
@@ -29,14 +29,17 @@ import io.etcd.recipes.common.putValue
 fun <T> withDistributedQueue(
   client: Client,
   queuePath: String,
-  receiver: DistributedQueue.() -> T
-): T =
-  DistributedQueue(client, queuePath).use { it.receiver() }
+  receiver: DistributedQueue.() -> T,
+): T = DistributedQueue(client, queuePath).use { it.receiver() }
 
-class DistributedQueue(client: Client, queuePath: String) : AbstractQueue(client, queuePath, SortTarget.MOD) {
-
+class DistributedQueue(
+  client: Client,
+  queuePath: String,
+) : AbstractQueue(client, queuePath, SortTarget.MOD) {
   fun enqueue(value: String) = enqueue(value.asByteSequence)
+
   fun enqueue(value: Int) = enqueue(value.asByteSequence)
+
   fun enqueue(value: Long) = enqueue(value.asByteSequence)
 
   fun enqueue(value: ByteSequence) {

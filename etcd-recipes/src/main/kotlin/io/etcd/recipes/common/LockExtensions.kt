@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,9 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.lock.LockResponse
 import io.etcd.jetcd.lock.UnlockResponse
 
-fun Client.lock(keyName: String, leaseId: Long): LockResponse = lockClient.lock(keyName.asByteSequence, leaseId).get()
+fun Client.lock(
+  keyName: String,
+  leaseId: Long,
+): LockResponse = lockClient.lock(keyName.asByteSequence, leaseId).get()
 
 fun Client.unlock(keyName: String): UnlockResponse = lockClient.unlock(keyName.asByteSequence).get()

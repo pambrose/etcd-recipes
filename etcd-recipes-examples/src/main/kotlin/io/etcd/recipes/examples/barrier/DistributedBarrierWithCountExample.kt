@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,37 +18,43 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.barrier.DistributedBarrierWithCount
 import io.etcd.recipes.barrier.withDistributedBarrierWithCount
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val barrierPath = "/barriers/barrierwithcountdemo"
   val count = 30
   val waitLatch = CountDownLatch(count)
   val retryLatch = CountDownLatch(count - 1)
 
-  fun waiter(id: Int, barrier: DistributedBarrierWithCount, retryCount: Int = 0) {
+  fun waiter(
+    id: Int,
+    barrier: DistributedBarrierWithCount,
+    retryCount: Int = 0,
+  ) {
     sleep(10.random().seconds)
-    println("#$id Waiting on barrier")
+    logger.info { "#$id Waiting on barrier" }
 
     repeat(retryCount) {
       barrier.waitOnBarrier(2.seconds)
-      println("#$id Timed out waiting on barrier, waiting again")
+      logger.info { "#$id Timed out waiting on barrier, waiting again" }
     }
 
     retryLatch.countDown()
 
-    println("#$id Waiter count = ${barrier.waiterCount}")
+    logger.info { "#$id Waiter count = ${barrier.waiterCount}" }
     barrier.waitOnBarrier()
-    println("#$id Done waiting on barrier")
+    logger.info { "#$id Done waiting on barrier" }
     waitLatch.countDown()
   }
 

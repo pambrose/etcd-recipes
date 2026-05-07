@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,5 +23,7 @@ package io.etcd.recipes.common
 fun String.ensureSuffix(delim: String = "/"): String = if (endsWith(delim)) this else "$this$delim"
 
 @JvmOverloads
-fun String.appendToPath(suffix: String, delim: String = "/") =
-  "${removeSuffix(delim)}$delim${suffix.removePrefix(delim)}"
+fun String.appendToPath(
+  suffix: String,
+  delim: String = "/",
+) = "${removeSuffix(delim)}$delim${suffix.removePrefix(delim)}"

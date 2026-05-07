@@ -11,15 +11,15 @@
 [![Kotlin](https://img.shields.io/badge/%20language-Kotlin-red.svg)](https://kotlinlang.org/)
 [![Java](https://img.shields.io/badge/%20language-Java-red.svg)](https://kotlinlang.org/)
 
-[etcd-recipes](https://github.com/pambrose/etcd-recipes) is a Kotlin/Java/JVM client library 
-for [etcd](https://etcd.io) v3, a distributed, reliable key-value store. It attempts to provide the same 
-kind of support for [etcd](https://etcd.io) that 
+[etcd-recipes](https://github.com/pambrose/etcd-recipes) is a Kotlin/Java/JVM client library
+for [etcd](https://etcd.io) v3, a distributed, reliable key-value store. It attempts to provide the same
+kind of support for [etcd](https://etcd.io) that
 [Curator](https://curator.apache.org) does for [ZooKeeper](https://zookeeper.apache.org).
 
 ## Examples
 
-The repo includes [Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples) 
-and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples) 
+The repo includes [Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples)
+and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples)
 examples.
 
 ## Usage
@@ -52,13 +52,13 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.pambrose.etcd-recipes:etcd-recipes:0.9.21"
+    implementation "com.pambrose.etcd-recipes:etcd-recipes:0.9.22"
 }
 ```
 
 ### Maven
 
-``` 
+```
 <repositories>
     <repository>
         <id>kotlinx</id>
@@ -74,9 +74,9 @@ dependencies {
 
 <dependencies>
     <dependency>
-      <groupId>com.github.pambrose.etcd-recipes</groupId>
+      <groupId>com.pambrose.etcd-recipes</groupId>
       <artifactId>etcd-recipes</artifactId>
-      <version>0.9.21</version>
+      <version>0.9.22</version>
     </dependency>
 </dependencies>
 ```

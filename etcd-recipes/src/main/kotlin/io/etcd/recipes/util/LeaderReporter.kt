@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,16 @@
 
 package io.etcd.recipes.util
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.election.LeaderListener
 import io.etcd.recipes.election.LeaderSelector
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.days
 import kotlin.time.TimeSource.Monotonic
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val electionPath = "/election/threaded"
   val executor = Executors.newSingleThreadExecutor()
@@ -42,17 +44,17 @@ fun main() {
         var currentLeader = ""
 
         override fun takeLeadership(leaderName: String) {
-          println("$leaderName is now the leader [Break time: ${unelectedTime.elapsedNow()}]")
+          logger.info {"$leaderName is now the leader [Break time: ${unelectedTime.elapsedNow()}]"}
           currentLeader = leaderName
           electedTime = electedClock.markNow()
         }
 
         override fun relinquishLeadership() {
-          println("$currentLeader is no longer the leader, after being leader for: ${electedTime.elapsedNow()}")
+          logger.info {"$currentLeader is no longer the leader, after being leader for: ${electedTime.elapsedNow()}"}
           unelectedTime = unelectedClock.markNow()
         }
       },
-      executor
+      executor,
     )
 
   sleep(1.days)

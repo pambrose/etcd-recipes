@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@
 package io.etcd.recipes.election
 
 interface LeaderListener {
-
   fun takeLeadership(leaderName: String)
 
   fun relinquishLeadership()

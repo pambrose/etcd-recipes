@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,11 @@ package io.etcd.recipes.examples.counter
 
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.counter.DistributedAtomicLong
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.measureTimedValue
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val counterPath = "counter2"
 
@@ -46,7 +48,7 @@ fun main() {
           .get()
       }
 
-    println("Total: $total in $dur")
+    logger.info {"Total: $total in $dur"}
 
     counters.forEach { it.close() }
   }

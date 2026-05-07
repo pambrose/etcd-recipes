@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,23 +18,27 @@
 
 package io.etcd.recipes.examples.discovery
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.withServiceDiscovery
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.days
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val servicePath = "/services/test"
 
   connectToEtcd(urls) { client ->
     withServiceDiscovery(client, servicePath) {
       withServiceCache("TestName") {
-        addListenerForChanges { eventType,
-                                isAdd,
-                                serviceName,
-                                serviceInstance ->
-          println("Change $isAdd $eventType $serviceName $serviceInstance")
+        addListenerForChanges {
+            eventType,
+            isAdd,
+            serviceName,
+            serviceInstance,
+          ->
+          logger.info {"Change $isAdd $eventType $serviceName $serviceInstance"}
           serviceInstance?.let {
             println("Payload: ${IntPayload.toObject(it.jsonPayload)}")
           }

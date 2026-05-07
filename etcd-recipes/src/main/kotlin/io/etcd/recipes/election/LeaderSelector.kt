@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,21 +18,43 @@
 
 package io.etcd.recipes.election
 
-import com.github.pambrose.common.concurrent.*
-import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
-import com.github.pambrose.common.time.*
-import com.github.pambrose.common.util.*
-import io.etcd.jetcd.*
+import com.pambrose.common.concurrent.BooleanMonitor
+import com.pambrose.common.delegate.AtomicDelegates.atomicBoolean
+import com.pambrose.common.time.timeUnitToDuration
+import com.pambrose.common.util.isNull
+import com.pambrose.common.util.randomId
+import com.pambrose.common.util.sleep
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.*
-import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
-import mu.*
-import java.util.concurrent.*
-import java.util.concurrent.atomic.*
-import kotlin.time.*
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
+import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.getChildrenValues
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.isKeyPresent
+import io.etcd.recipes.common.keepAliveWith
+import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.withWatcher
+import io.github.oshai.kotlinlogging.KotlinLogging
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
@@ -41,12 +63,11 @@ fun <T> withLeaderSelector(
   client: Client,
   electionPath: String,
   listener: LeaderSelectorListener,
-  leaseTtlSecs: Long = defaultTtlSecs,
+  leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   userExecutor: Executor? = null,
   clientId: String = defaultClientId(),
-  receiver: LeaderSelector.() -> T
-): T =
-  LeaderSelector(client, electionPath, listener, leaseTtlSecs, userExecutor, clientId).use { it.receiver() }
+  receiver: LeaderSelector.() -> T,
+): T = LeaderSelector(client, electionPath, listener, leaseTtlSecs, userExecutor, clientId).use { it.receiver() }
 
 @JvmOverloads
 fun <T> withLeaderSelector(
@@ -54,10 +75,10 @@ fun <T> withLeaderSelector(
   electionPath: String,
   takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
   relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-  leaseTtlSecs: Long = defaultTtlSecs,
+  leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   executorService: ExecutorService? = null,
   clientId: String = defaultClientId(),
-  receiver: LeaderSelector.() -> T
+  receiver: LeaderSelector.() -> T,
 ): T =
   LeaderSelector(
     client,
@@ -66,7 +87,7 @@ fun <T> withLeaderSelector(
     relinquishLeadershipBlock,
     leaseTtlSecs,
     executorService,
-    clientId
+    clientId,
   ).use { it.receiver() }
 
 // For Java clients
@@ -76,11 +97,10 @@ constructor(
   client: Client,
   val electionPath: String,
   private val listener: LeaderSelectorListener,
-  val leaseTtlSecs: Long = defaultTtlSecs,
+  val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   private val userExecutor: Executor? = null,
-  val clientId: String = defaultClientId()
+  val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
-
   // For Kotlin clients
   @JvmOverloads
   constructor(
@@ -88,26 +108,26 @@ constructor(
     electionPath: String,
     takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
     relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {},
-    leaseTtlSecs: Long = defaultTtlSecs,
+    leaseTtlSecs: Long = DEFAULT_TTL_SECS,
     executorService: ExecutorService? = null,
-    clientId: String = defaultClientId()
+    clientId: String = defaultClientId(),
   ) :
-      this(
-        client,
-        electionPath,
-        object : LeaderSelectorListener {
-          override fun takeLeadership(selector: LeaderSelector) {
-            takeLeadershipBlock.invoke(selector)
-          }
+    this(
+      client,
+      electionPath,
+      object : LeaderSelectorListener {
+        override fun takeLeadership(selector: LeaderSelector) {
+          takeLeadershipBlock.invoke(selector)
+        }
 
-          override fun relinquishLeadership(selector: LeaderSelector) {
-            relinquishLeadershipBlock.invoke(selector)
-          }
-        },
-        leaseTtlSecs,
-        executorService,
-        clientId
-      )
+        override fun relinquishLeadership(selector: LeaderSelector) {
+          relinquishLeadershipBlock.invoke(selector)
+        }
+      },
+      leaseTtlSecs,
+      executorService,
+      clientId,
+    )
 
   private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
   private val terminateWatch = BooleanMonitor(false)
@@ -128,7 +148,6 @@ constructor(
   val isFinished get() = leadershipComplete.get()
 
   fun start(): LeaderSelector {
-
     val electionSetup = BooleanMonitor(false)
 
     synchronized(startCallAllowed) {
@@ -157,15 +176,18 @@ constructor(
         executor.execute {
           try {
             val watchOption = watchOption { withNoPut(true) }
-            client.withWatcher(leaderPath,
-                               watchOption,
-                               { watchResponse ->
-                                 for (event in watchResponse.events)
-                                   if (event.eventType == DELETE) {
-                                     // Run for leader whenever leader key is deleted
-                                     attemptToBecomeLeader(client)
-                                   }
-                               }) {
+            client.withWatcher(
+              leaderPath,
+              watchOption,
+              { watchResponse ->
+                for (event in watchResponse.events) {
+                  if (event.eventType == DELETE) {
+                    // Run for leader whenever leader key is deleted
+                    attemptToBecomeLeader(client)
+                  }
+                }
+              },
+            ) {
               watchStarted.set(true)
               terminateWatch.waitUntilTrue()
             }
@@ -216,8 +238,10 @@ constructor(
   fun waitOnLeadershipComplete(): Boolean = waitOnLeadershipComplete(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class)
-  fun waitOnLeadershipComplete(timeout: Long, timeUnit: TimeUnit): Boolean =
-    waitOnLeadershipComplete(timeUnitToDuration(timeout, timeUnit))
+  fun waitOnLeadershipComplete(
+    timeout: Long,
+    timeUnit: TimeUnit,
+  ): Boolean = waitOnLeadershipComplete(timeUnitToDuration(timeout, timeUnit))
 
   @Throws(InterruptedException::class)
   fun waitOnLeadershipComplete(timeout: Duration): Boolean {
@@ -256,11 +280,13 @@ constructor(
     // Wait until key goes away when previous keep alive finishes
     val attemptCount = leaseTtlSecs * 2
     for (i in 0 until attemptCount) {
-      if (!client.isKeyPresent(path))
+      if (!client.isKeyPresent(path)) {
         break
+      }
 
-      if (i == attemptCount - 1)
+      if (i == attemptCount - 1) {
         logger.error { "Exhausted wait for deletion of participation key $path" }
+      }
 
       sleep(1.seconds)
     }
@@ -273,8 +299,9 @@ constructor(
         Then(path.setTo(clientId, putOption { withLeaseId(lease.id) }))
       }
 
-    if (!txn.isSucceeded)
+    if (!txn.isSucceeded) {
       throw EtcdRecipeException("Participation registration failed [$path]")
+    }
 
     // Run keep-alive until closed
     client.keepAliveWith(lease) { terminateKeepAlive.waitUntilTrue() }
@@ -283,11 +310,12 @@ constructor(
   // This will not return until election failure or leader surrenders leadership after being elected
   @Synchronized
   private fun attemptToBecomeLeader(client: Client): Boolean {
-    if (isLeader || !attemptLeadership.get())
+    if (isLeader || !attemptLeadership.get()) {
       return false
+    }
 
     // Create unique token to avoid collision from clients with same id
-    val uniqueToken = "$clientId:${randomId(tokenLength)}"
+    val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
 
     // Prime lease to give keepAliveWith a chance to get started
     val lease = client.leaseClient.grant(leaseTtlSecs).get()
@@ -327,18 +355,21 @@ constructor(
     }
   }
 
-  companion object : KLogging() {
+  companion object {
+    private val logger = KotlinLogging.logger {}
 
     private val String.withParticipationSuffix get() = appendToPath("participants")
     private val String.withLeaderSuffix get() = appendToPath("LEADER")
 
-    internal val String.stripUniqueSuffix get() = dropLast(tokenLength + 1)
+    internal val String.stripUniqueSuffix get() = dropLast(TOKEN_LENGTH + 1)
 
-    internal fun defaultClientId() = "${LeaderSelector::class.simpleName}:${randomId(tokenLength)}"
+    internal fun defaultClientId() = "${LeaderSelector::class.simpleName}:${randomId(TOKEN_LENGTH)}"
 
     @JvmStatic
-    fun getParticipants(client: Client, electionPath: String): List<Participant> {
-
+    fun getParticipants(
+      client: Client,
+      electionPath: String,
+    ): List<Participant> {
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 
       val participants = mutableListOf<Participant>()
@@ -353,29 +384,31 @@ constructor(
       urls: List<String>,
       electionPath: String,
       listener: LeaderListener,
-      executor: Executor
+      executor: Executor,
     ): CountDownLatch {
-
       require(urls.isNotEmpty()) { "URLs cannot be empty" }
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 
       val terminateListener = CountDownLatch(1)
       executor.execute {
         connectToEtcd(urls) { client ->
-          client.withWatcher(electionPath.withLeaderSuffix,
-                             block = { watchResponse ->
-                               for (event in watchResponse.events)
-                                 try {
-                                   when (event.eventType) {
-                                     PUT -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
-                                     DELETE -> listener.relinquishLeadership()
-                                     UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
-                                     else -> logger.error { "Unknown error with $electionPath watch" }
-                                   }
-                                 } catch (e: Throwable) {
-                                   logger.error(e) { "Exception in reportLeader()" }
-                                 }
-                             }) {
+          client.withWatcher(
+            electionPath.withLeaderSuffix,
+            block = { watchResponse ->
+              for (event in watchResponse.events) {
+                try {
+                  when (event.eventType) {
+                    PUT -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
+                    DELETE -> listener.relinquishLeadership()
+                    UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
+                    else -> logger.error { "Unknown error with $electionPath watch" }
+                  }
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in reportLeader()" }
+                }
+              }
+            },
+          ) {
             terminateListener.await()
           }
         }

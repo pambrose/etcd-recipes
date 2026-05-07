@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,14 @@
 
 package io.etcd.recipes.keyvalue
 
-import com.github.pambrose.common.util.isNull
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.util.isNull
+import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.putValueWithKeepAlive
-import mu.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -37,11 +37,11 @@ fun <T> withTransientKeyValue(
   client: Client,
   keyPath: String,
   keyValue: String,
-  leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+  leaseTtlSecs: Long = EtcdConnector.DEFAULT_TTL_SECS,
   autoStart: Boolean = true,
   userExecutor: Executor? = null,
   clientId: String = defaultClientId(),
-  receiver: TransientKeyValue.() -> T
+  receiver: TransientKeyValue.() -> T,
 ): T =
   TransientKeyValue(
     client,
@@ -50,7 +50,7 @@ fun <T> withTransientKeyValue(
     leaseTtlSecs,
     autoStart,
     userExecutor,
-    clientId
+    clientId,
   ).use { it.receiver() }
 
 class TransientKeyValue
@@ -59,12 +59,11 @@ constructor(
   client: Client,
   val keyPath: String,
   val keyValue: String,
-  val leaseTtlSecs: Long = defaultTtlSecs,
+  val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   autoStart: Boolean = true,
   private val userExecutor: Executor? = null,
-  val clientId: String = defaultClientId()
+  val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
-
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
   private val keepAliveWaitLatch = CountDownLatch(1)
   private val keepAliveStartedLatch = CountDownLatch(1)
@@ -84,7 +83,7 @@ constructor(
 
     executor.execute {
       try {
-          val leaseTtl = leaseTtlSecs.seconds
+        val leaseTtl = leaseTtlSecs.seconds
         logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
         client.putValueWithKeepAlive(keyPath, keyValue, leaseTtl) {
           keepAliveStartedLatch.countDown()
@@ -120,7 +119,9 @@ constructor(
     super.close()
   }
 
-  companion object : KLogging() {
-    internal fun defaultClientId() = "${TransientKeyValue::class.simpleName}:${randomId(tokenLength)}"
+  companion object {
+    private val logger = KotlinLogging.logger {}
+
+    internal fun defaultClientId() = "${TransientKeyValue::class.simpleName}:${randomId(TOKEN_LENGTH)}"
   }
 }

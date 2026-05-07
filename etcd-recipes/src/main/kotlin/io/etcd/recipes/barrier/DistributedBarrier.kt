@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,30 +18,18 @@
 
 package io.etcd.recipes.barrier
 
-import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
-import com.github.pambrose.common.delegate.AtomicDelegates.nullableReference
-import com.github.pambrose.common.time.timeUnitToDuration
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.delegate.AtomicDelegates.atomicBoolean
+import com.pambrose.common.time.timeUnitToDuration
+import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.deleteKey
-import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.keepAlive
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.putOption
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.withWatcher
-import mu.KLogging
+import io.etcd.recipes.common.*
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
@@ -50,24 +38,22 @@ import kotlin.time.Duration.Companion.seconds
 fun <T> withDistributedBarrier(
   client: Client,
   barrierPath: String,
-  leaseTtlSecs: Long = EtcdConnector.defaultTtlSecs,
+  leaseTtlSecs: Long = EtcdConnector.DEFAULT_TTL_SECS,
   waitOnMissingBarriers: Boolean = true,
   clientId: String = defaultClientId(),
-  receiver: DistributedBarrier.() -> T
-): T =
-  DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
+  receiver: DistributedBarrier.() -> T,
+): T = DistributedBarrier(client, barrierPath, leaseTtlSecs, waitOnMissingBarriers, clientId).use { it.receiver() }
 
 class DistributedBarrier
 @JvmOverloads
 constructor(
   client: Client,
   val barrierPath: String,
-  val leaseTtlSecs: Long = defaultTtlSecs,
+  val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   private val waitOnMissingBarriers: Boolean = true,
-  val clientId: String = defaultClientId()
+  val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
-
-  private var keepAliveLease by nullableReference<CloseableClient?>(null)
+  private var keepAliveLease: AtomicReference<CloseableClient?> = AtomicReference(null)
   private var barrierRemoved by atomicBoolean(false)
 
   init {
@@ -82,11 +68,11 @@ constructor(
   @Synchronized
   fun setBarrier(): Boolean {
     checkCloseNotCalled()
-    return if (client.isKeyPresent(barrierPath))
+    return if (client.isKeyPresent(barrierPath)) {
       false
-    else {
+    } else {
       // Create unique token to avoid collision from clients with same id
-      val uniqueToken = "$clientId:${randomId(tokenLength)}"
+      val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
 
       // Prime lease with 2 seconds to give keepAlive a chance to get started
       val lease = client.leaseGrant(leaseTtlSecs.seconds)
@@ -100,7 +86,7 @@ constructor(
 
       // Check to see if unique value was successfully set in the CAS step
       if (txn.isSucceeded && client.getValue(barrierPath)?.asString == uniqueToken) {
-        keepAliveLease = client.keepAlive(lease)
+        keepAliveLease.store(client.keepAlive(lease))
         true
       } else {
         false
@@ -114,8 +100,8 @@ constructor(
     return if (barrierRemoved) {
       false
     } else {
-      keepAliveLease?.close()
-      keepAliveLease = null
+      keepAliveLease.load()?.close()
+      keepAliveLease.store(null)
 
       client.deleteKey(barrierPath)
 
@@ -129,27 +115,33 @@ constructor(
   fun waitOnBarrier(): Boolean = waitOnBarrier(Long.MAX_VALUE.days)
 
   @Throws(InterruptedException::class)
-  fun waitOnBarrier(timeout: Long, timeUnit: TimeUnit): Boolean =
-    waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
+  fun waitOnBarrier(
+    timeout: Long,
+    timeUnit: TimeUnit,
+  ): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
   @Throws(InterruptedException::class)
   fun waitOnBarrier(timeout: Duration): Boolean {
     checkCloseNotCalled()
 
     // Check if barrier is present before using watcher
-    return if (!waitOnMissingBarriers && !isBarrierSet())
+    return if (!waitOnMissingBarriers && !isBarrierSet()) {
       true
-    else {
+    } else {
       val waitLatch = CountDownLatch(1)
       val watchOption = watchOption { withNoPut(true) }
 
-      client.withWatcher(barrierPath,
-                         watchOption,
-                         { watchResponse ->
-                           for (event in watchResponse.events)
-                             if (event.eventType == DELETE)
-                               waitLatch.countDown()
-                         }) {
+      client.withWatcher(
+        barrierPath,
+        watchOption,
+        { watchResponse ->
+          for (event in watchResponse.events) {
+            if (event.eventType == DELETE) {
+              waitLatch.countDown()
+            }
+          }
+        },
+      ) {
         // Check one more time in case watch missed the delete just after last check
         if (!waitOnMissingBarriers && !isBarrierSet())
           waitLatch.countDown()
@@ -164,13 +156,15 @@ constructor(
     if (closeCalled)
       return
 
-    keepAliveLease?.close()
-    keepAliveLease = null
+    keepAliveLease.load()?.close()
+    keepAliveLease.store(null)
 
     super.close()
   }
 
-  companion object : KLogging() {
-    internal fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(tokenLength)}"
+  companion object {
+    private val logger = KotlinLogging.logger {}
+
+    internal fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(TOKEN_LENGTH)}"
   }
 }

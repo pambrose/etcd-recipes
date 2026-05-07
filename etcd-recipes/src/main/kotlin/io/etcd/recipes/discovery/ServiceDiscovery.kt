@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,16 +18,16 @@
 
 package io.etcd.recipes.discovery
 
-import com.github.pambrose.common.delegate.AtomicDelegates.nonNullableReference
-import com.github.pambrose.common.util.isNotNull
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.delegate.AtomicDelegates.nonNullableReference
+import com.pambrose.common.util.isNotNull
+import com.pambrose.common.util.randomId
 import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdConnector.Companion.defaultTtlSecs
+import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
@@ -42,7 +42,7 @@ import io.etcd.recipes.common.leaseGrant
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
-import mu.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
@@ -52,21 +52,19 @@ import kotlin.time.Duration.Companion.seconds
 fun <T> withServiceDiscovery(
   client: Client,
   servicePath: String,
-  leaseTtlSecs: Long = defaultTtlSecs,
+  leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   clientId: String = defaultClientId(),
-  receiver: ServiceDiscovery.() -> T
-): T =
-  ServiceDiscovery(client, servicePath, leaseTtlSecs, clientId).use { it.receiver() }
+  receiver: ServiceDiscovery.() -> T,
+): T = ServiceDiscovery(client, servicePath, leaseTtlSecs, clientId).use { it.receiver() }
 
 class ServiceDiscovery
 @JvmOverloads
 constructor(
   client: Client,
   val servicePath: String,
-  val leaseTtlSecs: Long = defaultTtlSecs,
-  val clientId: String = defaultClientId()
+  val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
+  val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
-
   private val namesPath = servicePath.appendToPath("/names")
   private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = newConcurrentMap()
   private val serviceCacheList: MutableList<ServiceCache> = synchronizedList(mutableListOf())
@@ -79,7 +77,7 @@ constructor(
   private class ServiceInstanceContext(
     val service: ServiceInstance,
     val client: Client,
-    val instancePath: String
+    val instancePath: String,
   ) : Closeable {
     var lease: LeaseGrantResponse by nonNullableReference()
     var keepAlive: CloseableClient by nonNullableReference()
@@ -153,7 +151,10 @@ constructor(
     return cache
   }
 
-  fun <T> withServiceCache(name: String, receiver: ServiceCache.() -> T) = serviceCache(name).use { it.receiver() }
+  fun <T> withServiceCache(
+    name: String,
+    receiver: ServiceCache.() -> T,
+  ) = serviceCache(name).use { it.receiver() }
 
   fun serviceProvider(serviceName: String): ServiceProvider {
     val provider = ServiceProvider(client, namesPath, serviceName)
@@ -175,7 +176,10 @@ constructor(
 
   @Synchronized
   @Throws(EtcdRecipeException::class)
-  fun queryForInstance(name: String, id: String): ServiceInstance {
+  fun queryForInstance(
+    name: String,
+    id: String,
+  ): ServiceInstance {
     checkCloseNotCalled()
     val path = getNamesPath(name, id)
     val json = client.getValue(path)?.asString
@@ -199,7 +203,9 @@ constructor(
 
   private fun getNamesPath(vararg elems: String) = namesPath.appendToPath(elems.joinToString("/"))
 
-  companion object : KLogging() {
-    internal fun defaultClientId() = "${ServiceDiscovery::class.simpleName}:${randomId(tokenLength)}"
+  companion object {
+    private val logger = KotlinLogging.logger {}
+
+    internal fun defaultClientId() = "${ServiceDiscovery::class.simpleName}:${randomId(TOKEN_LENGTH)}"
   }
 }

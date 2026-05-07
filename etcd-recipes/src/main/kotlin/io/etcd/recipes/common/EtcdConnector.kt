@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,15 @@
 
 package io.etcd.recipes.common
 
-import com.github.pambrose.common.concurrent.BooleanMonitor
-import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
+import com.pambrose.common.concurrent.BooleanMonitor
+import com.pambrose.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.Client
 import java.io.Closeable
 import java.util.Collections.synchronizedList
 
-open class EtcdConnector(val client: Client) : Closeable {
-
+open class EtcdConnector(
+  val client: Client,
+) : Closeable {
   protected var startCalled by atomicBoolean(false)
   protected val startThreadComplete = BooleanMonitor(false)
   protected var closeCalled: Boolean by atomicBoolean(false)
@@ -37,7 +38,7 @@ open class EtcdConnector(val client: Client) : Closeable {
 
   val exceptions: List<Throwable> get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList()
 
-  val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.size > 0
+  val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.isNotEmpty()
 
   fun clearExceptions() {
     if (exceptionList.isInitialized()) exceptionList.value.clear()
@@ -53,7 +54,7 @@ open class EtcdConnector(val client: Client) : Closeable {
   }
 
   companion object {
-    internal const val tokenLength = 7
-    internal const val defaultTtlSecs = 2L
+    internal const val TOKEN_LENGTH = 7
+    internal const val DEFAULT_TTL_SECS = 2L
   }
 }

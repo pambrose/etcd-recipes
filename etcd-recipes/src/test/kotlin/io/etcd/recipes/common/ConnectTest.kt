@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,13 @@
 
 package io.etcd.recipes.common
 
-import org.amshove.kluent.invoking
-import org.amshove.kluent.shouldThrow
-import org.junit.jupiter.api.Test
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.assertions.throwables.shouldThrow
 
-class ConnectTest {
-
-  @Test
-  fun badArgsTest() {
-    invoking { connectToEtcd(emptyList()) { this } } shouldThrow IllegalArgumentException::class
-  }
+class ConnectTest : StringSpec() {
+    init {
+        "badArgsTest" {
+            shouldThrow<IllegalArgumentException> { connectToEtcd(emptyList()) { this } }
+        }
+    }
 }

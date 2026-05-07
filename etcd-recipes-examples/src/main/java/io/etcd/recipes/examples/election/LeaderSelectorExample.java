@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,58 +23,58 @@ import io.etcd.recipes.election.LeaderSelectorListener;
 
 import java.util.List;
 
-import static com.github.pambrose.common.util.MiscJavaFuncs.random;
-import static com.github.pambrose.common.util.MiscJavaFuncs.sleepSecs;
+import static com.pambrose.common.util.MiscJavaFuncs.random;
+import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 
 public class LeaderSelectorExample {
 
-    public static void main(String[] args) throws InterruptedException {
-        List<String> urls = Lists.newArrayList("http://localhost:2379");
-        String electionPath = "/election/LeaderSelectorExample";
-        int count = 5;
+  public static void main(String[] args) throws InterruptedException {
+    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    String electionPath = "/election/LeaderSelectorExample";
+    int count = 5;
 
-        LeaderSelectorListener listener =
-                new LeaderSelectorListener() {
-                    @Override
-                    public void takeLeadership(LeaderSelector selector) {
-                        System.out.println(selector.getClientId() + " elected leader");
-                        long pause = random(5);
-                        sleepSecs(pause);
-                        System.out.printf("%s surrendering after %s seconds%n", selector.getClientId(), pause);
-                    }
-
-                    @Override
-                    public void relinquishLeadership(LeaderSelector selector) {
-                        System.out.printf("%s relinquished leadership%n", selector.getClientId());
-                    }
-                };
-
-        try (Client client = connectToEtcd(urls)) {
-            System.out.println("Single leader is created and repeatedly runs for election");
-            try (LeaderSelector selector = new LeaderSelector(client, electionPath, listener)) {
-                for (int i = 0; i < count; i++) {
-                    selector.start();
-
-                    selector.waitOnLeadershipComplete();
-                }
-            }
-
-            System.out.println("\nMultiple leaders are created and each runs for election once");
-            List<LeaderSelector> selectors = Lists.newArrayList();
-            for (int i = 0; i < count; i++)
-                selectors.add(new LeaderSelector(client, electionPath, listener));
-
-            for (LeaderSelector selector : selectors)
-                selector.start();
-
-            System.out.printf("Participants: %s%n", LeaderSelector.getParticipants(client, electionPath));
-
-            for (LeaderSelector selector : selectors)
-                selector.waitOnLeadershipComplete();
-
-            for (LeaderSelector selector : selectors)
-                selector.close();
+    LeaderSelectorListener listener =
+      new LeaderSelectorListener() {
+        @Override
+        public void takeLeadership(LeaderSelector selector) {
+          System.out.println(selector.getClientId() + " elected leader");
+          long pause = random(5);
+          sleepSecs(pause);
+          System.out.printf("%s surrendering after %s seconds%n", selector.getClientId(), pause);
         }
+
+        @Override
+        public void relinquishLeadership(LeaderSelector selector) {
+          System.out.printf("%s relinquished leadership%n", selector.getClientId());
+        }
+      };
+
+    try (Client client = connectToEtcd(urls)) {
+      System.out.println("Single leader is created and repeatedly runs for election");
+      try (LeaderSelector selector = new LeaderSelector(client, electionPath, listener)) {
+        for (int i = 0; i < count; i++) {
+          selector.start();
+
+          selector.waitOnLeadershipComplete();
+        }
+      }
+
+      System.out.println("\nMultiple leaders are created and each runs for election once");
+      List<LeaderSelector> selectors = Lists.newArrayList();
+      for (int i = 0; i < count; i++)
+        selectors.add(new LeaderSelector(client, electionPath, listener));
+
+      for (LeaderSelector selector : selectors)
+        selector.start();
+
+      System.out.printf("Participants: %s%n", LeaderSelector.getParticipants(client, electionPath));
+
+      for (LeaderSelector selector : selectors)
+        selector.waitOnLeadershipComplete();
+
+      for (LeaderSelector selector : selectors)
+        selector.close();
     }
+  }
 }

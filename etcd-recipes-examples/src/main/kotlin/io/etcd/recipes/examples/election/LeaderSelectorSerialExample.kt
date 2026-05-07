@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,27 +18,29 @@
 
 package io.etcd.recipes.examples.election
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.election.withLeaderSelector
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val electionPath = "/election/single"
 
   val leadershipAction = { selector: LeaderSelector ->
-    println("${selector.clientId} elected leader")
-    val pause = 0.seconds //Random.nextInt(1, 3).seconds
+    logger.info {"${selector.clientId} elected leader"}
+    val pause = 0.seconds // Random.nextInt(1, 3).seconds
     sleep(pause)
-    println("${selector.clientId} surrendering after $pause")
+    logger.info {"${selector.clientId} surrendering after $pause"}
   }
 
   connectToEtcd(urls) { client ->
     withLeaderSelector(client, electionPath, leadershipAction) {
       repeat(100) {
-        println("Iteration $it")
+        logger.info {"Iteration $it"}
         start()
         waitOnLeadershipComplete()
       }
@@ -46,7 +48,7 @@ fun main() {
 
     repeat(5) {
       withLeaderSelector(client, electionPath, leadershipAction) {
-        println("Iteration $it")
+        logger.info {"Iteration $it"}
         start()
         waitOnLeadershipComplete()
       }

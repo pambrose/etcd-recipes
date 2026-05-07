@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,22 @@
 
 package io.etcd.recipes.counter
 
-import com.github.pambrose.common.util.*
-import io.etcd.jetcd.*
-import io.etcd.jetcd.kv.*
-import io.etcd.jetcd.op.*
-import io.etcd.recipes.common.*
-import mu.*
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
+import io.etcd.jetcd.Client
+import io.etcd.jetcd.KeyValue
+import io.etcd.jetcd.kv.TxnResponse
+import io.etcd.jetcd.op.CmpTarget
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.asLong
+import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.equalTo
+import io.etcd.recipes.common.getResponse
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.milliseconds
 
 @JvmOverloads
@@ -31,18 +41,16 @@ fun <T> withDistributedAtomicLong(
   client: Client,
   counterPath: String,
   default: Long = 0L,
-  receiver: DistributedAtomicLong.() -> T
-): T =
-  DistributedAtomicLong(client, counterPath, default).use { it.receiver() }
+  receiver: DistributedAtomicLong.() -> T,
+): T = DistributedAtomicLong(client, counterPath, default).use { it.receiver() }
 
 class DistributedAtomicLong
 @JvmOverloads
 constructor(
   client: Client,
   val counterPath: String,
-  private val default: Long = 0L
+  private val default: Long = 0L,
 ) : EtcdConnector(client) {
-
   init {
     require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
 
@@ -68,11 +76,11 @@ constructor(
   private fun modifyCounterValue(value: Long): Long {
     checkCloseNotCalled()
     var count = 1
-    //totalCount.incrementAndGet()
+    // totalCount.incrementAndGet()
     do {
       val txnResponse = applyCounterTransaction(value)
       if (!txnResponse.isSucceeded) {
-        //println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
+        // logger.info {"Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
         // Crude backoff for retry
         sleep((count * 100).random().milliseconds)
         count++
@@ -85,13 +93,15 @@ constructor(
 
   private fun createCounterIfNotPresent(): Boolean =
     // Run the transaction if the counter is not present
-    if (client.getResponse(counterPath).kvs.isEmpty())
-      client.transaction {
-        If(counterPath.doesNotExist)
-        Then(counterPath setTo default)
-      }.isSucceeded
-    else
+    if (client.getResponse(counterPath).kvs.isEmpty()) {
+      client
+        .transaction {
+          If(counterPath.doesNotExist)
+          Then(counterPath setTo default)
+        }.isSucceeded
+    } else {
       false
+    }
 
   private fun applyCounterTransaction(amount: Long): TxnResponse =
     client.transaction {
@@ -102,12 +112,16 @@ constructor(
       Then(counterPath setTo kv.value.asLong + amount)
     }
 
-  companion object : KLogging() {
-    //val collisionCount = AtomicLong()
-    //val totalCount = AtomicLong()
+  companion object {
+    private val logger = KotlinLogging.logger {}
+    // val collisionCount = AtomicLong()
+    // val totalCount = AtomicLong()
 
     @JvmStatic
-    fun delete(client: Client, counterPath: String) {
+    fun delete(
+      client: Client,
+      counterPath: String,
+    ) {
       require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
       client.deleteKey(counterPath)
     }

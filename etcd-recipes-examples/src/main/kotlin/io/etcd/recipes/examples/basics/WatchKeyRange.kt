@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteKey
@@ -28,27 +28,32 @@ import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val path = "/watchkeyrange"
 
   connectToEtcd(urls) { client ->
     client.apply {
       val watchOption = watchOption { isPrefix(true) }
-      withWatcher(path,
-                  watchOption,
-                  { watchResponse ->
-                    for (event in watchResponse.events)
-                      println("${event.eventType} for ${event.keyValue.asString}")
-                  }) {
+      withWatcher(
+        path,
+        watchOption,
+        { watchResponse ->
+          for (event in watchResponse.events) {
+            logger.info { "${event.eventType} for ${event.keyValue.asString}" }
+          }
+        },
+      ) {
         // Create empty root
         putValue(path, "root")
 
-        println("After creation:")
-        println(getChildren(path))
-        println(getChildCount(path))
+        logger.info { "After creation:" }
+        logger.info { getChildren(path) }
+        logger.info { getChildCount(path) }
 
         sleep(5.seconds)
 
@@ -58,17 +63,17 @@ fun main() {
         putValue("$path/waiting/c", "ccc")
         putValue("$path/waiting/d", "dddd")
 
-        println("\nAfter putValues:")
-        println(getChildren(path).asString)
-        println(getChildCount(path))
+        logger.info { "After putValues:" }
+        logger.info { getChildren(path).asString }
+        logger.info { getChildCount(path) }
 
-        println("\nElection only:")
-        println(getChildren("$path/election").asString)
-        println(getChildCount("$path/election"))
+        logger.info { "Election only:" }
+        logger.info { getChildren("$path/election").asString }
+        logger.info { getChildCount("$path/election") }
 
-        println("\nWaiting only:")
-        println(getChildren("$path/waiting").asString)
-        println(getChildCount("$path/waiting"))
+        logger.info { "Waiting only:" }
+        logger.info { getChildren("$path/waiting").asString }
+        logger.info { getChildCount("$path/waiting") }
 
         sleep(5.seconds)
 
@@ -77,16 +82,17 @@ fun main() {
 
         // Delete children
         getChildrenKeys(path).forEach {
-          println("Deleting key: $it")
-          deleteKey(it)
+          logger.info {
+            "Deleting key: $it"}
+            deleteKey(it)
+          }
+
+          println("After removal:")
+          println(getChildren(path).asString)
+          println(getChildCount(path))
+
+          sleep(5.seconds)
         }
-
-        println("\nAfter removal:")
-        println(getChildren(path).asString)
-        println(getChildCount(path))
-
-        sleep(5.seconds)
       }
     }
   }
-}

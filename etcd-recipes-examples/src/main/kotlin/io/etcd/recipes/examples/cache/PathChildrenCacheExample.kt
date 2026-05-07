@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,18 @@
 
 package io.etcd.recipes.examples.cache
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.cache.withPathChildrenCache
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.putValue
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val cachePath = "/cache/test"
 
@@ -38,15 +40,15 @@ fun main() {
 
     withPathChildrenCache(client, cachePath) {
       addListener { event: PathChildrenCacheEvent ->
-        println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+        logger.info { "CB: ${event.type} ${event.childName} ${event.data?.asString}" }
       }
 
       start(true)
       waitOnStartComplete()
 
-      currentData.forEach { println("${it.key} ${it.value.asString}") }
+      currentData.forEach { logger.info { "${it.key} ${it.value.asString}" } }
 
-      println("Deleted: ${client.deleteChildren(cachePath)}")
+      logger.info { "Deleted: ${client.deleteChildren(cachePath)}" }
 
       sleep(1.seconds)
     }

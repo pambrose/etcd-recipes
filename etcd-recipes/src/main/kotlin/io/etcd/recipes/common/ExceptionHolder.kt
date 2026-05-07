@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,10 @@
 
 package io.etcd.recipes.common
 
-import com.github.pambrose.common.util.isNotNull
+import com.pambrose.common.util.isNotNull
 import java.util.concurrent.atomic.AtomicReference
 
 class ExceptionHolder {
-
   private val holder = lazy { AtomicReference<Throwable>() }
 
   var exception: Throwable?

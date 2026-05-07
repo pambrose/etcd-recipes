@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,20 +30,20 @@ import io.etcd.jetcd.options.WatchOption
 
 fun etcdClient(block: ClientBuilder.() -> ClientBuilder): Client = Client.builder().block().build()
 
-fun compactOption(reciever: CompactOption.Builder.() -> CompactOption.Builder): CompactOption =
-  CompactOption.newBuilder().reciever().build()
+fun compactOption(receiver: CompactOption.Builder.() -> CompactOption.Builder): CompactOption =
+  CompactOption.builder().receiver().build()
 
-fun deleteOption(reciever: DeleteOption.Builder.() -> DeleteOption.Builder): DeleteOption =
-  DeleteOption.newBuilder().reciever().build()
+fun deleteOption(receiver: DeleteOption.Builder.() -> DeleteOption.Builder): DeleteOption =
+  DeleteOption.builder().receiver().build()
 
-fun getOption(reciever: GetOption.Builder.() -> GetOption.Builder): GetOption =
-  GetOption.newBuilder().reciever().build()
+fun getOption(receiver: GetOption.Builder.() -> GetOption.Builder): GetOption =
+  GetOption.builder().receiver().build()
 
-fun leaseOption(reciever: LeaseOption.Builder.() -> LeaseOption.Builder): LeaseOption =
-  LeaseOption.newBuilder().reciever().build()
+fun leaseOption(receiver: LeaseOption.Builder.() -> LeaseOption.Builder): LeaseOption =
+  LeaseOption.builder().receiver().build()
 
-fun putOption(reciever: PutOption.Builder.() -> PutOption.Builder): PutOption =
-  PutOption.newBuilder().reciever().build()
+fun putOption(receiver: PutOption.Builder.() -> PutOption.Builder): PutOption =
+  PutOption.builder().receiver().build()
 
-fun watchOption(reciever: WatchOption.Builder.() -> WatchOption.Builder): WatchOption =
-  WatchOption.newBuilder().reciever().build()
+fun watchOption(receiver: WatchOption.Builder.() -> WatchOption.Builder): WatchOption =
+  WatchOption.builder().receiver().build()

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,16 +25,13 @@ import kotlin.random.Random
 class ServiceProvider internal constructor(
   client: Client,
   namesPath: String,
-  val serviceName: String
+  val serviceName: String,
 ) : Closeable {
-
   val serviceDiscovery = lazy { ServiceDiscovery(client, namesPath) }
 
   fun getInstance(): ServiceInstance = getAllInstances()[Random.nextInt(0, getAllInstances().size)]
 
-  fun getAllInstances(): List<ServiceInstance> {
-    return serviceDiscovery.value.queryForInstances(serviceName)
-  }
+  fun getAllInstances(): List<ServiceInstance> = serviceDiscovery.value.queryForInstances(serviceName)
 
   override fun close() {
     if (serviceDiscovery.isInitialized())

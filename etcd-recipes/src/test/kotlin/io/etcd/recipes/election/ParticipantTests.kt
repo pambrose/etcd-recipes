@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,85 +18,88 @@
 
 package io.etcd.recipes.election
 
-import com.github.pambrose.common.concurrent.thread
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.concurrent.thread
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
-import mu.KLogging
-import org.amshove.kluent.shouldBeEqualTo
-import org.junit.jupiter.api.Test
+import io.github.oshai.kotlinlogging.KotlinLogging
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import kotlin.time.Duration.Companion.seconds
 
-class ParticipantTests {
-  val path = "/election/${javaClass.simpleName}"
+class ParticipantTests : StringSpec() {
+    val path = "/election/${javaClass.simpleName}"
 
-  @Test
-  fun participantTest() {
-    val count = 20
-    val startedLatch = CountDownLatch(count)
-    val finishedLatch = CountDownLatch(count)
-    val holdLatch = CountDownLatch(1)
-    val participantCounts: MutableList<Int> = synchronizedList(mutableListOf())
-    val leaderNames: MutableList<String> = synchronizedList(mutableListOf())
+    init {
+        "participantTest" {
+            val count = 20
+            val startedLatch = CountDownLatch(count)
+            val finishedLatch = CountDownLatch(count)
+            val holdLatch = CountDownLatch(1)
+            val participantCounts: MutableList<Int> = synchronizedList(mutableListOf())
+            val leaderNames: MutableList<String> = synchronizedList(mutableListOf())
 
-    connectToEtcd(urls) { client ->
-      blockingThreads(count) {
-        thread(finishedLatch) {
-          withLeaderSelector(
-            client,
-            path,
-            object : LeaderSelectorListenerAdapter() {
-              override fun takeLeadership(selector: LeaderSelector) {
-                val pause = 2.seconds
-                logger.debug { "${selector.clientId} elected leader for $pause" }
-                sleep(pause)
+            connectToEtcd(urls) { client ->
+                blockingThreads(count) {
+                    thread(finishedLatch) {
+                        withLeaderSelector(
+                            client,
+                            path,
+                            object : LeaderSelectorListenerAdapter() {
+                                override fun takeLeadership(selector: LeaderSelector) {
+                                    val pause = 2.seconds
+                                    logger.info { "${selector.clientId} elected leader for $pause" }
+                                    sleep(pause)
 
-                // Wait until participation count has been taken
-                holdLatch.await()
-                participantCounts += LeaderSelector.getParticipants(client, path).size
-                leaderNames += selector.clientId
-              }
-            },
-            clientId = "Thread$it"
-          ) {
-            start()
-            startedLatch.countDown()
-            waitOnLeadershipComplete()
-          }
+                                    // Wait until participation count has been taken
+                                    holdLatch.await()
+                                    participantCounts += LeaderSelector.getParticipants(client, path).size
+                                    leaderNames += selector.clientId
+                                }
+                            },
+                            clientId = "Thread$it",
+                        ) {
+                            start()
+                            startedLatch.countDown()
+                            waitOnLeadershipComplete()
+                        }
+                    }
+                }
+
+                startedLatch.await()
+
+                // Wait for participants to register
+                sleep(3.seconds)
+                var participants = LeaderSelector.getParticipants(client, path)
+                logger.info { "Found ${participants.size} participants" }
+                participants.size shouldBe count
+
+                holdLatch.countDown()
+
+                finishedLatch.await()
+
+                sleep(5.seconds)
+
+                participants = LeaderSelector.getParticipants(client, path)
+                logger.info { "Found ${participants.size} participants" }
+                participants.size shouldBe 0
+
+                // Compare participant counts
+                logger.info { "participantCounts = $participantCounts" }
+                participantCounts.size shouldBe count
+                participantCounts shouldBe (count downTo 1).toList()
+
+                // Compare leader names
+                logger.info { "leaderNames = $leaderNames" }
+                leaderNames.sorted() shouldBe List(count) { "Thread$it" }.sorted()
+            }
         }
-      }
-
-      startedLatch.await()
-
-      // Wait for participants to register
-      sleep(3.seconds)
-      var particpants = LeaderSelector.getParticipants(client, path)
-      logger.debug { "Found ${particpants.size} participants" }
-      particpants.size shouldBeEqualTo count
-
-      holdLatch.countDown()
-
-      finishedLatch.await()
-
-      sleep(5.seconds)
-
-      particpants = LeaderSelector.getParticipants(client, path)
-      logger.debug { "Found ${particpants.size} participants" }
-      particpants.size shouldBeEqualTo 0
-
-      // Compare participant counts
-      logger.debug { "participantCounts = $participantCounts" }
-      participantCounts.size shouldBeEqualTo count
-      participantCounts shouldBeEqualTo (count downTo 1).toList()
-
-      // Compare leader names
-      logger.debug { "leaderNames = $leaderNames" }
-      leaderNames.sorted() shouldBeEqualTo List(count) { "Thread$it" }.sorted()
     }
-  }
 
-  companion object : KLogging()
+    companion object {
+        private val logger = KotlinLogging.logger {}
+    }
 }

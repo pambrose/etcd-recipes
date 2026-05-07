@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,16 @@
 
 package io.etcd.recipes.examples.counter
 
-import com.github.pambrose.common.concurrent.thread
+import com.pambrose.common.concurrent.thread
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.counter.DistributedAtomicLong
 import io.etcd.recipes.counter.withDistributedAtomicLong
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.time.measureTimedValue
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val path = "/counters"
   val threadCount = 5
@@ -40,7 +42,7 @@ fun main() {
       measureTimedValue {
         repeat(threadCount) { i ->
           thread(latch) {
-            println("Creating counter #$i")
+            logger.info {"Creating counter #$i"}
             withDistributedAtomicLong(client, path) {
               repeat(repeatCount) { increment() }
               repeat(repeatCount) { decrement() }
@@ -52,6 +54,6 @@ fun main() {
         latch.await()
       }
 
-    withDistributedAtomicLong(client, path) { println("Counter value = ${get()} in $dur") }
+    withDistributedAtomicLong(client, path) { logger.info {"Counter value = ${get()} in $dur"} }
   }
 }

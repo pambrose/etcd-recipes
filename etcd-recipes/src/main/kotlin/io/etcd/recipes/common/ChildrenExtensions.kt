@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ fun Client.getChildren(
   keyName: String,
   target: GetOption.SortTarget = GetOption.SortTarget.KEY,
   order: SortOrder = SortOrder.ASCEND,
-  keysOnly: Boolean = false
+  keysOnly: Boolean = false,
 ): List<Pair<String, ByteSequence>> {
   val trailingKey = keyName.ensureSuffix("/")
   val getOption =
@@ -43,18 +43,22 @@ fun Client.getChildren(
   return getKeyValuePairs(trailingKey, getOption)
 }
 
-fun Client.getFirstChild(keyName: String, target: GetOption.SortTarget): GetResponse =
-  getSingleChild(keyName, target, SortOrder.ASCEND)
+fun Client.getFirstChild(
+  keyName: String,
+  target: GetOption.SortTarget,
+): GetResponse = getSingleChild(keyName, target, SortOrder.ASCEND)
 
-fun Client.getLastChild(keyName: String, target: GetOption.SortTarget): GetResponse =
-  getSingleChild(keyName, target, SortOrder.DESCEND)
+fun Client.getLastChild(
+  keyName: String,
+  target: GetOption.SortTarget,
+): GetResponse = getSingleChild(keyName, target, SortOrder.DESCEND)
 
-//fun GetOption.Builder.withPrefix(prefix: String): GetOption.Builder = withPrefix(prefix.asByteSequence)
+// fun GetOption.Builder.withPrefix(prefix: String): GetOption.Builder = withPrefix(prefix.asByteSequence)
 
 private fun Client.getSingleChild(
   keyName: String,
   target: GetOption.SortTarget,
-  order: SortOrder
+  order: SortOrder,
 ): GetResponse {
   val trailingKey = keyName.ensureSuffix("/")
   val getOption =
@@ -71,23 +75,22 @@ private fun Client.getSingleChild(
 fun Client.getChildrenKeys(
   keyName: String,
   target: GetOption.SortTarget = GetOption.SortTarget.KEY,
-  order: SortOrder = SortOrder.ASCEND
-): List<String> =
-  getChildren(keyName, target, order, true).keys
+  order: SortOrder = SortOrder.ASCEND,
+): List<String> = getChildren(keyName, target, order, true).keys
 
 @JvmOverloads
 fun Client.getChildrenValues(
   keyName: String,
   target: GetOption.SortTarget = GetOption.SortTarget.KEY,
-  order: SortOrder = SortOrder.ASCEND
-): List<ByteSequence> =
-  getChildren(keyName, target, order).values
+  order: SortOrder = SortOrder.ASCEND,
+): List<ByteSequence> = getChildren(keyName, target, order).values
 
 // Delete children keys
 fun Client.deleteChildren(keyName: String): List<String> {
   val keys = getChildrenKeys(keyName)
-  for (key in keys)
+  for (key in keys) {
     deleteKey(key)
+  }
   return keys
 }
 

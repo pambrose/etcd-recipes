@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,19 +23,25 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.support.Observers
+import io.etcd.recipes.common.LeaseLogger.logger
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 
-fun <T> Client.keepAliveWith(lease: LeaseGrantResponse, block: () -> T): T =
-  keepAlive(lease).use { block.invoke() }
+fun <T> Client.keepAliveWith(
+  lease: LeaseGrantResponse,
+  block: () -> T,
+): T = keepAlive(lease).use { block.invoke() }
 
 fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
   leaseClient.keepAlive(
     lease.id,
-    Observers.observer(
-      { /*println("KeepAlive next resp: $next")*/ },
-      { /*println("KeepAlive err resp: $err")*/ })
+    Observers.observer { next -> logger.debug { "KeepAlive next resp: $next" } },
   )
 
 fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse =
   leaseClient.grant(ttl.toDouble(DurationUnit.SECONDS).toLong()).get()
+
+object LeaseLogger {
+  val logger = KotlinLogging.logger {}
+}
