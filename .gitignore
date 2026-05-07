@@ -7,3 +7,4 @@ out
 .kotlin
 default.etcd
 .DS_Store
+.claude/*.lock
