@@ -98,13 +98,23 @@ abstract class AbstractQueue(
         }
       },
     ) {
-      // Query again in case a value arrived just before watch was created
-      synchronized(watchLatch) {
-        if (watchLatch.count > 0) {
-          val waitingChildList = client.getFirstChild(queuePath, target).kvs
-          if (waitingChildList.isNotEmpty()) {
-            keyFound.compareAndSet(null, waitingChildList.first())
-            watchLatch.countDown()
+      // Query again in case a value arrived just before watch was created.
+      // The gRPC call must run *outside* the synchronized block: the watcher
+      // callback executes on the jetcd Vert.x event loop and also takes
+      // watchLatch's monitor, so holding it while a gRPC response is pending
+      // deadlocks the event loop and never delivers the response.
+      //
+      // The poll result is authoritative for ordering — it returns the
+      // queue's actual first item by mod revision, which may pre-date any
+      // PUT the watcher saw if PUTs slipped in between watcher.use { } and
+      // the watch actually being live in jetcd. Override keyFound so we
+      // always dequeue the oldest item.
+      if (watchLatch.count > 0) {
+        val waitingChildList = client.getFirstChild(queuePath, target).kvs
+        if (waitingChildList.isNotEmpty()) {
+          synchronized(watchLatch) {
+            keyFound.set(waitingChildList.first())
+            if (watchLatch.count > 0) watchLatch.countDown()
           }
         }
       }
