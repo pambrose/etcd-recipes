@@ -53,7 +53,7 @@ class TransientKeyValueTest : StringSpec() {
             }
         }
 
-        "!multiKVTest" {
+        "multiKVTest" {
             val count = 25
             val prefix = "/keyvalue"
             val paths = List(count) { "$prefix/multiKVTest$it" }

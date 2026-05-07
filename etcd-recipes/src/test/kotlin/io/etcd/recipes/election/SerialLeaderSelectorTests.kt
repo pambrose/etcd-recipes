@@ -39,7 +39,7 @@ class SerialLeaderSelectorTests : StringSpec() {
             }
         }
 
-        "!serialElectionTest" {
+        "serialElectionTest" {
             val count = 10
             val takeLeadershiptCounter = AtomicInteger(0)
             val relinquishLeadershiptCounter = AtomicInteger(0)

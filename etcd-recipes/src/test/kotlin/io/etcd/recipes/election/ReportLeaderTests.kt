@@ -36,7 +36,7 @@ class ReportLeaderTests : StringSpec() {
     init {
         // Disabled under Kotest: hangs in LeaderSelector.attemptToBecomeLeader's
         // jetcd lease grant. Same code passed under JUnit — root cause not yet diagnosed.
-        "!reportLeaderTest" {
+        "reportLeaderTest" {
             val count = 2
             val takeLeadershipCounter = AtomicInteger(0)
             val relinquishLeadershipCounter = AtomicInteger(0)

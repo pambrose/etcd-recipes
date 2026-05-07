@@ -44,7 +44,7 @@ class DistributedDoubleBarrierTests : StringSpec() {
             }
         }
 
-        "!barrierTest" {
+        "barrierTest" {
             val path = "/barriers/DistributedDoubleBarrierTests"
             val count = 10
             val retryAttempts = 5

@@ -34,7 +34,7 @@ class ParticipantTests : StringSpec() {
     val path = "/election/${javaClass.simpleName}"
 
     init {
-        "!participantTest" {
+        "participantTest" {
             val count = 20
             val startedLatch = CountDownLatch(count)
             val finishedLatch = CountDownLatch(count)

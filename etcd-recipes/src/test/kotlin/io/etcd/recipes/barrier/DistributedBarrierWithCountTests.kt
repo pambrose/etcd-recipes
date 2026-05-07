@@ -42,7 +42,7 @@ class DistributedBarrierWithCountTests : StringSpec() {
             }
         }
 
-        "!barrierWithCountTest" {
+        "barrierWithCountTest" {
             val path = "/barriers/DistributedBarrierWithCountTests"
             val count = 30
             val retryAttempts = 5

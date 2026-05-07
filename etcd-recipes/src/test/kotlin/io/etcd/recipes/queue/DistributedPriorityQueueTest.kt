@@ -194,27 +194,27 @@ class DistributedPriorityQueueTest : StringSpec() {
         }
 
         // Disabled under Kotest: concurrent enqueue/dequeue deadlocks (same root cause as pingPongTest)
-        "!threadedTestWithWait1" {
+        "threadedTestWithWait1" {
             threadedTestWithWait(10, 1)
             threadedTestWithWait(10, 2)
             threadedTestWithWait(10, 5)
             threadedTestWithWait(10, 10)
         }
 
-        "!threadedTestWithWait2" {
+        "threadedTestWithWait2" {
             threadedTestWithWait(100, 1)
             threadedTestWithWait(100, 2)
             threadedTestWithWait(100, 5)
             threadedTestWithWait(100, 10)
         }
 
-        "!threadedTestWithWait3" {
+        "threadedTestWithWait3" {
             threadedTestWithWait(iterCount, threadCount)
         }
 
         // Disabled under Kotest: 10 dequeue watchers on the same path appear to deadlock.
         // Same code passed under JUnit — root cause not yet diagnosed.
-        "!pingPongTest" {
+        "pingPongTest" {
             val queuePath = "/queue/pingPongTest"
             val counter = AtomicInteger(0)
             val token = "Pong"
@@ -249,7 +249,7 @@ class DistributedPriorityQueueTest : StringSpec() {
             counter.get() shouldBe threadCount * iterCount
         }
 
-        "!serialTestNoWaitWithPriorities" {
+        "serialTestNoWaitWithPriorities" {
             val queuePath = "/queue/serialTestNoWaitWithPriorities"
             val dequeuedData = mutableListOf<String>()
 
