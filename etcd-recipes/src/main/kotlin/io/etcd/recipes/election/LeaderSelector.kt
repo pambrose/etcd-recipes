@@ -130,13 +130,6 @@ constructor(
     )
 
   private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
-
-  // Dedicated executor for handling watch callbacks. The jetcd watch callback
-  // runs on the gRPC event loop, so any blocking gRPC call from inside it
-  // (e.g. attemptToBecomeLeader's lease grant) would deadlock. Dispatch from
-  // the watch callback onto this executor to break that chain.
-  private val watchEventExecutor: ExecutorService = Executors.newSingleThreadExecutor()
-
   private val terminateWatch = BooleanMonitor(false)
   private val terminateKeepAlive = BooleanMonitor(false)
   private val leadershipComplete = BooleanMonitor(false)
@@ -189,11 +182,8 @@ constructor(
               { watchResponse ->
                 for (event in watchResponse.events) {
                   if (event.eventType == DELETE) {
-                    // Run for leader whenever leader key is deleted.
-                    // Dispatch off the gRPC event loop so the synchronous
-                    // gRPC calls inside attemptToBecomeLeader don't deadlock
-                    // with this very callback.
-                    watchEventExecutor.execute { attemptToBecomeLeader(client) }
+                    // Run for leader whenever leader key is deleted
+                    attemptToBecomeLeader(client)
                   }
                 }
               },
@@ -279,7 +269,6 @@ constructor(
     startThreadComplete.waitUntilTrue()
 
     if (userExecutor.isNull()) (executor as ExecutorService).shutdown()
-    watchEventExecutor.shutdown()
 
     super.close()
   }
