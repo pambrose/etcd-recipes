@@ -6,3 +6,4 @@ target
 out
 .kotlin
 default.etcd
+.DS_Store
