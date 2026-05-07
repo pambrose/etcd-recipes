@@ -1,0 +1,36 @@
+[versions]
+kotlin = "2.3.21"
+coroutines = "1.10.0"
+serialization = "1.11.0"
+jetcd = "0.8.6"
+guava = "33.6.0-jre"
+utils = "2.8.2"
+kotlin-logging = "8.0.02"
+logback = "1.5.32"
+netty = "4.1.116.Final"
+kluent = "1.73"
+junit = "5.11.4"
+atomicfu = "0.26.1"
+ben-manes-versions = "0.54.0"
+coveralls = "2.12.2"
+
+[libraries]
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+jetcd-core = { module = "io.etcd:jetcd-core", version.ref = "jetcd" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+common-utils-core = { module = "com.pambrose.common-utils:core-utils", version.ref = "utils" }
+common-utils-guava = { module = "com.pambrose.common-utils:guava-utils", version.ref = "utils" }
+kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
+kluent = { module = "org.amshove.kluent:kluent", version.ref = "kluent" }
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "atomicfu" }
+ben-manes-versions = { id = "com.github.ben-manes.versions", version.ref = "ben-manes-versions" }
+coveralls = { id = "com.github.kt3k.coveralls", version.ref = "coveralls" }

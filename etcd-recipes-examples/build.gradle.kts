@@ -1,0 +1,5 @@
+description = "etcd-recipes-examples"
+
+dependencies {
+  "implementation"(project(":etcd-recipes"))
+}

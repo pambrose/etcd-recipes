@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build, Test, Lint
 
-JDK 17 toolchain (configured in `build.gradle` via `kotlin { jvmToolchain(17) }`). Gradle wrapper is pinned to 9.5.0. Common entry points are in the `Makefile`:
+JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17) }`). Gradle wrapper is pinned to 9.5.0. Common entry points are in the `Makefile`:
 
 - `make build` — `./gradlew clean build -xtest` (build without running tests)
 - `make tests` — `./gradlew check jacocoTestReport` (runs all tests + coverage)
@@ -33,7 +33,7 @@ which runs `etcd --listen-client-urls=http://localhost:2379 --advertise-client-u
 
 ## Module Layout
 
-Multi-module Gradle build (`settings.gradle`):
+Multi-module Gradle build (`settings.gradle.kts`):
 
 - **`etcd-recipes/`** — the library itself. Source is organized by recipe under `io.etcd.recipes.*`:
   - `barrier/` — `DistributedBarrier`, `DistributedBarrierWithCount`, `DistributedDoubleBarrier`
@@ -58,4 +58,4 @@ The recipes are layered on a thin Kotlin extension layer over jetcd, not a wrapp
 
 ## Versioning
 
-The current development branch is named after the version (e.g. `0.9.22`). Library version and Kotlin/dependency versions are defined in `build.gradle` and `gradle.properties`; bump both when releasing.
+The current development branch is named after the version (e.g. `0.9.22`). Library version is defined in `build.gradle.kts`; Kotlin/dependency versions live in `gradle.properties`; bump both when releasing.
