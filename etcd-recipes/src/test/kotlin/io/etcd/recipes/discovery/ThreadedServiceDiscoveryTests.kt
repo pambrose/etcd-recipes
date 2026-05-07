@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,127 +18,128 @@
 
 package io.etcd.recipes.discovery
 
-import com.pambrose.common.util.sleep
 import com.google.common.collect.Maps.newConcurrentMap
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.kotest.core.spec.style.StringSpec
 import org.amshove.kluent.invoking
 import org.amshove.kluent.shouldBeEqualTo
 import org.amshove.kluent.shouldThrow
-import org.junit.jupiter.api.Test
 import java.util.concurrent.ConcurrentMap
 import kotlin.time.Duration.Companion.seconds
 
-class ThreadedServiceDiscoveryTests {
-  val path = "/discovery/${javaClass.simpleName}"
-  private val threadCount = 5
-  private val serviceCount = 10
-  private val contextMap: ConcurrentMap<Int, ServiceDiscoveryContext> = newConcurrentMap()
+class ThreadedServiceDiscoveryTests : StringSpec() {
+    val path = "/discovery/${javaClass.simpleName}"
+    private val threadCount = 5
+    private val serviceCount = 10
+    private val contextMap: ConcurrentMap<Int, ServiceDiscoveryContext> = newConcurrentMap()
 
-  class ServiceDiscoveryContext(val serviceDiscovery: ServiceDiscovery) {
-    val serviceMap: ConcurrentMap<String, ServiceInstance> = newConcurrentMap()
-  }
-
-  @Test
-  fun discoveryTest() {
-    connectToEtcd(urls) { client ->
-
-      // Create services
-      blockingThreads(threadCount) { i ->
-        // Close ServiceDiscovery objects at end
-        val sd = ServiceDiscovery(client, path)
-        val context = ServiceDiscoveryContext(sd)
-        contextMap[i] = context
-
-        repeat(serviceCount) { j ->
-          val service = ServiceInstance("TestInstance$j", TestPayload(j).toJson())
-          context.serviceMap[service.id] = service
-          logger.info { "Registering: $service" }
-          sd.registerService(service)
-        }
-      }
-
-      // Query services
-      blockingThreads(threadCount) {
-        withServiceDiscovery(client, path) {
-          contextMap.values.forEach { context ->
-            context.serviceMap.forEach { (_, service) ->
-              val inst = queryForInstance(service.name, service.id)
-              logger.info { "Retrieved value: $inst" }
-              inst shouldBeEqualTo service
-            }
-          }
-        }
-      }
-
-      // Update services
-      contextMap.forEach { (_, context) ->
-        context.serviceMap.forEach { (_, service) ->
-          val payload = TestPayload.toObject(service.jsonPayload)
-          payload.testval = payload.testval * -1
-          service.jsonPayload = payload.toJson()
-          logger.info { "Updating service: $service" }
-          context.serviceDiscovery.updateService(service)
-        }
-      }
-
-      // Query updated services
-      blockingThreads(threadCount) {
-        withServiceDiscovery(client, path) {
-          contextMap.values.forEach { context ->
-            context.serviceMap.forEach { (_, service) ->
-              val inst = queryForInstance(service.name, service.id)
-              logger.info { "Retrieved updated value: $inst" }
-              inst shouldBeEqualTo service
-            }
-          }
-        }
-      }
-
-      withServiceDiscovery(client, path) {
-        val size = queryForNames().size
-        logger.info { "Retrieved all names: $size" }
-        size shouldBeEqualTo threadCount * serviceCount
-      }
-
-      // Delete services
-      contextMap.forEach { (_, context) ->
-        context.serviceMap.forEach { (_, service) ->
-          val payload = TestPayload.toObject(service.jsonPayload)
-          payload.testval = payload.testval * -1
-          service.jsonPayload = payload.toJson()
-          logger.info { "Unregistering service: $service" }
-          context.serviceDiscovery.unregisterService(service)
-        }
-      }
+    class ServiceDiscoveryContext(val serviceDiscovery: ServiceDiscovery) {
+        val serviceMap: ConcurrentMap<String, ServiceInstance> = newConcurrentMap()
     }
 
-    // Give unregister a chance to take place
-    sleep(5.seconds)
+    init {
+        "discoveryTest" {
+            connectToEtcd(urls) { client ->
 
-    // Query deleted services
-    blockingThreads(threadCount) {
-      connectToEtcd(urls) { client ->
-        withServiceDiscovery(client, path) {
-          contextMap.values.forEach { context ->
-            context.serviceMap.forEach { (_, service) ->
-              val name = service.name
-              logger.info { "Query deleted service: $name  ${service.id}" }
-              invoking { queryForInstance(name, service.id) } shouldThrow EtcdRecipeException::class
+                // Create services
+                blockingThreads(threadCount) { i ->
+                    // Close ServiceDiscovery objects at end
+                    val sd = ServiceDiscovery(client, path)
+                    val context = ServiceDiscoveryContext(sd)
+                    contextMap[i] = context
+
+                    repeat(serviceCount) { j ->
+                        val service = ServiceInstance("TestInstance$j", TestPayload(j).toJson())
+                        context.serviceMap[service.id] = service
+                        logger.info { "Registering: $service" }
+                        sd.registerService(service)
+                    }
+                }
+
+                // Query services
+                blockingThreads(threadCount) {
+                    withServiceDiscovery(client, path) {
+                        contextMap.values.forEach { context ->
+                            context.serviceMap.forEach { (_, service) ->
+                                val inst = queryForInstance(service.name, service.id)
+                                logger.info { "Retrieved value: $inst" }
+                                inst shouldBeEqualTo service
+                            }
+                        }
+                    }
+                }
+
+                // Update services
+                contextMap.forEach { (_, context) ->
+                    context.serviceMap.forEach { (_, service) ->
+                        val payload = TestPayload.toObject(service.jsonPayload)
+                        payload.testval = payload.testval * -1
+                        service.jsonPayload = payload.toJson()
+                        logger.info { "Updating service: $service" }
+                        context.serviceDiscovery.updateService(service)
+                    }
+                }
+
+                // Query updated services
+                blockingThreads(threadCount) {
+                    withServiceDiscovery(client, path) {
+                        contextMap.values.forEach { context ->
+                            context.serviceMap.forEach { (_, service) ->
+                                val inst = queryForInstance(service.name, service.id)
+                                logger.info { "Retrieved updated value: $inst" }
+                                inst shouldBeEqualTo service
+                            }
+                        }
+                    }
+                }
+
+                withServiceDiscovery(client, path) {
+                    val size = queryForNames().size
+                    logger.info { "Retrieved all names: $size" }
+                    size shouldBeEqualTo threadCount * serviceCount
+                }
+
+                // Delete services
+                contextMap.forEach { (_, context) ->
+                    context.serviceMap.forEach { (_, service) ->
+                        val payload = TestPayload.toObject(service.jsonPayload)
+                        payload.testval = payload.testval * -1
+                        service.jsonPayload = payload.toJson()
+                        logger.info { "Unregistering service: $service" }
+                        context.serviceDiscovery.unregisterService(service)
+                    }
+                }
             }
-          }
+
+            // Give unregister a chance to take place
+            sleep(5.seconds)
+
+            // Query deleted services
+            blockingThreads(threadCount) {
+                connectToEtcd(urls) { client ->
+                    withServiceDiscovery(client, path) {
+                        contextMap.values.forEach { context ->
+                            context.serviceMap.forEach { (_, service) ->
+                                val name = service.name
+                                logger.info { "Query deleted service: $name  ${service.id}" }
+                                invoking { queryForInstance(name, service.id) } shouldThrow EtcdRecipeException::class
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Close ServiceDiscovery objects
+            contextMap.values.forEach { it.serviceDiscovery.close() }
         }
-      }
     }
 
-    // Close ServiceDiscovery objects
-    contextMap.values.forEach { it.serviceDiscovery.close() }
-  }
-
-  companion object {
-    private val logger = KotlinLogging.logger {}
-  }
+    companion object {
+        private val logger = KotlinLogging.logger {}
+    }
 }

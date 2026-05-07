@@ -39,8 +39,11 @@ subprojects {
 
         "testImplementation"(rootProject.libs.kluent)
         "testImplementation"(rootProject.libs.junit.jupiter.api)
+        "testImplementation"(rootProject.libs.kotest.runner.junit5)
+        "testImplementation"(rootProject.libs.kotest.assertions.core)
 
         "testRuntimeOnly"(rootProject.libs.junit.jupiter.engine)
+        "testRuntimeOnly"(rootProject.libs.junit.platform.launcher)
     }
 
     val mainSourceSet = the<JavaPluginExtension>().sourceSets["main"]
@@ -88,6 +91,9 @@ subprojects {
 
     tasks.named<Test>("test") {
         useJUnitPlatform()
+        // Fork a new JVM for each test class so background threads / etcd watch
+        // connections from one spec don't interfere with the next one
+        setForkEvery(1)
         testLogging {
             events("passed", "skipped", "failed", "standardOut", "standardError")
             exceptionFormat = TestExceptionFormat.FULL

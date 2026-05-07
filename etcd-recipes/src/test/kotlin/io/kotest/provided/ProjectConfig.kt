@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-@file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
+@file:Suppress("UndocumentedPublicClass")
 
-package io.etcd.recipes.election
+package io.kotest.provided
 
-open class LeaderSelectorListenerAdapter : LeaderSelectorListener {
-  override fun takeLeadership(selector: LeaderSelector) {
-    // Default to no action
-  }
+import io.kotest.core.config.AbstractProjectConfig
+import io.kotest.core.spec.IsolationMode
 
-  override fun relinquishLeadership(selector: LeaderSelector) {
-    // Default to no action
-  }
+// Each test gets a fresh spec instance so any threads/clients started in one
+// test don't leak into the next. Matches the per-method isolation JUnit gave us.
+class ProjectConfig : AbstractProjectConfig() {
+    override val isolationMode = IsolationMode.InstancePerTest
 }

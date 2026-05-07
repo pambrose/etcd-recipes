@@ -1,5 +1,5 @@
 /*
- * Copyright © 2024 Paul Ambrose (pambrose@mac.com)
+ * Copyright © 2026 Paul Ambrose
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,103 +27,103 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.kotest.core.spec.style.StringSpec
 import org.amshove.kluent.shouldBeEqualTo
-import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
-class ServiceCacheTests {
-  @Test
-  fun serviceCacheTest() {
-    val path = "/discovery/${javaClass.simpleName}"
-    val threadCount = 10
-    val serviceCount = 10
-    val name = "ServiceCacheTest"
-    val holder = ExceptionHolder()
-    val registerCounter = AtomicInteger(0)
-    val updateCounter = AtomicInteger(0)
-    val unregisterCounter = AtomicInteger(0)
-    val totalCounter = AtomicInteger(0)
+class ServiceCacheTests : StringSpec() {
+    init {
+        "serviceCacheTest" {
+            val path = "/discovery/ServiceCacheTests"
+            val threadCount = 10
+            val serviceCount = 10
+            val name = "ServiceCacheTest"
+            val holder = ExceptionHolder()
+            val registerCounter = AtomicInteger(0)
+            val updateCounter = AtomicInteger(0)
+            val unregisterCounter = AtomicInteger(0)
+            val totalCounter = AtomicInteger(0)
 
-    connectToEtcd(urls) { client ->
-      withServiceDiscovery(client, path) {
-        withServiceCache(name) {
-          start()
-          sleep(2.seconds)
+            connectToEtcd(urls) { client ->
+                withServiceDiscovery(client, path) {
+                    withServiceCache(name) {
+                        start()
+                        sleep(2.seconds)
 
-          instances.size shouldBeEqualTo 0
-          serviceName shouldBeEqualTo name
-          urls shouldBeEqualTo urls
+                        instances.size shouldBeEqualTo 0
+                        serviceName shouldBeEqualTo name
+                        urls shouldBeEqualTo urls
 
-          addListenerForChanges(object : ServiceCacheListener {
-            override fun cacheChanged(
-              eventType: EventType,
-              isAdd: Boolean,
-              serviceName: String,
-              serviceInstance: ServiceInstance?,
-            ) {
-              captureException(holder) {
-                // logger.info {"Comparing $serviceName and $name")
-                serviceName.split("/").first() shouldBeEqualTo name
+                        addListenerForChanges(object : ServiceCacheListener {
+                            override fun cacheChanged(
+                                eventType: EventType,
+                                isAdd: Boolean,
+                                serviceName: String,
+                                serviceInstance: ServiceInstance?,
+                            ) {
+                                captureException(holder) {
+                                    serviceName.split("/").first() shouldBeEqualTo name
 
-                if (eventType == EventType.PUT) {
-                  if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
+                                    if (eventType == EventType.PUT) {
+                                        if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
 
-                  serviceInstance?.name shouldBeEqualTo name
+                                        serviceInstance?.name shouldBeEqualTo name
+                                    }
+
+                                    if (eventType == EventType.DELETE) {
+                                        unregisterCounter.incrementAndGet()
+                                        serviceInstance?.name shouldBeEqualTo name
+                                    }
+                                }
+                            }
+                        })
+
+                        addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
+
+                        val (finishedLatch, holder2) =
+                            nonblockingThreads(threadCount) {
+                                withServiceDiscovery(client, path) {
+                                    repeat(serviceCount) {
+                                        val service = ServiceInstance(name, TestPayload(it).toJson())
+                                        logger.debug { "Registering: ${service.name} ${service.id}" }
+                                        registerService(service)
+
+                                        sleep(1.seconds)
+
+                                        val payload = TestPayload.toObject(service.jsonPayload)
+                                        payload.testval = payload.testval * -1
+                                        service.jsonPayload = payload.toJson()
+                                        logger.debug { "Updating: ${service.name} ${service.id}" }
+                                        updateService(service)
+
+                                        sleep(1.seconds)
+
+                                        logger.debug { "Unregistering: ${service.name} ${service.id}" }
+                                        unregisterService(service)
+
+                                        sleep(1.seconds)
+                                    }
+                                }
+                            }
+                        finishedLatch.await()
+                        holder2.checkForException()
+                    }
                 }
-
-                if (eventType == EventType.DELETE) {
-                  unregisterCounter.incrementAndGet()
-                  serviceInstance?.name shouldBeEqualTo name
-                }
-              }
             }
-          })
 
-          addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
+            // Wait for deletes to propagate
+            sleep(5.seconds)
 
-          val (finishedLatch, holder2) =
-            nonblockingThreads(threadCount) {
-              withServiceDiscovery(client, path) {
-                repeat(serviceCount) {
-                  val service = ServiceInstance(name, TestPayload(it).toJson())
-                  logger.debug { "Registering: ${service.name} ${service.id}" }
-                  registerService(service)
-
-                  sleep(1.seconds)
-
-                  val payload = TestPayload.toObject(service.jsonPayload)
-                  payload.testval = payload.testval * -1
-                  service.jsonPayload = payload.toJson()
-                  logger.debug { "Updating: ${service.name} ${service.id}" }
-                  updateService(service)
-
-                  sleep(1.seconds)
-
-                  logger.debug { "Unregistering: ${service.name} ${service.id}" }
-                  unregisterService(service)
-
-                  sleep(1.seconds)
-                }
-              }
-            }
-          finishedLatch.await()
-          holder2.checkForException()
+            holder.checkForException()
+            registerCounter.get() shouldBeEqualTo threadCount * serviceCount
+            updateCounter.get() shouldBeEqualTo threadCount * serviceCount
+            unregisterCounter.get() shouldBeEqualTo threadCount * serviceCount
+            totalCounter.get() shouldBeEqualTo (threadCount * serviceCount) * 3
         }
-      }
     }
 
-    // Wait for deletes to propagate
-    sleep(5.seconds)
-
-    holder.checkForException()
-    registerCounter.get() shouldBeEqualTo threadCount * serviceCount
-    updateCounter.get() shouldBeEqualTo threadCount * serviceCount
-    unregisterCounter.get() shouldBeEqualTo threadCount * serviceCount
-    totalCounter.get() shouldBeEqualTo (threadCount * serviceCount) * 3
-  }
-
-  companion object {
-    private val logger = KotlinLogging.logger {}
-  }
+    companion object {
+        private val logger = KotlinLogging.logger {}
+    }
 }
