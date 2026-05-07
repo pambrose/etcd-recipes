@@ -18,17 +18,19 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.github.pambrose.common.concurrent.thread
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.concurrent.thread
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.keyAsString
 import io.etcd.recipes.common.putValueWithKeepAlive
 import io.etcd.recipes.common.watcherWithLatch
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val path = "/foo"
   val keyval = "foobar"
@@ -40,28 +42,28 @@ fun main() {
       client.watcherWithLatch(
         path,
         endWatchLatch,
-        { event -> println("Updated key: ${event.keyAsString}") },
-        { event -> println("Deleted key: ${event.keyAsString}") },
+        { event -> logger.info { "Updated key: ${event.keyAsString}" } },
+        { event -> logger.info { "Deleted key: ${event.keyAsString}" } },
       )
     }
   }
 
   thread(latch) {
     connectToEtcd(urls) { client ->
-      println("Assigning $path = $keyval")
+      logger.info { "Assigning $path = $keyval" }
       client.putValueWithKeepAlive(path, keyval, 2.seconds) {
-        println("Starting sleep")
+        logger.info { "Starting sleep" }
         sleep(5.seconds)
-        println("Finished sleep")
+        logger.info { "Finished sleep" }
       }
-      println("Keep-alive is now terminated")
+      logger.info { "Keep-alive is now terminated" }
       sleep(5.seconds)
     }
-    println("Releasing latch")
+    logger.info { "Releasing latch" }
   }
 
   latch.await()
 
-  println("Done")
+  logger.info { "Done" }
   endWatchLatch.countDown()
 }

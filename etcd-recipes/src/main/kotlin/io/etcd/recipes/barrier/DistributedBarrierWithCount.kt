@@ -18,9 +18,9 @@
 
 package io.etcd.recipes.barrier
 
-import com.github.pambrose.common.concurrent.BooleanMonitor
-import com.github.pambrose.common.time.timeUnitToDuration
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.concurrent.BooleanMonitor
+import com.pambrose.common.time.timeUnitToDuration
+import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE

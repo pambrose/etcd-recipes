@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.discovery
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.captureException
@@ -63,7 +63,7 @@ class ServiceCacheTests {
               serviceInstance: ServiceInstance?,
             ) {
               captureException(holder) {
-                // println("Comparing $serviceName and $name")
+                // logger.info {"Comparing $serviceName and $name")
                 serviceName.split("/").first() shouldBeEqualTo name
 
                 if (eventType == EventType.PUT) {

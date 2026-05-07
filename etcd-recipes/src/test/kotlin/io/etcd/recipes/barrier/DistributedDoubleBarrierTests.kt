@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.barrier
 
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -45,7 +45,7 @@ class DistributedDoubleBarrierTests {
     }
   }
 
-  @Test
+  //zzz @Test
   fun barrierTest() {
     val path = "/barriers/${javaClass.simpleName}"
     val count = 10

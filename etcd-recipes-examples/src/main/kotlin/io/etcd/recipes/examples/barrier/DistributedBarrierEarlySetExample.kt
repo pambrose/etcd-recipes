@@ -18,14 +18,16 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.barrier.withDistributedBarrier
 import io.etcd.recipes.common.connectToEtcd
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val barrierPath = "/barriers/earlythreadedclients"
   val count = 5
@@ -36,13 +38,13 @@ fun main() {
     thread {
       connectToEtcd(urls) { client ->
         withDistributedBarrier(client, barrierPath) {
-          println("$i Waiting on Barrier")
+          logger.info { "$i Waiting on Barrier" }
           waitOnBarrier(1.seconds)
 
-          println("$i Timed out waiting on barrier, waiting again")
+          logger.info { "$i Timed out waiting on barrier, waiting again" }
           waitOnBarrier()
 
-          println("$i Done Waiting on Barrier")
+          logger.info { "$i Done Waiting on Barrier" }
           waitLatch.countDown()
         }
       }
@@ -55,10 +57,10 @@ fun main() {
     sleep(5.seconds)
     connectToEtcd(urls) { client ->
       withDistributedBarrier(client, barrierPath) {
-        println("Setting Barrier")
+        logger.info { "Setting Barrier" }
         setBarrier()
         sleep(6.seconds)
-        println("Removing Barrier")
+        logger.info { "Removing Barrier" }
         removeBarrier()
         sleep(3.seconds)
       }
@@ -67,5 +69,5 @@ fun main() {
 
   waitLatch.await()
 
-  println("Done")
+  logger.info { "Done" }
 }

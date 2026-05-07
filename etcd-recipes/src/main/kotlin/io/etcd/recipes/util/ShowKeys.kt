@@ -18,21 +18,23 @@
 
 package io.etcd.recipes.util
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getChildren
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val path = "/"
 
   connectToEtcd(urls) { client ->
     repeat(600) {
-      println(client.getChildren(path).asString)
-      println(client.getChildCount(path))
+      logger.info { client.getChildren(path).asString }
+      logger.info { client.getChildCount(path) }
       sleep(1.seconds)
     }
   }

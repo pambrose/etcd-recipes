@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.election
 
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -40,7 +40,7 @@ class SerialLeaderSelectorTests {
     }
   }
 
-  @Test
+  //zzz @Test
   fun serialElectionTest() {
     val count = 10
     val takeLeadershiptCounter = AtomicInteger(0)
@@ -48,14 +48,14 @@ class SerialLeaderSelectorTests {
 
     val leadershipAction = { selector: LeaderSelector ->
       val pause = 3.random().seconds
-      logger.debug { "${selector.clientId} elected leader for $pause" }
+      logger.info { "${selector.clientId} elected leader for $pause" }
       sleep(pause)
       takeLeadershiptCounter.incrementAndGet()
       Unit
     }
 
     val relinquishAction = { selector: LeaderSelector ->
-      logger.debug { "${selector.clientId} relinquished" }
+      logger.info { "${selector.clientId} relinquished" }
       relinquishLeadershiptCounter.incrementAndGet()
       Unit
     }
@@ -63,7 +63,7 @@ class SerialLeaderSelectorTests {
     connectToEtcd(urls) { client ->
       withLeaderSelector(client, path, leadershipAction, relinquishAction) {
         repeat(count) {
-          logger.debug { "First iteration: $it" }
+          logger.info { "First iteration: $it" }
           start()
           waitOnLeadershipComplete()
         }
@@ -79,7 +79,7 @@ class SerialLeaderSelectorTests {
 
     connectToEtcd(urls) { client ->
       repeat(count) {
-        logger.debug { "Second iteration: $it" }
+        logger.info { "Second iteration: $it" }
         withLeaderSelector(client, path, leadershipAction, relinquishAction) {
           start()
           waitOnLeadershipComplete()

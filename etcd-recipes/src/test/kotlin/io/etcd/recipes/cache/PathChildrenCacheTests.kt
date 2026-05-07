@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.cache
 
-import com.github.pambrose.common.util.randomId
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.randomId
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCache.StartMode.POST_INITIALIZED_EVENT
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
@@ -81,7 +81,7 @@ class PathChildrenCacheTests {
 
       withPathChildrenCache(client, path) {
         addListener { event: PathChildrenCacheEvent ->
-          // println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+          // logger.info {"CB: ${event.type} ${event.childName} ${event.data?.asString}")
           when (event.type) {
             CHILD_ADDED -> addCount.incrementAndGet()
             CHILD_UPDATED -> updateCount.incrementAndGet()
@@ -148,7 +148,7 @@ class PathChildrenCacheTests {
 
       withPathChildrenCache(client, path) {
         addListener { event: PathChildrenCacheEvent ->
-          // println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+          // logger.info {"CB: ${event.type} ${event.childName} ${event.data?.asString}")
           when (event.type) {
             CHILD_ADDED -> addCount.incrementAndGet()
             CHILD_UPDATED -> updateCount.incrementAndGet()
@@ -207,7 +207,7 @@ class PathChildrenCacheTests {
 
       withPathChildrenCache(client, path) {
         addListener { event: PathChildrenCacheEvent ->
-          // println("CB: ${event.type} ${event.childName} ${event.data?.asString}")
+          // logger.info {"CB: ${event.type} ${event.childName} ${event.data?.asString}")
           when (event.type) {
             CHILD_ADDED -> addCount.incrementAndGet()
             CHILD_UPDATED -> updateCount.incrementAndGet()
@@ -256,8 +256,8 @@ class PathChildrenCacheTests {
           sleep(5.seconds)
           val data = currentData
 
-          // println("KVs:  ${kvs.map { it.first }.sorted()}")
-          // println("Data: ${data.map { it.key }.sorted()}")
+          // logger.info {"KVs:  ${kvs.map { it.first }.sorted()}")
+          // logger.info {"Data: ${data.map { it.key }.sorted()}")
 
           compareData(count, data, kvs)
         }

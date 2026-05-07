@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.common
 
-import com.github.pambrose.common.util.isNotNull
+import com.pambrose.common.util.isNotNull
 import java.util.concurrent.atomic.AtomicReference
 
 class ExceptionHolder {

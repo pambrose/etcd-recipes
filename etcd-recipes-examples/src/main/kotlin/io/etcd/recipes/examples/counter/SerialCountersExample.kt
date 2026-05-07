@@ -20,9 +20,11 @@ package io.etcd.recipes.examples.counter
 
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.counter.DistributedAtomicLong
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.measureTimedValue
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val counterPath = "counter2"
 
@@ -46,7 +48,7 @@ fun main() {
           .get()
       }
 
-    println("Total: $total in $dur")
+    logger.info {"Total: $total in $dur"}
 
     counters.forEach { it.close() }
   }

@@ -13,14 +13,13 @@ tests:
 	./gradlew check jacocoTestReport
 
 lint:
-	./gradlew lintKotlinMain
-	./gradlew lintKotlinTest
+	./gradlew lintKotlinMain lintKotlinTest
 
 refresh:
 	./gradlew --refresh-dependencies
 
 versioncheck:
-	./gradlew dependencyUpdates
+	./gradlew dependencyUpdates --no-parallel
 
 upgrade-wrapper:
-	./gradlew wrapper --gradle-version=8.12 --distribution-type=bin
+	./gradlew wrapper --gradle-version=9.5.0 --distribution-type=bin

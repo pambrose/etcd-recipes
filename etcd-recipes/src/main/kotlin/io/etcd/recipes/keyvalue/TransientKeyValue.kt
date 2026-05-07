@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.keyvalue
 
-import com.github.pambrose.common.util.isNull
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.util.isNull
+import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector

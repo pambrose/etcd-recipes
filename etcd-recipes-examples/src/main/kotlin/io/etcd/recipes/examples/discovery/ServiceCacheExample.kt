@@ -18,12 +18,14 @@
 
 package io.etcd.recipes.examples.discovery
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.withServiceDiscovery
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.days
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val servicePath = "/services/test"
 
@@ -36,7 +38,7 @@ fun main() {
             serviceName,
             serviceInstance,
           ->
-          println("Change $isAdd $eventType $serviceName $serviceInstance")
+          logger.info {"Change $isAdd $eventType $serviceName $serviceInstance"}
           serviceInstance?.let {
             println("Payload: ${IntPayload.toObject(it.jsonPayload)}")
           }

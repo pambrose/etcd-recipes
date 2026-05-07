@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.queue
 
-import com.github.pambrose.common.util.isNotNull
+import com.pambrose.common.util.isNotNull
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
@@ -32,13 +32,18 @@ import io.etcd.recipes.common.getFirstChild
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
+import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 abstract class AbstractQueue(
   client: Client,
   val queuePath: String,
-  private val target: SortTarget,
+  val target: SortTarget,
 ) : EtcdConnector(client) {
   init {
     require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
@@ -47,18 +52,25 @@ abstract class AbstractQueue(
   fun dequeue(): ByteSequence {
     checkCloseNotCalled()
 
-    //  println(client.getFirstChild(queuePath, target = target).kvs
+    //  logger.info {client.getFirstChild(queuePath, target = target).kvs
     //           .map { p -> p.key.asString to p.value.asString }
     //           .joinToString("\n"))
 
     val childList = client.getFirstChild(queuePath, target).kvs
 
     if (childList.isNotEmpty()) {
+      logger.info { "Child list not empty" }
       val child = childList.first()
       // If transactional delete fails, then just call self again
-      return if (deleteRevKey(child)) child.value else dequeue()
+      return if (deleteRevKey(child))
+        child.value
+      else {
+        logger.info { "Called self again" }
+        dequeue()
+      }
     }
 
+    logger.info { "Child list was empty" }
     // No values available, so wait on them
     val watchLatch = CountDownLatch(1)
     // val trailingPath = queuePath.ensureSuffix("/")
@@ -75,12 +87,14 @@ abstract class AbstractQueue(
       { watchResponse ->
         synchronized(watchLatch) {
           if (watchLatch.count > 0)
-            for (watchEvent in watchResponse.events) {
-              if (watchEvent.eventType == WatchEvent.EventType.PUT) {
-                keyFound.compareAndSet(null, watchEvent.keyValue)
-                watchLatch.countDown()
-              }
+            logger.info { "watchResponse.events.size = ${watchResponse.events.size}" }
+          for (watchEvent in watchResponse.events) {
+            if (watchEvent.eventType == WatchEvent.EventType.PUT) {
+              keyFound.compareAndSet(null, watchEvent.keyValue)
+              watchLatch.countDown()
+              break
             }
+          }
         }
       },
     ) {
@@ -94,6 +108,7 @@ abstract class AbstractQueue(
           }
         }
       }
+      logger.info { "Waiting for watchLatch" }
       watchLatch.await()
     }
 
@@ -107,4 +122,8 @@ abstract class AbstractQueue(
       If(equalTo(kv.key, CmpTarget.modRevision(kv.modRevision)))
       Then(deleteOp(kv.key))
     }.isSucceeded
+
+  companion object {
+    private val logger = KotlinLogging.logger {}
+  }
 }

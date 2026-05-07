@@ -51,7 +51,11 @@ fun <T> Client.withWatcher(
   option: WatchOption = WatchOption.DEFAULT,
   block: (WatchResponse) -> Unit,
   receiver: Watch.Watcher.() -> T,
-): T = watcher(keyName, option, block).use { it.receiver() }
+): T =
+  watcher(keyName, option, block)
+    .use { watcher ->
+      watcher.receiver()
+    }
 
 @JvmOverloads
 fun Client.watcherWithLatch(

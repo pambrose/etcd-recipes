@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.queue
 
-import com.github.pambrose.common.util.length
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.util.length
+import com.pambrose.common.util.randomId
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.GetOption.SortTarget

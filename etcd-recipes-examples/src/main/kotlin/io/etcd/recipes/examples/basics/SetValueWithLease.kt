@@ -18,18 +18,20 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.github.pambrose.common.concurrent.thread
-import com.github.pambrose.common.util.repeatWithSleep
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.concurrent.thread
+import com.pambrose.common.util.repeatWithSleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.leaseGrant
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.putValue
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val path = "/foo"
   val keyval = "foobar"
@@ -38,7 +40,7 @@ fun main() {
   thread(latch) {
     sleep(3.seconds)
     connectToEtcd(urls) { client ->
-      println("Assigning $path = $keyval")
+      logger.info {"Assigning $path = $keyval"}
       val lease = client.leaseGrant(5.seconds)
       client.putValue(path, keyval, putOption { withLeaseId(lease.id) })
     }
@@ -48,7 +50,7 @@ fun main() {
     connectToEtcd(urls) { client ->
       repeatWithSleep(12) { _, start ->
         val kval = client.getValue(path, "unset")
-        println("Key $path = $kval after ${System.currentTimeMillis() - start}ms")
+        logger.info {"Key $path = $kval after ${System.currentTimeMillis() - start}ms"}
       }
     }
   }

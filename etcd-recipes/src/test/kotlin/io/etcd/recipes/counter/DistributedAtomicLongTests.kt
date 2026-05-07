@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.counter
 
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd

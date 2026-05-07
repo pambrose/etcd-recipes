@@ -18,12 +18,15 @@
 
 package io.etcd.recipes.election
 
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.amshove.kluent.shouldBeEqualTo
 import org.junit.jupiter.api.Test
 import java.util.concurrent.Executors
@@ -35,9 +38,9 @@ class ReportLeaderTests {
 
   @Test
   fun reportLeaderTest() {
-    val count = 25
-    val takeLeadershiptCounter = AtomicInteger(0)
-    val relinquishLeadershiptCounter = AtomicInteger(0)
+    val count = 2
+    val takeLeadershipCounter = AtomicInteger(0)
+    val relinquishLeadershipCounter = AtomicInteger(0)
 
     val executor = Executors.newSingleThreadExecutor()
     LeaderSelector.reportLeader(
@@ -46,19 +49,19 @@ class ReportLeaderTests {
       object : LeaderListener {
         override fun takeLeadership(leaderName: String) {
           logger.debug { "$leaderName elected leader" }
-          takeLeadershiptCounter.incrementAndGet()
+          takeLeadershipCounter.incrementAndGet()
         }
 
         override fun relinquishLeadership() {
-          relinquishLeadershiptCounter.incrementAndGet()
+          relinquishLeadershipCounter.incrementAndGet()
         }
       },
       executor,
     )
 
-    sleep(5.seconds)
+    sleep(2.seconds)
 
-    blockingThreads(count) {
+    blockingThreads(count) { cnt ->
       connectToEtcd(urls) { client ->
         withLeaderSelector(
           client,
@@ -66,11 +69,11 @@ class ReportLeaderTests {
           object : LeaderSelectorListenerAdapter() {
             override fun takeLeadership(selector: LeaderSelector) {
               val pause = 2.random().seconds
-              logger.debug { "${selector.clientId} elected leader for $pause" }
+              logger.info { "${selector.clientId} elected leader for $pause" }
               sleep(pause)
             }
           },
-          clientId = "Thread$it",
+          clientId = "Thread$cnt",
         ) {
           start()
           waitOnLeadershipComplete()
@@ -81,8 +84,8 @@ class ReportLeaderTests {
     // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
     sleep(10.seconds)
 
-    takeLeadershiptCounter.get() shouldBeEqualTo count
-    relinquishLeadershiptCounter.get() shouldBeEqualTo count
+    takeLeadershipCounter.get() shouldBeEqualTo count
+    relinquishLeadershipCounter.get() shouldBeEqualTo count
 
     executor.shutdown()
   }

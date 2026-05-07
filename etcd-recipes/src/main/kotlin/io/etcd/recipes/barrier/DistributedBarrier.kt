@@ -18,30 +18,18 @@
 
 package io.etcd.recipes.barrier
 
-import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
-import com.github.pambrose.common.delegate.AtomicDelegates.nullableReference
-import com.github.pambrose.common.time.timeUnitToDuration
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.delegate.AtomicDelegates.atomicBoolean
+import com.pambrose.common.time.timeUnitToDuration
+import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.deleteKey
-import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.keepAlive
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.putOption
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.withWatcher
+import io.etcd.recipes.common.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
@@ -65,7 +53,7 @@ constructor(
   private val waitOnMissingBarriers: Boolean = true,
   val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
-  private var keepAliveLease by nullableReference<CloseableClient?>(null)
+  private var keepAliveLease: AtomicReference<CloseableClient?> = AtomicReference(null)
   private var barrierRemoved by atomicBoolean(false)
 
   init {
@@ -98,7 +86,7 @@ constructor(
 
       // Check to see if unique value was successfully set in the CAS step
       if (txn.isSucceeded && client.getValue(barrierPath)?.asString == uniqueToken) {
-        keepAliveLease = client.keepAlive(lease)
+        keepAliveLease.store(client.keepAlive(lease))
         true
       } else {
         false
@@ -112,8 +100,8 @@ constructor(
     return if (barrierRemoved) {
       false
     } else {
-      keepAliveLease?.close()
-      keepAliveLease = null
+      keepAliveLease.load()?.close()
+      keepAliveLease.store(null)
 
       client.deleteKey(barrierPath)
 
@@ -168,8 +156,8 @@ constructor(
     if (closeCalled)
       return
 
-    keepAliveLease?.close()
-    keepAliveLease = null
+    keepAliveLease.load()?.close()
+    keepAliveLease.store(null)
 
     super.close()
   }

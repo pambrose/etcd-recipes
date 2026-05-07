@@ -18,17 +18,19 @@
 
 package io.etcd.recipes.examples.election
 
-import com.github.pambrose.common.concurrent.thread
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.concurrent.thread
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.election.LeaderSelector.Companion.getParticipants
 import io.etcd.recipes.election.withLeaderSelector
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val electionPath = "/election/threaded"
   val count = 5
@@ -38,15 +40,15 @@ fun main() {
     thread(latch) {
       val takeLeadershipAction =
         { selector: LeaderSelector ->
-          println("${selector.clientId} elected leader")
+          logger.info { "${selector.clientId} elected leader" }
           val pause = 3.random().seconds
           sleep(pause)
-          println("${selector.clientId} surrendering after $pause")
+          logger.info { "${selector.clientId} surrendering after $pause" }
         }
 
       val relinquishLeadershipAction =
         { selector: LeaderSelector ->
-          println("${selector.clientId} relinquished leadership")
+          logger.info { "${selector.clientId} relinquished leadership" }
         }
 
       connectToEtcd(urls) { client ->
@@ -66,7 +68,7 @@ fun main() {
 
   connectToEtcd(urls) { client ->
     while (latch.count > 0) {
-      println("Participants: ${getParticipants(client, electionPath)}")
+      logger.info { "Participants: ${getParticipants(client, electionPath)}" }
       sleep(1.seconds)
     }
   }

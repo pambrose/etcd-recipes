@@ -26,7 +26,7 @@ import kotlin.Unit;
 
 import java.util.List;
 
-import static com.github.pambrose.common.util.MiscJavaFuncs.sleepSecs;
+import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.BuilderUtils.watchOption;
 import static io.etcd.recipes.common.ChildrenUtils.getChildCount;
 import static io.etcd.recipes.common.ChildrenUtils.getChildren;
@@ -74,15 +74,15 @@ public class WatchKeyRange {
       putValue(client, path + "/waiting/c", "ccc");
       putValue(client, path + "/waiting/d", "dddd");
 
-      System.out.println("\nAfter putValues:");
+      System.out.println("After putValues:");
       System.out.println(getAsString(getChildren(client, path)));
       System.out.println(getChildCount(client, path));
 
-      System.out.println("\nElections only:");
+      System.out.println("Elections only:");
       System.out.println(getAsString(getChildren(client, path + "/election")));
       System.out.println(getChildCount(client, path + "/election"));
 
-      System.out.println("\nWaitings only:");
+      System.out.println("Waitings only:");
       System.out.println(getAsString(getChildren(client, path + "/waiting")));
       System.out.println(getChildCount(client, path + "/waiting"));
 
@@ -97,7 +97,7 @@ public class WatchKeyRange {
         KVUtils.deleteKey(client, keyName);
       });
 
-      System.out.println("\nAfter delete:");
+      System.out.println("After delete:");
       System.out.println(getAsString(getChildren(client, path)));
       System.out.println(getChildCount(client, path));
 

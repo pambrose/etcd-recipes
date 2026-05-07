@@ -18,36 +18,19 @@
 
 package io.etcd.recipes.cache
 
-import com.github.pambrose.common.delegate.AtomicDelegates.nullableReference
-import com.github.pambrose.common.time.timeUnitToDuration
-import com.github.pambrose.common.util.isNull
 import com.google.common.collect.Maps.newConcurrentMap
+import com.pambrose.common.time.timeUnitToDuration
+import com.pambrose.common.util.isNull
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
-import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
-import io.etcd.recipes.cache.PathChildrenCache.StartMode.BUILD_INITIAL_CACHE
-import io.etcd.recipes.cache.PathChildrenCache.StartMode.NORMAL
-import io.etcd.recipes.cache.PathChildrenCache.StartMode.POST_INITIALIZED_EVENT
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.INITIALIZED
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.common.asPair
-import io.etcd.recipes.common.ensureSuffix
-import io.etcd.recipes.common.getChildren
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.watcher
+import io.etcd.jetcd.watch.WatchEvent.EventType.*
+import io.etcd.recipes.cache.PathChildrenCache.StartMode.*
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.*
+import io.etcd.recipes.common.*
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.util.concurrent.ConcurrentMap
-import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
@@ -64,7 +47,7 @@ class PathChildrenCache(
   val cachePath: String,
   private val userExecutor: Executor? = null,
 ) : EtcdConnector(client) {
-  private var watcher: Watch.Watcher? by nullableReference()
+  private var watcher: AtomicReference<Watch.Watcher?> = AtomicReference(null)
   private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
   private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
 
@@ -177,48 +160,50 @@ class PathChildrenCache(
     val trailingPath = cachePath.ensureSuffix("/")
     logger.debug { "Setting up watch for $trailingPath" }
     val watchOption = watchOption { isPrefix(true) }
-    watcher = client.watcher(trailingPath, watchOption) { watchResponse ->
-      watchResponse.events
-        .forEach { event ->
-          val (k, v) = event.keyValue.asPair
-          val stripped = k.substring(trailingPath.length)
-          when (event.eventType) {
-            PUT -> {
-              val isAdd = !cacheMap.containsKey(stripped)
-              logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
-              cacheMap[stripped] = v
+    watcher.store(
+      client.watcher(trailingPath, watchOption) { watchResponse ->
+        watchResponse.events
+          .forEach { event ->
+            val (k, v) = event.keyValue.asPair
+            val stripped = k.substring(trailingPath.length)
+            when (event.eventType) {
+              PUT -> {
+                val isAdd = !cacheMap.containsKey(stripped)
+                logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
+                cacheMap[stripped] = v
 
-              val cacheEvent =
-                PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
-              listeners.forEach { listener ->
-                try {
-                  listener.childEvent(cacheEvent)
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in cacheChanged()" }
-                  exceptionList.value += e
+                val cacheEvent =
+                  PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
+                listeners.forEach { listener ->
+                  try {
+                    listener.childEvent(cacheEvent)
+                  } catch (e: Throwable) {
+                    logger.error(e) { "Exception in cacheChanged()" }
+                    exceptionList.value += e
+                  }
                 }
               }
-            }
 
-            DELETE -> {
-              logger.debug { "$stripped deleted" }
-              val prevValue = cacheMap.remove(stripped)
-              val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
-              listeners.forEach { listener ->
-                try {
-                  listener.childEvent(cacheEvent)
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in cacheChanged()" }
-                  exceptionList.value += e
+              DELETE -> {
+                logger.debug { "$stripped deleted" }
+                val prevValue = cacheMap.remove(stripped)
+                val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
+                listeners.forEach { listener ->
+                  try {
+                    listener.childEvent(cacheEvent)
+                  } catch (e: Throwable) {
+                    logger.error(e) { "Exception in cacheChanged()" }
+                    exceptionList.value += e
+                  }
                 }
               }
-            }
 
-            UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
-            else -> logger.error { "Unknown error with $cachePath watch" }
+              UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
+              else -> logger.error { "Unknown error with $cachePath watch" }
+            }
           }
-        }
-    }
+      },
+    )
   }
 
   @Throws(InterruptedException::class)
@@ -259,7 +244,7 @@ class PathChildrenCache(
 
     checkStartCalled()
 
-    watcher?.close()
+    watcher.load()?.close()
 
     listeners.clear()
     startThreadComplete.waitUntilTrue()

@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.discovery
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.blockingThreads
@@ -56,7 +56,7 @@ class ThreadedServiceDiscoveryTests {
         repeat(serviceCount) { j ->
           val service = ServiceInstance("TestInstance$j", TestPayload(j).toJson())
           context.serviceMap[service.id] = service
-          logger.debug { "Registering: $service" }
+          logger.info { "Registering: $service" }
           sd.registerService(service)
         }
       }
@@ -67,7 +67,7 @@ class ThreadedServiceDiscoveryTests {
           contextMap.values.forEach { context ->
             context.serviceMap.forEach { (_, service) ->
               val inst = queryForInstance(service.name, service.id)
-              logger.debug { "Retrieved value: $inst" }
+              logger.info { "Retrieved value: $inst" }
               inst shouldBeEqualTo service
             }
           }
@@ -80,7 +80,7 @@ class ThreadedServiceDiscoveryTests {
           val payload = TestPayload.toObject(service.jsonPayload)
           payload.testval = payload.testval * -1
           service.jsonPayload = payload.toJson()
-          logger.debug { "Updating service: $service" }
+          logger.info { "Updating service: $service" }
           context.serviceDiscovery.updateService(service)
         }
       }
@@ -91,7 +91,7 @@ class ThreadedServiceDiscoveryTests {
           contextMap.values.forEach { context ->
             context.serviceMap.forEach { (_, service) ->
               val inst = queryForInstance(service.name, service.id)
-              logger.debug { "Retrieved updated value: $inst" }
+              logger.info { "Retrieved updated value: $inst" }
               inst shouldBeEqualTo service
             }
           }
@@ -100,7 +100,7 @@ class ThreadedServiceDiscoveryTests {
 
       withServiceDiscovery(client, path) {
         val size = queryForNames().size
-        logger.debug { "Retrieved all names: $size" }
+        logger.info { "Retrieved all names: $size" }
         size shouldBeEqualTo threadCount * serviceCount
       }
 
@@ -110,7 +110,7 @@ class ThreadedServiceDiscoveryTests {
           val payload = TestPayload.toObject(service.jsonPayload)
           payload.testval = payload.testval * -1
           service.jsonPayload = payload.toJson()
-          logger.debug { "Unregistering service: $service" }
+          logger.info { "Unregistering service: $service" }
           context.serviceDiscovery.unregisterService(service)
         }
       }
@@ -126,7 +126,7 @@ class ThreadedServiceDiscoveryTests {
           contextMap.values.forEach { context ->
             context.serviceMap.forEach { (_, service) ->
               val name = service.name
-              logger.debug { "Query deleted service: $name  ${service.id}" }
+              logger.info { "Query deleted service: $name  ${service.id}" }
               invoking { queryForInstance(name, service.id) } shouldThrow EtcdRecipeException::class
             }
           }

@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.keyvalue
 
-import com.github.pambrose.common.util.randomId
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.randomId
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
@@ -38,7 +38,6 @@ class TransientKeyValueTest {
     val id = randomId(8)
 
     connectToEtcd(urls) { client ->
-
       client.getValue(path, defaultValue) shouldBeEqualTo defaultValue
 
       withTransientKeyValue(client, path, id) {

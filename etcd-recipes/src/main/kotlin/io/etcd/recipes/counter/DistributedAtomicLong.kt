@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.counter
 
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
@@ -80,7 +80,7 @@ constructor(
     do {
       val txnResponse = applyCounterTransaction(value)
       if (!txnResponse.isSucceeded) {
-        // println("Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
+        // logger.info {"Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
         // Crude backoff for retry
         sleep((count * 100).random().milliseconds)
         count++

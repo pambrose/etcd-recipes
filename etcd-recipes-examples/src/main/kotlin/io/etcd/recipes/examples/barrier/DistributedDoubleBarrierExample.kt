@@ -18,17 +18,19 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.barrier.DistributedDoubleBarrier
 import io.etcd.recipes.barrier.withDistributedDoubleBarrier
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val barrierPath = "/barriers/doublebarriertest"
   val count = 5
@@ -44,7 +46,7 @@ fun main() {
     sleep(10.random().seconds)
 
     repeat(retryCount) {
-      println("#$id Waiting to enter barrier")
+      logger.info {"#$id Waiting to enter barrier"}
       barrier.enter(2.seconds)
       println("#$id Timed out entering barrier")
     }

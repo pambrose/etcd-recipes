@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.barrier
 
-import com.github.pambrose.common.concurrent.thread
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.concurrent.thread
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
@@ -76,7 +76,7 @@ class DistributedBarrierTests {
           // Pause to give time-outs a chance
           sleep(6.seconds)
 
-          logger.debug { "Removing Barrier" }
+          logger.info { "Removing Barrier" }
           removeBarrierTime.set(System.currentTimeMillis())
           val isRemoved = removeBarrier()
           isRemoved.shouldBeTrue()
@@ -92,12 +92,12 @@ class DistributedBarrierTests {
       blockingThreads(count) { i ->
         setBarrierLatch.await()
         withDistributedBarrier(client, path) {
-          logger.debug { "$i Waiting on Barrier" }
+          logger.info { "$i Waiting on Barrier" }
           waitOnBarrier(1.seconds)
 
           timeoutCount.incrementAndGet()
 
-          logger.debug { "$i Timed out waiting on barrier, waiting again" }
+          logger.info { "$i Timed out waiting on barrier, waiting again" }
           waitOnBarrier()
 
           // Make sure the waiter advanced quickly

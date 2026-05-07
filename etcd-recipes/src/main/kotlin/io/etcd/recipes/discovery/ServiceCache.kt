@@ -18,34 +18,24 @@
 
 package io.etcd.recipes.discovery
 
-import com.github.pambrose.common.concurrent.BooleanMonitor
-import com.github.pambrose.common.delegate.AtomicDelegates
 import com.google.common.collect.Maps.newConcurrentMap
+import com.pambrose.common.concurrent.BooleanMonitor
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.watch.WatchEvent
-import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
-import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
-import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.common.appendToPath
-import io.etcd.recipes.common.asPair
-import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.ensureSuffix
-import io.etcd.recipes.common.getChildren
-import io.etcd.recipes.common.watchOption
-import io.etcd.recipes.common.watcher
+import io.etcd.jetcd.watch.WatchEvent.EventType.*
+import io.etcd.recipes.common.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
+import kotlin.concurrent.atomics.AtomicReference
 
 class ServiceCache internal constructor(
   client: Client,
   val namesPath: String,
   val serviceName: String,
 ) : EtcdConnector(client) {
-  private var watcher: Watch.Watcher? by AtomicDelegates.nullableReference()
+  private var watcher: AtomicReference<Watch.Watcher?> = AtomicReference(null)
   private var dataPreloaded = BooleanMonitor(false)
   private val servicePath = namesPath.appendToPath(serviceName)
   private val serviceMap: ConcurrentMap<String, String> = newConcurrentMap()
@@ -65,48 +55,50 @@ class ServiceCache internal constructor(
     val trailingNamesPath = namesPath.ensureSuffix("/")
     val watchOption = watchOption { isPrefix(true) }
 
-    watcher = client.watcher(trailingServicePath, watchOption) { watchResponse ->
-      // Wait for data to be loaded
-      dataPreloaded.waitUntilTrue()
+    watcher.store(
+      client.watcher(trailingServicePath, watchOption) { watchResponse ->
+        // Wait for data to be loaded
+        dataPreloaded.waitUntilTrue()
 
-      watchResponse.events
-        .forEach { event ->
-          val (k, v) = event.keyValue.asPair.asString
-          val stripped = k.substring(trailingNamesPath.length)
-          when (event.eventType) {
-            PUT -> {
-              val isAdd = !serviceMap.containsKey(stripped)
-              serviceMap[stripped] = v
-              listeners.forEach { listener ->
-                try {
-                  listener.cacheChanged(PUT, isAdd, stripped, ServiceInstance.toObject(v))
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in cacheChanged()" }
-                  exceptionList.value += e
+        watchResponse.events
+          .forEach { event ->
+            val (k, v) = event.keyValue.asPair.asString
+            val stripped = k.substring(trailingNamesPath.length)
+            when (event.eventType) {
+              PUT -> {
+                val isAdd = !serviceMap.containsKey(stripped)
+                serviceMap[stripped] = v
+                listeners.forEach { listener ->
+                  try {
+                    listener.cacheChanged(PUT, isAdd, stripped, ServiceInstance.toObject(v))
+                  } catch (e: Throwable) {
+                    logger.error(e) { "Exception in cacheChanged()" }
+                    exceptionList.value += e
+                  }
                 }
+                // logger.info {"$k $v ${if (newKey) "added" else "updated"}")
               }
-              // println("$k $v ${if (newKey) "added" else "updated"}")
-            }
 
-            DELETE -> {
-              val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
-              listeners.forEach { listener ->
-                try {
-                  listener.cacheChanged(DELETE, false, stripped, prevValue)
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in cacheChanged()" }
-                  exceptionList.value += e
+              DELETE -> {
+                val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
+                listeners.forEach { listener ->
+                  try {
+                    listener.cacheChanged(DELETE, false, stripped, prevValue)
+                  } catch (e: Throwable) {
+                    logger.error(e) { "Exception in cacheChanged()" }
+                    exceptionList.value += e
+                  }
                 }
+                // logger.info {"$stripped deleted")
               }
-              // println("$stripped deleted")
-            }
 
-            UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
-            else -> logger.error { "Unknown error with $servicePath watch" }
+              UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
+              else -> logger.error { "Unknown error with $servicePath watch" }
+            }
           }
-        }
-      startThreadComplete.set(true)
-    }
+        startThreadComplete.set(true)
+      },
+    )
 
     // Preload with initial data
     val kvs = client.getChildren(trailingServicePath)
@@ -162,7 +154,7 @@ class ServiceCache internal constructor(
 
     checkStartCalled()
 
-    watcher?.close()
+    watcher.load()?.close()
 
     listeners.clear()
     startThreadComplete.waitUntilTrue()

@@ -27,8 +27,10 @@ import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
+import io.github.oshai.kotlinlogging.KotlinLogging
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val path = "/txnexample"
   val keyval = "debug"
@@ -40,16 +42,16 @@ fun main() {
       Else(keyval setTo "Key $path not found")
     }
 
-    println("Debug value: ${client.getValue(keyval, "not_used")}")
+    logger.info { "Debug value: ${client.getValue(keyval, "not_used")}" }
   }
 
   connectToEtcd(urls) { client ->
-    println("Deleting keys")
+    logger.info { "Deleting keys" }
     client.deleteKeys(path, keyval)
 
-    println("Key present: ${client.isKeyPresent(keyval)}")
+    logger.info { "Key present: ${client.isKeyPresent(keyval)}" }
     checkForKey(client)
-    println("Key present: ${client.isKeyPresent(keyval)}")
+    logger.info { "Key present: ${client.isKeyPresent(keyval)}" }
     client.putValue(path, "Something")
     checkForKey(client)
   }

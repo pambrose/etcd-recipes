@@ -18,13 +18,15 @@
 
 package io.etcd.recipes.examples.discovery
 
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.ServiceInstance
 import io.etcd.recipes.discovery.withServiceDiscovery
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
+  val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val servicePath = "/services/test"
 
@@ -33,30 +35,30 @@ fun main() {
       val payload = IntPayload(-999)
       val service = ServiceInstance("TestName", payload.toJson())
 
-      println(service.toJson())
+      logger.info {service.toJson()}
 
-      println("Registering")
+      logger.info {"Registering"}
       registerService(service)
-      println("Retrieved value: ${queryForInstance(service.name, service.id)}")
-      println("Retrieved values: ${queryForInstances(service.name)}")
-      println("Retrieved names: ${queryForNames()}")
+      logger.info {"Retrieved value: ${queryForInstance(service.name, service.id)}"}
+      logger.info {"Retrieved values: ${queryForInstances(service.name)}"}
+      logger.info {"Retrieved names: ${queryForNames()}"}
 
       sleep(2.seconds)
-      println("Updating")
+      logger.info {"Updating"}
       payload.intval = -888
       service.jsonPayload = payload.toJson()
       updateService(service)
-      println("Retrieved value: ${queryForInstance(service.name, service.id)}")
-      println("Retrieved values: ${queryForInstances(service.name)}")
-      println("Retrieved names: ${queryForNames()}")
+      logger.info {"Retrieved value: ${queryForInstance(service.name, service.id)}"}
+      logger.info {"Retrieved values: ${queryForInstances(service.name)}"}
+      logger.info {"Retrieved names: ${queryForNames()}"}
 
       sleep(2.seconds)
-      println("Unregistering")
+      logger.info {"Unregistering"}
       unregisterService(service)
       sleep(3.seconds)
 
       try {
-        println("Retrieved value: ${queryForInstance(service.name, service.id)}")
+        logger.info {"Retrieved value: ${queryForInstance(service.name, service.id)}"}
       } catch (e: Throwable) {
         println("Exception: $e")
       }

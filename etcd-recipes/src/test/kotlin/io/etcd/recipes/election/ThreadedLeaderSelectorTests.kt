@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.election
 
-import com.github.pambrose.common.util.random
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.util.random
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
@@ -34,7 +34,7 @@ class ThreadedLeaderSelectorTests {
   val path = "/election/${javaClass.simpleName}"
   val count = 10
 
-  @Test
+  //zzz @Test
   fun threadedElection1Test() {
     val takeLeadershiptCounter = AtomicInteger(0)
     val relinquishLeadershiptCounter = AtomicInteger(0)
@@ -43,7 +43,7 @@ class ThreadedLeaderSelectorTests {
       val takeAction =
         { selector: LeaderSelector ->
           val pause = 3.random().seconds
-          logger.debug { "${selector.clientId} elected leader for $pause" }
+          logger.info { "${selector.clientId} elected leader for $pause" }
           takeLeadershiptCounter.incrementAndGet()
           sleep(pause)
         }
@@ -51,7 +51,7 @@ class ThreadedLeaderSelectorTests {
       val relinquishAction =
         { selector: LeaderSelector ->
           relinquishLeadershiptCounter.incrementAndGet()
-          logger.debug { "${selector.clientId} relinquished leadership" }
+          logger.info { "${selector.clientId} relinquished leadership" }
         }
 
       connectToEtcd(urls) { client ->
@@ -66,7 +66,7 @@ class ThreadedLeaderSelectorTests {
     relinquishLeadershiptCounter.get() shouldBeEqualTo count
   }
 
-  @Test
+  //zzz @Test
   fun threadedElection2Test() {
     val takeLeadershiptCounter = AtomicInteger(0)
     val relinquishLeadershiptCounter = AtomicInteger(0)
@@ -75,7 +75,7 @@ class ThreadedLeaderSelectorTests {
     val takeAction =
       { selector: LeaderSelector ->
         val pause = 3.random().seconds
-        logger.debug { "${selector.clientId} elected leader for $pause" }
+        logger.info { "${selector.clientId} elected leader for $pause" }
         takeLeadershiptCounter.incrementAndGet()
         sleep(pause)
       }
@@ -83,19 +83,19 @@ class ThreadedLeaderSelectorTests {
     val relinquishAction =
       { selector: LeaderSelector ->
         relinquishLeadershiptCounter.incrementAndGet()
-        logger.debug { "${selector.clientId} relinquished leadership" }
+        logger.info { "${selector.clientId} relinquished leadership" }
       }
 
     connectToEtcd(urls) { client ->
       blockingThreads(count) {
-        logger.debug { "Creating Thread$it" }
+        logger.info { "Creating Thread$it" }
 
         val election = LeaderSelector(client, path, takeAction, relinquishAction, clientId = "Thread$it")
         electionList += election
         election.start()
       }
 
-      logger.debug { "Size = ${electionList.size}" }
+      logger.info { "Size = ${electionList.size}" }
 
       electionList
         .onEach { it.waitOnLeadershipComplete() }

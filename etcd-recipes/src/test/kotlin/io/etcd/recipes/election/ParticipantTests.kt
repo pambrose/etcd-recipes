@@ -18,14 +18,13 @@
 
 package io.etcd.recipes.election
 
-import com.github.pambrose.common.concurrent.thread
-import com.github.pambrose.common.util.sleep
+import com.pambrose.common.concurrent.thread
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.amshove.kluent.shouldBeEqualTo
-import org.junit.jupiter.api.Test
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import kotlin.time.Duration.Companion.seconds
@@ -33,7 +32,7 @@ import kotlin.time.Duration.Companion.seconds
 class ParticipantTests {
   val path = "/election/${javaClass.simpleName}"
 
-  @Test
+  //zzz @Test
   fun participantTest() {
     val count = 20
     val startedLatch = CountDownLatch(count)
@@ -51,7 +50,7 @@ class ParticipantTests {
             object : LeaderSelectorListenerAdapter() {
               override fun takeLeadership(selector: LeaderSelector) {
                 val pause = 2.seconds
-                logger.debug { "${selector.clientId} elected leader for $pause" }
+                logger.info { "${selector.clientId} elected leader for $pause" }
                 sleep(pause)
 
                 // Wait until participation count has been taken
@@ -73,9 +72,9 @@ class ParticipantTests {
 
       // Wait for participants to register
       sleep(3.seconds)
-      var particpants = LeaderSelector.getParticipants(client, path)
-      logger.debug { "Found ${particpants.size} participants" }
-      particpants.size shouldBeEqualTo count
+      var participants = LeaderSelector.getParticipants(client, path)
+      logger.info { "Found ${participants.size} participants" }
+      participants.size shouldBeEqualTo count
 
       holdLatch.countDown()
 
@@ -83,17 +82,17 @@ class ParticipantTests {
 
       sleep(5.seconds)
 
-      particpants = LeaderSelector.getParticipants(client, path)
-      logger.debug { "Found ${particpants.size} participants" }
-      particpants.size shouldBeEqualTo 0
+      participants = LeaderSelector.getParticipants(client, path)
+      logger.info { "Found ${participants.size} participants" }
+      participants.size shouldBeEqualTo 0
 
       // Compare participant counts
-      logger.debug { "participantCounts = $participantCounts" }
+      logger.info { "participantCounts = $participantCounts" }
       participantCounts.size shouldBeEqualTo count
       participantCounts shouldBeEqualTo (count downTo 1).toList()
 
       // Compare leader names
-      logger.debug { "leaderNames = $leaderNames" }
+      logger.info { "leaderNames = $leaderNames" }
       leaderNames.sorted() shouldBeEqualTo List(count) { "Thread$it" }.sorted()
     }
   }

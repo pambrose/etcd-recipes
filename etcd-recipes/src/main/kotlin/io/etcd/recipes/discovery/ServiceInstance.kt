@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.discovery
 
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.util.randomId
 import io.etcd.recipes.common.EtcdConnector.Companion.TOKEN_LENGTH
 import io.etcd.recipes.discovery.ServiceInstance.Companion.ServiceInstanceBuilder
 import kotlinx.serialization.Serializable

@@ -18,9 +18,9 @@
 
 package io.etcd.recipes.discovery
 
-import com.github.pambrose.common.delegate.AtomicDelegates.nonNullableReference
-import com.github.pambrose.common.util.isNotNull
-import com.github.pambrose.common.util.randomId
+import com.pambrose.common.delegate.AtomicDelegates.nonNullableReference
+import com.pambrose.common.util.isNotNull
+import com.pambrose.common.util.randomId
 import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.lease.LeaseGrantResponse

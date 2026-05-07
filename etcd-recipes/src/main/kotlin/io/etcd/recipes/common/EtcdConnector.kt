@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.common
 
-import com.github.pambrose.common.concurrent.BooleanMonitor
-import com.github.pambrose.common.delegate.AtomicDelegates.atomicBoolean
+import com.pambrose.common.concurrent.BooleanMonitor
+import com.pambrose.common.delegate.AtomicDelegates.atomicBoolean
 import io.etcd.jetcd.Client
 import java.io.Closeable
 import java.util.Collections.synchronizedList
@@ -38,7 +38,7 @@ open class EtcdConnector(
 
   val exceptions: List<Throwable> get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList()
 
-  val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.size > 0
+  val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.isNotEmpty()
 
   fun clearExceptions() {
     if (exceptionList.isInitialized()) exceptionList.value.clear()

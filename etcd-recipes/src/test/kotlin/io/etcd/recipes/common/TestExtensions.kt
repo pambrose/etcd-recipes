@@ -18,8 +18,8 @@
 
 package io.etcd.recipes.common
 
-import com.github.pambrose.common.concurrent.thread
-import com.github.pambrose.common.util.isNotNull
+import com.pambrose.common.concurrent.thread
+import com.pambrose.common.util.isNotNull
 import org.junit.jupiter.api.Assertions.fail
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
