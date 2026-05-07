@@ -111,7 +111,8 @@ constructor(
     var keepAliveLease: CloseableClient? = null
     val keepAliveClosed = BooleanMonitor(false)
     val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
-    val waitingPath = waitingPath.appendToPath(uniqueToken)
+    val myWaitingPath = waitingPath.appendToPath(uniqueToken)
+    val waitingPrefix = waitingPath.ensureSuffix("/")
 
     checkCloseNotCalled()
 
@@ -119,7 +120,7 @@ constructor(
       if (!keepAliveClosed.get()) {
         keepAliveLease?.close()
         keepAliveLease = null
-        client.deleteKey(waitingPath)
+        client.deleteKey(myWaitingPath)
         keepAliveClosed.set(true)
       }
     }
@@ -151,15 +152,15 @@ constructor(
 
     val txn =
       client.transaction {
-        If(waitingPath.doesNotExist)
-        Then(waitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+        If(myWaitingPath.doesNotExist)
+        Then(myWaitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
       }
 
     when {
       !txn.isSucceeded ->
         throw EtcdRecipeException("Failed to set waitingPath")
 
-      client.getValue(waitingPath)?.asString != uniqueToken ->
+      client.getValue(myWaitingPath)?.asString != uniqueToken ->
         throw EtcdRecipeException("Failed to assign waitingPath unique value")
 
       else -> {
@@ -183,8 +184,8 @@ constructor(
                 .forEach { watchEvent ->
                   val key = watchEvent.keyValue.key.asString
                   when {
-                    key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
-                    key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
+                    key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> checkWaiterCount()
+                    key == readyPath && watchEvent.eventType == DELETE -> closeKeepAlive()
                   }
                 }
             },
@@ -196,7 +197,7 @@ constructor(
             // Cleanup if a time-out occurred
             if (!success) {
               closeKeepAlive()
-              client.deleteKey(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
+              client.deleteKey(myWaitingPath)  // This is redundant but waiting for keep-alive to stop is slower
             }
 
             success

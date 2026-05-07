@@ -96,7 +96,6 @@ class ServiceCache internal constructor(
               else -> logger.error { "Unknown error with $servicePath watch" }
             }
           }
-        startThreadComplete.set(true)
       },
     )
 
@@ -110,6 +109,7 @@ class ServiceCache internal constructor(
 
     dataPreloaded.set(true)
     startCalled = true
+    startThreadComplete.set(true)
 
     return this
   }

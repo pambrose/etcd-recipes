@@ -129,7 +129,7 @@ constructor(
       clientId,
     )
 
-  private val executor = userExecutor ?: Executors.newFixedThreadPool(3)
+  private var executor: Executor = userExecutor ?: Executors.newFixedThreadPool(3)
   private val terminateWatch = BooleanMonitor(false)
   private val terminateKeepAlive = BooleanMonitor(false)
   private val leadershipComplete = BooleanMonitor(false)
@@ -154,7 +154,10 @@ constructor(
       if (!startCallAllowed.get())
         throw EtcdRecipeRuntimeException("Previous call to start() not complete")
 
-      checkCloseNotCalled()
+      // Re-create the internal executor if a previous close() shut it down,
+      // so the instance can be re-used across start()/close() cycles.
+      if (userExecutor.isNull() && (executor as ExecutorService).isShutdown)
+        executor = Executors.newFixedThreadPool(3)
 
       terminateWatch.set(false)
       terminateKeepAlive.set(false)
