@@ -12,71 +12,169 @@
 [![Java](https://img.shields.io/badge/%20language-Java-red.svg)](https://kotlinlang.org/)
 
 [etcd-recipes](https://github.com/pambrose/etcd-recipes) is a Kotlin/Java/JVM client library
-for [etcd](https://etcd.io) v3, a distributed, reliable key-value store. It attempts to provide the same
-kind of support for [etcd](https://etcd.io) that
-[Curator](https://curator.apache.org) does for [ZooKeeper](https://zookeeper.apache.org).
+for [etcd](https://etcd.io) v3, a distributed, reliable key-value store. It provides higher-level
+distributed coordination primitives layered on top of the raw key/value API — similar in spirit to
+what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zookeeper.apache.org).
 
-## Examples
+## Recipes
 
-The repo includes [Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples)
-and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples)
-examples.
+| Package | Recipes |
+|---|---|
+| `io.etcd.recipes.barrier` | `DistributedBarrier`, `DistributedBarrierWithCount`, `DistributedDoubleBarrier` |
+| `io.etcd.recipes.cache` | `PathChildrenCache` (key-prefix cache with PUT/UPDATE/DELETE listeners) |
+| `io.etcd.recipes.counter` | `DistributedAtomicLong` |
+| `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider` |
+| `io.etcd.recipes.election` | `LeaderSelector`, `LeaderSelectorListener`, `Participant` |
+| `io.etcd.recipes.keyvalue` | `TransientKeyValue` (lease-backed key/value) |
+| `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue` |
+| `io.etcd.recipes.common` | Kotlin extensions over jetcd `Client`, `KV`, `Lease`, `Watch`, `Txn` |
 
 ## Usage
+
+Connect to a cluster and read/write keys with the extension API:
+
 ```kotlin
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.delete
+import io.etcd.recipes.common.putValue
+import kotlin.time.Duration.Companion.seconds
+
+val urls = listOf("http://localhost:2379")
+
 connectToEtcd(urls) { client ->
     client.putValue("test_key", "test_value")
-    sleep(5.seconds)
+    Thread.sleep(5.seconds.inWholeMilliseconds)
     client.delete("test_key")
 }
 ```
 
-## Compatability
-etcd-recipes is built on top of [jetcd](https://github.com/etcd-io/jetcd), which works with etcd v3.
+Run a single-leader election across a cluster of processes:
 
-etcd-recipies is written in Kotlin, but is usable by Java and any other JVM clients.
+```kotlin
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.election.LeaderSelector
+
+connectToEtcd(urls) { client ->
+    LeaderSelector(
+        client,
+        electionPath = "/election/my-service",
+        takeLeadershipBlock = { selector ->
+            // Invoked on the elected leader; return to release leadership.
+        },
+        clientId = "node-1",
+    ).use { selector ->
+        selector.start()
+        selector.waitOnLeadershipComplete()
+    }
+}
+```
+
+See the `etcd-recipes-examples/` module for runnable
+[Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples)
+and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples)
+demos of every recipe.
+
+## Compatibility
+
+- Built on [jetcd](https://github.com/etcd-io/jetcd) and targets etcd v3.
+- Requires Java 17+ at runtime (the published artifact is compiled against a JDK 17 toolchain).
+- Written in Kotlin; fully usable from Java and any other JVM language.
 
 
 ## Download
 
-Jars are available at [jitpack.io](https://jitpack.io/#pambrose/etcd-recipes).
+### Gradle (Kotlin DSL)
 
-### Gradle
-
-```
-# Add kotlinx and jitpack.io to repositories
+```kotlin
 repositories {
     mavenCentral()
-    maven { url "https://kotlin.bintray.com/kotlinx" }
+}
+
+dependencies {
+    implementation("com.pambrose.etcd-recipes:etcd-recipes:0.10.0")
+}
+```
+
+If you use a version catalog (`gradle/libs.versions.toml`):
+
+```toml
+[versions]
+etcd-recipes = "0.10.0"
+
+[libraries]
+etcd-recipes = { module = "com.pambrose.etcd-recipes:etcd-recipes", version.ref = "etcd-recipes" }
+```
+
+### Gradle (Groovy DSL)
+
+```groovy
+repositories {
+    mavenCentral()
     maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    implementation "com.pambrose.etcd-recipes:etcd-recipes:0.9.22"
+    implementation 'com.pambrose.etcd-recipes:etcd-recipes:0.10.0'
 }
 ```
 
 ### Maven
 
-```
+```xml
 <repositories>
     <repository>
-        <id>kotlinx</id>
-        <name>kotlinkx Releases</name>
-        <url>https://kotlin.bintray.com/kotlinx</url>
-    </repository>
-    <repository>
         <id>jitpack.io</id>
-        <name>jitpack.io Releases</name>
         <url>https://jitpack.io</url>
     </repository>
 </repositories>
 
 <dependencies>
     <dependency>
-      <groupId>com.pambrose.etcd-recipes</groupId>
-      <artifactId>etcd-recipes</artifactId>
-      <version>0.9.22</version>
+        <groupId>com.pambrose.etcd-recipes</groupId>
+        <artifactId>etcd-recipes</artifactId>
+        <version>0.10.0</version>
     </dependency>
 </dependencies>
 ```
+
+## Building from source
+
+JDK 17 is required (the build is configured with a Kotlin JVM toolchain of 17). The Gradle wrapper
+is checked in, so no local Gradle install is needed.
+
+```
+./gradlew clean build -xtest    # build without running tests
+./gradlew check                 # run all tests + jacoco coverage
+./gradlew lintKotlinMain lintKotlinTest
+```
+
+A `Makefile` wraps the most common entry points:
+
+```
+make build          # ./gradlew clean build -xtest
+make tests          # ./gradlew check jacocoTestReport
+make lint           # ./gradlew lintKotlinMain lintKotlinTest
+make versioncheck   # ./gradlew dependencyUpdates --no-parallel
+```
+
+The integration tests and examples expect a local etcd at `http://localhost:2379`. Start one with:
+
+```
+./etcd.sh
+```
+
+To run a single test class:
+
+```
+./gradlew :etcd-recipes:test --tests "io.etcd.recipes.barrier.DistributedBarrierTests"
+```
+
+## Contributing
+
+Issues and pull requests are welcome on [GitHub](https://github.com/pambrose/etcd-recipes). When
+adding a new recipe, please include a runnable example under `etcd-recipes-examples/` and Kotest
+tests under `etcd-recipes/src/test/kotlin/`.
+
+## License
+
+Released under the [Apache License, Version 2.0](License.txt).
