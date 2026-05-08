@@ -1,3 +1,5 @@
+import com.vanniktech.maven.publish.JavadocJar
+import com.vanniktech.maven.publish.SourcesJar
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
@@ -5,24 +7,25 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.io.File
 
 plugins {
-    java
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
-    alias(libs.plugins.ben.manes.versions) apply false
+    alias(libs.plugins.ben.manes.versions)
     alias(libs.plugins.kotlinter) apply false
-    alias(libs.plugins.dokka) apply false
-    alias(libs.plugins.dokka.javadoc) apply false
-    alias(libs.plugins.kover) apply false
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.dokka.javadoc)
+    alias(libs.plugins.kover)
     alias(libs.plugins.detekt) apply false
+    alias(libs.plugins.maven.publish) apply false
 }
 
 // Version and group are defined in gradle.properties; also update version refs in README.md and website/srcref/docs/{api,getting-started}.md
-providers.gradleProperty("overrideVersion").orNull?.let { version = it }
-
 allprojects {
+    providers.gradleProperty("overrideVersion").orNull?.let { version = it }
+}
+
+subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
-    apply(plugin = "com.github.ben-manes.versions")
     apply(plugin = "org.jmailen.kotlinter")
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "org.jetbrains.dokka-javadoc")
@@ -30,15 +33,17 @@ allprojects {
     apply(plugin = "io.gitlab.arturbosch.detekt")
 }
 
-// Root-level Kover aggregation: `./gradlew koverHtmlReport` at the root
-// produces one merged coverage report across all subprojects.
+// Root-level aggregation: `./gradlew dokkaGenerate` and `koverHtmlReport`
+// at the root produce one merged report across all subprojects.
 dependencies {
-    "kover"(project(":etcd-recipes"))
-    "kover"(project(":etcd-recipes-examples"))
+    dokka(project(":etcd-recipes"))
+    dokka(project(":etcd-recipes-examples"))
+
+    kover(project(":etcd-recipes"))
+    kover(project(":etcd-recipes-examples"))
 }
 
 dokka {
-    moduleName.set("etcd-recipes")
     pluginsConfiguration.html {
         homepageLink.set("https://github.com/pambrose/etcd-recipes")
         footerMessage.set("etcd-recipes")
@@ -46,6 +51,8 @@ dokka {
 }
 
 subprojects {
+    description = name
+
     dependencies {
         "implementation"(rootProject.libs.kotlinx.serialization.json)
         "implementation"(rootProject.libs.kotlinx.coroutines.core)
@@ -71,31 +78,8 @@ subprojects {
         "testRuntimeOnly"(rootProject.libs.junit.platform.launcher)
     }
 
-    val mainSourceSet = the<JavaPluginExtension>().sourceSets["main"]
-
-    val sourcesJar by tasks.registering(Jar::class) {
-        dependsOn("classes")
-        archiveClassifier.set("sources")
-        from(mainSourceSet.allSource)
-    }
-
-    // Package Dokka's Javadoc-format output as the javadoc JAR so Maven
-    // consumers see real KDoc instead of an empty Javadoc-on-Kotlin tree.
-    val dokkaJavadocTask = tasks.named("dokkaGeneratePublicationJavadoc")
-    tasks.register<Jar>("javadocJar") {
-        dependsOn(dokkaJavadocTask)
-        archiveClassifier.set("javadoc")
-        from(dokkaJavadocTask)
-    }
-
-    // Fixes a bizarre gradle error related to duplicate methods
-    tasks.named<Jar>("jar") {
-        duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    }
-
-    artifacts {
-        add("archives", sourcesJar)
-    }
+    // Examples module isn't published; only the library is.
+    if (name == "etcd-recipes") configurePublishing()
 
     configure<KotlinJvmProjectExtension> {
         jvmToolchain(17)
@@ -104,7 +88,6 @@ subprojects {
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions {
             freeCompilerArgs.addAll(
-                "-Xbackend-threads=8",
                 "-opt-in=kotlin.time.ExperimentalTime",
                 "-opt-in=kotlin.ExperimentalUnsignedTypes",
                 "-opt-in=kotlin.concurrent.atomics.ExperimentalAtomicApi",
@@ -160,6 +143,7 @@ subprojects {
                 environment("TESTCONTAINERS_RYUK_DISABLED", "true")
             }
         }
+
         testLogging {
             events = setOf(TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED)
             exceptionFormat = TestExceptionFormat.FULL
@@ -167,3 +151,50 @@ subprojects {
         }
     }
 }
+
+fun Project.configurePublishing() {
+    apply {
+        plugin("org.jetbrains.dokka")
+        plugin("com.vanniktech.maven.publish")
+    }
+
+    extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
+        configure(
+            com.vanniktech.maven.publish.KotlinJvm(
+                javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml"),
+                sourcesJar = SourcesJar.Sources(),
+            ),
+        )
+
+        pom {
+            name.set(project.name)
+            description.set(provider { project.description })
+            url.set("https://github.com/pambrose/etcd-recipes")
+            licenses {
+                license {
+                    name.set("Apache License 2.0")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                }
+            }
+            developers {
+                developer {
+                    id.set("etcd-recipes")
+                    name.set("Paul Ambrose")
+                    email.set("paul@pambrose.com")
+                }
+            }
+            scm {
+                connection.set("scm:git:git://github.com/pambrose/etcd-recipes.git")
+                developerConnection.set("scm:git:ssh://github.com/pambrose/etcd-recipes.git")
+                url.set("https://github.com/pambrose/etcd-recipes")
+            }
+        }
+
+        publishToMavenCentral(automaticRelease = true)
+        // Skip signing when no GPG key is provided (e.g., local publishing)
+        if (providers.gradleProperty("signingInMemoryKey").isPresent) {
+            signAllPublications()
+        }
+    }
+}
+

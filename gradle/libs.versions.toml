@@ -1,45 +1,47 @@
 [versions]
-kotlin = "2.3.21"
+ben-manes-versions = "0.54.0"
 coroutines = "1.11.0"
-serialization = "1.11.0"
-jetcd = "0.8.6"
+detekt = "1.23.8"
+dokka = "2.2.0"
 guava = "33.6.0-jre"
-utils = "2.8.2"
-kotlin-logging = "8.0.02"
-logback = "1.5.32"
-netty = "4.1.116.Final"
+jetcd = "0.8.6"
 junit = "6.1.0-RC1"
 kotest = "6.1.11"
-testcontainers = "2.0.5"
-ben-manes-versions = "0.54.0"
+kotlin = "2.3.21"
+kotlin-logging = "8.0.02"
 kotlinter = "5.4.2"
-dokka = "2.2.0"
 kover = "0.9.8"
-detekt = "1.23.8"
+logback = "1.5.32"
+maven-publish = "0.36.0"
+netty = "4.1.116.Final"
+serialization = "1.11.0"
+testcontainers = "2.0.5"
+utils = "2.8.2"
 
 [libraries]
-kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
-jetcd-core = { module = "io.etcd:jetcd-core", version.ref = "jetcd" }
-guava = { module = "com.google.guava:guava", version.ref = "guava" }
 common-utils-core = { module = "com.pambrose.common-utils:core-utils", version.ref = "utils" }
 common-utils-guava = { module = "com.pambrose.common-utils:guava-utils", version.ref = "utils" }
-kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
-netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+jetcd-core = { module = "io.etcd:jetcd-core", version.ref = "jetcd" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
-kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
 kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
+kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
 testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 
 [plugins]
-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ben-manes-versions = { id = "com.github.ben-manes.versions", version.ref = "ben-manes-versions" }
-kotlinter = { id = "org.jmailen.kotlinter", version.ref = "kotlinter" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 dokka-javadoc = { id = "org.jetbrains.dokka-javadoc", version.ref = "dokka" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlinter = { id = "org.jmailen.kotlinter", version.ref = "kotlinter" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }

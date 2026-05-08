@@ -1,5 +1,11 @@
 .PHONY: default clean clean-all stop build tests tests-tc coverage kdocs \
-        lint detekt detekt-baseline refresh versioncheck upgrade-wrapper
+        lint detekt detekt-baseline refresh versioncheck \
+        publish-local publish-local-snapshot check-gpg-env \
+        publish-snapshot publish-maven-central upgrade-wrapper
+
+# Read the project version from gradle.properties; can be overridden on
+# the command line, e.g. `make publish-snapshot VERSION=0.10.1`.
+VERSION ?= $(shell awk -F= '/^version=/ {print $$2; exit}' gradle.properties)
 
 default: versioncheck
 
