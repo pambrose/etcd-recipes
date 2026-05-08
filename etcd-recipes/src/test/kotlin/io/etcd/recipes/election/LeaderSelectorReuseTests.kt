@@ -22,6 +22,8 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 // Regression test for: LeaderSelector with the default internal executor
@@ -55,6 +57,45 @@ class LeaderSelectorReuseTests : StringSpec() {
 
         tookLeadership.get() shouldBe 2
         selector.hasExceptions shouldBe false
+      }
+    }
+
+    // Symmetric to the internal-executor case: a user-supplied executor must
+    // survive close() so the same instance can be re-used, and close() must
+    // NOT shut down the user's executor (it didn't create it).
+    "startWorksAfterCloseWithUserExecutor" {
+      val path = "/election/LeaderSelectorReuseTests-userExecutor"
+      val tookLeadership = AtomicInteger(0)
+      val userExecutor = Executors.newFixedThreadPool(3)
+
+      try {
+        connectToEtcd(urls) { client ->
+          val selector =
+            LeaderSelector(
+              client,
+              path,
+              takeLeadershipBlock = { tookLeadership.incrementAndGet() },
+              executorService = userExecutor,
+            )
+
+          selector.start()
+          selector.waitOnLeadershipComplete()
+          selector.close()
+
+          // The user's executor must remain usable across close().
+          userExecutor.isShutdown shouldBe false
+
+          selector.start()
+          selector.waitOnLeadershipComplete()
+          selector.close()
+
+          tookLeadership.get() shouldBe 2
+          selector.hasExceptions shouldBe false
+          userExecutor.isShutdown shouldBe false
+        }
+      } finally {
+        userExecutor.shutdown()
+        userExecutor.awaitTermination(5, TimeUnit.SECONDS)
       }
     }
   }

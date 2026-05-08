@@ -18,8 +18,12 @@
 
 package io.etcd.recipes.discovery
 
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.urls
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -56,6 +60,67 @@ class ServiceCacheCloseTests : StringSpec() {
         }
 
         closed.await(10, TimeUnit.SECONDS) shouldBe true
+      }
+    }
+
+    // The fix moved startThreadComplete out of the watcher callback, so the
+    // normal-path code (events DO arrive before close()) must still complete
+    // promptly. Pin that behavior so a future revert that re-couples the
+    // signal to the callback would fail here AND in the no-events test above.
+    "closeReturnsAfterReceivingEvents" {
+      val path = "/discovery/ServiceCacheCloseTests-with-events"
+      val namesPath = path.appendToPath("/names")
+      val name = "WithEventsService"
+      val seenEvent = CountDownLatch(1)
+      val closed = CountDownLatch(1)
+
+      connectToEtcd(urls) { client ->
+        client.deleteChildren(namesPath)
+
+        val cache = ServiceCache(client, namesPath, name).start()
+        cache.addListenerForChanges { eventType, _, _, _ ->
+          if (eventType == PUT) seenEvent.countDown()
+        }
+
+        // PUT a real ServiceInstance under namesPath/name/<id> — toObject
+        // deserialization runs inside the watcher callback, so the value
+        // must be valid JSON.
+        val instance = ServiceInstance(name, "{}")
+        val key = namesPath.appendToPath(name).appendToPath(instance.id)
+        client.transaction { Then(key.setTo(instance.toJson())) }
+
+        seenEvent.await(10, TimeUnit.SECONDS) shouldBe true
+
+        thread(isDaemon = true, name = "service-cache-closer") {
+          cache.close()
+          closed.countDown()
+        }
+
+        closed.await(10, TimeUnit.SECONDS) shouldBe true
+
+        client.deleteChildren(namesPath)
+      }
+    }
+
+    // close() guards on closeCalled and returns early; verify a second close()
+    // returns promptly (no hang on startThreadComplete, no thrown exception).
+    "closeIsIdempotent" {
+      val path = "/discovery/ServiceCacheCloseTests-idempotent"
+      val namesPath = path.appendToPath("/names")
+      val name = "IdempotentService"
+      val secondClosed = CountDownLatch(1)
+
+      connectToEtcd(urls) { client ->
+        val cache = ServiceCache(client, namesPath, name).start()
+
+        cache.close()
+
+        thread(isDaemon = true, name = "service-cache-second-closer") {
+          cache.close()
+          secondClosed.countDown()
+        }
+
+        secondClosed.await(5, TimeUnit.SECONDS) shouldBe true
       }
     }
   }
