@@ -18,13 +18,13 @@
 
 package io.etcd.recipes.discovery
 
-import com.pambrose.common.util.sleep
 import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.recipes.common.ExceptionHolder
 import io.etcd.recipes.common.captureException
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.nonblockingThreads
+import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
@@ -49,7 +49,6 @@ class ServiceCacheTests : StringSpec() {
                 withServiceDiscovery(client, path) {
                     withServiceCache(name) {
                         start()
-                        sleep(2.seconds)
 
                         instances.size shouldBe 0
                         serviceName shouldBe name
@@ -89,20 +88,14 @@ class ServiceCacheTests : StringSpec() {
                                         logger.debug { "Registering: ${service.name} ${service.id}" }
                                         registerService(service)
 
-                                        sleep(1.seconds)
-
                                         val payload = TestPayload.toObject(service.jsonPayload)
                                         payload.testval = payload.testval * -1
                                         service.jsonPayload = payload.toJson()
                                         logger.debug { "Updating: ${service.name} ${service.id}" }
                                         updateService(service)
 
-                                        sleep(1.seconds)
-
                                         logger.debug { "Unregistering: ${service.name} ${service.id}" }
                                         unregisterService(service)
-
-                                        sleep(1.seconds)
                                     }
                                 }
                             }
@@ -112,14 +105,15 @@ class ServiceCacheTests : StringSpec() {
                 }
             }
 
-            // Wait for deletes to propagate
-            sleep(5.seconds)
+            // Wait for events to propagate to the cache listeners.
+            val expectedTotal = (threadCount * serviceCount) * 3
+            pollUntil(15.seconds) { totalCounter.get() == expectedTotal } shouldBe true
 
             holder.checkForException()
             registerCounter.get() shouldBe threadCount * serviceCount
             updateCounter.get() shouldBe threadCount * serviceCount
             unregisterCounter.get() shouldBe threadCount * serviceCount
-            totalCounter.get() shouldBe (threadCount * serviceCount) * 3
+            totalCounter.get() shouldBe expectedTotal
         }
     }
 

@@ -18,8 +18,6 @@
 
 package io.etcd.recipes.election
 
-import com.pambrose.common.util.random
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
@@ -28,7 +26,6 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.Collections.synchronizedList
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration.Companion.seconds
 
 class ThreadedLeaderSelectorTests : StringSpec() {
     val path = "/election/${javaClass.simpleName}"
@@ -42,10 +39,9 @@ class ThreadedLeaderSelectorTests : StringSpec() {
             blockingThreads(count) {
                 val takeAction =
                     { selector: LeaderSelector ->
-                        val pause = 3.random().seconds
-                        logger.info { "${selector.clientId} elected leader for $pause" }
+                        logger.info { "${selector.clientId} elected leader" }
                         takeLeadershiptCounter.incrementAndGet()
-                        sleep(pause)
+                        Unit
                     }
 
                 val relinquishAction =
@@ -73,10 +69,9 @@ class ThreadedLeaderSelectorTests : StringSpec() {
 
             val takeAction =
                 { selector: LeaderSelector ->
-                    val pause = 3.random().seconds
-                    logger.info { "${selector.clientId} elected leader for $pause" }
+                    logger.info { "${selector.clientId} elected leader" }
                     takeLeadershiptCounter.incrementAndGet()
-                    sleep(pause)
+                    Unit
                 }
 
             val relinquishAction =

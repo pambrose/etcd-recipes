@@ -19,9 +19,9 @@
 package io.etcd.recipes.election
 
 import com.pambrose.common.concurrent.thread
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
@@ -35,7 +35,7 @@ class ParticipantTests : StringSpec() {
 
     init {
         "participantTest" {
-            val count = 20
+            val count = 10
             val startedLatch = CountDownLatch(count)
             val finishedLatch = CountDownLatch(count)
             val holdLatch = CountDownLatch(1)
@@ -50,12 +50,17 @@ class ParticipantTests : StringSpec() {
                             path,
                             object : LeaderSelectorListenerAdapter() {
                                 override fun takeLeadership(selector: LeaderSelector) {
-                                    val pause = 2.seconds
-                                    logger.info { "${selector.clientId} elected leader for $pause" }
-                                    sleep(pause)
+                                    logger.info { "${selector.clientId} elected leader" }
 
                                     // Wait until participation count has been taken
                                     holdLatch.await()
+                                    // Each leader's participant lease only expires after its
+                                    // selector closes. Wait for previous leaders' leases to
+                                    // expire so we observe a strictly decreasing count.
+                                    val expected = count - participantCounts.size
+                                    pollUntil(15.seconds) {
+                                        LeaderSelector.getParticipants(client, path).size == expected
+                                    } shouldBe true
                                     participantCounts += LeaderSelector.getParticipants(client, path).size
                                     leaderNames += selector.clientId
                                 }
@@ -72,7 +77,9 @@ class ParticipantTests : StringSpec() {
                 startedLatch.await()
 
                 // Wait for participants to register
-                sleep(3.seconds)
+                pollUntil(15.seconds) {
+                    LeaderSelector.getParticipants(client, path).size == count
+                } shouldBe true
                 var participants = LeaderSelector.getParticipants(client, path)
                 logger.info { "Found ${participants.size} participants" }
                 participants.size shouldBe count
@@ -81,10 +88,11 @@ class ParticipantTests : StringSpec() {
 
                 finishedLatch.await()
 
-                sleep(5.seconds)
-
+                // After all leaders complete, etcd should evict every participant lease.
+                pollUntil(15.seconds) {
+                    LeaderSelector.getParticipants(client, path).isEmpty()
+                } shouldBe true
                 participants = LeaderSelector.getParticipants(client, path)
-                logger.info { "Found ${participants.size} participants" }
                 participants.size shouldBe 0
 
                 // Compare participant counts

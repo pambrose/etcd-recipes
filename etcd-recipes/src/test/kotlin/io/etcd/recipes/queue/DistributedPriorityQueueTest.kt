@@ -19,7 +19,6 @@
 package io.etcd.recipes.queue
 
 import com.pambrose.common.concurrent.thread
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -35,6 +34,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class DistributedPriorityQueueTest : StringSpec() {
+    // Namespace etcd paths by class name so concurrent test forks (and the
+    // structurally similar DistributedQueueTest) cannot collide.
+    private val basePath = "/queue/${this::class.simpleName}"
     private val iterCount = 100
     private val threadCount = 10
     private val testData = List(iterCount) { "V %04d".format(it) }
@@ -43,7 +45,7 @@ class DistributedPriorityQueueTest : StringSpec() {
         iterCount: Int,
         threadCount: Int,
     ) {
-        val queuePath = "/queue/threadedTestNoWait"
+        val queuePath = "$basePath/threadedTestNoWait"
         val latch = CountDownLatch(threadCount)
         val dequeuedData = mutableListOf<String>()
         val testData = List(iterCount) { "V %04d".format(it) }
@@ -80,7 +82,7 @@ class DistributedPriorityQueueTest : StringSpec() {
         iterCount: Int,
         threadCount: Int,
     ) {
-        val queuePath = "/queue/threadedTestWithWait"
+        val queuePath = "$basePath/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)
         val dequeuedData = synchronizedList(mutableListOf<String>())
         val testData = List(iterCount) { "V %04d".format(it) }
@@ -108,8 +110,7 @@ class DistributedPriorityQueueTest : StringSpec() {
             client.getChildCount(queuePath) shouldBe 0
         }
 
-        sleep(5.seconds)
-
+        // The producer/consumer latch has already drained — no settle needed.
         dequeuedData.size shouldBe testData.size
         repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
         dequeuedData shouldBe testData
@@ -117,7 +118,7 @@ class DistributedPriorityQueueTest : StringSpec() {
 
     init {
         "serialTestNoWait" {
-            val queuePath = "/queue/serialTestNoWait"
+            val queuePath = "$basePath/serialTestNoWait"
             val dequeuedData = mutableListOf<String>()
 
             connectToEtcd(urls) { client ->
@@ -133,7 +134,7 @@ class DistributedPriorityQueueTest : StringSpec() {
         }
 
         "serialTestWithWait" {
-            val queuePath = "/queue/serialPriorityTestWithWait"
+            val queuePath = "$basePath/serialPriorityTestWithWait"
             val dequeuedData = mutableListOf<String>()
             val dequeueLatch = CountDownLatch(1)
             val enqueueLatch = CountDownLatch(1)
@@ -216,7 +217,7 @@ class DistributedPriorityQueueTest : StringSpec() {
         // Disabled under Kotest: 10 dequeue watchers on the same path appear to deadlock.
         // Same code passed under JUnit — root cause not yet diagnosed.
         "pingPongTest" {
-            val queuePath = "/queue/pingPongTest"
+            val queuePath = "$basePath/pingPongTest"
             val counter = AtomicInteger(0)
             val token = "Pong"
             val latch = CountDownLatch(threadCount)
@@ -251,7 +252,7 @@ class DistributedPriorityQueueTest : StringSpec() {
         }
 
         "serialTestNoWaitWithPriorities" {
-            val queuePath = "/queue/serialTestNoWaitWithPriorities"
+            val queuePath = "$basePath/serialTestNoWaitWithPriorities"
             val dequeuedData = mutableListOf<String>()
 
             connectToEtcd(urls) { client ->
@@ -268,7 +269,7 @@ class DistributedPriorityQueueTest : StringSpec() {
         }
 
         "serialTestNoWaitWithReversedPriorities" {
-            val queuePath = "/queue/serialTestNoWaitWithReversedPriorities"
+            val queuePath = "$basePath/serialTestNoWaitWithReversedPriorities"
             val dequeuedData = mutableListOf<String>()
 
             connectToEtcd(urls) { client ->

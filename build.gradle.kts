@@ -1,4 +1,5 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -90,12 +91,17 @@ subprojects {
     tasks.named<Test>("test") {
         useJUnitPlatform()
         // Fork a new JVM for each test class so background threads / etcd watch
-        // connections from one spec don't interfere with the next one
+        // connections from one spec don't interfere with the next one.
         setForkEvery(1)
+        // Run multiple test classes in parallel against the local etcd. Each
+        // test namespaces its keys under its own path, so concurrent forks
+        // do not collide. Cap at half the cores so etcd + jacoco aren't
+        // starved.
+        maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(2)
         testLogging {
-            events("passed", "skipped", "failed", "standardOut", "standardError")
+            events = setOf(TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED)
             exceptionFormat = TestExceptionFormat.FULL
-            showStandardStreams = true
+            showStandardStreams = false
         }
     }
 }

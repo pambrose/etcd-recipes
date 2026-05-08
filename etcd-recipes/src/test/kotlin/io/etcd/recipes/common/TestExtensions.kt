@@ -23,8 +23,29 @@ import com.pambrose.common.util.isNotNull
 import org.junit.jupiter.api.Assertions.fail
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 val urls = listOf("http://localhost:2379")
+
+/**
+ * Wait up to [timeout] for [predicate] to become true, polling every [poll].
+ * Returns true if the predicate succeeded before the deadline, false on timeout.
+ * Prefer this over fixed `sleep(...)` "settle" calls in tests — it returns as
+ * soon as the condition holds, which usually beats the worst-case settle time.
+ */
+fun pollUntil(
+  timeout: Duration,
+  poll: Duration = 50.milliseconds,
+  predicate: () -> Boolean,
+): Boolean {
+  val deadline = System.nanoTime() + timeout.inWholeNanoseconds
+  while (true) {
+    if (predicate()) return true
+    if (System.nanoTime() > deadline) return false
+    Thread.sleep(poll.inWholeMilliseconds)
+  }
+}
 
 fun nonblockingThreads(
   threadCount: Int,

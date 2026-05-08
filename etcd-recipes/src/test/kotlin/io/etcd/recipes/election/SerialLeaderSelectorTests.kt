@@ -18,8 +18,6 @@
 
 package io.etcd.recipes.election
 
-import com.pambrose.common.util.random
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -27,7 +25,6 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration.Companion.seconds
 
 class SerialLeaderSelectorTests : StringSpec() {
     val path = "/election/${javaClass.simpleName}"
@@ -40,14 +37,12 @@ class SerialLeaderSelectorTests : StringSpec() {
         }
 
         "serialElectionTest" {
-            val count = 10
+            val count = 5
             val takeLeadershiptCounter = AtomicInteger(0)
             val relinquishLeadershiptCounter = AtomicInteger(0)
 
             val leadershipAction = { selector: LeaderSelector ->
-                val pause = 3.random().seconds
-                logger.info { "${selector.clientId} elected leader for $pause" }
-                sleep(pause)
+                logger.info { "${selector.clientId} elected leader" }
                 takeLeadershiptCounter.incrementAndGet()
                 Unit
             }

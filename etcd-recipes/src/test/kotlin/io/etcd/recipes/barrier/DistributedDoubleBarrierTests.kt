@@ -19,11 +19,11 @@
 package io.etcd.recipes.barrier
 
 import com.pambrose.common.util.random
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.nonblockingThreads
+import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
@@ -62,8 +62,6 @@ class DistributedDoubleBarrierTests : StringSpec() {
                 barrier: DistributedDoubleBarrier,
                 retryCount: Int = 0,
             ) {
-                sleep(5.random().seconds)
-
                 repeat(retryCount) {
                     logger.debug { "#$id Waiting to enter barrier" }
                     if (it % 2 == 0)
@@ -87,8 +85,6 @@ class DistributedDoubleBarrierTests : StringSpec() {
                 barrier: DistributedDoubleBarrier,
                 retryCount: Int = 0,
             ) {
-                sleep(10.random().seconds)
-
                 repeat(retryCount) {
                     logger.debug { "#$id Waiting to leave barrier" }
                     if (it % 2 == 0)
@@ -116,21 +112,18 @@ class DistributedDoubleBarrierTests : StringSpec() {
                     nonblockingThreads(count - 1) { i ->
                         withDistributedDoubleBarrier(client, path, count) {
                             enterBarrier(i, this, retryAttempts)
-                            sleep(5.random().seconds)
                             leaveBarrier(i, this, retryAttempts)
                         }
                     }
 
                 withDistributedDoubleBarrier(client, path, count) {
                     enterLatch.await()
-                    sleep(2.seconds)
-
+                    pollUntil(5.seconds) { enterWaiterCount.toInt() == count - 1 } shouldBe true
                     enterWaiterCount.toInt() shouldBe count - 1
                     enterBarrier(99, this)
 
                     leaveLatch.await()
-                    sleep(2.seconds)
-
+                    pollUntil(5.seconds) { leaveWaiterCount.toInt() == count - 1 } shouldBe true
                     leaveWaiterCount.toInt() shouldBe count - 1
                     leaveBarrier(99, this)
                 }

@@ -3,6 +3,14 @@ default: versioncheck
 clean:
 	./gradlew clean
 
+# Wipe every build / IDE / tool artifact a fresh checkout would not have.
+# Stops any Gradle daemons first so .gradle is not held open.
+clean-all: stop
+	./gradlew clean || true
+	rm -rf .gradle .kotlin build out
+	find . -type d \( -name build -o -name .gradle -o -name .kotlin -o -name out -o -name bin \) -prune -exec rm -rf {} +
+	rm -rf default.etcd
+
 stop:
 	./gradlew --stop
 
@@ -10,7 +18,7 @@ build: clean
 	./gradlew build -xtest
 
 tests:
-	./gradlew check jacocoTestReport
+	./gradlew check --rerun-tasks --no-build-cache
 
 lint:
 	./gradlew lintKotlinMain lintKotlinTest

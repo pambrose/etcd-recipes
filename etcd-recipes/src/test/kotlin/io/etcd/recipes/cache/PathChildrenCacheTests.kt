@@ -19,7 +19,6 @@
 package io.etcd.recipes.cache
 
 import com.pambrose.common.util.randomId
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCache.StartMode.POST_INITIALIZED_EVENT
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
@@ -30,6 +29,7 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getChildCount
+import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.putValuesWithKeepAlive
 import io.etcd.recipes.common.urls
@@ -41,6 +41,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class PathChildrenCacheTests : StringSpec() {
     private val suffix = "update"
+    private val settle = 10.seconds
 
     private fun generateTestData(count: Int): List<Pair<String, String>> {
         val names = List(count) { "Key:%05d".format(it) }
@@ -105,17 +106,15 @@ class PathChildrenCacheTests : StringSpec() {
                         client.putValue("$path/${kv.first}", kv.second + suffix)
                     }
 
-                    sleep(5.seconds)
+                    pollUntil(settle) { addCount.get() == count && updateCount.get() == count } shouldBe true
                     compareData(count, currentData, kvs, suffix)
 
                     client.deleteChildren(path)
 
-                    sleep(5.seconds)
+                    pollUntil(settle) { deleteCount.get() == count && currentData.isEmpty() } shouldBe true
                     currentData shouldBe emptyList()
                 }
             }
-
-            sleep(5.seconds)
 
             addCount.get() shouldBe count
             updateCount.get() shouldBe count
@@ -157,7 +156,7 @@ class PathChildrenCacheTests : StringSpec() {
                     start(true)
                     waitOnStartComplete()
 
-                    sleep(5.seconds)
+                    pollUntil(settle) { currentData.size == count } shouldBe true
                     compareData(count, currentData, testKvs, suffix)
 
                     addCount.get() shouldBe 0
@@ -167,7 +166,7 @@ class PathChildrenCacheTests : StringSpec() {
 
                     client.deleteChildren(path)
 
-                    sleep(5.seconds)
+                    pollUntil(settle) { deleteCount.get() == count && currentData.isEmpty() } shouldBe true
                     currentData shouldBe emptyList()
                 }
             }
@@ -217,12 +216,12 @@ class PathChildrenCacheTests : StringSpec() {
                     start(POST_INITIALIZED_EVENT)
                     waitOnStartComplete()
 
-                    sleep(5.seconds)
+                    pollUntil(settle) { currentData.size == count && initCount.get() == 1 } shouldBe true
                     compareData(count, currentData, kvs, suffix)
 
                     client.deleteChildren(path)
 
-                    sleep(5.seconds)
+                    pollUntil(settle) { deleteCount.get() == count && currentData.isEmpty() } shouldBe true
                     currentData shouldBe emptyList()
                 }
 
@@ -247,13 +246,12 @@ class PathChildrenCacheTests : StringSpec() {
 
                     val bsvals = kvs.map { "$path/${it.first}" to it.second.asByteSequence }
                     client.putValuesWithKeepAlive(bsvals, 2.seconds) {
-                        sleep(5.seconds)
-                        val data = currentData
-
-                        compareData(count, data, kvs)
+                        pollUntil(settle) { currentData.size == count } shouldBe true
+                        compareData(count, currentData, kvs)
                     }
 
-                    sleep(5.seconds)
+                    // After keep-alive returns the leases expire; wait for etcd to evict them.
+                    pollUntil(settle) { currentData.isEmpty() } shouldBe true
                     currentData shouldBe emptyList()
                 }
             }
