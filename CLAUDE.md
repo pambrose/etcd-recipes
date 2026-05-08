@@ -54,7 +54,7 @@ The recipes are layered on a thin Kotlin extension layer over jetcd, not a wrapp
 - **Extensions in `common/`** (`ClientExtensions`, `KVExtensions`, `LeaseExtensions`, `WatchExtensions`, `TxnExtensions`, `ByteSequenceExtensions`, etc.) are where most direct etcd interaction happens. New recipes should compose these rather than reach into jetcd directly.
 - **`EtcdConnector`** (`common/EtcdConnector.kt`) is the shared base for stateful recipes. It owns the jetcd `Client`, tracks `startCalled` / `closeCalled` lifecycle (atomic flags), accumulates background-thread exceptions in `exceptionList`, and implements `Closeable`. Recipes generally follow a `start()` … `close()` lifecycle and surface async failures via `exceptions` rather than throwing from a worker thread.
 - **`EtcdRecipeException` / `EtcdRecipeRuntimeException`** are the library's own exception types — prefer these over leaking jetcd exception types.
-- **Concurrency**: recipes rely on `kotlinx-coroutines`, `kotlinx-atomicfu`, and helpers from `com.pambrose.common-utils` (`BooleanMonitor`, `AtomicDelegates`). Several Kotlin opt-ins are enabled compiler-wide: `kotlin.time.ExperimentalTime`, `kotlin.ExperimentalUnsignedTypes`, `kotlin.concurrent.atomics.ExperimentalAtomicApi` — assume these are available without per-file `@OptIn`.
+- **Concurrency**: recipes rely on `kotlinx-coroutines`, `kotlin.concurrent.atomics` (stdlib `AtomicBoolean` / `AtomicReference`), and helpers from `com.pambrose.common-utils` (`BooleanMonitor`). Several Kotlin opt-ins are enabled compiler-wide: `kotlin.time.ExperimentalTime`, `kotlin.ExperimentalUnsignedTypes`, `kotlin.concurrent.atomics.ExperimentalAtomicApi` — assume these are available without per-file `@OptIn`.
 
 ## Versioning
 
