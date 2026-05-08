@@ -46,7 +46,7 @@ class ServiceCache internal constructor(
 
   @Synchronized
   fun start(): ServiceCache {
-    if (startCalled)
+    if (startCalled.load())
       throw EtcdRecipeRuntimeException("start() already called")
     checkCloseNotCalled()
 
@@ -107,7 +107,7 @@ class ServiceCache internal constructor(
     }
 
     dataPreloaded.set(true)
-    startCalled = true
+    startCalled.store(true)
     startThreadComplete.set(true)
 
     return this
@@ -126,7 +126,7 @@ class ServiceCache internal constructor(
 
   @Synchronized
   override fun close() {
-    if (closeCalled)
+    if (closeCalled.load())
       return
 
     checkStartCalled()

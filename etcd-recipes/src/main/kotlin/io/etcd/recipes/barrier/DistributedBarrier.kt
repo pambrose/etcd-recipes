@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.barrier
 
-import com.pambrose.common.delegate.AtomicDelegates.atomicBoolean
 import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
@@ -29,6 +28,7 @@ import io.etcd.recipes.common.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -54,7 +54,7 @@ constructor(
   val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
   private var keepAliveLease: AtomicReference<CloseableClient?> = AtomicReference(null)
-  private var barrierRemoved by atomicBoolean(false)
+  private val barrierRemoved = AtomicBoolean(false)
 
   init {
     require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
@@ -97,7 +97,7 @@ constructor(
   @Synchronized
   fun removeBarrier(): Boolean {
     checkCloseNotCalled()
-    return if (barrierRemoved) {
+    return if (barrierRemoved.load()) {
       false
     } else {
       keepAliveLease.load()?.close()
@@ -105,7 +105,7 @@ constructor(
 
       client.deleteKey(barrierPath)
 
-      barrierRemoved = true
+      barrierRemoved.store(true)
 
       true
     }
@@ -153,7 +153,7 @@ constructor(
 
   @Synchronized
   override fun close() {
-    if (closeCalled)
+    if (closeCalled.load())
       return
 
     keepAliveLease.load()?.close()

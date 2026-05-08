@@ -85,7 +85,7 @@ class PathChildrenCache(
     mode: StartMode,
     waitOnStartComplete: Boolean = true,
   ): PathChildrenCache {
-    if (startCalled)
+    if (startCalled.load())
       throw EtcdRecipeRuntimeException("start() already called")
     checkCloseNotCalled()
 
@@ -117,7 +117,7 @@ class PathChildrenCache(
       startThreadComplete.set(true)
     }
 
-    startCalled = true
+    startCalled.store(true)
 
     if (waitOnStartComplete)
       waitOnStartComplete()
@@ -228,7 +228,7 @@ class PathChildrenCache(
 
   @Synchronized
   override fun close() {
-    if (closeCalled)
+    if (closeCalled.load())
       return
 
     checkStartCalled()

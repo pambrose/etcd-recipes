@@ -187,7 +187,7 @@ constructor(
 
   @Synchronized
   override fun close() {
-    if (closeCalled)
+    if (closeCalled.load())
       return
 
     // Close all service caches

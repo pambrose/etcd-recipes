@@ -30,7 +30,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
@@ -60,7 +60,7 @@ class DistributedBarrierWithCountWatcherTests : StringSpec() {
         // timeout: only a real release sets `released = true`.
         thread(isDaemon = true, name = "barrier-waiter") {
           try {
-            if (barrier.waitOnBarrier(8.seconds)) released.set(true)
+            if (barrier.waitOnBarrier(8.seconds)) released.store(true)
           } finally {
             finished.countDown()
           }
@@ -83,7 +83,7 @@ class DistributedBarrierWithCountWatcherTests : StringSpec() {
         }
 
         finished.await(12, TimeUnit.SECONDS) shouldBe true
-        released.get() shouldBe true
+        released.load() shouldBe true
 
         client.deleteChildren(path)
       }

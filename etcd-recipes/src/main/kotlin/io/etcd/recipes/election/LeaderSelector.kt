@@ -19,7 +19,6 @@
 package io.etcd.recipes.election
 
 import com.pambrose.common.concurrent.BooleanMonitor
-import com.pambrose.common.delegate.AtomicDelegates.atomicBoolean
 import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.randomId
 import com.pambrose.common.util.sleep
@@ -52,6 +51,7 @@ import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
@@ -132,9 +132,9 @@ constructor(
   private val terminateKeepAlive = BooleanMonitor(false)
   private val leadershipComplete = BooleanMonitor(false)
   private val attemptLeadership = BooleanMonitor(true)
-  private var electedLeader by atomicBoolean(false)
+  private val electedLeader = AtomicBoolean(false)
   private val startCallLock = Any()
-  private var startCallAllowed by atomicBoolean(true)
+  private val startCallAllowed = AtomicBoolean(true)
   private val leaderPath = electionPath.withLeaderSuffix
 
   init {
@@ -142,7 +142,7 @@ constructor(
     require(leaseTtlSecs > 0) { "Lease TTL must be > 0" }
   }
 
-  val isLeader get() = electedLeader
+  val isLeader get() = electedLeader.load()
 
   val isFinished get() = leadershipComplete.get()
 
@@ -150,7 +150,7 @@ constructor(
     val electionSetup = BooleanMonitor(false)
 
     synchronized(startCallLock) {
-      if (!startCallAllowed)
+      if (!startCallAllowed.load())
         throw EtcdRecipeRuntimeException("Previous call to start() not complete")
 
       // Re-create the internal executor if a previous close() shut it down,
@@ -163,10 +163,10 @@ constructor(
       leadershipComplete.set(false)
       startThreadComplete.set(false)
       attemptLeadership.set(true)
-      startCalled = true
-      closeCalled = false
-      electedLeader = false
-      startCallAllowed = false
+      startCalled.store(true)
+      closeCalled.store(false)
+      electedLeader.store(false)
+      startCallAllowed.store(false)
     }
 
     executor.execute {
@@ -262,7 +262,7 @@ constructor(
 
   @Synchronized
   override fun close() {
-    if (closeCalled)
+    if (closeCalled.load())
       return
 
     checkStartCalled()
@@ -338,7 +338,7 @@ constructor(
     // Selected as leader. This will exit when leadership is relinquished
     try {
       client.keepAliveWith(lease) {
-        electedLeader = true
+        electedLeader.store(true)
         listener.takeLeadership(this)
       }
       // Leadership was relinquished
@@ -351,8 +351,8 @@ constructor(
     } finally {
       // Do this after leadership is complete so the thread does not terminate
       attemptLeadership.set(false)
-      startCallAllowed = true
-      electedLeader = false
+      startCallAllowed.store(true)
+      electedLeader.store(false)
       markLeadershipComplete()
     }
   }

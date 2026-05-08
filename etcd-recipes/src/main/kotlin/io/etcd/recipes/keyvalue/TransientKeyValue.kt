@@ -76,7 +76,7 @@ constructor(
 
   @Synchronized
   fun start(): TransientKeyValue {
-    if (startCalled)
+    if (startCalled.load())
       throw EtcdRecipeRuntimeException("start() already called")
     checkCloseNotCalled()
 
@@ -98,14 +98,14 @@ constructor(
     }
 
     keepAliveStartedLatch.await()
-    startCalled = true
+    startCalled.store(true)
 
     return this
   }
 
   @Synchronized
   override fun close() {
-    if (closeCalled)
+    if (closeCalled.load())
       return
 
     checkStartCalled()
