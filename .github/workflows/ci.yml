@@ -26,6 +26,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Detekt
+        run: ./gradlew detekt
+
       - name: Test (Testcontainers)
         run: ./gradlew check -PuseTestcontainers
 

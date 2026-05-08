@@ -13,6 +13,7 @@ plugins {
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.dokka.javadoc) apply false
     alias(libs.plugins.kover) apply false
+    alias(libs.plugins.detekt) apply false
 }
 
 allprojects {
@@ -23,6 +24,7 @@ allprojects {
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "org.jetbrains.dokka-javadoc")
     apply(plugin = "org.jetbrains.kotlinx.kover")
+    apply(plugin = "io.gitlab.arturbosch.detekt")
 }
 
 // Root-level Kover aggregation: `./gradlew koverHtmlReport` at the root

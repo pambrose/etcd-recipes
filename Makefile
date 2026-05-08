@@ -32,6 +32,12 @@ kdocs:
 lint:
 	./gradlew lintKotlinMain lintKotlinTest
 
+detekt:
+	./gradlew detekt
+
+detekt-baseline:
+	./gradlew detektBaseline
+
 refresh:
 	./gradlew --refresh-dependencies
 
