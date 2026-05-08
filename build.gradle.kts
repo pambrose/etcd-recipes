@@ -182,7 +182,7 @@ fun Project.configurePublishing() {
             }
             developers {
                 developer {
-                    id.set("etcd-recipes")
+                    id.set("pambrose")
                     name.set("Paul Ambrose")
                     email.set("paul@pambrose.com")
                 }
