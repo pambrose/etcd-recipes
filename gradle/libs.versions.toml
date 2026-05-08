@@ -12,8 +12,9 @@ junit = "6.1.0-RC1"
 kotest = "6.1.11"
 testcontainers = "2.0.5"
 ben-manes-versions = "0.54.0"
-coveralls = "2.12.2"
 kotlinter = "5.4.2"
+dokka = "2.2.0"
+kover = "0.9.8"
 
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
@@ -36,5 +37,7 @@ testcontainers-core = { module = "org.testcontainers:testcontainers", version.re
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ben-manes-versions = { id = "com.github.ben-manes.versions", version.ref = "ben-manes-versions" }
-coveralls = { id = "com.github.kt3k.coveralls", version.ref = "coveralls" }
 kotlinter = { id = "org.jmailen.kotlinter", version.ref = "kotlinter" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
+dokka-javadoc = { id = "org.jetbrains.dokka-javadoc", version.ref = "dokka" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }

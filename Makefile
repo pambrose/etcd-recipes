@@ -23,6 +23,12 @@ tests:
 tests-tc:
 	./gradlew check --rerun-tasks --no-build-cache -PuseTestcontainers
 
+coverage:
+	./gradlew koverHtmlReport koverXmlReport koverLog
+
+kdocs:
+	./gradlew dokkaGenerate
+
 lint:
 	./gradlew lintKotlinMain lintKotlinTest
 

@@ -29,6 +29,18 @@ jobs:
       - name: Test (Testcontainers)
         run: ./gradlew check -PuseTestcontainers
 
+      - name: Generate Kover XML coverage
+        if: ${{ !cancelled() }}
+        run: ./gradlew koverXmlReport
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./build/reports/kover/report.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Upload test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4

@@ -6,21 +6,30 @@ import java.io.File
 
 plugins {
     java
-    jacoco
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ben.manes.versions) apply false
-    alias(libs.plugins.coveralls) apply false
     alias(libs.plugins.kotlinter) apply false
+    alias(libs.plugins.dokka) apply false
+    alias(libs.plugins.dokka.javadoc) apply false
+    alias(libs.plugins.kover) apply false
 }
 
 allprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
     apply(plugin = "com.github.ben-manes.versions")
-    apply(plugin = "jacoco")
-    apply(plugin = "com.github.kt3k.coveralls")
     apply(plugin = "org.jmailen.kotlinter")
+    apply(plugin = "org.jetbrains.dokka")
+    apply(plugin = "org.jetbrains.dokka-javadoc")
+    apply(plugin = "org.jetbrains.kotlinx.kover")
+}
+
+// Root-level Kover aggregation: `./gradlew koverHtmlReport` at the root
+// produces one merged coverage report across all subprojects.
+dependencies {
+    "kover"(project(":etcd-recipes"))
+    "kover"(project(":etcd-recipes-examples"))
 }
 
 subprojects {
@@ -57,20 +66,18 @@ subprojects {
         from(mainSourceSet.allSource)
     }
 
-    val javadocTask = tasks.named<Javadoc>("javadoc")
+    // Package Dokka's Javadoc-format output as the javadoc JAR so Maven
+    // consumers see real KDoc instead of an empty Javadoc-on-Kotlin tree.
+    val dokkaJavadocTask = tasks.named("dokkaGeneratePublicationJavadoc")
     tasks.register<Jar>("javadocJar") {
-        dependsOn(javadocTask)
+        dependsOn(dokkaJavadocTask)
         archiveClassifier.set("javadoc")
-        from(javadocTask.map { it.destinationDir!! })
+        from(dokkaJavadocTask)
     }
 
     // Fixes a bizarre gradle error related to duplicate methods
     tasks.named<Jar>("jar") {
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    }
-
-    tasks.named("check") {
-        dependsOn("jacocoTestReport")
     }
 
     artifacts {
@@ -99,8 +106,8 @@ subprojects {
         setForkEvery(1)
         // Run multiple test classes in parallel against the local etcd. Each
         // test namespaces its keys under its own path, so concurrent forks
-        // do not collide. Cap at half the cores so etcd + jacoco aren't
-        // starved.
+        // do not collide. Cap at half the cores so etcd + coverage
+        // instrumentation aren't starved.
         maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(2)
         // Opt-in: -PuseTestcontainers makes each forked JVM start its own
         // ephemeral etcd container instead of hitting localhost:2379.
