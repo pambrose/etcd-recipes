@@ -39,6 +39,8 @@ class ServiceCacheTests : StringSpec() {
       val unregisterCounter = AtomicInteger(0)
       val totalCounter = AtomicInteger(0)
 
+      val expectedTotal = (threadCount * serviceCount) * 3
+
       connectToEtcd(urls) { client ->
         withServiceDiscovery(client, path) {
           withServiceCache(name) {
@@ -95,13 +97,16 @@ class ServiceCacheTests : StringSpec() {
               }
             finishedLatch.await()
             holder2.checkForException()
+
+            // Wait for the watch stream to drain *before* the cache closes:
+            // closing the cache cancels the watcher and drops any in-flight
+            // events. On slow runners the producer threads finish ahead of
+            // the watch delivery, so polling outside this block races the
+            // close path and can lose tail events.
+            pollUntil(30.seconds) { totalCounter.get() == expectedTotal } shouldBe true
           }
         }
       }
-
-      // Wait for events to propagate to the cache listeners.
-      val expectedTotal = (threadCount * serviceCount) * 3
-      pollUntil(15.seconds) { totalCounter.get() == expectedTotal } shouldBe true
 
       holder.checkForException()
       registerCounter.get() shouldBe threadCount * serviceCount
