@@ -104,8 +104,14 @@ fun Client.watcherWithLatch(
       watchResponse.events
         .forEach { event ->
           when (event.eventType) {
-            EventType.PUT -> onPut(event)
-            EventType.DELETE -> onDelete(event)
+            EventType.PUT -> {
+              onPut(event)
+            }
+
+            EventType.DELETE -> {
+              onDelete(event)
+            }
+
             EventType.UNRECOGNIZED -> { // Ignore
             }
 

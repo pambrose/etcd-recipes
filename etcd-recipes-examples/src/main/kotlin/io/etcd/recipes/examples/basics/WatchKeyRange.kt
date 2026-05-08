@@ -83,7 +83,8 @@ fun main() {
         // Delete children
         getChildrenKeys(path).forEach {
           logger.info {
-            "Deleting key: $it"}
+            "Deleting key: $it"
+          }
             deleteKey(it)
           }
 

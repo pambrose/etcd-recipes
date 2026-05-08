@@ -26,9 +26,9 @@ import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -58,9 +58,9 @@ class DistributedDoubleBarrierTests : StringSpec() {
             val leaveCounter = AtomicInteger(0)
 
             fun enterBarrier(
-                id: Int,
-                barrier: DistributedDoubleBarrier,
-                retryCount: Int = 0,
+              id: Int,
+              barrier: DistributedDoubleBarrier,
+              retryCount: Int = 0,
             ) {
                 repeat(retryCount) {
                     logger.debug { "#$id Waiting to enter barrier" }
@@ -81,9 +81,9 @@ class DistributedDoubleBarrierTests : StringSpec() {
             }
 
             fun leaveBarrier(
-                id: Int,
-                barrier: DistributedDoubleBarrier,
-                retryCount: Int = 0,
+              id: Int,
+              barrier: DistributedDoubleBarrier,
+              retryCount: Int = 0,
             ) {
                 repeat(retryCount) {
                     logger.debug { "#$id Waiting to leave barrier" }

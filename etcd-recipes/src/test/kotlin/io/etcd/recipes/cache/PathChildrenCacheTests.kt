@@ -50,10 +50,10 @@ class PathChildrenCacheTests : StringSpec() {
     }
 
     private fun compareData(
-        count: Int,
-        data: List<ChildData>,
-        origData: List<Pair<String, String>>,
-        suffix: String = "",
+      count: Int,
+      data: List<ChildData>,
+      origData: List<Pair<String, String>>,
+      suffix: String = "",
     ) {
         data.size shouldBe count
         val currData = data.map { it.key to it.value.asString }.sortedBy { it.first }
@@ -203,9 +203,18 @@ class PathChildrenCacheTests : StringSpec() {
                 withPathChildrenCache(client, path) {
                     addListener { event: PathChildrenCacheEvent ->
                         when (event.type) {
-                            CHILD_ADDED -> addCount.incrementAndGet()
-                            CHILD_UPDATED -> updateCount.incrementAndGet()
-                            CHILD_REMOVED -> deleteCount.incrementAndGet()
+                            CHILD_ADDED -> {
+                              addCount.incrementAndGet()
+                            }
+
+                            CHILD_UPDATED -> {
+                              updateCount.incrementAndGet()
+                            }
+
+                            CHILD_REMOVED -> {
+                              deleteCount.incrementAndGet()
+                            }
+
                             INITIALIZED -> {
                                 initCount.incrementAndGet()
                                 initData = event.initialData

@@ -21,9 +21,9 @@ package io.etcd.recipes.election
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.atomic.AtomicInteger
 
 class SerialLeaderSelectorTests : StringSpec() {

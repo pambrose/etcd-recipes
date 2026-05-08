@@ -26,9 +26,9 @@ import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
@@ -51,9 +51,9 @@ class DistributedBarrierWithCountTests : StringSpec() {
             val advancedCounter = AtomicInteger(0)
 
             fun waiter(
-                id: Int,
-                barrier: DistributedBarrierWithCount,
-                retryCount: Int = 0,
+              id: Int,
+              barrier: DistributedBarrierWithCount,
+              retryCount: Int = 0,
             ) {
                 sleep(5.random().seconds)
                 logger.debug { "#$id Waiting on barrier" }

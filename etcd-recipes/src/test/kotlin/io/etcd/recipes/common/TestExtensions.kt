@@ -26,7 +26,12 @@ import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-val urls = listOf("http://localhost:2379")
+val urls: List<String> by lazy {
+  if (System.getProperty("etcd.recipes.testcontainers") == "true")
+    listOf(EtcdTestContainer.endpoint())
+  else
+    listOf("http://localhost:2379")
+}
 
 /**
  * Wait up to [timeout] for [predicate] to become true, polling every [poll].

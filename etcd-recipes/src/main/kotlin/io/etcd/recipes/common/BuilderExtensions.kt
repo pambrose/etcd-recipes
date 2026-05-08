@@ -36,14 +36,12 @@ fun compactOption(receiver: CompactOption.Builder.() -> CompactOption.Builder): 
 fun deleteOption(receiver: DeleteOption.Builder.() -> DeleteOption.Builder): DeleteOption =
   DeleteOption.builder().receiver().build()
 
-fun getOption(receiver: GetOption.Builder.() -> GetOption.Builder): GetOption =
-  GetOption.builder().receiver().build()
+fun getOption(receiver: GetOption.Builder.() -> GetOption.Builder): GetOption = GetOption.builder().receiver().build()
 
 fun leaseOption(receiver: LeaseOption.Builder.() -> LeaseOption.Builder): LeaseOption =
   LeaseOption.builder().receiver().build()
 
-fun putOption(receiver: PutOption.Builder.() -> PutOption.Builder): PutOption =
-  PutOption.builder().receiver().build()
+fun putOption(receiver: PutOption.Builder.() -> PutOption.Builder): PutOption = PutOption.builder().receiver().build()
 
 fun watchOption(receiver: WatchOption.Builder.() -> WatchOption.Builder): WatchOption =
   WatchOption.builder().receiver().build()

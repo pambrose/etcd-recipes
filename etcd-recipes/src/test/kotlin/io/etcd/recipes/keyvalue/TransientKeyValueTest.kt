@@ -62,8 +62,9 @@ class TransientKeyValueTest : StringSpec() {
             connectToEtcd(urls) { client ->
 
                 client.apply {
-                    for (p in paths)
-                        getValue(p, defaultValue) shouldBe defaultValue
+                    for (p in paths) {
+                      getValue(p, defaultValue) shouldBe defaultValue
+                    }
 
                     getChildCount(prefix) shouldBe 0
 
@@ -77,13 +78,15 @@ class TransientKeyValueTest : StringSpec() {
 
                     getChildCount(prefix) shouldBe 25
 
-                    for (kv in kvs)
-                        kv.close()
+                    for (kv in kvs) {
+                      kv.close()
+                    }
 
                     // Wait for nodes to go away
                     sleep(5.seconds)
-                    for (p in paths)
-                        getValue(p, defaultValue) shouldBe defaultValue
+                    for (p in paths) {
+                      getValue(p, defaultValue) shouldBe defaultValue
+                    }
 
                     getChildCount(prefix) shouldBe 0
                 }

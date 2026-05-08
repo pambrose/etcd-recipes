@@ -23,10 +23,10 @@ import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldEndWith
-import io.kotest.assertions.throwables.shouldThrow
 import kotlin.time.Duration.Companion.seconds
 
 class SerialServiceDiscoveryTests : StringSpec() {

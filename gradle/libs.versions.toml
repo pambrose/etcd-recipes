@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.3.21"
-coroutines = "1.10.0"
+coroutines = "1.11.0"
 serialization = "1.11.0"
 jetcd = "0.8.6"
 guava = "33.6.0-jre"
@@ -10,8 +10,10 @@ logback = "1.5.32"
 netty = "4.1.116.Final"
 junit = "6.1.0-RC1"
 kotest = "6.1.11"
+testcontainers = "2.0.5"
 ben-manes-versions = "0.54.0"
 coveralls = "2.12.2"
+kotlinter = "5.4.2"
 
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
@@ -28,9 +30,11 @@ junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", vers
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
 kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
+testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ben-manes-versions = { id = "com.github.ben-manes.versions", version.ref = "ben-manes-versions" }
 coveralls = { id = "com.github.kt3k.coveralls", version.ref = "coveralls" }
+kotlinter = { id = "org.jmailen.kotlinter", version.ref = "kotlinter" }
