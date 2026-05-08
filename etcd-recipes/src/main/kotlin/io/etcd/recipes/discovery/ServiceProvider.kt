@@ -20,7 +20,6 @@ package io.etcd.recipes.discovery
 
 import io.etcd.jetcd.Client
 import java.io.Closeable
-import kotlin.random.Random
 
 class ServiceProvider internal constructor(
   client: Client,
@@ -29,7 +28,7 @@ class ServiceProvider internal constructor(
 ) : Closeable {
   val serviceDiscovery = lazy { ServiceDiscovery(client, namesPath) }
 
-  fun getInstance(): ServiceInstance = getAllInstances()[Random.nextInt(0, getAllInstances().size)]
+  fun getInstance(): ServiceInstance = getAllInstances().random()
 
   fun getAllInstances(): List<ServiceInstance> = serviceDiscovery.value.queryForInstances(serviceName)
 

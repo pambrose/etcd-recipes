@@ -20,7 +20,6 @@ package io.etcd.recipes.cache
 
 import com.google.common.collect.Maps.newConcurrentMap
 import com.pambrose.common.time.timeUnitToDuration
-import com.pambrose.common.util.isNull
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
@@ -49,7 +48,7 @@ class PathChildrenCache(
 ) : EtcdConnector(client) {
   private var watcher: AtomicReference<Watch.Watcher?> = AtomicReference(null)
   private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
-  private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
+  private val listeners: MutableList<PathChildrenCacheListener> = CopyOnWriteArrayList()
 
   // Use a single threaded executor to maintain order
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
@@ -128,16 +127,6 @@ class PathChildrenCache(
 
   fun addListener(listener: PathChildrenCacheListener) {
     listeners += listener
-  }
-
-  fun addListener(block: (PathChildrenCacheEvent) -> Unit) {
-    addListener(
-      object : PathChildrenCacheListener {
-        override fun childEvent(event: PathChildrenCacheEvent) {
-          block(event)
-        }
-      },
-    )
   }
 
   fun clearListeners() = listeners.clear()
@@ -249,7 +238,7 @@ class PathChildrenCache(
     listeners.clear()
     startThreadComplete.waitUntilTrue()
 
-    if (userExecutor.isNull()) (executor as ExecutorService).shutdown()
+    if (userExecutor == null) (executor as ExecutorService).shutdown()
 
     super.close()
   }

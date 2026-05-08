@@ -86,13 +86,7 @@ fun Client.getChildrenValues(
 ): List<ByteSequence> = getChildren(keyName, target, order).values
 
 // Delete children keys
-fun Client.deleteChildren(keyName: String): List<String> {
-  val keys = getChildrenKeys(keyName)
-  for (key in keys) {
-    deleteKey(key)
-  }
-  return keys
-}
+fun Client.deleteChildren(keyName: String): List<String> = getChildrenKeys(keyName).onEach { deleteKey(it) }
 
 // Count children keys
 fun Client.getChildCount(keyName: String): Long {

@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.keyvalue
 
-import com.pambrose.common.util.isNull
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
@@ -114,7 +113,7 @@ constructor(
     keepAliveWaitLatch.countDown()
     startThreadComplete.waitUntilTrue()
 
-    if (userExecutor.isNull()) (executor as ExecutorService).shutdown()
+    if (userExecutor == null) (executor as ExecutorService).shutdown()
 
     super.close()
   }

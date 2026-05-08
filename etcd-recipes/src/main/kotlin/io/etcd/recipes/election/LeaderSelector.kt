@@ -21,7 +21,6 @@ package io.etcd.recipes.election
 import com.pambrose.common.concurrent.BooleanMonitor
 import com.pambrose.common.delegate.AtomicDelegates.atomicBoolean
 import com.pambrose.common.time.timeUnitToDuration
-import com.pambrose.common.util.isNull
 import com.pambrose.common.util.randomId
 import com.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
@@ -53,7 +52,6 @@ import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
@@ -135,7 +133,8 @@ constructor(
   private val leadershipComplete = BooleanMonitor(false)
   private val attemptLeadership = BooleanMonitor(true)
   private var electedLeader by atomicBoolean(false)
-  private var startCallAllowed = AtomicBoolean(true)
+  private val startCallLock = Any()
+  private var startCallAllowed by atomicBoolean(true)
   private val leaderPath = electionPath.withLeaderSuffix
 
   init {
@@ -150,13 +149,13 @@ constructor(
   fun start(): LeaderSelector {
     val electionSetup = BooleanMonitor(false)
 
-    synchronized(startCallAllowed) {
-      if (!startCallAllowed.get())
+    synchronized(startCallLock) {
+      if (!startCallAllowed)
         throw EtcdRecipeRuntimeException("Previous call to start() not complete")
 
       // Re-create the internal executor if a previous close() shut it down,
       // so the instance can be re-used across start()/close() cycles.
-      if (userExecutor.isNull() && (executor as ExecutorService).isShutdown)
+      if (userExecutor == null && (executor as ExecutorService).isShutdown)
         executor = Executors.newFixedThreadPool(3)
 
       terminateWatch.set(false)
@@ -167,7 +166,7 @@ constructor(
       startCalled = true
       closeCalled = false
       electedLeader = false
-      startCallAllowed.set(false)
+      startCallAllowed = false
     }
 
     executor.execute {
@@ -271,7 +270,7 @@ constructor(
     markLeadershipComplete()
     startThreadComplete.waitUntilTrue()
 
-    if (userExecutor.isNull()) (executor as ExecutorService).shutdown()
+    if (userExecutor == null) (executor as ExecutorService).shutdown()
 
     super.close()
   }
@@ -352,7 +351,7 @@ constructor(
     } finally {
       // Do this after leadership is complete so the thread does not terminate
       attemptLeadership.set(false)
-      startCallAllowed.set(true)
+      startCallAllowed = true
       electedLeader = false
       markLeadershipComplete()
     }

@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.queue
 
-import com.pambrose.common.util.isNotNull
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
@@ -124,7 +123,7 @@ abstract class AbstractQueue(
 
     val kv = keyFound.get()
     // If transactional delete fails, then just call self again
-    return if (kv.isNotNull() && deleteRevKey(kv)) kv.value else dequeue()
+    return if (kv != null && deleteRevKey(kv)) kv.value else dequeue()
   }
 
   private fun deleteRevKey(kv: KeyValue): Boolean =

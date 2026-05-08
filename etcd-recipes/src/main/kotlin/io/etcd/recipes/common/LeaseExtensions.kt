@@ -23,10 +23,11 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.support.Observers
-import io.etcd.recipes.common.LeaseLogger.logger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
+
+private val logger = KotlinLogging.logger {}
 
 fun <T> Client.keepAliveWith(
   lease: LeaseGrantResponse,
@@ -41,7 +42,3 @@ fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
 
 fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse =
   leaseClient.grant(ttl.toDouble(DurationUnit.SECONDS).toLong()).get()
-
-object LeaseLogger {
-  val logger = KotlinLogging.logger {}
-}

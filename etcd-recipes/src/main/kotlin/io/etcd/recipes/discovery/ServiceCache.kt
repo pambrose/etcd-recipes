@@ -22,12 +22,11 @@ import com.google.common.collect.Maps.newConcurrentMap
 import com.pambrose.common.concurrent.BooleanMonitor
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
-import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType.*
 import io.etcd.recipes.common.*
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.concurrent.atomics.AtomicReference
 
 class ServiceCache internal constructor(
@@ -39,7 +38,7 @@ class ServiceCache internal constructor(
   private var dataPreloaded = BooleanMonitor(false)
   private val servicePath = namesPath.appendToPath(serviceName)
   private val serviceMap: ConcurrentMap<String, String> = newConcurrentMap()
-  private val listeners: MutableList<ServiceCacheListener> = synchronizedList(mutableListOf())
+  private val listeners: MutableList<ServiceCacheListener> = CopyOnWriteArrayList()
 
   init {
     require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }
@@ -119,28 +118,6 @@ class ServiceCache internal constructor(
       checkCloseNotCalled()
       return serviceMap.values.map { ServiceInstance.toObject(it) }
     }
-
-  fun addListenerForChanges(
-    listener: (
-      eventType: WatchEvent.EventType,
-      isAdd: Boolean,
-      serviceName: String,
-      serviceInstance: ServiceInstance?,
-    ) -> Unit,
-  ) {
-    addListenerForChanges(
-      object : ServiceCacheListener {
-        override fun cacheChanged(
-          eventType: WatchEvent.EventType,
-          isAdd: Boolean,
-          serviceName: String,
-          serviceInstance: ServiceInstance?,
-        ) {
-          listener.invoke(eventType, isAdd, serviceName, serviceInstance)
-        }
-      },
-    )
-  }
 
   fun addListenerForChanges(listener: ServiceCacheListener) {
     checkCloseNotCalled()

@@ -19,7 +19,6 @@
 package io.etcd.recipes.discovery
 
 import com.pambrose.common.delegate.AtomicDelegates.nonNullableReference
-import com.pambrose.common.util.isNotNull
 import com.pambrose.common.util.randomId
 import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.Client
@@ -44,8 +43,8 @@ import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.Closeable
-import java.util.Collections.synchronizedList
 import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Duration.Companion.seconds
 
 @JvmOverloads
@@ -67,8 +66,8 @@ constructor(
 ) : EtcdConnector(client) {
   private val namesPath = servicePath.appendToPath("/names")
   private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = newConcurrentMap()
-  private val serviceCacheList: MutableList<ServiceCache> = synchronizedList(mutableListOf())
-  private val serviceProviderList: MutableList<ServiceProvider> = synchronizedList(mutableListOf())
+  private val serviceCacheList: MutableList<ServiceCache> = CopyOnWriteArrayList()
+  private val serviceProviderList: MutableList<ServiceProvider> = CopyOnWriteArrayList()
 
   init {
     require(servicePath.isNotEmpty()) { "Service base path cannot be empty" }
@@ -138,10 +137,9 @@ constructor(
   }
 
   private fun internalUnregisterService(service: ServiceInstance): Boolean {
-    val context = serviceContextMap[service.id]
+    val context = serviceContextMap.remove(service.id)
     context?.close()
-    serviceContextMap.remove(service.id)
-    return context.isNotNull()
+    return context != null
   }
 
   fun serviceCache(name: String): ServiceCache {
