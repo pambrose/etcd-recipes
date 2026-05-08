@@ -252,11 +252,18 @@ class PathChildrenCache(
   override fun doClose() {
     checkStartCalled()
 
+    // Wait for the background loader before touching the watcher: in
+    // BUILD_INITIAL_CACHE / POST_INITIALIZED_EVENT modes the watcher is
+    // assigned inside loadDataAndStartWatcher() running on `executor`. If
+    // close() runs before that task assigns `watcher`, closing here first
+    // would no-op on a null reference and the later-assigned watcher (and
+    // its dispatcher executor) would leak.
+    startThreadComplete.waitUntilTrue()
+
     watcher?.close()
     watcher = null
 
     listeners.clear()
-    startThreadComplete.waitUntilTrue()
 
     if (userExecutor == null) (executor as ExecutorService).shutdown()
   }

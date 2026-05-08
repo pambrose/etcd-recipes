@@ -89,6 +89,10 @@ constructor(
         keepAliveLease = client.keepAlive(lease)
         true
       } else {
+        // Lease leaked the original implementation: when the CAS lost or the
+        // value verification failed we returned without ever revoking the
+        // lease, so it sat in etcd until TTL — wasteful in tight retry loops.
+        client.leaseRevoke(lease)
         false
       }
     }

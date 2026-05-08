@@ -106,17 +106,19 @@ constructor(
     ensureStarted()
     checkCloseNotCalled()
     var count = 1
-    do {
-      val txnResponse = applyCounterTransaction(value)
-      if (!txnResponse.isSucceeded) {
-        // Crude backoff for retry
-        sleep((count * 100).random().milliseconds)
-        count++
+    while (true) {
+      val (txnResponse, committedValue) = applyCounterTransaction(value)
+      if (txnResponse.isSucceeded) {
+        // Return the value we just wrote — not a separate GET. The previous
+        // implementation re-read counterPath after a successful CAS; under
+        // contention another writer could mutate the counter between the CAS
+        // and the GET, so callers received a value they did not commit.
+        return committedValue
       }
-    } while (!txnResponse.isSucceeded)
-
-    // Return the latest value
-    return client.getValue(counterPath, -1L)
+      // Crude backoff for retry
+      sleep((count * 100).random().milliseconds)
+      count++
+    }
   }
 
   private fun createCounterIfNotPresent(): Boolean =
@@ -130,14 +132,18 @@ constructor(
       false
     }
 
-  private fun applyCounterTransaction(amount: Long): TxnResponse =
-    client.transaction {
-      val kvList: List<KeyValue> = client.getResponse(counterPath).kvs
-      check(kvList.isNotEmpty()) { "Empty KeyValue list" }
-      val kv = kvList.first()
-      If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
-      Then(counterPath setTo kv.value.asLong + amount)
-    }
+  private fun applyCounterTransaction(amount: Long): Pair<TxnResponse, Long> {
+    val kvList: List<KeyValue> = client.getResponse(counterPath).kvs
+    check(kvList.isNotEmpty()) { "Empty KeyValue list" }
+    val kv = kvList.first()
+    val newValue = kv.value.asLong + amount
+    val txn =
+      client.transaction {
+        If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
+        Then(counterPath setTo newValue)
+      }
+    return txn to newValue
+  }
 
   companion object {
     private val logger = KotlinLogging.logger {}

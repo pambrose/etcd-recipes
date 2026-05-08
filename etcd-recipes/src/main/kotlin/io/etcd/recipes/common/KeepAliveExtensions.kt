@@ -96,8 +96,16 @@ fun Client.putValuesWithKeepAlive(
   block: () -> Unit,
 ) {
   val lease = leaseGrant(ttl)
-  for (kv in kvs) {
-    putValue(kv.first, kv.second, putOption { withLeaseId(lease.id) })
+  // Original code never revoked the lease if a put threw or if keepAliveWith
+  // could not start, so a transient etcd error during initial setup would
+  // strand a lease for ttl seconds.
+  try {
+    for (kv in kvs) {
+      putValue(kv.first, kv.second, putOption { withLeaseId(lease.id) })
+    }
+  } catch (e: Throwable) {
+    leaseRevoke(lease)
+    throw e
   }
   keepAliveWith(lease) { block() }
 }

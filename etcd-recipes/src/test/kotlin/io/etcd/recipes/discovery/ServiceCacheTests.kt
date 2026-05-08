@@ -19,13 +19,7 @@
 package io.etcd.recipes.discovery
 
 import io.etcd.jetcd.watch.WatchEvent.EventType
-import io.etcd.recipes.common.ExceptionHolder
-import io.etcd.recipes.common.captureException
-import io.etcd.recipes.common.checkForException
-import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.nonblockingThreads
-import io.etcd.recipes.common.pollUntil
-import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -33,91 +27,91 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
 class ServiceCacheTests : StringSpec() {
-    init {
-        "serviceCacheTest" {
-            val path = "/discovery/ServiceCacheTests"
-            val threadCount = 10
-            val serviceCount = 10
-            val name = "ServiceCacheTest"
-            val holder = ExceptionHolder()
-            val registerCounter = AtomicInteger(0)
-            val updateCounter = AtomicInteger(0)
-            val unregisterCounter = AtomicInteger(0)
-            val totalCounter = AtomicInteger(0)
+  init {
+    "serviceCacheTest" {
+      val path = "/discovery/ServiceCacheTests"
+      val threadCount = 10
+      val serviceCount = 10
+      val name = "ServiceCacheTest"
+      val holder = ExceptionHolder()
+      val registerCounter = AtomicInteger(0)
+      val updateCounter = AtomicInteger(0)
+      val unregisterCounter = AtomicInteger(0)
+      val totalCounter = AtomicInteger(0)
 
-            connectToEtcd(urls) { client ->
-                withServiceDiscovery(client, path) {
-                    withServiceCache(name) {
-                        start()
+      connectToEtcd(urls) { client ->
+        withServiceDiscovery(client, path) {
+          withServiceCache(name) {
+            start()
 
-                        instances.size shouldBe 0
-                        serviceName shouldBe name
-                        urls shouldBe urls
+            instances.size shouldBe 0
+            serviceName shouldBe name
+            urls shouldBe urls
 
-                        addListenerForChanges(object : ServiceCacheListener {
-                            override fun cacheChanged(
-                                eventType: EventType,
-                                isAdd: Boolean,
-                                serviceName: String,
-                                serviceInstance: ServiceInstance?,
-                            ) {
-                                captureException(holder) {
-                                    serviceName.split("/").first() shouldBe name
+            addListenerForChanges(object : ServiceCacheListener {
+              override fun cacheChanged(
+                eventType: EventType,
+                isAdd: Boolean,
+                serviceName: String,
+                serviceInstance: ServiceInstance?,
+              ) {
+                captureException(holder) {
+                  serviceName.split("/").first() shouldBe name
 
-                                    if (eventType == EventType.PUT) {
-                                        if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
+                  if (eventType == EventType.PUT) {
+                    if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
 
-                                        serviceInstance?.name shouldBe name
-                                    }
+                    serviceInstance?.name shouldBe name
+                  }
 
-                                    if (eventType == EventType.DELETE) {
-                                        unregisterCounter.incrementAndGet()
-                                        serviceInstance?.name shouldBe name
-                                    }
-                                }
-                            }
-                        })
-
-                        addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
-
-                        val (finishedLatch, holder2) =
-                            nonblockingThreads(threadCount) {
-                                withServiceDiscovery(client, path) {
-                                    repeat(serviceCount) {
-                                        val service = ServiceInstance(name, TestPayload(it).toJson())
-                                        logger.debug { "Registering: ${service.name} ${service.id}" }
-                                        registerService(service)
-
-                                        val payload = TestPayload.toObject(service.jsonPayload)
-                                        payload.testval = payload.testval * -1
-                                        service.jsonPayload = payload.toJson()
-                                        logger.debug { "Updating: ${service.name} ${service.id}" }
-                                        updateService(service)
-
-                                        logger.debug { "Unregistering: ${service.name} ${service.id}" }
-                                        unregisterService(service)
-                                    }
-                                }
-                            }
-                        finishedLatch.await()
-                        holder2.checkForException()
-                    }
+                  if (eventType == EventType.DELETE) {
+                    unregisterCounter.incrementAndGet()
+                    serviceInstance?.name shouldBe name
+                  }
                 }
-            }
+              }
+            })
 
-            // Wait for events to propagate to the cache listeners.
-            val expectedTotal = (threadCount * serviceCount) * 3
-            pollUntil(15.seconds) { totalCounter.get() == expectedTotal } shouldBe true
+            addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
 
-            holder.checkForException()
-            registerCounter.get() shouldBe threadCount * serviceCount
-            updateCounter.get() shouldBe threadCount * serviceCount
-            unregisterCounter.get() shouldBe threadCount * serviceCount
-            totalCounter.get() shouldBe expectedTotal
+            val (finishedLatch, holder2) =
+              nonblockingThreads(threadCount) {
+                withServiceDiscovery(client, path) {
+                  repeat(serviceCount) {
+                    val service = ServiceInstance(name, TestPayload(it).toJson())
+                    logger.debug { "Registering: ${service.name} ${service.id}" }
+                    registerService(service)
+
+                    val payload = TestPayload.toObject(service.jsonPayload)
+                    payload.testval *= -1
+                    service.jsonPayload = payload.toJson()
+                    logger.debug { "Updating: ${service.name} ${service.id}" }
+                    updateService(service)
+
+                    logger.debug { "Unregistering: ${service.name} ${service.id}" }
+                    unregisterService(service)
+                  }
+                }
+              }
+            finishedLatch.await()
+            holder2.checkForException()
+          }
         }
-    }
+      }
 
-    companion object {
-        private val logger = KotlinLogging.logger {}
+      // Wait for events to propagate to the cache listeners.
+      val expectedTotal = (threadCount * serviceCount) * 3
+      pollUntil(15.seconds) { totalCounter.get() == expectedTotal } shouldBe true
+
+      holder.checkForException()
+      registerCounter.get() shouldBe threadCount * serviceCount
+      updateCounter.get() shouldBe threadCount * serviceCount
+      unregisterCounter.get() shouldBe threadCount * serviceCount
+      totalCounter.get() shouldBe expectedTotal
     }
+  }
+
+  companion object {
+    private val logger = KotlinLogging.logger {}
+  }
 }

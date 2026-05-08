@@ -240,6 +240,6 @@ constructor(
   }
 
   companion object {
-    internal fun defaultClientId() = EtcdConnector.defaultClientId(DistributedBarrierWithCount::class.simpleName!!)
+    internal fun defaultClientId() = defaultClientId(DistributedBarrierWithCount::class.simpleName!!)
   }
 }
