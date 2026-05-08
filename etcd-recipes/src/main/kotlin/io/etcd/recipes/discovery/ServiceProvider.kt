@@ -19,22 +19,28 @@
 package io.etcd.recipes.discovery
 
 import io.etcd.jetcd.Client
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.getChildrenValues
 import java.io.Closeable
-import kotlin.random.Random
 
-class ServiceProvider internal constructor(
-  client: Client,
+class ServiceProvider(
+  private val client: Client,
   namesPath: String,
   val serviceName: String,
 ) : Closeable {
-  val serviceDiscovery = lazy { ServiceDiscovery(client, namesPath) }
+  // Direct path to the service's instances. The previous implementation lazily
+  // constructed a nested ServiceDiscovery rooted at namesPath, which caused
+  // path double-nesting (`namesPath/names/...`) and escaped lifecycle tracking
+  // by the parent ServiceDiscovery.
+  private val instancesPath: String = namesPath.appendToPath(serviceName)
 
-  fun getInstance(): ServiceInstance = getAllInstances()[Random.nextInt(0, getAllInstances().size)]
+  fun getInstance(): ServiceInstance = getAllInstances().random()
 
-  fun getAllInstances(): List<ServiceInstance> = serviceDiscovery.value.queryForInstances(serviceName)
+  fun getAllInstances(): List<ServiceInstance> =
+    client.getChildrenValues(instancesPath).map { it.asString }.map { ServiceInstance.toObject(it) }
 
   override fun close() {
-    if (serviceDiscovery.isInitialized())
-      serviceDiscovery.value.close()
+    // No owned resources: provider does not hold a watcher, lease, or executor.
   }
 }

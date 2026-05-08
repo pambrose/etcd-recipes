@@ -53,14 +53,25 @@ constructor(
 ) : EtcdConnector(client) {
   init {
     require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
-
-    // Create counter if first time through
-    createCounterIfNotPresent()
   }
 
-  @Synchronized
+  /**
+   * Initialize the counter in etcd if it does not already exist.
+   *
+   * Previously the constructor performed this work in its `init` block,
+   * which made the counter impossible to construct without a live etcd —
+   * a unit-testable constructor is now possible. start() is invoked
+   * automatically on the first call to a method that needs the counter
+   * present, so existing call sites that just construct + use continue
+   * to work; an explicit start() is also accepted.
+   */
+  fun start(): DistributedAtomicLong {
+    ensureStarted()
+    return this
+  }
+
   fun get(): Long {
-    checkCloseNotCalled()
+    ensureStarted()
     return client.getValue(counterPath, -1L)
   }
 
@@ -72,15 +83,32 @@ constructor(
 
   fun subtract(value: Long): Long = modifyCounterValue(-value)
 
-  @Synchronized
+  // Lazy init for thread-safe first-use. The CAS ensures exactly one thread
+  // performs the actual etcd transaction; concurrent callers wait on the
+  // start-complete monitor so they only proceed after the counter row is
+  // committed. The original design ran this in the constructor; the lazy
+  // form keeps construction I/O-free without losing the happens-before
+  // guarantee that other threads relied on.
+  private fun ensureStarted() {
+    checkCloseNotCalled()
+    if (startCalled.compareAndSet(false, true)) {
+      try {
+        createCounterIfNotPresent()
+      } finally {
+        startThreadComplete.set(true)
+      }
+    } else {
+      startThreadComplete.waitUntilTrue()
+    }
+  }
+
   private fun modifyCounterValue(value: Long): Long {
+    ensureStarted()
     checkCloseNotCalled()
     var count = 1
-    // totalCount.incrementAndGet()
     do {
       val txnResponse = applyCounterTransaction(value)
       if (!txnResponse.isSucceeded) {
-        // logger.info {"Collisions: ${collisionCount.incrementAndGet()} Total: ${totalCount.get()} $count")
         // Crude backoff for retry
         sleep((count * 100).random().milliseconds)
         count++
@@ -92,7 +120,6 @@ constructor(
   }
 
   private fun createCounterIfNotPresent(): Boolean =
-    // Run the transaction if the counter is not present
     if (client.getResponse(counterPath).kvs.isEmpty()) {
       client
         .transaction {
@@ -114,8 +141,6 @@ constructor(
 
   companion object {
     private val logger = KotlinLogging.logger {}
-    // val collisionCount = AtomicLong()
-    // val totalCount = AtomicLong()
 
     @JvmStatic
     fun delete(

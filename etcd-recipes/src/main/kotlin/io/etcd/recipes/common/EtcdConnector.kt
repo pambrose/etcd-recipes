@@ -19,21 +19,22 @@
 package io.etcd.recipes.common
 
 import com.pambrose.common.concurrent.BooleanMonitor
-import com.pambrose.common.delegate.AtomicDelegates.atomicBoolean
+import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import java.io.Closeable
 import java.util.Collections.synchronizedList
+import kotlin.concurrent.atomics.AtomicBoolean
 
 open class EtcdConnector(
-  val client: Client,
+  protected val client: Client,
 ) : Closeable {
-  protected var startCalled by atomicBoolean(false)
+  protected val startCalled = AtomicBoolean(false)
   protected val startThreadComplete = BooleanMonitor(false)
-  protected var closeCalled: Boolean by atomicBoolean(false)
+  protected val closeCalled = AtomicBoolean(false)
   protected val exceptionList: Lazy<MutableList<Throwable>> = lazy { synchronizedList(mutableListOf<Throwable>()) }
 
   protected fun checkCloseNotCalled() {
-    if (closeCalled) throw EtcdRecipeRuntimeException("close() already called")
+    if (closeCalled.load()) throw EtcdRecipeRuntimeException("close() already called")
   }
 
   val exceptions: List<Throwable> get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList()
@@ -45,16 +46,25 @@ open class EtcdConnector(
   }
 
   protected fun checkStartCalled() {
-    if (!startCalled) throw EtcdRecipeRuntimeException("start() not called")
+    if (!startCalled.load()) throw EtcdRecipeRuntimeException("start() not called")
   }
 
+  // Template-method close: idempotency is enforced here so subclasses cannot
+  // forget to guard against double-close. Subclasses override doClose() for
+  // their cleanup. @Synchronized preserves mutual exclusion with other
+  // @Synchronized methods on the same instance (matches prior contract).
   @Synchronized
-  override fun close() {
-    closeCalled = true
+  final override fun close() {
+    if (!closeCalled.compareAndSet(false, true)) return
+    doClose()
   }
+
+  protected open fun doClose() {}
 
   companion object {
     internal const val TOKEN_LENGTH = 7
     internal const val DEFAULT_TTL_SECS = 2L
+
+    internal fun defaultClientId(prefix: String) = "$prefix:${randomId(TOKEN_LENGTH)}"
   }
 }

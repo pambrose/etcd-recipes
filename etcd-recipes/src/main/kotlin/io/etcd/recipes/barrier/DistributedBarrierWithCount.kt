@@ -46,6 +46,7 @@ import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
@@ -80,6 +81,18 @@ constructor(
   private val readyPath = barrierPath.appendToPath("ready")
   private val waitingPath = barrierPath.appendToPath("waiting")
 
+  // Cancellation hook stashed by an in-flight waitOnBarrier so that close()
+  // can unblock a waiting thread instead of leaving it parked indefinitely.
+  // Holds the keep-alive client and the waiting key path so close() can
+  // release them on behalf of the waiter.
+  private val activeWaiter = AtomicReference<ActiveWait?>(null)
+
+  private class ActiveWait(
+    val keepAliveClosed: BooleanMonitor,
+    val cancelled: BooleanMonitor,
+    val onCancel: () -> Unit,
+  )
+
   init {
     require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
     require(memberCount > 0) { "Member count must be > 0" }
@@ -110,8 +123,10 @@ constructor(
   fun waitOnBarrier(timeout: Duration): Boolean {
     var keepAliveLease: CloseableClient? = null
     val keepAliveClosed = BooleanMonitor(false)
+    val cancelled = BooleanMonitor(false)
     val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
-    val waitingPath = waitingPath.appendToPath(uniqueToken)
+    val myWaitingPath = waitingPath.appendToPath(uniqueToken)
+    val waitingPrefix = waitingPath.ensureSuffix("/")
 
     checkCloseNotCalled()
 
@@ -119,7 +134,7 @@ constructor(
       if (!keepAliveClosed.get()) {
         keepAliveLease?.close()
         keepAliveLease = null
-        client.deleteKey(waitingPath)
+        runCatching { client.deleteKey(myWaitingPath) }
         keepAliveClosed.set(true)
       }
     }
@@ -141,72 +156,90 @@ constructor(
       }
     }
 
-    // Do a CAS on the /ready name. If it is not found, then set it
-    client.transaction {
-      If(readyPath.doesNotExist)
-      Then(readyPath setTo uniqueToken)
+    // Register a cancellation hook so close() can unblock this waiter.
+    val active = ActiveWait(keepAliveClosed, cancelled) {
+      cancelled.set(true)
+      closeKeepAlive()
     }
+    activeWaiter.store(active)
 
-    val lease = client.leaseGrant(leaseTtlSecs.seconds)
-
-    val txn =
+    try {
+      // Do a CAS on the /ready name. If it is not found, then set it
       client.transaction {
-        If(waitingPath.doesNotExist)
-        Then(waitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+        If(readyPath.doesNotExist)
+        Then(readyPath setTo uniqueToken)
       }
 
-    when {
-      !txn.isSucceeded ->
-        throw EtcdRecipeException("Failed to set waitingPath")
+      val lease = client.leaseGrant(leaseTtlSecs.seconds)
 
-      client.getValue(waitingPath)?.asString != uniqueToken ->
-        throw EtcdRecipeException("Failed to assign waitingPath unique value")
+      val txn =
+        client.transaction {
+          If(myWaitingPath.doesNotExist)
+          Then(myWaitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+        }
 
-      else -> {
-        // Keep key alive
-        keepAliveLease = client.keepAlive(lease)
+      when {
+        !txn.isSucceeded ->
+          throw EtcdRecipeException("Failed to set waitingPath")
 
-        checkWaiterCount()
+        client.getValue(myWaitingPath)?.asString != uniqueToken ->
+          throw EtcdRecipeException("Failed to assign waitingPath unique value")
 
-        // Do not bother starting watcher if latch is already done
-        return if (keepAliveClosed.get()) {
-          true
-        } else {
-          // Watch for DELETE of /ready and PUTS on /waiters/*
-          val trailingKey = barrierPath.ensureSuffix("/")
-          val watchOption = watchOption { isPrefix(true) }
-          client.withWatcher(
-            trailingKey,
-            watchOption,
-            { watchResponse ->
-              watchResponse.events
-                .forEach { watchEvent ->
-                  val key = watchEvent.keyValue.key.asString
-                  when {
-                    key.startsWith(waitingPath) && watchEvent.eventType == PUT -> checkWaiterCount()
-                    key.startsWith(readyPath) && watchEvent.eventType == DELETE -> closeKeepAlive()
+        else -> {
+          // Keep key alive
+          keepAliveLease = client.keepAlive(lease)
+
+          checkWaiterCount()
+
+          // Do not bother starting watcher if latch is already done
+          return if (keepAliveClosed.get()) {
+            // Cancellation by close() also flips keepAliveClosed; report
+            // satisfied-only-when-not-cancelled.
+            !cancelled.get()
+          } else {
+            // Watch for DELETE of /ready and PUTS on /waiters/*
+            val trailingKey = barrierPath.ensureSuffix("/")
+            val watchOption = watchOption { isPrefix(true) }
+            client.withWatcher(
+              trailingKey,
+              watchOption,
+              { watchResponse ->
+                watchResponse.events
+                  .forEach { watchEvent ->
+                    val key = watchEvent.keyValue.key.asString
+                    when {
+                      key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> checkWaiterCount()
+                      key == readyPath && watchEvent.eventType == DELETE -> closeKeepAlive()
+                    }
                   }
-                }
-            },
-          ) {
-            // Check one more time in case watch missed the delete just after last check
-            checkWaiterCount()
+              },
+            ) {
+              // Check one more time in case watch missed the delete just after last check
+              checkWaiterCount()
 
-            val success = keepAliveClosed.waitUntilTrue(timeout)
-            // Cleanup if a time-out occurred
-            if (!success) {
-              closeKeepAlive()
-              client.deleteKey(waitingPath)  // This is redundant but waiting for keep-alive to stop is slower
+              val signalled = keepAliveClosed.waitUntilTrue(timeout)
+              // Cleanup if a time-out occurred
+              if (!signalled) {
+                closeKeepAlive()
+                client.deleteKey(myWaitingPath)  // This is redundant but waiting for keep-alive to stop is slower
+              }
+
+              // Distinguish natural completion from cancellation.
+              signalled && !cancelled.get()
             }
-
-            success
           }
         }
       }
+    } finally {
+      activeWaiter.compareAndSet(active, null)
     }
   }
 
+  override fun doClose() {
+    activeWaiter.exchange(null)?.onCancel?.invoke()
+  }
+
   companion object {
-    internal fun defaultClientId() = "${DistributedBarrierWithCount::class.simpleName}:${randomId(TOKEN_LENGTH)}"
+    internal fun defaultClientId() = EtcdConnector.defaultClientId(DistributedBarrierWithCount::class.simpleName!!)
   }
 }

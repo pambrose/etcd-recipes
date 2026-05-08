@@ -20,17 +20,16 @@ package io.etcd.recipes.cache
 
 import com.google.common.collect.Maps.newConcurrentMap
 import com.pambrose.common.time.timeUnitToDuration
-import com.pambrose.common.util.isNull
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
+import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.*
 import io.etcd.recipes.cache.PathChildrenCache.StartMode.*
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.*
 import io.etcd.recipes.common.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.*
-import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
@@ -47,9 +46,10 @@ class PathChildrenCache(
   val cachePath: String,
   private val userExecutor: Executor? = null,
 ) : EtcdConnector(client) {
-  private var watcher: AtomicReference<Watch.Watcher?> = AtomicReference(null)
+  // Plain var: all reads/writes are inside @Synchronized methods on this instance.
+  private var watcher: Watch.Watcher? = null
   private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
-  private val listeners: MutableList<PathChildrenCacheListener> = mutableListOf()
+  private val listeners: MutableList<PathChildrenCacheListener> = CopyOnWriteArrayList()
 
   // Use a single threaded executor to maintain order
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
@@ -86,16 +86,19 @@ class PathChildrenCache(
     mode: StartMode,
     waitOnStartComplete: Boolean = true,
   ): PathChildrenCache {
-    if (startCalled)
+    if (startCalled.load())
       throw EtcdRecipeRuntimeException("start() already called")
     checkCloseNotCalled()
 
-    // Preload with initial data
     if (mode == BUILD_INITIAL_CACHE || mode == POST_INITIALIZED_EVENT) {
       executor.execute {
         try {
-          setupWatcher()
-          loadData()
+          // Snapshot then watch with the snapshot's revision as the watch
+          // anchor: the watcher receives every event that occurred after the
+          // snapshot revision, with no overlap and no gap. Without anchoring
+          // a PUT could land between watch-registration and snapshot-load,
+          // and the snapshot would silently overwrite the newer value.
+          loadDataAndStartWatcher()
         } finally {
           if (mode == POST_INITIALIZED_EVENT)
             listeners.forEach { listener ->
@@ -114,11 +117,12 @@ class PathChildrenCache(
         }
       }
     } else {
-      setupWatcher()
+      // NORMAL mode: no snapshot, just start watching from now.
+      setupWatcher(0L)
       startThreadComplete.set(true)
     }
 
-    startCalled = true
+    startCalled.store(true)
 
     if (waitOnStartComplete)
       waitOnStartComplete()
@@ -130,80 +134,79 @@ class PathChildrenCache(
     listeners += listener
   }
 
-  fun addListener(block: (PathChildrenCacheEvent) -> Unit) {
-    addListener(
-      object : PathChildrenCacheListener {
-        override fun childEvent(event: PathChildrenCacheEvent) {
-          block(event)
-        }
-      },
-    )
-  }
-
   fun clearListeners() = listeners.clear()
 
-  private fun loadData() {
+  private fun loadDataAndStartWatcher() {
     try {
-      val kvs = client.getChildren(cachePath)
-      for (kv in kvs) {
-        val (k, v) = kv
-        val s = k.substring(cachePath.length + 1)
-        cacheMap[s] = v
+      val trailingPath = cachePath.ensureSuffix("/")
+      val getOption = getOption {
+        isPrefix(true)
+        withSortField(GetOption.SortTarget.KEY)
       }
+      val resp = client.getResponse(trailingPath, getOption)
+      val anchorRevision = resp.header.revision + 1
+
+      for (kv in resp.kvs) {
+        val k = kv.key.asString
+        val s = k.substring(cachePath.length + 1)
+        cacheMap[s] = kv.value
+      }
+
+      setupWatcher(anchorRevision)
     } catch (e: Throwable) {
-      logger.error(e) { "Exception in loadData()" }
+      logger.error(e) { "Exception in loadDataAndStartWatcher()" }
       exceptionList.value += e
     }
   }
 
-  private fun setupWatcher() {
+  private fun setupWatcher(startRevision: Long) {
     val trailingPath = cachePath.ensureSuffix("/")
-    logger.debug { "Setting up watch for $trailingPath" }
-    val watchOption = watchOption { isPrefix(true) }
-    watcher.store(
-      client.watcher(trailingPath, watchOption) { watchResponse ->
-        watchResponse.events
-          .forEach { event ->
-            val (k, v) = event.keyValue.asPair
-            val stripped = k.substring(trailingPath.length)
-            when (event.eventType) {
-              PUT -> {
-                val isAdd = !cacheMap.containsKey(stripped)
-                logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
-                cacheMap[stripped] = v
+    logger.debug { "Setting up watch for $trailingPath at rev $startRevision" }
+    val watchOption = watchOption {
+      isPrefix(true).also { if (startRevision > 0L) it.withRevision(startRevision) }
+    }
+    watcher = client.watcher(trailingPath, watchOption) { watchResponse ->
+      watchResponse.events
+        .forEach { event ->
+          val (k, v) = event.keyValue.asPair
+          val stripped = k.substring(trailingPath.length)
+          when (event.eventType) {
+            PUT -> {
+              val isAdd = !cacheMap.containsKey(stripped)
+              logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
+              cacheMap[stripped] = v
 
-                val cacheEvent =
-                  PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
-                listeners.forEach { listener ->
-                  try {
-                    listener.childEvent(cacheEvent)
-                  } catch (e: Throwable) {
-                    logger.error(e) { "Exception in cacheChanged()" }
-                    exceptionList.value += e
-                  }
+              val cacheEvent =
+                PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
+              listeners.forEach { listener ->
+                try {
+                  listener.childEvent(cacheEvent)
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in cacheChanged()" }
+                  exceptionList.value += e
                 }
               }
-
-              DELETE -> {
-                logger.debug { "$stripped deleted" }
-                val prevValue = cacheMap.remove(stripped)
-                val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
-                listeners.forEach { listener ->
-                  try {
-                    listener.childEvent(cacheEvent)
-                  } catch (e: Throwable) {
-                    logger.error(e) { "Exception in cacheChanged()" }
-                    exceptionList.value += e
-                  }
-                }
-              }
-
-              UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
-              else -> logger.error { "Unknown error with $cachePath watch" }
             }
+
+            DELETE -> {
+              logger.debug { "$stripped deleted" }
+              val prevValue = cacheMap.remove(stripped)
+              val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
+              listeners.forEach { listener ->
+                try {
+                  listener.childEvent(cacheEvent)
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in cacheChanged()" }
+                  exceptionList.value += e
+                }
+              }
+            }
+
+            UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
+            else -> logger.error { "Unknown error with $cachePath watch" }
           }
-      },
-    )
+        }
+    }
   }
 
   @Throws(InterruptedException::class)
@@ -224,7 +227,15 @@ class PathChildrenCache(
 
   fun rebuild() {
     clear()
-    loadData()
+    val trailingPath = cachePath.ensureSuffix("/")
+    val getOption = getOption {
+      isPrefix(true)
+      withSortField(GetOption.SortTarget.KEY)
+    }
+    for ((k, v) in client.getKeyValuePairs(trailingPath, getOption)) {
+      val s = k.substring(cachePath.length + 1)
+      cacheMap[s] = v
+    }
   }
 
   // For consistency with Curator
@@ -238,20 +249,16 @@ class PathChildrenCache(
   fun clear() = cacheMap.clear()
 
   @Synchronized
-  override fun close() {
-    if (closeCalled)
-      return
-
+  override fun doClose() {
     checkStartCalled()
 
-    watcher.load()?.close()
+    watcher?.close()
+    watcher = null
 
     listeners.clear()
     startThreadComplete.waitUntilTrue()
 
-    if (userExecutor.isNull()) (executor as ExecutorService).shutdown()
-
-    super.close()
+    if (userExecutor == null) (executor as ExecutorService).shutdown()
   }
 
   companion object {

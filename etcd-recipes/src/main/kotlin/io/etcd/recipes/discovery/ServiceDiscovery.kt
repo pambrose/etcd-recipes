@@ -18,35 +18,18 @@
 
 package io.etcd.recipes.discovery
 
-import com.pambrose.common.delegate.AtomicDelegates.nonNullableReference
-import com.pambrose.common.util.isNotNull
-import com.pambrose.common.util.randomId
-import com.google.common.collect.Maps.newConcurrentMap
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.lease.LeaseGrantResponse
-import io.etcd.jetcd.support.CloseableClient
-import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.deleteKey
-import io.etcd.recipes.common.doesExist
-import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.keepAlive
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.putOption
-import io.etcd.recipes.common.setTo
-import io.etcd.recipes.common.transaction
+import io.etcd.recipes.discovery.ServiceDiscovery.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.io.Closeable
-import java.util.Collections.synchronizedList
-import java.util.concurrent.ConcurrentMap
-import kotlin.time.Duration.Companion.seconds
+import java.util.concurrent.CopyOnWriteArrayList
 
 @JvmOverloads
 fun <T> withServiceDiscovery(
@@ -57,6 +40,12 @@ fun <T> withServiceDiscovery(
   receiver: ServiceDiscovery.() -> T,
 ): T = ServiceDiscovery(client, servicePath, leaseTtlSecs, clientId).use { it.receiver() }
 
+/**
+ * Façade combining the write-side ([ServiceRegistry]) and the read-side
+ * (queries, caches, providers) of service discovery. New code that only
+ * needs one side can depend on [ServiceRegistry], [ServiceCache], or
+ * [ServiceProvider] directly without pulling in the rest.
+ */
 class ServiceDiscovery
 @JvmOverloads
 constructor(
@@ -65,83 +54,31 @@ constructor(
   val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
+  private val registry = ServiceRegistry(client, servicePath, leaseTtlSecs)
   private val namesPath = servicePath.appendToPath("/names")
-  private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = newConcurrentMap()
-  private val serviceCacheList: MutableList<ServiceCache> = synchronizedList(mutableListOf())
-  private val serviceProviderList: MutableList<ServiceProvider> = synchronizedList(mutableListOf())
+  private val serviceCacheList: MutableList<ServiceCache> = CopyOnWriteArrayList()
+  private val serviceProviderList: MutableList<ServiceProvider> = CopyOnWriteArrayList()
 
   init {
     require(servicePath.isNotEmpty()) { "Service base path cannot be empty" }
   }
 
-  private class ServiceInstanceContext(
-    val service: ServiceInstance,
-    val client: Client,
-    val instancePath: String,
-  ) : Closeable {
-    var lease: LeaseGrantResponse by nonNullableReference()
-    var keepAlive: CloseableClient by nonNullableReference()
-
-    override fun close() {
-      keepAlive.close()
-      client.deleteKey(instancePath)
-    }
-  }
-
-  @Synchronized
   @Throws(EtcdRecipeException::class)
   fun registerService(service: ServiceInstance) {
     checkCloseNotCalled()
-
-    val instancePath = getNamesPath(service)
-    val context = ServiceInstanceContext(service, client, instancePath)
-
-    serviceContextMap[service.id] = context
-
-    // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
-    context.lease = client.leaseGrant(leaseTtlSecs.seconds)
-
-    val txn =
-      client.transaction {
-        If(instancePath.doesNotExist)
-        Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.lease.id) }))
-      }
-
-    // Run keep-alive until closed
-    if (txn.isSucceeded)
-      context.keepAlive = client.keepAlive(context.lease)
-    else
-      throw EtcdRecipeException("Service registration failed for $instancePath")
+    registry.registerService(service)
   }
 
-  @Synchronized
   @Throws(EtcdRecipeException::class)
   fun updateService(service: ServiceInstance) {
     checkCloseNotCalled()
-    val instancePath = getNamesPath(service)
-    val context = serviceContextMap[service.id]
-      ?: throw EtcdRecipeException("ServiceInstance ${service.name} was not first registered with registerService()")
-    val txn =
-      client.transaction {
-        If(instancePath.doesExist)
-        Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.lease.id) }))
-      }
-    if (!txn.isSucceeded) throw EtcdRecipeException("Service update failed for $instancePath")
+    registry.updateService(service)
   }
 
-  @Synchronized
   @Throws(EtcdRecipeException::class)
   fun unregisterService(service: ServiceInstance) {
     checkCloseNotCalled()
-    val found = internalUnregisterService(service)
-    if (!found) throw EtcdRecipeException("ServiceInstance not published with registerService()")
-  }
-
-  private fun internalUnregisterService(service: ServiceInstance): Boolean {
-    val context = serviceContextMap[service.id]
-    context?.close()
-    serviceContextMap.remove(service.id)
-    return context.isNotNull()
+    registry.unregisterService(service)
   }
 
   fun serviceCache(name: String): ServiceCache {
@@ -157,6 +94,7 @@ constructor(
   ) = serviceCache(name).use { it.receiver() }
 
   fun serviceProvider(serviceName: String): ServiceProvider {
+    checkCloseNotCalled()
     val provider = ServiceProvider(client, namesPath, serviceName)
     serviceProviderList += provider
     return provider
@@ -171,7 +109,7 @@ constructor(
   @Synchronized
   fun queryForInstances(name: String): List<ServiceInstance> {
     checkCloseNotCalled()
-    return client.getChildrenValues(getNamesPath(name)).map { it.asString }.map { ServiceInstance.toObject(it) }
+    return client.getChildrenValues(namesPath.appendToPath(name)).map { it.asString }.map { ServiceInstance.toObject(it) }
   }
 
   @Synchronized
@@ -181,31 +119,23 @@ constructor(
     id: String,
   ): ServiceInstance {
     checkCloseNotCalled()
-    val path = getNamesPath(name, id)
+    val path = namesPath.appendToPath("$name/$id")
     val json = client.getValue(path)?.asString
       ?: throw EtcdRecipeException("ServiceInstance $path not present")
     return ServiceInstance.toObject(json)
   }
 
   @Synchronized
-  override fun close() {
-    if (closeCalled)
-      return
-
-    // Close all service caches
-    serviceCacheList.forEach { it.close() }
-    serviceContextMap.forEach { (_, v) -> internalUnregisterService(v.service) }
-
-    super.close()
+  override fun doClose() {
+    // Close all child caches and providers tracked by this façade.
+    serviceCacheList.forEach { runCatching { it.close() } }
+    serviceProviderList.forEach { runCatching { it.close() } }
+    registry.close()
   }
-
-  private fun getNamesPath(service: ServiceInstance) = getNamesPath(service.name, service.id)
-
-  private fun getNamesPath(vararg elems: String) = namesPath.appendToPath(elems.joinToString("/"))
 
   companion object {
     private val logger = KotlinLogging.logger {}
 
-    internal fun defaultClientId() = "${ServiceDiscovery::class.simpleName}:${randomId(TOKEN_LENGTH)}"
+    internal fun defaultClientId() = EtcdConnector.defaultClientId(ServiceDiscovery::class.simpleName!!)
   }
 }

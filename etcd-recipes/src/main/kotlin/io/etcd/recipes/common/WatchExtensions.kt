@@ -19,7 +19,6 @@
 
 package io.etcd.recipes.common
 
-import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.options.WatchOption
@@ -111,5 +110,3 @@ fun Client.watcherWithLatch(
     endWatchLatch.await()
   }
 }
-
-private val nullWatchOption: WatchOption = watchOption { withRange(ByteSequence.from(ByteArray(1))) }

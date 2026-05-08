@@ -7,7 +7,6 @@ plugins {
     jacoco
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
-    alias(libs.plugins.atomicfu)
     alias(libs.plugins.ben.manes.versions) apply false
     alias(libs.plugins.coveralls) apply false
 }

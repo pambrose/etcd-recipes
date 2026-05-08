@@ -18,13 +18,11 @@
 
 package io.etcd.recipes.keyvalue
 
-import com.pambrose.common.util.isNull
-import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
-import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.putValueWithKeepAlive
+import io.etcd.recipes.keyvalue.TransientKeyValue.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
@@ -77,7 +75,7 @@ constructor(
 
   @Synchronized
   fun start(): TransientKeyValue {
-    if (startCalled)
+    if (startCalled.load())
       throw EtcdRecipeRuntimeException("start() already called")
     checkCloseNotCalled()
 
@@ -99,29 +97,23 @@ constructor(
     }
 
     keepAliveStartedLatch.await()
-    startCalled = true
+    startCalled.store(true)
 
     return this
   }
 
-  @Synchronized
-  override fun close() {
-    if (closeCalled)
-      return
-
+  override fun doClose() {
     checkStartCalled()
 
     keepAliveWaitLatch.countDown()
     startThreadComplete.waitUntilTrue()
 
-    if (userExecutor.isNull()) (executor as ExecutorService).shutdown()
-
-    super.close()
+    if (userExecutor == null) (executor as ExecutorService).shutdown()
   }
 
   companion object {
     private val logger = KotlinLogging.logger {}
 
-    internal fun defaultClientId() = "${TransientKeyValue::class.simpleName}:${randomId(TOKEN_LENGTH)}"
+    internal fun defaultClientId() = EtcdConnector.defaultClientId(TransientKeyValue::class.simpleName!!)
   }
 }
