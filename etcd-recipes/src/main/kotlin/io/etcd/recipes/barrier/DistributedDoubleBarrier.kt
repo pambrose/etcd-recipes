@@ -19,10 +19,9 @@
 package io.etcd.recipes.barrier
 
 import com.pambrose.common.time.timeUnitToDuration
-import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
-import io.etcd.recipes.common.EtcdConnector.Companion.TOKEN_LENGTH
+import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
 import java.io.Closeable
@@ -88,6 +87,6 @@ constructor(
   }
 
   companion object {
-    internal fun defaultClientId() = "${DistributedDoubleBarrier::class.simpleName}:${randomId(TOKEN_LENGTH)}"
+    internal fun defaultClientId() = EtcdConnector.defaultClientId(DistributedDoubleBarrier::class.simpleName!!)
   }
 }

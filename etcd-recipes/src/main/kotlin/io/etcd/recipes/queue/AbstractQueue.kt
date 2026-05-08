@@ -32,12 +32,8 @@ import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.time.Clock
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
 
 abstract class AbstractQueue(
   client: Client,
@@ -51,28 +47,31 @@ abstract class AbstractQueue(
   fun dequeue(): ByteSequence {
     checkCloseNotCalled()
 
-    //  logger.info {client.getFirstChild(queuePath, target = target).kvs
-    //           .map { p -> p.key.asString to p.value.asString }
-    //           .joinToString("\n"))
-
-    val childList = client.getFirstChild(queuePath, target).kvs
-
-    if (childList.isNotEmpty()) {
-      logger.info { "Child list not empty" }
-      val child = childList.first()
-      // If transactional delete fails, then just call self again
-      return if (deleteRevKey(child))
-        child.value
-      else {
-        logger.info { "Called self again" }
-        dequeue()
+    // Loop instead of recursing on CAS-conflict retries: the previous
+    // implementation called itself recursively, and each recursive frame
+    // could allocate a new watcher (with its own dispatcher executor).
+    // Under high contention the resulting churn was unbounded.
+    while (true) {
+      val childList = client.getFirstChild(queuePath, target).kvs
+      if (childList.isNotEmpty()) {
+        val child = childList.first()
+        if (deleteRevKey(child)) {
+          return child.value
+        }
+        logger.debug { "Lost CAS to concurrent consumer, retrying without watcher" }
+        continue
       }
-    }
 
-    logger.info { "Child list was empty" }
-    // No values available, so wait on them
+      // Queue is empty; wait under a single watcher. If the CAS delete fails
+      // after waking up, loop and retry — withWatcher closes its dispatcher
+      // before we retry, so no executor or watcher resources accumulate.
+      val winner = waitForFirstChild() ?: continue
+      if (deleteRevKey(winner)) return winner.value
+    }
+  }
+
+  private fun waitForFirstChild(): KeyValue? {
     val watchLatch = CountDownLatch(1)
-    // val trailingPath = queuePath.ensureSuffix("/")
     val watchOption =
       watchOption {
         isPrefix(true)
@@ -80,13 +79,11 @@ abstract class AbstractQueue(
       }
     val keyFound = AtomicReference<KeyValue?>()
 
-    client.withWatcher(
+    return client.withWatcher(
       queuePath,
       watchOption,
       { watchResponse ->
         synchronized(watchLatch) {
-          if (watchLatch.count > 0)
-            logger.info { "watchResponse.events.size = ${watchResponse.events.size}" }
           for (watchEvent in watchResponse.events) {
             if (watchEvent.eventType == WatchEvent.EventType.PUT) {
               keyFound.compareAndSet(null, watchEvent.keyValue)
@@ -117,13 +114,9 @@ abstract class AbstractQueue(
           }
         }
       }
-      logger.info { "Waiting for watchLatch" }
       watchLatch.await()
+      keyFound.get()
     }
-
-    val kv = keyFound.get()
-    // If transactional delete fails, then just call self again
-    return if (kv != null && deleteRevKey(kv)) kv.value else dequeue()
   }
 
   private fun deleteRevKey(kv: KeyValue): Boolean =

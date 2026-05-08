@@ -26,7 +26,6 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
-import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
@@ -45,6 +44,7 @@ import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
+import io.etcd.recipes.election.LeaderSelector.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
@@ -260,19 +260,13 @@ constructor(
     leadershipComplete.set(true)
   }
 
-  @Synchronized
-  override fun close() {
-    if (closeCalled.load())
-      return
-
+  override fun doClose() {
     checkStartCalled()
 
     markLeadershipComplete()
     startThreadComplete.waitUntilTrue()
 
     if (userExecutor == null) (executor as ExecutorService).shutdown()
-
-    super.close()
   }
 
   @Throws(EtcdRecipeException::class)
@@ -319,8 +313,9 @@ constructor(
     // Create unique token to avoid collision from clients with same id
     val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
 
-    // Prime lease to give keepAliveWith a chance to get started
-    val lease = client.leaseClient.grant(leaseTtlSecs).get()
+    // Prime lease to give keepAliveWith a chance to get started; route through
+    // the common/ extension layer rather than reaching into jetcd directly.
+    val lease = client.leaseGrant(leaseTtlSecs.seconds)
 
     // Check the key name. If it is not found, then set it
     val txn =
@@ -365,7 +360,7 @@ constructor(
 
     internal val String.stripUniqueSuffix get() = dropLast(TOKEN_LENGTH + 1)
 
-    internal fun defaultClientId() = "${LeaderSelector::class.simpleName}:${randomId(TOKEN_LENGTH)}"
+    internal fun defaultClientId() = EtcdConnector.defaultClientId(LeaderSelector::class.simpleName!!)
 
     @JvmStatic
     fun getParticipants(

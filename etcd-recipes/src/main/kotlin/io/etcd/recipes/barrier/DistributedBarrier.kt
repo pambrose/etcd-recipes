@@ -23,13 +23,12 @@ import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
-import io.etcd.recipes.barrier.DistributedDoubleBarrier.Companion.defaultClientId
+import io.etcd.recipes.barrier.DistributedBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
@@ -53,7 +52,8 @@ constructor(
   private val waitOnMissingBarriers: Boolean = true,
   val clientId: String = defaultClientId(),
 ) : EtcdConnector(client) {
-  private var keepAliveLease: AtomicReference<CloseableClient?> = AtomicReference(null)
+  // Plain var: all reads/writes are inside @Synchronized methods on this instance.
+  private var keepAliveLease: CloseableClient? = null
   private val barrierRemoved = AtomicBoolean(false)
 
   init {
@@ -86,7 +86,7 @@ constructor(
 
       // Check to see if unique value was successfully set in the CAS step
       if (txn.isSucceeded && client.getValue(barrierPath)?.asString == uniqueToken) {
-        keepAliveLease.store(client.keepAlive(lease))
+        keepAliveLease = client.keepAlive(lease)
         true
       } else {
         false
@@ -100,8 +100,8 @@ constructor(
     return if (barrierRemoved.load()) {
       false
     } else {
-      keepAliveLease.load()?.close()
-      keepAliveLease.store(null)
+      keepAliveLease?.close()
+      keepAliveLease = null
 
       client.deleteKey(barrierPath)
 
@@ -152,19 +152,14 @@ constructor(
   }
 
   @Synchronized
-  override fun close() {
-    if (closeCalled.load())
-      return
-
-    keepAliveLease.load()?.close()
-    keepAliveLease.store(null)
-
-    super.close()
+  override fun doClose() {
+    keepAliveLease?.close()
+    keepAliveLease = null
   }
 
   companion object {
     private val logger = KotlinLogging.logger {}
 
-    internal fun defaultClientId() = "${DistributedBarrier::class.simpleName}:${randomId(TOKEN_LENGTH)}"
+    internal fun defaultClientId() = EtcdConnector.defaultClientId(DistributedBarrier::class.simpleName!!)
   }
 }

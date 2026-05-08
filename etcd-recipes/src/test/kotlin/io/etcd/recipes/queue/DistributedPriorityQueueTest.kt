@@ -28,6 +28,7 @@ import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
@@ -81,7 +82,7 @@ class DistributedPriorityQueueTest : StringSpec() {
     ) {
         val queuePath = "/queue/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)
-        val dequeuedData = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val dequeuedData = synchronizedList(mutableListOf<String>())
         val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
