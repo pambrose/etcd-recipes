@@ -7,6 +7,10 @@
 # the command line, e.g. `make publish-snapshot VERSION=0.10.1`.
 VERSION ?= $(shell awk -F= '/^version=/ {print $$2; exit}' gradle.properties)
 
+# Read the Gradle wrapper version from the version catalog so
+# `make upgrade-wrapper` always tracks the catalog's `gradle` entry.
+GRADLE_VERSION ?= $(shell awk -F'"' '/^gradle = /{print $$2; exit}' gradle/libs.versions.toml)
+
 default: versioncheck
 
 clean:
@@ -30,8 +34,16 @@ build: clean
 tests:
 	./gradlew check --rerun-tasks --no-build-cache
 
+# DOCKER_HOST defaults to Docker Desktop's "raw" socket on macOS. The
+# routing socket at ~/.docker/run/docker.sock returns a redirect stub
+# that docker-java can't follow, so we point at the daemon's socket
+# directly. Override with `DOCKER_HOST=unix://...` if needed.
+ifeq ($(shell uname -s),Darwin)
+DOCKER_HOST ?= unix://$(HOME)/Library/Containers/com.docker.docker/Data/docker.raw.sock
+endif
+
 tests-tc:
-	./gradlew check --rerun-tasks --no-build-cache -PuseTestcontainers
+	DOCKER_HOST="$(DOCKER_HOST)" ./gradlew check --rerun-tasks --no-build-cache -PuseTestcontainers
 
 coverage:
 	./gradlew koverHtmlReport koverXmlReport koverLog
@@ -83,4 +95,4 @@ publish-maven-central: check-gpg-env
 	$(GPG_ENV) ./gradlew publishAndReleaseToMavenCentral
 
 upgrade-wrapper:
-	./gradlew wrapper --gradle-version=9.5.0 --distribution-type=bin
+	./gradlew wrapper --gradle-version=$(GRADLE_VERSION) --distribution-type=bin

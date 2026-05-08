@@ -1,47 +1,82 @@
 [versions]
-ben-manes-versions = "0.54.0"
+# Build infrastructure
+gradle = "9.5.0"
+jvm = "17"
+
+# Kotlin language and runtime
+kotlin = "2.3.21"
 coroutines = "1.11.0"
+serialization = "1.11.0"
+
+# Main library
+jetcd = "0.8.6"
+
+# Runtime libraries
+common-utils = "2.8.2"
+guava = "33.6.0-jre"
+kotlin-logging = "8.0.02"
+logback = "1.5.32"
+
+# Testing
+junit = "6.0.3"
+kotest = "6.1.11"
+testcontainers = "2.0.5"
+
+# Build tooling plugins
+ben-manes-versions = "0.54.0"
 detekt = "1.23.8"
 dokka = "2.2.0"
-guava = "33.6.0-jre"
-jetcd = "0.8.6"
-junit = "6.1.0-RC1"
-kotest = "6.1.11"
-kotlin = "2.3.21"
-kotlin-logging = "8.0.02"
 kotlinter = "5.4.2"
 kover = "0.9.8"
-logback = "1.5.32"
 maven-publish = "0.36.0"
-netty = "4.1.116.Final"
-serialization = "1.11.0"
-testcontainers = "2.0.5"
-utils = "2.8.2"
 
 [libraries]
-common-utils-core = { module = "com.pambrose.common-utils:core-utils", version.ref = "utils" }
-common-utils-guava = { module = "com.pambrose.common-utils:guava-utils", version.ref = "utils" }
-guava = { module = "com.google.guava:guava", version.ref = "guava" }
+# Main library
 jetcd-core = { module = "io.etcd:jetcd-core", version.ref = "jetcd" }
-junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
-junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
-junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
-kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
-kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+
+# Runtime
+common-utils-core = { module = "com.pambrose.common-utils:core-utils", version.ref = "common-utils" }
+common-utils-guava = { module = "com.pambrose.common-utils:guava-utils", version.ref = "common-utils" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
 kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
-netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
+
+# Testing
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit" }
+kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
+kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
 testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 
+[bundles]
+testing = [
+  "junit-jupiter-api",
+  "kotest-runner-junit5",
+  "kotest-assertions-core",
+  "testcontainers-core",
+]
+testing-runtime = [
+  "junit-jupiter-engine",
+  "junit-platform-launcher",
+]
+
 [plugins]
-ben-manes-versions = { id = "com.github.ben-manes.versions", version.ref = "ben-manes-versions" }
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
-dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
-dokka-javadoc = { id = "org.jetbrains.dokka-javadoc", version.ref = "dokka" }
+# Kotlin
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+
+# Static analysis
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 kotlinter = { id = "org.jmailen.kotlinter", version.ref = "kotlinter" }
+
+# Coverage and docs
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
+dokka-javadoc = { id = "org.jetbrains.dokka-javadoc", version.ref = "dokka" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+
+# Dependency updates and publishing
+ben-manes-versions = { id = "com.github.ben-manes.versions", version.ref = "ben-manes-versions" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }

@@ -4,7 +4,6 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.io.File
 
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
@@ -67,31 +66,24 @@ subprojects {
         "implementation"(rootProject.libs.kotlin.logging)
         "implementation"(rootProject.libs.logback.classic)
 
-        "implementation"(rootProject.libs.netty.all)
-
-        "testImplementation"(rootProject.libs.junit.jupiter.api)
-        "testImplementation"(rootProject.libs.kotest.runner.junit5)
-        "testImplementation"(rootProject.libs.kotest.assertions.core)
-        "testImplementation"(rootProject.libs.testcontainers.core)
-
-        "testRuntimeOnly"(rootProject.libs.junit.jupiter.engine)
-        "testRuntimeOnly"(rootProject.libs.junit.platform.launcher)
+        "testImplementation"(rootProject.libs.bundles.testing)
+        "testRuntimeOnly"(rootProject.libs.bundles.testing.runtime)
     }
 
     // Examples module isn't published; only the library is.
     if (name == "etcd-recipes") configurePublishing()
 
     configure<KotlinJvmProjectExtension> {
-        jvmToolchain(17)
+        jvmToolchain(rootProject.libs.versions.jvm.get().toInt())
     }
 
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions {
-            freeCompilerArgs.addAll(
-                "-opt-in=kotlin.time.ExperimentalTime",
-                "-opt-in=kotlin.ExperimentalUnsignedTypes",
-                "-opt-in=kotlin.concurrent.atomics.ExperimentalAtomicApi",
-            )
+            listOf(
+                "kotlin.time.ExperimentalTime",
+                "kotlin.ExperimentalUnsignedTypes",
+                "kotlin.concurrent.atomics.ExperimentalAtomicApi",
+            ).forEach { freeCompilerArgs.add("-opt-in=$it") }
         }
     }
 
@@ -113,18 +105,23 @@ subprojects {
         val useTestcontainers = rawProp != null && !rawProp.equals("false", ignoreCase = true)
         systemProperty("etcd.recipes.testcontainers", useTestcontainers.toString())
         if (useTestcontainers) {
-            // Point Testcontainers at the first reachable Docker socket. We
-            // prefer the Docker Desktop "raw" socket because the routing
-            // socket at ~/.docker/run/docker.sock returns malformed /info
-            // responses to docker-java even though plain curl/`docker` work.
+            // Honor an explicit DOCKER_HOST / TESTCONTAINERS_DOCKER_HOST first.
+            // We deliberately do NOT probe inside ~/Library/Containers/com.docker.docker/...
+            // because reading that directory requires the macOS "App Management"
+            // entitlement and triggers a TCC prompt every time Gradle reconfigures.
+            // If you need the Docker Desktop "raw" socket, export it from your
+            // shell, e.g.:
+            //   export DOCKER_HOST="unix://$HOME/Library/Containers/com.docker.docker/Data/docker.raw.sock"
             val home = System.getProperty("user.home")
-            val candidates = listOf(
-                "$home/Library/Containers/com.docker.docker/Data/docker.raw.sock",
-                "$home/.docker/run/docker.sock",
-                "/var/run/docker.sock",
-            )
-            candidates.firstOrNull { File(it).exists() }?.let { sock ->
-                val dockerHost = "unix://$sock"
+            val explicit = System.getenv("TESTCONTAINERS_DOCKER_HOST")
+                ?: System.getenv("DOCKER_HOST")
+            val dockerHost = explicit
+                ?: listOf(
+                    "$home/.docker/run/docker.sock",
+                    "/var/run/docker.sock",
+                ).firstOrNull { File(it).exists() }?.let { "unix://$it" }
+
+            if (dockerHost != null) {
                 environment("DOCKER_HOST", dockerHost)
                 // TESTCONTAINERS_DOCKER_HOST overrides ~/.testcontainers.properties
                 // when a stale config there pins docker.host to a missing socket.
