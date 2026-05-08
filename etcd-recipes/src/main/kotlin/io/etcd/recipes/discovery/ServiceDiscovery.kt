@@ -136,6 +136,6 @@ constructor(
   companion object {
     private val logger = KotlinLogging.logger {}
 
-    internal fun defaultClientId() = EtcdConnector.defaultClientId(ServiceDiscovery::class.simpleName!!)
+    internal fun defaultClientId() = defaultClientId(ServiceDiscovery::class.simpleName!!)
   }
 }

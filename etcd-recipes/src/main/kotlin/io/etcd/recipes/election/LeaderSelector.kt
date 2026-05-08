@@ -39,6 +39,7 @@ import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAliveWith
 import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.leaseRevoke
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
@@ -326,7 +327,10 @@ constructor(
 
     // Check to see if unique value was successfully set in the CAS step
     if (isLeader || !txn.isSucceeded || client.getValue(leaderPath)?.asString != uniqueToken) {
-      // Failed to become leader
+      // Failed to become leader: revoke the lease we just created so it does
+      // not linger in etcd until TTL. Without this, every losing candidate in
+      // an election leaks a lease per turnover.
+      client.leaseRevoke(lease)
       return false
     }
 

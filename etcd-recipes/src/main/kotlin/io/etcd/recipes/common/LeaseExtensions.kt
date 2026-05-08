@@ -42,3 +42,17 @@ fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
 
 fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse =
   leaseClient.grant(ttl.toDouble(DurationUnit.SECONDS).toLong()).get()
+
+/**
+ * Best-effort revoke of a lease. Failures are logged and swallowed because
+ * callers use this on cleanup paths (failed CAS, exception in put loop) where
+ * raising a secondary failure would mask the original problem; the lease's TTL
+ * is the upper bound on resource retention if the revoke RPC itself fails.
+ */
+fun Client.leaseRevoke(lease: LeaseGrantResponse) {
+  try {
+    leaseClient.revoke(lease.id).get()
+  } catch (e: Throwable) {
+    logger.debug(e) { "leaseRevoke(${lease.id}) failed; lease will expire on TTL" }
+  }
+}

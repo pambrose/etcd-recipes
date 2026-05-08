@@ -92,13 +92,31 @@ constructor(
         logger.error(e) { "In start()" }
         exceptionList.value += e
       } finally {
+        // Always release the start() caller, even on failure. The previous
+        // version only counted down inside the keepAlive callback, so if the
+        // initial put / lease grant threw, start() would block on
+        // keepAliveStartedLatch forever.
+        keepAliveStartedLatch.countDown()
         startThreadComplete.set(true)
       }
     }
 
     keepAliveStartedLatch.await()
-    startCalled.store(true)
 
+    // Surface a setup failure to the caller of start() so they don't believe
+    // a non-running keepAlive is healthy. Mark startCalled only on success;
+    // marking before checking would let close() proceed past checkStartCalled()
+    // on an instance that never actually started.
+    val startupError = exceptionList.value.firstOrNull()
+    if (startupError != null) {
+      // Constructor with autoStart=true throws here; the user never gets a
+      // reference to call close(), so we must release our owned executor
+      // before propagating, otherwise the thread (and JVM exit) leaks.
+      if (userExecutor == null) (executor as ExecutorService).shutdown()
+      throw EtcdRecipeRuntimeException("start() failed: $startupError")
+    }
+
+    startCalled.store(true)
     return this
   }
 
@@ -114,6 +132,6 @@ constructor(
   companion object {
     private val logger = KotlinLogging.logger {}
 
-    internal fun defaultClientId() = EtcdConnector.defaultClientId(TransientKeyValue::class.simpleName!!)
+    internal fun defaultClientId() = defaultClientId(TransientKeyValue::class.simpleName!!)
   }
 }

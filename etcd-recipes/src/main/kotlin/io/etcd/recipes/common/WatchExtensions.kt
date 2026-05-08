@@ -28,6 +28,7 @@ import io.etcd.jetcd.watch.WatchResponse
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 val WatchEvent.keyAsString get() = keyValue.key.asString
 val WatchEvent.keyAsInt get() = keyValue.key.asInt
@@ -66,6 +67,13 @@ private class DispatchingWatcher(
   override fun close() {
     delegate.close()
     dispatcher.shutdown()
+    // shutdown() refuses new tasks but does not wait for the currently-running
+    // callback task. Without awaiting, the user's `block` could still be
+    // executing on the dispatcher thread after withWatcher's receiver has
+    // returned — touching state the caller assumes is no longer in use. A
+    // short bounded wait makes the close-then-touch contract real without
+    // turning into a blocker on a misbehaving callback.
+    dispatcher.awaitTermination(5, TimeUnit.SECONDS)
   }
 }
 
