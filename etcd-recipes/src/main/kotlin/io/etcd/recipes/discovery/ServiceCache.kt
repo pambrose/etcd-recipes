@@ -104,8 +104,13 @@ class ServiceCache(
               }
             }
 
-            UNRECOGNIZED -> logger.error { "Unrecognized error with $servicePath watch" }
-            else -> logger.error { "Unknown error with $servicePath watch" }
+            UNRECOGNIZED -> {
+              logger.error { "Unrecognized error with $servicePath watch" }
+            }
+
+            else -> {
+              logger.error { "Unknown error with $servicePath watch" }
+            }
           }
         }
     }

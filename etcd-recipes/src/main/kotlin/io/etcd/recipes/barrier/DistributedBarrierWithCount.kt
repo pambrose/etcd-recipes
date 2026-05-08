@@ -179,11 +179,13 @@ constructor(
         }
 
       when {
-        !txn.isSucceeded ->
+        !txn.isSucceeded -> {
           throw EtcdRecipeException("Failed to set waitingPath")
+        }
 
-        client.getValue(myWaitingPath)?.asString != uniqueToken ->
+        client.getValue(myWaitingPath)?.asString != uniqueToken -> {
           throw EtcdRecipeException("Failed to assign waitingPath unique value")
+        }
 
         else -> {
           // Keep key alive

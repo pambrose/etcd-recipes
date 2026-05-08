@@ -22,7 +22,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
-data class TestPayload(var testval: Int) {
+data class TestPayload(
+  var testval: Int,
+) {
   fun toJson() = Json.encodeToString(serializer(), this)
 
   companion object {

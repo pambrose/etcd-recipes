@@ -40,8 +40,8 @@ class DistributedQueueTest : StringSpec() {
     private val testData = List(iterCount) { "V $it" }
 
     private fun threadedTestNoWait(
-        iterCount: Int,
-        threadCount: Int,
+      iterCount: Int,
+      threadCount: Int,
     ) {
         val queuePath = "$basePath/threadedTestNoWait"
         val latch = CountDownLatch(threadCount)
@@ -77,8 +77,8 @@ class DistributedQueueTest : StringSpec() {
     }
 
     private fun threadedTestWithWait(
-        iterCount: Int,
-        threadCount: Int,
+      iterCount: Int,
+      threadCount: Int,
     ) {
         val queuePath = "$basePath/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)

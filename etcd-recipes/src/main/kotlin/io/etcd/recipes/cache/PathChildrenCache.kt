@@ -202,8 +202,13 @@ class PathChildrenCache(
               }
             }
 
-            UNRECOGNIZED -> logger.error { "Unrecognized error with $cachePath watch" }
-            else -> logger.error { "Unknown error with $cachePath watch" }
+            UNRECOGNIZED -> {
+              logger.error { "Unrecognized error with $cachePath watch" }
+            }
+
+            else -> {
+              logger.error { "Unknown error with $cachePath watch" }
+            }
           }
         }
     }

@@ -42,8 +42,8 @@ class DistributedPriorityQueueTest : StringSpec() {
     private val testData = List(iterCount) { "V %04d".format(it) }
 
     private fun threadedTestNoWait(
-        iterCount: Int,
-        threadCount: Int,
+      iterCount: Int,
+      threadCount: Int,
     ) {
         val queuePath = "$basePath/threadedTestNoWait"
         val latch = CountDownLatch(threadCount)
@@ -79,8 +79,8 @@ class DistributedPriorityQueueTest : StringSpec() {
     }
 
     private fun threadedTestWithWait(
-        iterCount: Int,
-        threadCount: Int,
+      iterCount: Int,
+      threadCount: Int,
     ) {
         val queuePath = "$basePath/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)
@@ -124,7 +124,9 @@ class DistributedPriorityQueueTest : StringSpec() {
             connectToEtcd(urls) { client ->
                 client.getChildCount(queuePath) shouldBe 0
                 withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
-                withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
+                withDistributedPriorityQueue(client, queuePath) {
+                  repeat(iterCount) { dequeuedData += dequeue().asString }
+                }
                 client.getChildCount(queuePath) shouldBe 0
             }
 
@@ -259,7 +261,9 @@ class DistributedPriorityQueueTest : StringSpec() {
                 client.deleteChildren(queuePath)
                 client.getChildCount(queuePath) shouldBe 0
                 withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], i) } }
-                withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { dequeuedData += dequeue().asString } }
+                withDistributedPriorityQueue(client, queuePath) {
+                  repeat(iterCount) { dequeuedData += dequeue().asString }
+                }
                 client.getChildCount(queuePath) shouldBe 0
             }
 

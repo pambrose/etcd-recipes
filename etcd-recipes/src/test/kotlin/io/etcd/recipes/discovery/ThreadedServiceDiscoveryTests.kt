@@ -25,9 +25,9 @@ import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.assertions.throwables.shouldThrow
 import java.util.concurrent.ConcurrentMap
 import kotlin.time.Duration.Companion.seconds
 
@@ -37,7 +37,9 @@ class ThreadedServiceDiscoveryTests : StringSpec() {
     private val serviceCount = 10
     private val contextMap: ConcurrentMap<Int, ServiceDiscoveryContext> = newConcurrentMap()
 
-    class ServiceDiscoveryContext(val serviceDiscovery: ServiceDiscovery) {
+    class ServiceDiscoveryContext(
+      val serviceDiscovery: ServiceDiscovery,
+    ) {
         val serviceMap: ConcurrentMap<String, ServiceInstance> = newConcurrentMap()
     }
 

@@ -109,7 +109,9 @@ constructor(
   @Synchronized
   fun queryForInstances(name: String): List<ServiceInstance> {
     checkCloseNotCalled()
-    return client.getChildrenValues(namesPath.appendToPath(name)).map { it.asString }.map { ServiceInstance.toObject(it) }
+    return client.getChildrenValues(namesPath.appendToPath(name)).map {
+      it.asString
+    }.map { ServiceInstance.toObject(it) }
   }
 
   @Synchronized

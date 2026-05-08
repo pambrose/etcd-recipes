@@ -20,6 +20,9 @@ build: clean
 tests:
 	./gradlew check --rerun-tasks --no-build-cache
 
+tests-tc:
+	./gradlew check --rerun-tasks --no-build-cache -PuseTestcontainers
+
 lint:
 	./gradlew lintKotlinMain lintKotlinTest
 
