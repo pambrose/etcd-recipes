@@ -16,6 +16,9 @@ plugins {
     alias(libs.plugins.detekt) apply false
 }
 
+// Version and group are defined in gradle.properties; also update version refs in README.md and website/srcref/docs/{api,getting-started}.md
+providers.gradleProperty("overrideVersion").orNull?.let { version = it }
+
 allprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
@@ -32,6 +35,14 @@ allprojects {
 dependencies {
     "kover"(project(":etcd-recipes"))
     "kover"(project(":etcd-recipes-examples"))
+}
+
+dokka {
+    moduleName.set("etcd-recipes")
+    pluginsConfiguration.html {
+        homepageLink.set("https://github.com/pambrose/etcd-recipes")
+        footerMessage.set("etcd-recipes")
+    }
 }
 
 subprojects {
