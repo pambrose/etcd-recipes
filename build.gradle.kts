@@ -5,6 +5,14 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+val libraryName = "etcd-recipes"
+val libraryModule = ":$libraryName"
+val examplesModule = ":$libraryName-examples"
+val repoUrl = "https://github.com/pambrose/$libraryName"
+
+val envDockerHost = "DOCKER_HOST"
+val envTcDockerHost = "TESTCONTAINERS_DOCKER_HOST"
+
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
@@ -35,17 +43,17 @@ subprojects {
 // Root-level aggregation: `./gradlew dokkaGenerate` and `koverHtmlReport`
 // at the root produce one merged report across all subprojects.
 dependencies {
-    dokka(project(":etcd-recipes"))
-    dokka(project(":etcd-recipes-examples"))
+    dokka(project(libraryModule))
+    dokka(project(examplesModule))
 
-    kover(project(":etcd-recipes"))
-    kover(project(":etcd-recipes-examples"))
+    kover(project(libraryModule))
+    kover(project(examplesModule))
 }
 
 dokka {
     pluginsConfiguration.html {
-        homepageLink.set("https://github.com/pambrose/etcd-recipes")
-        footerMessage.set("etcd-recipes")
+        homepageLink.set(repoUrl)
+        footerMessage.set(libraryName)
     }
 }
 
@@ -71,7 +79,7 @@ subprojects {
     }
 
     // Examples module isn't published; only the library is.
-    if (name == "etcd-recipes") configurePublishing()
+    if (name == libraryName) configurePublishing()
 
     configure<KotlinJvmProjectExtension> {
         jvmToolchain(rootProject.libs.versions.jvm.get().toInt())
@@ -113,8 +121,8 @@ subprojects {
             // shell, e.g.:
             //   export DOCKER_HOST="unix://$HOME/Library/Containers/com.docker.docker/Data/docker.raw.sock"
             val home = System.getProperty("user.home")
-            val explicit = System.getenv("TESTCONTAINERS_DOCKER_HOST")
-                ?: System.getenv("DOCKER_HOST")
+            val explicit = System.getenv(envTcDockerHost)
+                ?: System.getenv(envDockerHost)
             val dockerHost = explicit
                 ?: listOf(
                     "$home/.docker/run/docker.sock",
@@ -122,10 +130,10 @@ subprojects {
                 ).firstOrNull { File(it).exists() }?.let { "unix://$it" }
 
             if (dockerHost != null) {
-                environment("DOCKER_HOST", dockerHost)
+                environment(envDockerHost, dockerHost)
                 // TESTCONTAINERS_DOCKER_HOST overrides ~/.testcontainers.properties
                 // when a stale config there pins docker.host to a missing socket.
-                environment("TESTCONTAINERS_DOCKER_HOST", dockerHost)
+                environment(envTcDockerHost, dockerHost)
                 // Force the env-driven strategy so the locked-in
                 // UnixSocketClientProviderStrategy from a stale user config
                 // (which hardcodes /var/run/docker.sock) is ignored.
@@ -150,10 +158,9 @@ subprojects {
 }
 
 fun Project.configurePublishing() {
-    apply {
-        plugin("org.jetbrains.dokka")
-        plugin("com.vanniktech.maven.publish")
-    }
+    // Dokka is already applied via the root subprojects { ... } block;
+    // only maven-publish is project-specific to the published module.
+    apply(plugin = "com.vanniktech.maven.publish")
 
     extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
         configure(
@@ -166,7 +173,7 @@ fun Project.configurePublishing() {
         pom {
             name.set(project.name)
             description.set(provider { project.description })
-            url.set("https://github.com/pambrose/etcd-recipes")
+            url.set(repoUrl)
             licenses {
                 license {
                     name.set("Apache License 2.0")
@@ -183,7 +190,7 @@ fun Project.configurePublishing() {
             scm {
                 connection.set("scm:git:git://github.com/pambrose/etcd-recipes.git")
                 developerConnection.set("scm:git:ssh://github.com/pambrose/etcd-recipes.git")
-                url.set("https://github.com/pambrose/etcd-recipes")
+                url.set(repoUrl)
             }
         }
 
