@@ -1,7 +1,11 @@
+.PHONY: default clean clean-all stop build tests tests-tc coverage kdocs \
+        lint detekt detekt-baseline refresh versioncheck upgrade-wrapper
+
 default: versioncheck
 
 clean:
 	./gradlew clean
+	rm -rf build
 
 # Wipe every build / IDE / tool artifact a fresh checkout would not have.
 # Stops any Gradle daemons first so .gradle is not held open.
@@ -29,7 +33,7 @@ coverage:
 kdocs:
 	./gradlew dokkaGenerate
 
-lint:
+lint: detekt
 	./gradlew lintKotlinMain lintKotlinTest
 
 detekt:
