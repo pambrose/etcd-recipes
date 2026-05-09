@@ -1,1 +1,0 @@
-description = "etcd-recipes"

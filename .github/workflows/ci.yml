@@ -26,8 +26,28 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Test (Testcontainers)
-        run: ./gradlew check -PuseTestcontainers
+      - name: Detekt
+        run: ./gradlew detekt
+
+      - name: Test + Kover XML (Testcontainers)
+        # Run check + koverXmlReport in one Gradle invocation so the test
+        # task's inputs (notably -PuseTestcontainers) match between the
+        # two; running them separately invalidates the test cache and
+        # re-runs the suite without testcontainers wiring, which then
+        # hangs trying to reach localhost:2379.
+        run: ./gradlew check koverXmlReport -PuseTestcontainers
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          # Use the library subproject's report directly. The root aggregate
+          # at build/reports/kover/report.xml is empty because the root
+          # project has no Kotlin source for Kover 0.9's aggregation to
+          # attach to; the per-subproject report has the real data.
+          files: ./etcd-recipes/build/reports/kover/report.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test reports on failure
         if: failure()

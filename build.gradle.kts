@@ -1,29 +1,68 @@
+import com.vanniktech.maven.publish.JavadocJar
+import com.vanniktech.maven.publish.SourcesJar
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.io.File
+
+val libraryName = "etcd-recipes"
+val libraryModule = ":$libraryName"
+val examplesModule = ":$libraryName-examples"
+val repoUrl = "https://github.com/pambrose/$libraryName"
+
+val envDockerHost = "DOCKER_HOST"
+val envTcDockerHost = "TESTCONTAINERS_DOCKER_HOST"
 
 plugins {
-    java
-    jacoco
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
-    alias(libs.plugins.ben.manes.versions) apply false
-    alias(libs.plugins.coveralls) apply false
+    alias(libs.plugins.ben.manes.versions)
     alias(libs.plugins.kotlinter) apply false
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.dokka.javadoc)
+    alias(libs.plugins.kover)
+    alias(libs.plugins.detekt) apply false
+    alias(libs.plugins.maven.publish) apply false
 }
 
+// Version and group are defined in gradle.properties; also update version refs in README.md and website/srcref/docs/{api,getting-started}.md
 allprojects {
-    apply(plugin = "org.jetbrains.kotlin.jvm")
-    apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
-    apply(plugin = "com.github.ben-manes.versions")
-    apply(plugin = "jacoco")
-    apply(plugin = "com.github.kt3k.coveralls")
-    apply(plugin = "org.jmailen.kotlinter")
+    providers.gradleProperty("overrideVersion").orNull?.let { version = it }
 }
 
 subprojects {
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
+    apply(plugin = "org.jmailen.kotlinter")
+    apply(plugin = "org.jetbrains.dokka")
+    apply(plugin = "org.jetbrains.dokka-javadoc")
+    apply(plugin = "org.jetbrains.kotlinx.kover")
+    apply(plugin = "io.gitlab.arturbosch.detekt")
+}
+
+// Root-level aggregation:
+// - `./gradlew dokkaGenerate` covers both subprojects so the published
+//   docs include API docs for the examples too.
+// - `./gradlew koverHtmlReport` covers only the library; the examples
+//   module is `main()` programs without tests and would otherwise drag
+//   the aggregate coverage from ~70% down to ~45%.
+dependencies {
+    dokka(project(libraryModule))
+    dokka(project(examplesModule))
+
+    kover(project(libraryModule))
+}
+
+dokka {
+    pluginsConfiguration.html {
+        homepageLink.set(repoUrl)
+        footerMessage.set(libraryName)
+    }
+}
+
+subprojects {
+    description = name
+
     dependencies {
         "implementation"(rootProject.libs.kotlinx.serialization.json)
         "implementation"(rootProject.libs.kotlinx.coroutines.core)
@@ -38,57 +77,24 @@ subprojects {
         "implementation"(rootProject.libs.kotlin.logging)
         "implementation"(rootProject.libs.logback.classic)
 
-        "implementation"(rootProject.libs.netty.all)
-
-        "testImplementation"(rootProject.libs.junit.jupiter.api)
-        "testImplementation"(rootProject.libs.kotest.runner.junit5)
-        "testImplementation"(rootProject.libs.kotest.assertions.core)
-        "testImplementation"(rootProject.libs.testcontainers.core)
-
-        "testRuntimeOnly"(rootProject.libs.junit.jupiter.engine)
-        "testRuntimeOnly"(rootProject.libs.junit.platform.launcher)
+        "testImplementation"(rootProject.libs.bundles.testing)
+        "testRuntimeOnly"(rootProject.libs.bundles.testing.runtime)
     }
 
-    val mainSourceSet = the<JavaPluginExtension>().sourceSets["main"]
-
-    val sourcesJar by tasks.registering(Jar::class) {
-        dependsOn("classes")
-        archiveClassifier.set("sources")
-        from(mainSourceSet.allSource)
-    }
-
-    val javadocTask = tasks.named<Javadoc>("javadoc")
-    tasks.register<Jar>("javadocJar") {
-        dependsOn(javadocTask)
-        archiveClassifier.set("javadoc")
-        from(javadocTask.map { it.destinationDir!! })
-    }
-
-    // Fixes a bizarre gradle error related to duplicate methods
-    tasks.named<Jar>("jar") {
-        duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    }
-
-    tasks.named("check") {
-        dependsOn("jacocoTestReport")
-    }
-
-    artifacts {
-        add("archives", sourcesJar)
-    }
+    // Examples module isn't published; only the library is.
+    if (name == libraryName) configurePublishing()
 
     configure<KotlinJvmProjectExtension> {
-        jvmToolchain(17)
+        jvmToolchain(rootProject.libs.versions.jvm.get().toInt())
     }
 
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions {
-            freeCompilerArgs.addAll(
-                "-Xbackend-threads=8",
-                "-opt-in=kotlin.time.ExperimentalTime",
-                "-opt-in=kotlin.ExperimentalUnsignedTypes",
-                "-opt-in=kotlin.concurrent.atomics.ExperimentalAtomicApi",
-            )
+            listOf(
+                "kotlin.time.ExperimentalTime",
+                "kotlin.ExperimentalUnsignedTypes",
+                "kotlin.concurrent.atomics.ExperimentalAtomicApi",
+            ).forEach { freeCompilerArgs.add("-opt-in=$it") }
         }
     }
 
@@ -99,8 +105,8 @@ subprojects {
         setForkEvery(1)
         // Run multiple test classes in parallel against the local etcd. Each
         // test namespaces its keys under its own path, so concurrent forks
-        // do not collide. Cap at half the cores so etcd + jacoco aren't
-        // starved.
+        // do not collide. Cap at half the cores so etcd + coverage
+        // instrumentation aren't starved.
         maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(2)
         // Opt-in: -PuseTestcontainers makes each forked JVM start its own
         // ephemeral etcd container instead of hitting localhost:2379.
@@ -110,22 +116,27 @@ subprojects {
         val useTestcontainers = rawProp != null && !rawProp.equals("false", ignoreCase = true)
         systemProperty("etcd.recipes.testcontainers", useTestcontainers.toString())
         if (useTestcontainers) {
-            // Point Testcontainers at the first reachable Docker socket. We
-            // prefer the Docker Desktop "raw" socket because the routing
-            // socket at ~/.docker/run/docker.sock returns malformed /info
-            // responses to docker-java even though plain curl/`docker` work.
+            // Honor an explicit DOCKER_HOST / TESTCONTAINERS_DOCKER_HOST first.
+            // We deliberately do NOT probe inside ~/Library/Containers/com.docker.docker/...
+            // because reading that directory requires the macOS "App Management"
+            // entitlement and triggers a TCC prompt every time Gradle reconfigures.
+            // If you need the Docker Desktop "raw" socket, export it from your
+            // shell, e.g.:
+            //   export DOCKER_HOST="unix://$HOME/Library/Containers/com.docker.docker/Data/docker.raw.sock"
             val home = System.getProperty("user.home")
-            val candidates = listOf(
-                "$home/Library/Containers/com.docker.docker/Data/docker.raw.sock",
-                "$home/.docker/run/docker.sock",
-                "/var/run/docker.sock",
-            )
-            candidates.firstOrNull { File(it).exists() }?.let { sock ->
-                val dockerHost = "unix://$sock"
-                environment("DOCKER_HOST", dockerHost)
+            val explicit = System.getenv(envTcDockerHost)
+                ?: System.getenv(envDockerHost)
+            val dockerHost = explicit
+                ?: listOf(
+                    "$home/.docker/run/docker.sock",
+                    "/var/run/docker.sock",
+                ).firstOrNull { File(it).exists() }?.let { "unix://$it" }
+
+            if (dockerHost != null) {
+                environment(envDockerHost, dockerHost)
                 // TESTCONTAINERS_DOCKER_HOST overrides ~/.testcontainers.properties
                 // when a stale config there pins docker.host to a missing socket.
-                environment("TESTCONTAINERS_DOCKER_HOST", dockerHost)
+                environment(envTcDockerHost, dockerHost)
                 // Force the env-driven strategy so the locked-in
                 // UnixSocketClientProviderStrategy from a stale user config
                 // (which hardcodes /var/run/docker.sock) is ignored.
@@ -140,6 +151,7 @@ subprojects {
                 environment("TESTCONTAINERS_RYUK_DISABLED", "true")
             }
         }
+
         testLogging {
             events = setOf(TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED)
             exceptionFormat = TestExceptionFormat.FULL
@@ -147,3 +159,49 @@ subprojects {
         }
     }
 }
+
+fun Project.configurePublishing() {
+    // Dokka is already applied via the root subprojects { ... } block;
+    // only maven-publish is project-specific to the published module.
+    apply(plugin = "com.vanniktech.maven.publish")
+
+    extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
+        configure(
+            com.vanniktech.maven.publish.KotlinJvm(
+                javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml"),
+                sourcesJar = SourcesJar.Sources(),
+            ),
+        )
+
+        pom {
+            name.set(project.name)
+            description.set(provider { project.description })
+            url.set(repoUrl)
+            licenses {
+                license {
+                    name.set("Apache License 2.0")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                }
+            }
+            developers {
+                developer {
+                    id.set("pambrose")
+                    name.set("Paul Ambrose")
+                    email.set("paul@pambrose.com")
+                }
+            }
+            scm {
+                connection.set("scm:git:git://github.com/pambrose/etcd-recipes.git")
+                developerConnection.set("scm:git:ssh://github.com/pambrose/etcd-recipes.git")
+                url.set(repoUrl)
+            }
+        }
+
+        publishToMavenCentral(automaticRelease = true)
+        // Skip signing when no GPG key is provided (e.g., local publishing)
+        if (providers.gradleProperty("signingInMemoryKey").isPresent) {
+            signAllPublications()
+        }
+    }
+}
+
