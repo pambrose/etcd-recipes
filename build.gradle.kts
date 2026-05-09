@@ -40,14 +40,17 @@ subprojects {
     apply(plugin = "io.gitlab.arturbosch.detekt")
 }
 
-// Root-level aggregation: `./gradlew dokkaGenerate` and `koverHtmlReport`
-// at the root produce one merged report across all subprojects.
+// Root-level aggregation:
+// - `./gradlew dokkaGenerate` covers both subprojects so the published
+//   docs include API docs for the examples too.
+// - `./gradlew koverHtmlReport` covers only the library; the examples
+//   module is `main()` programs without tests and would otherwise drag
+//   the aggregate coverage from ~70% down to ~45%.
 dependencies {
     dokka(project(libraryModule))
     dokka(project(examplesModule))
 
     kover(project(libraryModule))
-    kover(project(examplesModule))
 }
 
 dokka {

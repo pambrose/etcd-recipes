@@ -41,7 +41,11 @@ jobs:
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v5
         with:
-          files: ./build/reports/kover/report.xml
+          # Use the library subproject's report directly. The root aggregate
+          # at build/reports/kover/report.xml is empty because the root
+          # project has no Kotlin source for Kover 0.9's aggregation to
+          # attach to; the per-subproject report has the real data.
+          files: ./etcd-recipes/build/reports/kover/report.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
