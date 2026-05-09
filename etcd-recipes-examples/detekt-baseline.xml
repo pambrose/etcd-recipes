@@ -2,30 +2,17 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>MagicNumber:DistributedBarrierEarlySetExample.kt$5</ID>
-    <ID>MagicNumber:DistributedBarrierExample.kt$5</ID>
-    <ID>MagicNumber:DistributedBarrierWithCountExample.kt$30</ID>
-    <ID>MagicNumber:DistributedBarrierWithCountExample.kt$5</ID>
-    <ID>MagicNumber:DistributedBarrierWithCountExample.kt$99</ID>
-    <ID>MagicNumber:DistributedDoubleBarrierExample.kt$5</ID>
-    <ID>MagicNumber:DistributedDoubleBarrierExample.kt$99</ID>
-    <ID>MagicNumber:DistributedPriorityQueueExample.kt$5</ID>
-    <ID>MagicNumber:DistributedPriorityQueueExample.kt$50</ID>
-    <ID>MagicNumber:DistributedQueueExample.kt$5</ID>
-    <ID>MagicNumber:DistributedQueueExample.kt$50</ID>
-    <ID>MagicNumber:LeaderSelectorSerialExample.kt$100</ID>
-    <ID>MagicNumber:LeaderSelectorSerialExample.kt$5</ID>
-    <ID>MagicNumber:LeaderSelectorThreadedExample.kt$5</ID>
-    <ID>MagicNumber:SerialCountersExample.kt$25</ID>
-    <ID>MagicNumber:SerialCountersExample.kt$30</ID>
-    <ID>MagicNumber:SerialCountersExample.kt$5</ID>
-    <ID>MagicNumber:ServiceDiscoveryExample.kt$888</ID>
-    <ID>MagicNumber:ServiceDiscoveryExample.kt$999</ID>
-    <ID>MagicNumber:SetAndDeleteValue.kt$12</ID>
-    <ID>MagicNumber:SetValueAndWatch.kt$10</ID>
-    <ID>MagicNumber:SetValueWithLease.kt$12</ID>
-    <ID>MagicNumber:ThreadedCountersExample.kt$10</ID>
-    <ID>MagicNumber:ThreadedCountersExample.kt$5</ID>
-    <ID>TooGenericExceptionCaught:ServiceDiscoveryExample.kt$e: Throwable</ID>
+    <ID>MagicNumber:DistributedBarrierWithCountExample.kt:5</ID>
+    <ID>MagicNumber:DistributedBarrierWithCountExample.kt:99</ID>
+    <ID>MagicNumber:DistributedDoubleBarrierExample.kt:99</ID>
+    <ID>MagicNumber:LeaderSelectorSerialExample.kt:100</ID>
+    <ID>MagicNumber:LeaderSelectorSerialExample.kt:5</ID>
+    <ID>MagicNumber:SerialCountersExample.kt:5</ID>
+    <ID>MagicNumber:ServiceDiscoveryExample.kt:888</ID>
+    <ID>MagicNumber:SetAndDeleteValue.kt:12</ID>
+    <ID>MagicNumber:SetValueAndWatch.kt:10</ID>
+    <ID>MagicNumber:SetValueWithLease.kt:12</ID>
+    <ID>MagicNumber:ThreadedCountersExample.kt:5</ID>
+    <ID>TooGenericExceptionCaught:ServiceDiscoveryExample.kt:e: Throwable</ID>
   </CurrentIssues>
 </SmellBaseline>

@@ -37,7 +37,7 @@ subprojects {
     apply(plugin = "org.jetbrains.dokka")
     apply(plugin = "org.jetbrains.dokka-javadoc")
     apply(plugin = "org.jetbrains.kotlinx.kover")
-    apply(plugin = "io.gitlab.arturbosch.detekt")
+    apply(plugin = "dev.detekt")
 }
 
 // Root-level aggregation:

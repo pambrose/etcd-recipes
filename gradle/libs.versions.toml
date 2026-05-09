@@ -24,7 +24,7 @@ testcontainers = "2.0.5"
 
 # Build tooling plugins
 ben-manes-versions = "0.54.0"
-detekt = "1.23.8"
+detekt = "2.0.0-alpha.3"
 dokka = "2.2.0"
 kotlinter = "5.4.2"
 kover = "0.9.8"
@@ -69,7 +69,7 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 
 # Static analysis
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
 kotlinter = { id = "org.jmailen.kotlinter", version.ref = "kotlinter" }
 
 # Coverage and docs
