@@ -29,12 +29,13 @@ jobs:
       - name: Detekt
         run: ./gradlew detekt
 
-      - name: Test (Testcontainers)
-        run: ./gradlew check -PuseTestcontainers
-
-      - name: Generate Kover XML coverage
-        if: ${{ !cancelled() }}
-        run: ./gradlew koverXmlReport
+      - name: Test + Kover XML (Testcontainers)
+        # Run check + koverXmlReport in one Gradle invocation so the test
+        # task's inputs (notably -PuseTestcontainers) match between the
+        # two; running them separately invalidates the test cache and
+        # re-runs the suite without testcontainers wiring, which then
+        # hangs trying to reach localhost:2379.
+        run: ./gradlew check koverXmlReport -PuseTestcontainers
 
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
