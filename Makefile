@@ -1,23 +1,15 @@
 .PHONY: default help clean clean-all stop build tests tests-tc coverage kdocs \
-        lint detekt detekt-baseline refresh versioncheck \
-        publish-local publish-local-snapshot check-gpg-env \
-        publish-snapshot publish-maven-central upgrade-wrapper
+        lint detekt detekt-baseline refresh versioncheck publish-local publish-local-snapshot \
+        publish-snapshot publish-maven-central upgrade-wrapper \
+        _check-gpg-env _require-version _require-gradle-version
 
 # Read the project version from gradle.properties; can be overridden on
 # the command line, e.g. `make publish-snapshot VERSION=0.10.1`.
 VERSION ?= $(shell awk -F= '/^version=/ {print $$2; exit}' gradle.properties)
 
-ifeq ($(strip $(VERSION)),)
-$(error Could not determine project version from gradle.properties)
-endif
-
 # Read the Gradle wrapper version from the version catalog so
 # `make upgrade-wrapper` always tracks the catalog's `gradle` entry.
 GRADLE_VERSION ?= $(shell awk -F'"' '/^gradle = /{print $$2; exit}' gradle/libs.versions.toml)
-
-ifeq ($(strip $(GRADLE_VERSION)),)
-$(error Could not determine gradle version from gradle/libs.versions.toml)
-endif
 
 GPG_ENV = \
 	ORG_GRADLE_PROJECT_signingInMemoryKey="$$(gpg --armor --export-secret-keys $$GPG_SIGNING_KEY_ID)" \
@@ -69,8 +61,8 @@ coverage: ## Generate Kover HTML + XML coverage reports and print the summary
 kdocs: ## Generate Dokka HTML and Javadoc documentation
 	./gradlew dokkaGenerate
 
-lint: detekt ## Run detekt and kotlinter (style + static analysis)
-	./gradlew lintKotlinMain lintKotlinTest
+lint: ## Run kotlinter and detekt (style + static analysis)
+	./gradlew lintKotlin detekt
 
 detekt: ## Run detekt static analysis
 	./gradlew detekt
@@ -84,13 +76,26 @@ refresh: ## Force-refresh Gradle dependencies
 versioncheck: ## Report dependencies with newer versions available
 	./gradlew dependencyUpdates --no-parallel
 
-publish-local: ## Publish artifacts to ~/.m2/repository
+publish-local: _require-version ## Publish artifacts to ~/.m2/repository
 	./gradlew publishToMavenLocal
 
-publish-local-snapshot: ## Publish a -SNAPSHOT to ~/.m2/repository (uses VERSION= or gradle.properties)
+publish-local-snapshot: _require-version ## Publish a -SNAPSHOT to ~/.m2/repository (uses VERSION= or gradle.properties)
 	./gradlew -PoverrideVersion=$(VERSION)-SNAPSHOT publishToMavenLocal
 
-check-gpg-env: ## Validate GPG signing key and keychain password are reachable
+publish-snapshot: _require-version _check-gpg-env ## Publish a -SNAPSHOT to Maven Central (requires VERSION= and GPG)
+	$(GPG_ENV) ./gradlew -PoverrideVersion=$(VERSION)-SNAPSHOT publishToMavenCentral
+
+publish-maven-central: _require-version _check-gpg-env ## Publish and release the current version to Maven Central
+	$(GPG_ENV) ./gradlew publishAndReleaseToMavenCentral
+
+# Gradle's documented upgrade procedure: the first run rewrites
+# gradle-wrapper.properties using the *old* wrapper jar; the second run
+# regenerates the wrapper itself with the new version.
+upgrade-wrapper: _require-gradle-version ## Upgrade the Gradle wrapper to the version pinned in libs.versions.toml
+	./gradlew wrapper --gradle-version=$(GRADLE_VERSION) --distribution-type=bin
+	./gradlew wrapper --gradle-version=$(GRADLE_VERSION) --distribution-type=bin
+
+_check-gpg-env:
 	@if [ -z "$$GPG_SIGNING_KEY_ID" ]; then \
 		echo "Error: GPG_SIGNING_KEY_ID is not set" >&2; exit 1; \
 	fi
@@ -101,11 +106,8 @@ check-gpg-env: ## Validate GPG signing key and keychain password are reachable
 		echo "Error: keychain entry 'gradle-signing-password' (account 'gpg-signing') not found" >&2; exit 1; \
 	fi
 
-publish-snapshot: check-gpg-env ## Publish a -SNAPSHOT to Maven Central (requires VERSION= and GPG)
-	$(GPG_ENV) ./gradlew -PoverrideVersion=$(VERSION)-SNAPSHOT publishToMavenCentral
+_require-version:
+	@[ -n "$(VERSION)" ] || { echo "ERROR: Could not determine project version from gradle.properties" >&2; exit 1; }
 
-publish-maven-central: check-gpg-env ## Publish and release the current version to Maven Central
-	$(GPG_ENV) ./gradlew publishAndReleaseToMavenCentral
-
-upgrade-wrapper: ## Upgrade the Gradle wrapper to the version pinned in libs.versions.toml
-	./gradlew wrapper --gradle-version=$(GRADLE_VERSION) --distribution-type=bin
+_require-gradle-version:
+	@[ -n "$(GRADLE_VERSION)" ] || { echo "ERROR: Could not determine gradle version from gradle/libs.versions.toml" >&2; exit 1; }
