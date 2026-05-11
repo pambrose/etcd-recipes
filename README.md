@@ -1,11 +1,11 @@
 # etcd Recipes
 
-[![JitPack](https://jitpack.io/v/pambrose/etcd-recipes.svg)](https://jitpack.io/#pambrose/etcd-recipes)
-[![Build Status](https://app.travis-ci.com/pambrose/etcd-recipes.svg?branch=master)](https://app.travis-ci.com/pambrose/etcd-recipes)
+[![Maven Central](https://img.shields.io/maven-central/v/com.pambrose.etcd-recipes/etcd-recipes.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.pambrose.etcd-recipes/etcd-recipes)
+[![CI](https://github.com/pambrose/etcd-recipes/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/pambrose/etcd-recipes/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e185b9c637b040bab55bdecf38b0de76)](https://www.codacy.com/manual/pambrose/etcd-recipes?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pambrose/etcd-recipes&amp;utm_campaign=Badge_Grade)
 [![codebeat badge](https://codebeat.co/badges/d61556d4-22e8-44c3-b8f8-db7613fae7fc)](https://codebeat.co/projects/github-com-pambrose-etcd-recipes-master)
 [![codecov](https://codecov.io/gh/pambrose/etcd-recipes/branch/master/graph/badge.svg)](https://codecov.io/gh/pambrose/etcd-recipes)
-[![Coverage Status](https://coveralls.io/repos/github/pambrose/etcd-recipes/badge.svg)](https://coveralls.io/github/pambrose/etcd-recipes)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=pambrose_etcd-recipes&metric=alert_status)](https://sonarcloud.io/dashboard?id=pambrose_etcd-recipes)
 [![Known Vulnerabilities](https://snyk.io/test/github/pambrose/etcd-recipes/badge.svg)](https://snyk.io/test/github/pambrose/etcd-recipes)
 [![Kotlin](https://img.shields.io/badge/%20language-Kotlin-red.svg)](https://kotlinlang.org/)
@@ -110,7 +110,6 @@ etcd-recipes = { module = "com.pambrose.etcd-recipes:etcd-recipes", version.ref 
 ```groovy
 repositories {
     mavenCentral()
-    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -121,13 +120,6 @@ dependencies {
 ### Maven
 
 ```xml
-<repositories>
-    <repository>
-        <id>jitpack.io</id>
-        <url>https://jitpack.io</url>
-    </repository>
-</repositories>
-
 <dependencies>
     <dependency>
         <groupId>com.pambrose.etcd-recipes</groupId>

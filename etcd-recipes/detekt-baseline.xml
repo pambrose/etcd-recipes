@@ -2,44 +2,35 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>CyclomaticComplexMethod:DistributedBarrierWithCount.kt$DistributedBarrierWithCount$@Throws(InterruptedException::class, EtcdRecipeException::class) fun waitOnBarrier(timeout: Duration): Boolean</ID>
-    <ID>LongMethod:DistributedBarrierWithCount.kt$DistributedBarrierWithCount$@Throws(InterruptedException::class, EtcdRecipeException::class) fun waitOnBarrier(timeout: Duration): Boolean</ID>
-    <ID>LongMethod:LeaderSelector.kt$LeaderSelector$fun start(): LeaderSelector</ID>
-    <ID>LongMethod:ServiceCache.kt$ServiceCache$@Synchronized fun start(): ServiceCache</ID>
-    <ID>LongParameterList:DistributedBarrier.kt$( client: Client, barrierPath: String, leaseTtlSecs: Long = EtcdConnector.DEFAULT_TTL_SECS, waitOnMissingBarriers: Boolean = true, clientId: String = defaultClientId(), receiver: DistributedBarrier.() -> T, )</ID>
-    <ID>LongParameterList:DistributedBarrierWithCount.kt$( client: Client, barrierPath: String, memberCount: Int, leaseTtlSecs: Long = EtcdConnector.DEFAULT_TTL_SECS, clientId: String = defaultClientId(), receiver: DistributedBarrierWithCount.() -> T, )</ID>
-    <ID>LongParameterList:LeaderSelector.kt$( client: Client, electionPath: String, listener: LeaderSelectorListener, leaseTtlSecs: Long = DEFAULT_TTL_SECS, userExecutor: Executor? = null, clientId: String = defaultClientId(), receiver: LeaderSelector.() -> T, )</ID>
-    <ID>LongParameterList:LeaderSelector.kt$( client: Client, electionPath: String, takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {}, relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {}, leaseTtlSecs: Long = DEFAULT_TTL_SECS, executorService: ExecutorService? = null, clientId: String = defaultClientId(), receiver: LeaderSelector.() -> T, )</ID>
-    <ID>LongParameterList:LeaderSelector.kt$LeaderSelector$( client: Client, electionPath: String, takeLeadershipBlock: (selector: LeaderSelector) -> Unit = {}, relinquishLeadershipBlock: (selector: LeaderSelector) -> Unit = {}, leaseTtlSecs: Long = DEFAULT_TTL_SECS, executorService: ExecutorService? = null, clientId: String = defaultClientId(), )</ID>
-    <ID>LongParameterList:TransientKeyValue.kt$( client: Client, keyPath: String, keyValue: String, leaseTtlSecs: Long = EtcdConnector.DEFAULT_TTL_SECS, autoStart: Boolean = true, userExecutor: Executor? = null, clientId: String = defaultClientId(), receiver: TransientKeyValue.() -> T, )</ID>
-    <ID>LongParameterList:TransientKeyValue.kt$TransientKeyValue$( client: Client, val keyPath: String, val keyValue: String, val leaseTtlSecs: Long = DEFAULT_TTL_SECS, autoStart: Boolean = true, private val userExecutor: Executor? = null, val clientId: String = defaultClientId(), )</ID>
-    <ID>LoopWithTooManyJumpStatements:AbstractQueue.kt$AbstractQueue$while</ID>
-    <ID>MagicNumber:DistributedAtomicLong.kt$DistributedAtomicLong$100</ID>
-    <ID>MagicNumber:DistributedQueue.kt$DistributedQueue$3</ID>
-    <ID>MagicNumber:KVExtensions.kt$10</ID>
-    <ID>MagicNumber:LeaderSelector.kt$LeaderSelector$3</ID>
-    <ID>MagicNumber:ShowKeys.kt$600</ID>
-    <ID>MagicNumber:WatchExtensions.kt$DispatchingWatcher$5</ID>
-    <ID>MaxLineLength:ReportLeaderTests.kt$ReportLeaderTests$// This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership</ID>
-    <ID>ReturnCount:LeaderSelector.kt$LeaderSelector$@Synchronized private fun attemptToBecomeLeader(client: Client): Boolean</ID>
-    <ID>SpreadOperator:ClientExtensions.kt$(*urls.toTypedArray())</ID>
-    <ID>TooGenericExceptionCaught:KeepAliveExtensions.kt$e: Throwable</ID>
-    <ID>TooGenericExceptionCaught:LeaderSelector.kt$LeaderSelector$e: Throwable</ID>
-    <ID>TooGenericExceptionCaught:LeaderSelector.kt$LeaderSelector.Companion$e: Throwable</ID>
-    <ID>TooGenericExceptionCaught:LeaseExtensions.kt$e: Throwable</ID>
-    <ID>TooGenericExceptionCaught:PathChildrenCache.kt$PathChildrenCache$e: Throwable</ID>
-    <ID>TooGenericExceptionCaught:ServiceCache.kt$ServiceCache$e: Throwable</ID>
-    <ID>TooGenericExceptionCaught:TransientKeyValue.kt$TransientKeyValue$e: Throwable</ID>
-    <ID>TooManyFunctions:KVExtensions.kt$io.etcd.recipes.common.KVExtensions.kt</ID>
-    <ID>TooManyFunctions:PathChildrenCache.kt$PathChildrenCache : EtcdConnector</ID>
-    <ID>TooManyFunctions:TxnExtensions.kt$io.etcd.recipes.common.TxnExtensions.kt</ID>
-    <ID>WildcardImport:DistributedBarrier.kt$import io.etcd.recipes.common.*</ID>
-    <ID>WildcardImport:PathChildrenCache.kt$import io.etcd.jetcd.watch.WatchEvent.EventType.*</ID>
-    <ID>WildcardImport:PathChildrenCache.kt$import io.etcd.recipes.cache.PathChildrenCache.StartMode.*</ID>
-    <ID>WildcardImport:PathChildrenCache.kt$import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.*</ID>
-    <ID>WildcardImport:PathChildrenCache.kt$import io.etcd.recipes.common.*</ID>
-    <ID>WildcardImport:ServiceCache.kt$import io.etcd.jetcd.watch.WatchEvent.EventType.*</ID>
-    <ID>WildcardImport:ServiceCache.kt$import io.etcd.recipes.common.*</ID>
-    <ID>WildcardImport:ServiceCacheTests.kt$import io.etcd.recipes.common.*</ID>
+    <ID>CyclomaticComplexMethod:DistributedBarrierWithCount.kt:DistributedBarrierWithCount$@Throws(InterruptedException::class, EtcdRecipeException::class) fun waitOnBarrier: Boolean</ID>
+    <ID>LongMethod:DistributedBarrierWithCount.kt:DistributedBarrierWithCount$@Throws(InterruptedException::class, EtcdRecipeException::class) fun waitOnBarrier: Boolean</ID>
+    <ID>LongMethod:LeaderSelector.kt:LeaderSelector$fun start: LeaderSelector</ID>
+    <ID>LongMethod:ServiceCache.kt:ServiceCache$@Synchronized fun start: ServiceCache</ID>
+    <ID>LoopWithTooManyJumpStatements:AbstractQueue.kt:AbstractQueue$while</ID>
+    <ID>MagicNumber:DistributedAtomicLong.kt:DistributedAtomicLong$100</ID>
+    <ID>MagicNumber:KVExtensions.kt:10</ID>
+    <ID>MagicNumber:LeaderSelector.kt:LeaderSelector$3</ID>
+    <ID>MagicNumber:ShowKeys.kt:600</ID>
+    <ID>MagicNumber:WatchExtensions.kt:DispatchingWatcher$5</ID>
+    <ID>MaxLineLength:ReportLeaderTests.kt:ReportLeaderTests$// This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership</ID>
+    <ID>ReturnCount:LeaderSelector.kt:LeaderSelector$@Synchronized private fun attemptToBecomeLeader: Boolean</ID>
+    <ID>TooGenericExceptionCaught:KeepAliveExtensions.kt:e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:LeaderSelector.kt:LeaderSelector$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:LeaderSelector.kt:LeaderSelector.Companion$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:LeaseExtensions.kt:e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:PathChildrenCache.kt:PathChildrenCache$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ServiceCache.kt:ServiceCache$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:TransientKeyValue.kt:TransientKeyValue$e: Throwable</ID>
+    <ID>TooManyFunctions:KVExtensions.kt:io.etcd.recipes.common.KVExtensions.kt</ID>
+    <ID>TooManyFunctions:PathChildrenCache.kt:PathChildrenCache : EtcdConnector</ID>
+    <ID>TooManyFunctions:TxnExtensions.kt:io.etcd.recipes.common.TxnExtensions.kt</ID>
+    <ID>WildcardImport:DistributedBarrier.kt:import io.etcd.recipes.common.*</ID>
+    <ID>WildcardImport:PathChildrenCache.kt:import io.etcd.jetcd.watch.WatchEvent.EventType.*</ID>
+    <ID>WildcardImport:PathChildrenCache.kt:import io.etcd.recipes.cache.PathChildrenCache.StartMode.*</ID>
+    <ID>WildcardImport:PathChildrenCache.kt:import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.*</ID>
+    <ID>WildcardImport:PathChildrenCache.kt:import io.etcd.recipes.common.*</ID>
+    <ID>WildcardImport:ServiceCache.kt:import io.etcd.jetcd.watch.WatchEvent.EventType.*</ID>
+    <ID>WildcardImport:ServiceCache.kt:import io.etcd.recipes.common.*</ID>
+    <ID>WildcardImport:ServiceCacheTests.kt:import io.etcd.recipes.common.*</ID>
   </CurrentIssues>
 </SmellBaseline>
