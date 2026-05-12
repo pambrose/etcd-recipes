@@ -1,4 +1,4 @@
-.PHONY: default help clean clean-all stop build tests tests-tc coverage kdocs \
+.PHONY: default help clean clean-all stop build tests tests-tc tests-container coverage kdocs \
         lint detekt detekt-baseline refresh versioncheck publish-local publish-local-snapshot \
         publish-snapshot publish-maven-central upgrade-wrapper \
         _check-gpg-env _require-version _require-gradle-version
@@ -54,6 +54,9 @@ endif
 
 tests-tc: ## Run the full test suite under Testcontainers (no local etcd required)
 	DOCKER_HOST="$(DOCKER_HOST)" ./gradlew check --rerun-tasks --no-build-cache -PuseTestcontainers
+
+tests-container: ## Run only the multi-container tests (each participant in its own container)
+	DOCKER_HOST="$(DOCKER_HOST)" ./gradlew :etcd-recipes:cleanTest :etcd-recipes:test --tests "io.etcd.recipes.container.*" --no-build-cache -PuseTestcontainers
 
 coverage: ## Generate Kover HTML + XML coverage reports and print the summary
 	./gradlew koverHtmlReport koverXmlReport koverLog

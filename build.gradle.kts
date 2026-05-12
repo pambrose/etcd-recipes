@@ -81,6 +81,15 @@ subprojects {
         "testRuntimeOnly"(rootProject.libs.bundles.testing.runtime)
     }
 
+    // The library's tests include a container-based variant that reads result keys
+    // written by the runners module. The runners module already depends on the library,
+    // so this is a test-only one-way dependency, not a cycle.
+    if (name == libraryName) {
+        dependencies {
+            "testImplementation"(project(":$libraryName-test-runners"))
+        }
+    }
+
     // Examples module isn't published; only the library is.
     if (name == libraryName) configurePublishing()
 
@@ -149,6 +158,27 @@ subprojects {
                 // refuses with "operation not supported". We register an
                 // explicit JVM shutdown hook in EtcdTestContainer instead.
                 environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+            }
+
+            // The container-based tests (etcd-recipes/src/test/.../container) need
+            // the test-runners fat JAR to mount into each participant container.
+            // Wire it only for the library module's test task — the test-runners
+            // module's own test task (if any) has no need for it.
+            if (project.name == libraryName) {
+                // String-form dependsOn defers task-graph wiring until after all projects are
+                // configured. The path itself is captured in a doFirst so that we look up the
+                // (now-registered) shadowJar task at execution time — a configure-time lookup
+                // would race the runners project's own configuration, and passing a Provider
+                // to systemProperty just calls toString() on it.
+                dependsOn(":$libraryName-test-runners:shadowJar")
+                doFirst {
+                    systemProperty(
+                        "etcd.recipes.testRunnersJar",
+                        project(":$libraryName-test-runners")
+                            .tasks.named("shadowJar", Jar::class.java)
+                            .get().archiveFile.get().asFile.absolutePath,
+                    )
+                }
             }
         }
 

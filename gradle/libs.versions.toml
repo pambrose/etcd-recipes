@@ -29,6 +29,7 @@ dokka = "2.2.0"
 kotlinter = "5.4.2"
 kover = "0.9.8"
 maven-publish = "0.36.0"
+shadow = "9.2.2"
 
 [libraries]
 # Main library
@@ -80,3 +81,6 @@ kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 # Dependency updates and publishing
 ben-manes-versions = { id = "com.github.ben-manes.versions", version.ref = "ben-manes-versions" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
+
+# Packaging
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
