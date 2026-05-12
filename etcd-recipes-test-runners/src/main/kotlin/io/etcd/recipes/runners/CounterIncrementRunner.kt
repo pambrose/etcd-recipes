@@ -47,17 +47,14 @@ object CounterIncrementRunner : RecipeRunner {
       repeat(incrementCount) { last = increment() }
     }
 
-    return ParticipantResult(
+    return result(
       testId = testId,
       participantId = participantId,
-      role = "$recipe/$role",
       success = true,
-      payloadJson =
-        encodePayload(
-          CounterIncrementPayload(
-            incrementsApplied = incrementCount,
-            lastObservedValue = last,
-          ),
+      payload =
+        CounterIncrementPayload(
+          incrementsApplied = incrementCount,
+          lastObservedValue = last,
         ),
     )
   }

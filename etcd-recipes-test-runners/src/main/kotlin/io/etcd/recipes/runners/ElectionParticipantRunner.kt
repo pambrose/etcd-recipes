@@ -57,18 +57,15 @@ object ElectionParticipantRunner : RecipeRunner {
       waitOnLeadershipComplete()
     }
 
-    return ParticipantResult(
+    return result(
       testId = testId,
       participantId = participantId,
-      role = "$recipe/$role",
       success = tookLeadership && relinquished,
-      payloadJson =
-        encodePayload(
-          ElectionParticipantPayload(
-            tookLeadership = tookLeadership,
-            relinquished = relinquished,
-            clientId = clientId,
-          ),
+      payload =
+        ElectionParticipantPayload(
+          tookLeadership = tookLeadership,
+          relinquished = relinquished,
+          clientId = clientId,
         ),
     )
   }
