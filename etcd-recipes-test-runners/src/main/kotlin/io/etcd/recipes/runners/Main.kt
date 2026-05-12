@@ -37,6 +37,20 @@ interface RecipeRunner {
   ): ParticipantResult
 }
 
+internal inline fun <reified P> RecipeRunner.result(
+  testId: String,
+  participantId: String,
+  success: Boolean,
+  payload: P,
+): ParticipantResult =
+  ParticipantResult(
+    testId = testId,
+    participantId = participantId,
+    role = "$recipe/$role",
+    success = success,
+    payloadJson = encodePayload(payload),
+  )
+
 private val runners: Map<Pair<String, String>, RecipeRunner> =
   listOf(
     BarrierWaiterRunner,

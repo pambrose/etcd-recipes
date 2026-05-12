@@ -48,29 +48,21 @@ object BarrierWaiterRunner : RecipeRunner {
     // after the orchestrator has already removed the barrier, return immediately rather
     // than hanging on a watcher that will never fire (the etcd key is already gone).
     return withDistributedBarrier(client, barrierPath, waitOnMissingBarriers = false) {
-      // Signal that this participant is about to enter the first wait. The orchestrator
-      // waits for all such signals before removing the barrier, which closes the race
-      // where a slow-starting container would otherwise observe a barrier that the
-      // orchestrator had already cleared.
+      // The orchestrator waits for every ready key before removing the barrier — closes
+      // the race where a slow-starting container would see an already-cleared barrier.
       client.putValue("/barrier-ready/$testId/$participantId", "1")
       val timedOut = !waitOnBarrier(initialTimeoutMs.milliseconds)
-      // The first wait should time out while the controller still has the barrier set;
-      // the second wait blocks until the controller removes it.
       val unblocked = waitOnBarrier()
-      val unblockTs = System.currentTimeMillis()
 
-      ParticipantResult(
+      result(
         testId = testId,
         participantId = participantId,
-        role = "$recipe/$role",
         success = timedOut && unblocked,
-        payloadJson =
-          encodePayload(
-            BarrierWaiterPayload(
-              timeoutObserved = timedOut,
-              unblocked = unblocked,
-              unblockTimestampMs = unblockTs,
-            ),
+        payload =
+          BarrierWaiterPayload(
+            timeoutObserved = timedOut,
+            unblocked = unblocked,
+            unblockTimestampMs = System.currentTimeMillis(),
           ),
       )
     }

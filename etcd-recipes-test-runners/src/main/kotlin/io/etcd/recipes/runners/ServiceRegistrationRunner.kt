@@ -56,29 +56,27 @@ object ServiceRegistrationRunner : RecipeRunner {
     return withServiceDiscovery(client, servicePath) {
       registerService(instance)
 
-      // Block until the orchestrator (running on the host JVM) signals shutdown
-      // by writing any value to shutdownKey. Polling is fine here — service
-      // discovery tests don't measure latency, and a watch would complicate
-      // the runner without buying anything.
+      // Block until the orchestrator (host JVM) writes shutdownKey.
       val deadline = System.currentTimeMillis() + maxWaitMs
-      while (System.currentTimeMillis() < deadline && !client.isKeyPresent(shutdownKey)) {
+      var signalled = false
+      while (System.currentTimeMillis() < deadline) {
+        if (client.isKeyPresent(shutdownKey)) {
+          signalled = true
+          break
+        }
         sleep(200.milliseconds)
       }
 
-      val signalled = client.isKeyPresent(shutdownKey)
       unregisterService(instance)
 
-      ParticipantResult(
+      result(
         testId = testId,
         participantId = participantId,
-        role = "$recipe/$role",
         success = signalled,
-        payloadJson =
-          encodePayload(
-            ServiceRegistrationPayload(
-              serviceName = serviceName,
-              instanceId = instance.id,
-            ),
+        payload =
+          ServiceRegistrationPayload(
+            serviceName = serviceName,
+            instanceId = instance.id,
           ),
       )
     }

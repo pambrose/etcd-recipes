@@ -46,12 +46,11 @@ object QueueConsumerRunner : RecipeRunner {
         List(itemCount) { dequeue().asString }
       }
 
-    return ParticipantResult(
+    return result(
       testId = testId,
       participantId = participantId,
-      role = "$recipe/$role",
       success = items.size == itemCount,
-      payloadJson = encodePayload(QueueConsumerPayload(items = items)),
+      payload = QueueConsumerPayload(items = items),
     )
   }
 }

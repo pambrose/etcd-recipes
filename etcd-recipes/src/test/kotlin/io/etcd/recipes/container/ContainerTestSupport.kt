@@ -51,6 +51,8 @@ internal fun <R> useContainers(
   try {
     return block()
   } finally {
-    containers.forEach { runCatching { it.stop() } }
+    runBlocking(Dispatchers.IO) {
+      containers.map { async { runCatching { it.stop() } } }.awaitAll()
+    }
   }
 }
