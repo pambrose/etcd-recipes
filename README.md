@@ -135,31 +135,48 @@ JDK 17 is required (the build is configured with a Kotlin JVM toolchain of 17). 
 is checked in, so no local Gradle install is needed.
 
 ```
-./gradlew clean build -xtest    # build without running tests
-./gradlew check                 # run all tests + jacoco coverage
-./gradlew lintKotlinMain lintKotlinTest
+./gradlew clean build -xtest      # build without running tests
+./gradlew check                   # run all tests + Kover coverage
+./gradlew lintKotlin              # kotlinter + detekt
 ```
 
-A `Makefile` wraps the most common entry points:
+A `Makefile` wraps the most common entry points (`make help` lists everything):
 
 ```
-make build          # ./gradlew clean build -xtest
-make tests          # ./gradlew check jacocoTestReport
-make lint           # ./gradlew lintKotlinMain lintKotlinTest
-make versioncheck   # ./gradlew dependencyUpdates --no-parallel
+make build              # clean + build, skipping tests
+make tests              # full test suite against a local etcd at localhost:2379
+make tests-tc           # full test suite against an ephemeral Testcontainers etcd
+make tests-container    # multi-container variant: each participant in its own container
+make lint               # kotlinter + detekt
+make coverage           # Kover HTML + XML reports
+make kdocs              # Dokka HTML / Javadoc
+make versioncheck       # gradle dependencyUpdates
 ```
 
-The integration tests and examples expect a local etcd at `http://localhost:2379`. Start one with:
+`make tests` and the examples expect a local etcd at `http://localhost:2379`. Start one with:
 
 ```
 ./etcd.sh
 ```
+
+`make tests-tc` and `make tests-container` stand up etcd via Testcontainers and require Docker.
 
 To run a single test class:
 
 ```
 ./gradlew :etcd-recipes:test --tests "io.etcd.recipes.barrier.DistributedBarrierTests"
 ```
+
+### Test variants
+
+Two complementary variants of the distributed-coordination tests live in the repo:
+
+- **Thread-based** (`*Tests.kt` under each recipe directory) — N threads in a single JVM
+  simulate distributed clients. Fast; runs by default.
+- **Container-based** (`container/Container*Test.kt`) — each participant runs in its own
+  container against a shared etcd container, exercising true cross-process coordination.
+  Built from the `etcd-recipes-test-runners` submodule's shadow JAR. Gated by
+  `-PuseTestcontainers`; run via `make tests-container`.
 
 ## Contributing
 

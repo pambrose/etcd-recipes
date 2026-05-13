@@ -1,0 +1,54 @@
+# etcd-recipes
+
+> Kotlin/Java/JVM client library for [etcd](https://etcd.io) v3, built on top of
+> [jetcd](https://github.com/etcd-io/jetcd). Provides higher-level distributed
+> coordination primitives — barriers, leader election, queues, distributed counters,
+> service discovery, key/prefix caches — analogous to what
+> [Apache Curator](https://curator.apache.org) provides for ZooKeeper.
+
+The library is a thin Kotlin extension layer over jetcd, not a wrapper. New recipes
+compose the `common/` extensions (`ClientExtensions`, `KVExtensions`, `LeaseExtensions`,
+`WatchExtensions`, `TxnExtensions`, `ByteSequenceExtensions`) rather than reaching into
+jetcd directly. Stateful recipes extend `EtcdConnector` (in `common/`), which owns the
+jetcd `Client`, tracks `startCalled` / `closeCalled`, and accumulates background-thread
+exceptions for the caller to inspect rather than throwing from worker threads.
+
+JDK 17+ runtime. Compiler-wide opt-ins for `kotlin.time.ExperimentalTime`,
+`kotlin.ExperimentalUnsignedTypes`, and `kotlin.concurrent.atomics.ExperimentalAtomicApi`.
+
+## Docs
+
+- [README](README.md): library overview, usage examples, build/test instructions
+- [CHANGELOG](CHANGELOG.md): version history
+- [CLAUDE.md](CLAUDE.md): contributor guide aimed at LLM tooling — module layout, architecture, build entry points
+- [RELEASE_NOTES](RELEASE_NOTES.md): release-by-release highlights
+
+## Recipes
+
+- `io.etcd.recipes.barrier` — `DistributedBarrier`, `DistributedBarrierWithCount`, `DistributedDoubleBarrier`
+- `io.etcd.recipes.cache` — `PathChildrenCache` (key-prefix cache with PUT/UPDATE/DELETE listeners)
+- `io.etcd.recipes.counter` — `DistributedAtomicLong`
+- `io.etcd.recipes.discovery` — `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider`
+- `io.etcd.recipes.election` — `LeaderSelector`, `LeaderSelectorListener`, `Participant`
+- `io.etcd.recipes.keyvalue` — `TransientKeyValue` (lease-backed key/value)
+- `io.etcd.recipes.queue` — `DistributedQueue`, `DistributedPriorityQueue`
+- `io.etcd.recipes.common` — Kotlin extensions over jetcd `Client`/`KV`/`Lease`/`Watch`/`Txn`
+
+## Examples
+
+Every recipe has runnable `main()` demos under `etcd-recipes-examples/` in both
+[Kotlin](etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples/) and
+[Java](etcd-recipes-examples/src/main/java/io/etcd/recipes/examples/).
+
+## Testing
+
+- `make tests` — thread-based tests against a local etcd at `localhost:2379`
+- `make tests-tc` — same suite against a Testcontainers-managed etcd (no local etcd needed)
+- `make tests-container` — multi-container variant: each participant runs in its own
+  container coordinating through a shared etcd container
+
+## Optional
+
+- [Source repository](https://github.com/pambrose/etcd-recipes)
+- [Maven Central artifact](https://central.sonatype.com/artifact/com.pambrose.etcd-recipes/etcd-recipes)
+- [jetcd](https://github.com/etcd-io/jetcd) — the underlying etcd v3 Java client
