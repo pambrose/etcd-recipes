@@ -19,11 +19,20 @@
 package io.etcd.recipes.discovery
 
 import com.google.common.collect.Maps.newConcurrentMap
+import com.pambrose.common.util.ensureSuffix
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.options.GetOption
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.common.*
+import io.etcd.jetcd.watch.WatchEvent
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asPair
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.getOption
+import io.etcd.recipes.common.getResponse
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.watcher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -44,6 +53,7 @@ class ServiceCache(
   }
 
   @Synchronized
+  @Suppress("TooGenericExceptionCaught", "LongMethod")
   fun start(): ServiceCache {
     if (startCalled.load())
       throw EtcdRecipeRuntimeException("start() already called")
@@ -79,12 +89,12 @@ class ServiceCache(
           val (k, v) = event.keyValue.asPair.asString
           val stripped = k.substring(trailingNamesPath.length)
           when (event.eventType) {
-            PUT -> {
+            WatchEvent.EventType.PUT -> {
               val isAdd = !serviceMap.containsKey(stripped)
               serviceMap[stripped] = v
               listeners.forEach { listener ->
                 try {
-                  listener.cacheChanged(PUT, isAdd, stripped, ServiceInstance.toObject(v))
+                  listener.cacheChanged(event.eventType, isAdd, stripped, ServiceInstance.toObject(v))
                 } catch (e: Throwable) {
                   logger.error(e) { "Exception in cacheChanged()" }
                   exceptionList.value += e
@@ -92,11 +102,11 @@ class ServiceCache(
               }
             }
 
-            DELETE -> {
+            WatchEvent.EventType.DELETE -> {
               val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
               listeners.forEach { listener ->
                 try {
-                  listener.cacheChanged(DELETE, false, stripped, prevValue)
+                  listener.cacheChanged(event.eventType, false, stripped, prevValue)
                 } catch (e: Throwable) {
                   logger.error(e) { "Exception in cacheChanged()" }
                   exceptionList.value += e
@@ -104,7 +114,7 @@ class ServiceCache(
               }
             }
 
-            UNRECOGNIZED -> {
+            WatchEvent.EventType.UNRECOGNIZED -> {
               logger.error { "Unrecognized error with $servicePath watch" }
             }
 

@@ -25,6 +25,7 @@ import io.etcd.recipes.discovery.withServiceDiscovery
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.seconds
 
+@Suppress("TooGenericExceptionCaught")
 fun main() {
   val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")

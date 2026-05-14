@@ -73,6 +73,7 @@ constructor(
       start()
   }
 
+  @Suppress("TooGenericExceptionCaught")
   @Synchronized
   fun start(): TransientKeyValue {
     if (startCalled.load())

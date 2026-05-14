@@ -19,7 +19,14 @@
 package io.etcd.recipes.discovery
 
 import io.etcd.jetcd.watch.WatchEvent.EventType
-import io.etcd.recipes.common.*
+import io.etcd.recipes.common.ExceptionHolder
+import io.etcd.recipes.common.captureException
+import io.etcd.recipes.common.checkForException
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.nonblockingThreads
+import io.etcd.recipes.common.pollUntil
+import io.etcd.recipes.common.urls
+import io.etcd.recipes.discovery.withServiceDiscovery
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe

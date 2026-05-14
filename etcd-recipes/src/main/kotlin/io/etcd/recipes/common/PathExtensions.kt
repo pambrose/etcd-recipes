@@ -20,9 +20,6 @@
 package io.etcd.recipes.common
 
 @JvmOverloads
-fun String.ensureSuffix(delim: String = "/"): String = if (endsWith(delim)) this else "$this$delim"
-
-@JvmOverloads
 fun String.appendToPath(
   suffix: String,
   delim: String = "/",

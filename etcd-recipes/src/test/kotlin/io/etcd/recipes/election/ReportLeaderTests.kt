@@ -30,6 +30,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
+@Suppress("MaxLineLength")
 class ReportLeaderTests : StringSpec() {
     val path = "/election/${javaClass.simpleName}"
 

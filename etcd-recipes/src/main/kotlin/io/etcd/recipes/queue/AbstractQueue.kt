@@ -44,6 +44,7 @@ abstract class AbstractQueue(
     require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
   }
 
+  @Suppress("LoopWithTooManyJumpStatements")
   fun dequeue(): ByteSequence {
     checkCloseNotCalled()
 

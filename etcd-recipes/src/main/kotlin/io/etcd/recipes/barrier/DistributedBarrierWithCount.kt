@@ -20,6 +20,7 @@ package io.etcd.recipes.barrier
 
 import com.pambrose.common.concurrent.BooleanMonitor
 import com.pambrose.common.time.timeUnitToDuration
+import com.pambrose.common.util.ensureSuffix
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.support.CloseableClient
@@ -34,7 +35,6 @@ import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.ensureSuffix
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyPresent
@@ -119,6 +119,7 @@ constructor(
     timeUnit: TimeUnit,
   ): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
+  @Suppress("CyclomaticComplexMethod", "LongMethod")
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun waitOnBarrier(timeout: Duration): Boolean {
     var keepAliveLease: CloseableClient? = null

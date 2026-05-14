@@ -49,6 +49,7 @@ fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse =
  * raising a secondary failure would mask the original problem; the lease's TTL
  * is the upper bound on resource retention if the revoke RPC itself fails.
  */
+@Suppress("TooGenericExceptionCaught")
 fun Client.leaseRevoke(lease: LeaseGrantResponse) {
   try {
     leaseClient.revoke(lease.id).get()

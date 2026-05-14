@@ -90,6 +90,7 @@ fun Client.putValuesWithKeepAlive(
   block: () -> Unit,
 ) = putValuesWithKeepAlive(kvs, ttlSecs.seconds, block)
 
+@Suppress("TooGenericExceptionCaught")
 fun Client.putValuesWithKeepAlive(
   kvs: Collection<Pair<String, ByteSequence>>,
   ttl: Duration,

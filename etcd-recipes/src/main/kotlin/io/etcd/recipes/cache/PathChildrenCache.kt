@@ -20,16 +20,33 @@ package io.etcd.recipes.cache
 
 import com.google.common.collect.Maps.newConcurrentMap
 import com.pambrose.common.time.timeUnitToDuration
+import com.pambrose.common.util.ensureSuffix
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.options.GetOption
-import io.etcd.jetcd.watch.WatchEvent.EventType.*
-import io.etcd.recipes.cache.PathChildrenCache.StartMode.*
-import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.*
-import io.etcd.recipes.common.*
+import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
+import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
+import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_ADDED
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
+import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
+import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.asPair
+import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.getKeyValuePairs
+import io.etcd.recipes.common.getOption
+import io.etcd.recipes.common.getResponse
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.common.watcher
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.util.concurrent.*
+import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
@@ -51,7 +68,7 @@ class PathChildrenCache(
   private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
   private val listeners: MutableList<PathChildrenCacheListener> = CopyOnWriteArrayList()
 
-  // Use a single threaded executor to maintain order
+  // Use a single-threaded executor to maintain order
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
 
   enum class StartMode {
@@ -78,8 +95,10 @@ class PathChildrenCache(
   fun start(
     buildInitial: Boolean = false,
     waitOnStartComplete: Boolean = true,
-  ): PathChildrenCache = start(if (buildInitial) BUILD_INITIAL_CACHE else NORMAL, waitOnStartComplete)
+  ): PathChildrenCache =
+    start(if (buildInitial) StartMode.BUILD_INITIAL_CACHE else StartMode.NORMAL, waitOnStartComplete)
 
+  @Suppress("TooGenericExceptionCaught")
   @JvmOverloads
   @Synchronized
   fun start(
@@ -90,7 +109,7 @@ class PathChildrenCache(
       throw EtcdRecipeRuntimeException("start() already called")
     checkCloseNotCalled()
 
-    if (mode == BUILD_INITIAL_CACHE || mode == POST_INITIALIZED_EVENT) {
+    if (mode == StartMode.BUILD_INITIAL_CACHE || mode == StartMode.POST_INITIALIZED_EVENT) {
       executor.execute {
         try {
           // Snapshot then watch with the snapshot's revision as the watch
@@ -100,11 +119,11 @@ class PathChildrenCache(
           // and the snapshot would silently overwrite the newer value.
           loadDataAndStartWatcher()
         } finally {
-          if (mode == POST_INITIALIZED_EVENT)
+          if (mode == StartMode.POST_INITIALIZED_EVENT)
             listeners.forEach { listener ->
               try {
                 val cacheEvent =
-                  PathChildrenCacheEvent("", INITIALIZED, null).apply {
+                  PathChildrenCacheEvent("", PathChildrenCacheEvent.Type.INITIALIZED, null).apply {
                     initialDataVal = currentData
                   }
                 listener.childEvent(cacheEvent)
@@ -136,6 +155,7 @@ class PathChildrenCache(
 
   fun clearListeners() = listeners.clear()
 
+  @Suppress("TooGenericExceptionCaught")
   private fun loadDataAndStartWatcher() {
     try {
       val trailingPath = cachePath.ensureSuffix("/")
@@ -159,6 +179,7 @@ class PathChildrenCache(
     }
   }
 
+  @Suppress("TooGenericExceptionCaught")
   private fun setupWatcher(startRevision: Long) {
     val trailingPath = cachePath.ensureSuffix("/")
     logger.debug { "Setting up watch for $trailingPath at rev $startRevision" }
