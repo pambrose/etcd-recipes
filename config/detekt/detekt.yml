@@ -1,0 +1,10 @@
+# detekt overrides for etcd-recipes.
+# Applied with buildUponDefaultConfig = true, so only the rules listed here
+# differ from detekt's bundled defaults.
+
+style:
+  MagicNumber:
+    # Numeric literals are pervasive and self-explanatory in this codebase
+    # (lease TTLs, retry counts, byte offsets, timeouts). Hoisting every one
+    # to a named constant adds noise without improving clarity.
+    active: false

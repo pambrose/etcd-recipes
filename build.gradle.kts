@@ -38,6 +38,13 @@ subprojects {
     apply(plugin = "org.jetbrains.dokka-javadoc")
     apply(plugin = "org.jetbrains.kotlinx.kover")
     apply(plugin = "dev.detekt")
+
+    // Layer config/detekt/detekt.yml on top of detekt's bundled defaults so the
+    // repo only has to spell out the rules it overrides (currently: MagicNumber off).
+    configure<dev.detekt.gradle.extensions.DetektExtension> {
+        buildUponDefaultConfig.set(true)
+        config.from(rootProject.file("config/detekt/detekt.yml"))
+    }
 }
 
 // Root-level aggregation:

@@ -147,6 +147,7 @@ constructor(
 
   val isFinished get() = leadershipComplete.get()
 
+  @Suppress("TooGenericExceptionCaught", "LongMethod")
   fun start(): LeaderSelector {
     val electionSetup = BooleanMonitor(false)
 
@@ -306,6 +307,7 @@ constructor(
 
   // This will not return until election failure or leader surrenders leadership after being elected
   @Synchronized
+  @Suppress("ReturnCount", "TooGenericExceptionCaught")
   private fun attemptToBecomeLeader(client: Client): Boolean {
     if (isLeader || !attemptLeadership.get()) {
       return false
@@ -380,6 +382,7 @@ constructor(
       return participants
     }
 
+    @Suppress("TooGenericExceptionCaught")
     @JvmStatic
     fun reportLeader(
       urls: List<String>,
