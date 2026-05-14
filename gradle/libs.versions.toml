@@ -1,6 +1,6 @@
 [versions]
 # Build infrastructure
-gradle = "9.5.0"
+gradle = "9.5.1"
 jvm = "17"
 
 # Kotlin language and runtime

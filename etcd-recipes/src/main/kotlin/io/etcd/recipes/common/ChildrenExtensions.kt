@@ -19,6 +19,7 @@
 
 package io.etcd.recipes.common
 
+import com.pambrose.common.util.ensureSuffix
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.kv.GetResponse
