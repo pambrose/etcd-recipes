@@ -2,6 +2,13 @@
 # Applied with buildUponDefaultConfig = true, so only the rules listed here
 # differ from detekt's bundled defaults.
 
+complexity:
+  TooManyFunctions:
+    # The common/ extension files (KVExtensions, TxnExtensions, etc.) are flat
+    # collections of small jetcd wrapper extensions. Splitting them by an
+    # arbitrary function count would hurt discoverability, not help it.
+    active: false
+
 style:
   MagicNumber:
     # Numeric literals are pervasive and self-explanatory in this codebase

@@ -58,7 +58,6 @@ fun <T> withPathChildrenCache(
   receiver: PathChildrenCache.() -> T,
 ): T = PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
 
-@Suppress("TooManyFunctions")
 class PathChildrenCache(
   client: Client,
   val cachePath: String,
