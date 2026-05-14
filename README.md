@@ -1,6 +1,6 @@
 # etcd Recipes
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.pambrose.etcd-recipes/etcd-recipes.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.pambrose.etcd-recipes/etcd-recipes)
+[![Maven Central](https://img.shields.io/maven-central/v/com.pambrose/etcd-recipes.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.pambrose/etcd-recipes)
 [![CI](https://github.com/pambrose/etcd-recipes/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/pambrose/etcd-recipes/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e185b9c637b040bab55bdecf38b0de76)](https://www.codacy.com/manual/pambrose/etcd-recipes?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pambrose/etcd-recipes&amp;utm_campaign=Badge_Grade)
@@ -89,7 +89,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.pambrose.etcd-recipes:etcd-recipes:0.10.0")
+    implementation("com.pambrose:etcd-recipes:0.10.0")
 }
 ```
 
@@ -100,7 +100,7 @@ If you use a version catalog (`gradle/libs.versions.toml`):
 etcd-recipes = "0.10.0"
 
 [libraries]
-etcd-recipes = { module = "com.pambrose.etcd-recipes:etcd-recipes", version.ref = "etcd-recipes" }
+etcd-recipes = { module = "com.pambrose:etcd-recipes", version.ref = "etcd-recipes" }
 ```
 
 ### Gradle (Groovy DSL)
@@ -111,7 +111,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.pambrose.etcd-recipes:etcd-recipes:0.10.0'
+    implementation 'com.pambrose:etcd-recipes:0.10.0'
 }
 ```
 
@@ -120,7 +120,7 @@ dependencies {
 ```xml
 <dependencies>
     <dependency>
-        <groupId>com.pambrose.etcd-recipes</groupId>
+        <groupId>com.pambrose</groupId>
         <artifactId>etcd-recipes</artifactId>
         <version>0.10.0</version>
     </dependency>

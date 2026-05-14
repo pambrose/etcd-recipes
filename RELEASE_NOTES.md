@@ -51,7 +51,7 @@ settle calls to poll-based waits and forking each test class into its own JVM wi
 ### Maven coordinates
 
 ```kotlin
-implementation("com.pambrose.etcd-recipes:etcd-recipes:0.10.0")
+implementation("com.pambrose:etcd-recipes:0.10.0")
 ```
 
 See `CHANGELOG.md` for the full list of changes since 0.9.20.
