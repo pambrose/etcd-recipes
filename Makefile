@@ -15,8 +15,7 @@ default: versioncheck
 
 help:  ## Show this help (list of targets)
 	@awk 'BEGIN {FS = ":.*?## "; printf "Usage: make <target>\n\nTargets:\n"} \
-		/^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' \
-		$(MAKEFILE_LIST)
+		/^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 clean: ## Run gradle clean and remove the root build/ directory
 	./gradlew clean
@@ -34,7 +33,7 @@ stop: ## Stop running Gradle daemons
 	./gradlew --stop
 
 build: clean ## Clean and run a full build, skipping tests
-	./gradlew build -xtest
+	./gradlew build -x test
 
 tests: ## Run the full test suite against a local etcd at localhost:2379
 	./gradlew check --rerun-tasks --no-build-cache
