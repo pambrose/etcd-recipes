@@ -50,5 +50,5 @@ Every recipe has runnable `main()` demos under `etcd-recipes-examples/` in both
 ## Optional
 
 - [Source repository](https://github.com/pambrose/etcd-recipes)
-- [Maven Central artifact](https://central.sonatype.com/artifact/com.pambrose.etcd-recipes/etcd-recipes)
+- [Maven Central artifact](https://central.sonatype.com/artifact/com.pambrose/etcd-recipes)
 - [jetcd](https://github.com/etcd-io/jetcd) — the underlying etcd v3 Java client

@@ -1,5 +1,34 @@
 # Release Notes
 
+## 0.10.1 — 2026-05-15
+
+Maintenance release. No API or behavior changes — just build, static-analysis,
+and documentation tidy-up.
+
+### Highlights
+
+**detekt configuration.** Static analysis is now driven by a checked-in
+`config/detekt/detekt.yml` layered on detekt's bundled defaults. `MagicNumber` and
+`TooManyFunctions` are disabled there rather than masked by per-module
+`detekt-baseline.xml` files (both removed); wildcard imports were expanded to
+explicit imports and a handful of targeted `@Suppress` annotations added.
+
+**Gradle wrapper.** Upgraded 9.5.0 → 9.5.1.
+
+**Internal cleanup.** Dropped the library's own `String.ensureSuffix` extension in
+favor of `com.pambrose.common.util.ensureSuffix`.
+
+**Documentation.** Fixed the Maven Central coordinates throughout the docs — the
+published artifact is `com.pambrose:etcd-recipes`, not
+`com.pambrose.etcd-recipes:etcd-recipes`. Removed the dead codebeat and SonarCloud
+README badges.
+
+### Maven coordinates
+
+```kotlin
+implementation("com.pambrose:etcd-recipes:0.10.1")
+```
+
 ## 0.10.0 — 2026-05-13
 
 The 0.10.0 release modernizes the build, hardens the recipes against several races
@@ -51,7 +80,7 @@ settle calls to poll-based waits and forking each test class into its own JVM wi
 ### Maven coordinates
 
 ```kotlin
-implementation("com.pambrose.etcd-recipes:etcd-recipes:0.10.0")
+implementation("com.pambrose:etcd-recipes:0.10.0")
 ```
 
 See `CHANGELOG.md` for the full list of changes since 0.9.20.

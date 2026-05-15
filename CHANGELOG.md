@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-05-15
+
+Maintenance release: build/static-analysis tidy-up and documentation fixes. No
+API or behavior changes.
+
+### Changed
+
+- detekt is now driven by `config/detekt/detekt.yml` layered on the bundled
+  defaults (`buildUponDefaultConfig`); `MagicNumber` and `TooManyFunctions` are
+  disabled there. Wildcard imports expanded to explicit imports, targeted
+  `@Suppress` annotations added, and both `detekt-baseline.xml` files removed. (#31)
+- Upgraded the Gradle wrapper 9.5.0 → 9.5.1. (#31)
+- Dropped the library's own `String.ensureSuffix` extension in favor of
+  `com.pambrose.common.util.ensureSuffix`. (#31)
+
+### Fixed
+
+- Maven Central coordinates in the docs were `com.pambrose.etcd-recipes:etcd-recipes`;
+  the published artifact is `com.pambrose:etcd-recipes`. Corrected the README badge
+  and dependency snippets, `llms.txt`, and `RELEASE_NOTES.md`. (#32)
+
+### Removed
+
+- Dead codebeat and SonarCloud badges from the README. (#31)
+
 ## [0.10.0] - 2026-05-13
 
 ### Added

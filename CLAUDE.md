@@ -73,4 +73,4 @@ Test JVMs fork per class (`forkEvery=1`) so background threads / etcd watch conn
 
 ## Versioning
 
-The current development branch is named after the version (e.g. `0.10.0`). Library version lives in `gradle.properties` (`version=...`); Kotlin/dependency versions live in `gradle/libs.versions.toml`; bump both when releasing.
+The current development branch is named after the version (e.g. `0.10.1`). Library version lives in `gradle.properties` (`version=...`); Kotlin/dependency versions live in `gradle/libs.versions.toml`; bump both when releasing.
