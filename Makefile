@@ -1,17 +1,17 @@
 .PHONY: default help clean clean-all stop build tests tests-tc tests-container coverage kdocs \
-        lint detekt detekt-baseline refresh versioncheck publish-local publish-local-snapshot \
+        lint detekt detekt-baseline refresh versions publish-local publish-local-snapshot \
         publish-snapshot publish-maven-central upgrade-wrapper \
         _check-gpg-env _require-version _require-gradle-version
 
 VERSION := $(shell sed -n 's/^version=\(.*\)/\1/p' gradle.properties)
-GRADLE_VERSION := $(shell sed -n 's/^gradle = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+GRADLE_VERSION := $(shell sed -n 's/^gradle-wrapper = "\(.*\)"/\1/p' gradle/libs.versions.toml)
 
 GPG_ENV = \
 	ORG_GRADLE_PROJECT_signingInMemoryKey="$$(gpg --armor --export-secret-keys $$GPG_SIGNING_KEY_ID)" \
 	ORG_GRADLE_PROJECT_signingInMemoryKeyId="$$GPG_SIGNING_KEY_ID" \
 	ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="$$(security find-generic-password -a "gpg-signing" -s "gradle-signing-password" -w)"
 
-default: versioncheck
+default: help
 
 help:  ## Show this help (list of targets)
 	@awk 'BEGIN {FS = ":.*?## "; printf "Usage: make <target>\n\nTargets:\n"} \
@@ -70,7 +70,7 @@ detekt-baseline: ## (Re)generate detekt baseline files
 refresh: ## Force-refresh Gradle dependencies
 	./gradlew --refresh-dependencies
 
-versioncheck: ## Report dependencies with newer versions available
+versions: ## Report dependencies with newer versions available
 	./gradlew dependencyUpdates --no-parallel
 
 publish-local: _require-version ## Publish artifacts to ~/.m2/repository
