@@ -38,12 +38,14 @@ build: clean ## Clean and run a full build, skipping tests
 tests: ## Run the full test suite against a local etcd at localhost:2379
 	./gradlew check --rerun-tasks --no-build-cache
 
-# DOCKER_HOST defaults to Docker Desktop's "raw" socket on macOS. The
-# routing socket at ~/.docker/run/docker.sock returns a redirect stub
-# that docker-java can't follow, so we point at the daemon's socket
-# directly. Override with `DOCKER_HOST=unix://...` if needed.
+# DOCKER_HOST defaults to Docker Desktop's per-user routing socket on macOS
+# (~/.docker/run/docker.sock) — the same socket `docker context` and
+# ~/.testcontainers.properties use. Current Docker Desktop builds no longer
+# serve the "raw" socket under ~/Library/Containers/...; pointing at it makes
+# Testcontainers hang waiting on a dead socket. Override with
+# `DOCKER_HOST=unix://...` if your setup differs.
 ifeq ($(shell uname -s),Darwin)
-DOCKER_HOST ?= unix://$(HOME)/Library/Containers/com.docker.docker/Data/docker.raw.sock
+DOCKER_HOST ?= unix://$(HOME)/.docker/run/docker.sock
 endif
 
 tests-tc: ## Run the full test suite under Testcontainers (no local etcd required)
