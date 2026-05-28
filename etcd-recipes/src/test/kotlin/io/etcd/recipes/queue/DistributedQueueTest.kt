@@ -26,6 +26,7 @@ import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.urls
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
@@ -71,9 +72,7 @@ class DistributedQueueTest : StringSpec() {
             client.getChildCount(queuePath) shouldBe 0
         }
 
-        dequeuedData.size shouldBe testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
-        dequeuedData shouldBe testData
+        assertDequeued(dequeuedData, testData, threadCount)
     }
 
     private fun threadedTestWithWait(
@@ -113,9 +112,23 @@ class DistributedQueueTest : StringSpec() {
         }
 
         // The producer/consumer latch has already drained — no settle needed.
-        dequeuedData.size shouldBe testData.size
-        repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
-        dequeuedData shouldBe testData
+        assertDequeued(dequeuedData, testData, threadCount)
+    }
+
+    // A single consumer dequeues in deterministic FIFO order, so assert it
+    // exactly. With multiple concurrent consumers the global dequeue order is
+    // not guaranteed (each consumer races to append to the shared list) — there
+    // the meaningful invariant is that every item is dequeued exactly once.
+    private fun assertDequeued(
+      dequeued: List<String>,
+      expected: List<String>,
+      threadCount: Int,
+    ) {
+        dequeued.size shouldBe expected.size
+        if (threadCount == 1)
+            dequeued shouldBe expected
+        else
+            dequeued shouldContainExactlyInAnyOrder expected
     }
 
     init {
