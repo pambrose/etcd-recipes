@@ -1,27 +1,21 @@
 .PHONY: default help clean clean-all stop build tests tests-tc tests-container coverage kdocs \
-        lint detekt detekt-baseline refresh versioncheck publish-local publish-local-snapshot \
+        lint detekt detekt-baseline refresh versions publish-local publish-local-snapshot \
         publish-snapshot publish-maven-central upgrade-wrapper \
         _check-gpg-env _require-version _require-gradle-version
 
-# Read the project version from gradle.properties; can be overridden on
-# the command line, e.g. `make publish-snapshot VERSION=0.10.1`.
-VERSION ?= $(shell awk -F= '/^version=/ {print $$2; exit}' gradle.properties)
-
-# Read the Gradle wrapper version from the version catalog so
-# `make upgrade-wrapper` always tracks the catalog's `gradle` entry.
-GRADLE_VERSION ?= $(shell awk -F'"' '/^gradle = /{print $$2; exit}' gradle/libs.versions.toml)
+VERSION := $(shell sed -n 's/^version=\(.*\)/\1/p' gradle.properties)
+GRADLE_VERSION := $(shell sed -n 's/^gradle-wrapper = "\(.*\)"/\1/p' gradle/libs.versions.toml)
 
 GPG_ENV = \
 	ORG_GRADLE_PROJECT_signingInMemoryKey="$$(gpg --armor --export-secret-keys $$GPG_SIGNING_KEY_ID)" \
 	ORG_GRADLE_PROJECT_signingInMemoryKeyId="$$GPG_SIGNING_KEY_ID" \
 	ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="$$(security find-generic-password -a "gpg-signing" -s "gradle-signing-password" -w)"
 
-default: versioncheck
+default: help
 
-help: ## Show this help
-	@awk 'BEGIN { FS = ":.*?## "; printf "Usage: make <target>\n\nTargets:\n" } \
-	     /^[a-zA-Z_-]+:.*?## / { printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2 }' \
-	     $(MAKEFILE_LIST)
+help:  ## Show this help (list of targets)
+	@awk 'BEGIN {FS = ":.*?## "; printf "Usage: make <target>\n\nTargets:\n"} \
+		/^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 clean: ## Run gradle clean and remove the root build/ directory
 	./gradlew clean
@@ -39,7 +33,7 @@ stop: ## Stop running Gradle daemons
 	./gradlew --stop
 
 build: clean ## Clean and run a full build, skipping tests
-	./gradlew build -xtest
+	./gradlew build -x test
 
 tests: ## Run the full test suite against a local etcd at localhost:2379
 	./gradlew check --rerun-tasks --no-build-cache
@@ -76,7 +70,7 @@ detekt-baseline: ## (Re)generate detekt baseline files
 refresh: ## Force-refresh Gradle dependencies
 	./gradlew --refresh-dependencies
 
-versioncheck: ## Report dependencies with newer versions available
+versions: ## Report dependencies with newer versions available
 	./gradlew dependencyUpdates --no-parallel
 
 publish-local: _require-version ## Publish artifacts to ~/.m2/repository
