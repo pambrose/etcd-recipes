@@ -25,6 +25,7 @@ import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.urls
 import io.etcd.recipes.counter.DistributedAtomicLong
@@ -47,6 +48,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.KVisibility
 import kotlin.reflect.full.declaredMemberProperties
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Tests covering the 14 design fixes identified in the codebase review.
@@ -104,7 +106,12 @@ class DesignFixesTests : StringSpec() {
         }
 
         started.await()
-        Thread.sleep(500) // let waiter park inside the watcher
+        // Wait until the waiter has actually registered before closing. A fixed
+        // sleep races with slow etcd setup under CI load: close() could fire
+        // while the waiter is still in leaseGrant/CAS, where checkCloseNotCalled
+        // would throw instead of the waiter parking and being cancelled cleanly.
+        pollUntil(15.seconds) { barrier.waiterCount >= 1 } shouldBe true
+        Thread.sleep(500) // brief settle so the waiter reaches the park
 
         // close() must wake the waiter; without the fix this would hang.
         barrier.close()
@@ -132,6 +139,8 @@ class DesignFixesTests : StringSpec() {
           finished.countDown()
         }
         started.await()
+        // Wait for the waiter to register rather than racing a fixed sleep.
+        pollUntil(15.seconds) { doubleBarrier.enterWaiterCount >= 1 } shouldBe true
         Thread.sleep(500)
         doubleBarrier.close()
         finished.await(10, TimeUnit.SECONDS) shouldBe true
