@@ -46,6 +46,12 @@ jobs:
           # project has no Kotlin source for Kover 0.9's aggregation to
           # attach to; the per-subproject report has the real data.
           files: ./etcd-recipes/build/reports/kover/report.xml
+          # Do NOT let the action auto-discover reports. Search picks up the
+          # empty root aggregate plus the examples/test-runners reports (no
+          # main source / no tests), which report 0% and, when the named file
+          # is missing after a failed run, get uploaded *instead* of it —
+          # resetting the branch's coverage to 0%.
+          disable_search: true
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
