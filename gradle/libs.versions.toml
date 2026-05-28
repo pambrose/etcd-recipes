@@ -4,7 +4,7 @@ gradle-wrapper = "9.5.1"
 jvm = "17"
 
 # Kotlin language and runtime
-kotlin = "2.4.0-RC"
+kotlin = "2.4.0-RC2"
 coroutines = "1.11.0"
 serialization = "1.11.0"
 
@@ -14,12 +14,13 @@ jetcd = "0.8.6"
 # Runtime libraries
 common-utils = "2.8.2"
 guava = "33.6.0-jre"
-kotlin-logging = "8.0.03"
-logback = "1.5.32"
+kotlin-logging = "8.0.4"
+logback = "1.5.33"
 
 # Testing
 junit = "6.1.0"
 kotest = "6.1.11"
+mockk = "1.14.9"
 testcontainers = "2.0.5"
 
 # Build tooling plugins
@@ -29,7 +30,7 @@ dokka = "2.2.0"
 kotlinter = "5.5.0"
 kover = "0.9.8"
 maven-publish = "0.36.0"
-shadow = "9.2.2"
+shadow = "9.4.2"
 
 [libraries]
 # Main library
@@ -50,6 +51,7 @@ junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", vers
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit" }
 kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 
 [bundles]
@@ -57,6 +59,7 @@ testing = [
   "junit-jupiter-api",
   "kotest-runner-junit5",
   "kotest-assertions-core",
+  "mockk",
   "testcontainers-core",
 ]
 testing-runtime = [
