@@ -40,6 +40,7 @@ import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAlive
 import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.leaseRevoke
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
@@ -181,10 +182,14 @@ constructor(
 
       when {
         !txn.isSucceeded -> {
+          // Revoke the lease we just granted; otherwise it lingers in etcd
+          // until its TTL expires — wasteful in tight retry loops.
+          client.leaseRevoke(lease)
           throw EtcdRecipeException("Failed to set waitingPath")
         }
 
         client.getValue(myWaitingPath)?.asString != uniqueToken -> {
+          client.leaseRevoke(lease)
           throw EtcdRecipeException("Failed to assign waitingPath unique value")
         }
 

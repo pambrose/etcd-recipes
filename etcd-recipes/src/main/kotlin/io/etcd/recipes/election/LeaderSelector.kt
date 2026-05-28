@@ -272,7 +272,8 @@ constructor(
   }
 
   @Throws(EtcdRecipeException::class)
-  private fun advertiseParticipation() {
+  // internal (not private) so lease-cleanup behavior can be unit-tested directly.
+  internal fun advertiseParticipation() {
     val path = electionPath.withParticipationSuffix.appendToPath(clientId)
 
     // Wait until key goes away when previous keep alive finishes
@@ -298,6 +299,9 @@ constructor(
       }
 
     if (!txn.isSucceeded) {
+      // Revoke the lease we just granted; otherwise it lingers in etcd until
+      // its TTL expires whenever registration loses the CAS.
+      client.leaseRevoke(lease)
       throw EtcdRecipeException("Participation registration failed [$path]")
     }
 
