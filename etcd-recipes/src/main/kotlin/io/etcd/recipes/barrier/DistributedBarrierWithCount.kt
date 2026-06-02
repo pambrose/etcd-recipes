@@ -195,7 +195,7 @@ constructor(
 
         else -> {
           // Keep key alive
-          keepAliveLease = client.keepAlive(lease)
+          keepAliveLease = client.keepAlive(lease) { e -> exceptionList.value += e }
 
           checkWaiterCount()
 

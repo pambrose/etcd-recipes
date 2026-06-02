@@ -21,7 +21,8 @@ package io.etcd.recipes.keyvalue
 import io.etcd.jetcd.Client
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.common.putValueWithKeepAlive
+import io.etcd.recipes.common.asByteSequence
+import io.etcd.recipes.common.putValuesWithKeepAlive
 import io.etcd.recipes.keyvalue.TransientKeyValue.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
@@ -84,7 +85,13 @@ constructor(
       try {
         val leaseTtl = leaseTtlSecs.seconds
         logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
-        client.putValueWithKeepAlive(keyPath, keyValue, leaseTtl) {
+        client.putValuesWithKeepAlive(
+          listOf(keyPath to keyValue.asByteSequence),
+          leaseTtl,
+          // Record a keep-alive death so a caller polling exceptions/hasExceptions
+          // sees the key is no longer being renewed, instead of it silently expiring.
+          onKeepAliveError = { e -> exceptionList.value += e },
+        ) {
           keepAliveStartedLatch.countDown()
           keepAliveWaitLatch.await()
           logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }

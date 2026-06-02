@@ -21,6 +21,7 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.lease.LeaseGrantResponse
+import io.etcd.jetcd.lease.LeaseKeepAliveResponse
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.support.Observers
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -31,13 +32,37 @@ private val logger = KotlinLogging.logger {}
 
 fun <T> Client.keepAliveWith(
   lease: LeaseGrantResponse,
+  onKeepAliveError: (Throwable) -> Unit = {},
   block: () -> T,
-): T = keepAlive(lease).use { block.invoke() }
+): T = keepAlive(lease, onKeepAliveError).use { block.invoke() }
 
-fun Client.keepAlive(lease: LeaseGrantResponse): CloseableClient =
+// onNext stays at debug (one entry per renewal is noisy), but onError/onCompleted
+// must not be silent: this is the lease-liveness primitive for every recipe that
+// holds a lease, and a stream that errors or completes means renewal has stopped
+// and the lease (and its bound keys) will expire on TTL while the recipe still
+// looks healthy. jetcd's Observers.observer { } leaves both as no-ops, so surface
+// them at error/warn AND invoke [onKeepAliveError] so a holder (e.g. an
+// EtcdConnector subclass) can record the failure on its exceptions list. Neither
+// callback fires on our own CloseableClient.close() — both mean renewal genuinely
+// stopped — so onCompleted synthesizes a throwable for the same callback.
+@JvmOverloads
+fun Client.keepAlive(
+  lease: LeaseGrantResponse,
+  onKeepAliveError: (Throwable) -> Unit = {},
+): CloseableClient =
   leaseClient.keepAlive(
     lease.id,
-    Observers.observer { next -> logger.debug { "KeepAlive next resp: $next" } },
+    Observers.builder<LeaseKeepAliveResponse>()
+      .onNext { next -> logger.debug { "KeepAlive next resp: $next" } }
+      .onError { e ->
+        logger.error(e) { "KeepAlive stream errored for lease ${lease.id}; lease will expire on its TTL" }
+        onKeepAliveError(e)
+      }
+      .onCompleted {
+        logger.warn { "KeepAlive completed for lease ${lease.id}; renewal stopped, lease expires on TTL" }
+        onKeepAliveError(EtcdRecipeRuntimeException("KeepAlive renewal stopped for lease ${lease.id}"))
+      }
+      .build(),
   )
 
 fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse =

@@ -31,6 +31,7 @@ import io.etcd.recipes.common.getLastChild
 import io.etcd.recipes.common.lessThan
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -103,27 +104,50 @@ class DistributedPriorityQueue(
         sleep(minimumWaitTime - elapsed)
       }
 
-      val resp = client.getLastChild(prefix, SortTarget.KEY)
-      val kvs = resp.kvs
+      // Optimistic-concurrency retry loop. The CAS below is guarded on the base
+      // key's mod revision, so two producers enqueuing at the same priority from
+      // different instances can compute the same sequence number and one loses the
+      // CAS. That is ordinary contention, not an error: re-read getLastChild for a
+      // fresh sequence number and a fresh header revision, then retry — mirroring
+      // dequeue()'s retry-on-CAS-conflict loop. synchronized(this) only serializes
+      // writers within this JVM; cross-instance correctness comes from this retry.
+      repeat(MAX_ENQUEUE_ATTEMPTS) { attempt ->
+        val resp = client.getLastChild(prefix, SortTarget.KEY)
+        val kvs = resp.kvs
 
-      var newSeqNum = 0
-      if (kvs.isNotEmpty()) {
-        val fields = kvs.first().key.asString.split("/")
-        newSeqNum = fields[(fields.size) - 1].toInt() + 1
-      }
-
-      val txn =
-        client.transaction {
-          val newKey = "%s/%016d".format(prefix, newSeqNum)
-          val baseKey = "__$prefix"
-          If(lessThan(baseKey, CmpTarget.modRevision(resp.header.revision + 1)))
-          Then(baseKey setTo "", newKey setTo value)
+        var newSeqNum = 0
+        if (kvs.isNotEmpty()) {
+          val fields = kvs.first().key.asString.split("/")
+          newSeqNum = fields[(fields.size) - 1].toInt() + 1
         }
 
-      if (txn.isSucceeded)
-        lastWriteTime = TimeSource.Monotonic.markNow()
-      else
-        throw EtcdRecipeRuntimeException("Failed to set key")
+        val txn =
+          client.transaction {
+            val newKey = "%s/%016d".format(prefix, newSeqNum)
+            val baseKey = "__$prefix"
+            If(lessThan(baseKey, CmpTarget.modRevision(resp.header.revision + 1)))
+            Then(baseKey setTo "", newKey setTo value)
+          }
+
+        if (txn.isSucceeded) {
+          lastWriteTime = TimeSource.Monotonic.markNow()
+          return
+        }
+
+        logger.debug { "Lost enqueue CAS for $prefix on attempt ${attempt + 1}, retrying" }
+      }
+
+      throw EtcdRecipeRuntimeException("Failed to enqueue to $queuePath after $MAX_ENQUEUE_ATTEMPTS attempts")
     }
+  }
+
+  companion object {
+    private val logger = KotlinLogging.logger {}
+
+    // Upper bound on optimistic-CAS retries before surfacing failure. Each round
+    // guarantees forward progress (one same-priority producer always wins), so this
+    // only trips under pathological sustained contention; bounded rather than
+    // unbounded so a stuck enqueue cannot hold the instance monitor against close().
+    private const val MAX_ENQUEUE_ATTEMPTS = 50
   }
 }
