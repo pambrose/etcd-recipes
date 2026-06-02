@@ -37,21 +37,20 @@ fun main() {
       urls,
       electionPath,
       object : LeaderListener {
-        val electedClock = Monotonic
-        val unelectedClock = Monotonic
-        var electedTime = electedClock.markNow()
-        var unelectedTime = unelectedClock.markNow()
+        val clock = Monotonic
+        var electedTime = clock.markNow()
+        var unelectedTime = clock.markNow()
         var currentLeader = ""
 
         override fun takeLeadership(leaderName: String) {
           logger.info {"$leaderName is now the leader [Break time: ${unelectedTime.elapsedNow()}]"}
           currentLeader = leaderName
-          electedTime = electedClock.markNow()
+          electedTime = clock.markNow()
         }
 
         override fun relinquishLeadership() {
           logger.info {"$currentLeader is no longer the leader, after being leader for: ${electedTime.elapsedNow()}"}
-          unelectedTime = unelectedClock.markNow()
+          unelectedTime = clock.markNow()
         }
       },
       executor,

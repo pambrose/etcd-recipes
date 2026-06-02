@@ -308,11 +308,14 @@ constructor(
         break
       }
 
+      // Only sleep when another attempt will follow; on the last iteration just log
+      // the exhaustion and let the loop end (the CAS below then fails and throws as
+      // before). This also avoids a redundant final ~1s sleep past the intended bound.
       if (i == attemptCount - 1) {
         logger.error { "Exhausted wait for deletion of participation key $path" }
+      } else {
+        sleep(1.seconds)
       }
-
-      sleep(1.seconds)
     }
 
     // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
@@ -462,6 +465,7 @@ constructor(
                   }
                 } catch (e: Throwable) {
                   logger.error(e) { "Exception in reportLeader()" }
+                  listener.onError(e)
                 }
               }
             },

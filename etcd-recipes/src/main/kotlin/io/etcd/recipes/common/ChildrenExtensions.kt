@@ -23,6 +23,7 @@ import com.pambrose.common.util.ensureSuffix
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.kv.GetResponse
+import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.GetOption.SortOrder
 
@@ -87,7 +88,15 @@ fun Client.getChildrenValues(
 ): List<ByteSequence> = getChildren(keyName, target, order).values
 
 // Delete children keys
-fun Client.deleteChildren(keyName: String): List<String> = getChildrenKeys(keyName).onEach { deleteKey(it) }
+fun Client.deleteChildren(keyName: String): List<String> {
+  val trailingKey = keyName.ensureSuffix("/")
+  val deleteOption =
+    deleteOption {
+      isPrefix(true)
+      withPrevKV(true)
+    }
+  return kvClient.delete(trailingKey.asByteSequence, deleteOption).get().prevKvs.map { it.key.asString }
+}
 
 // Count children keys
 fun Client.getChildCount(keyName: String): Long {

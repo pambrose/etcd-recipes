@@ -280,7 +280,13 @@ class PathChildrenCache(
   val currentData: List<ChildData> get() = cacheMap.map { (k, v) -> ChildData(k, v) }.sortedBy { it.key }
 
   // For consistency with Curator
-  fun getCurrentData(path: String): ByteSequence? = cacheMap[path]
+
+  /**
+   * Returns the cached value for [childName], the child name relative to `cachePath` (the same keys
+   * exposed by [currentDataAsMap]) — NOT a full path. Passing a full path such as `cachePath/k1`
+   * returns `null`.
+   */
+  fun getCurrentData(childName: String): ByteSequence? = cacheMap[childName]
 
   val currentDataAsMap: Map<String, ByteSequence> get() = cacheMap.toMap()
 

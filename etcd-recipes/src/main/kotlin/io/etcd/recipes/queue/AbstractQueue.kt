@@ -101,11 +101,19 @@ abstract class AbstractQueue(
       // watchLatch's monitor, so holding it while a gRPC response is pending
       // deadlocks the event loop and never delivers the response.
       //
-      // The poll result is authoritative for ordering — it returns the
-      // queue's actual first item by mod revision, which may pre-date any
-      // PUT the watcher saw if PUTs slipped in between watcher.use { } and
-      // the watch actually being live in jetcd. Override keyFound so we
-      // always dequeue the oldest item.
+      // When the receiver poll wins the race (watchLatch is still latched),
+      // it is authoritative for ordering — it returns the queue's actual
+      // first item by mod revision, which may pre-date any PUT the watcher
+      // saw if PUTs slipped in between watcher.use { } and the watch actually
+      // being live in jetcd, so we override keyFound and dequeue the
+      // highest-priority/oldest item. But this override only runs while the
+      // latch is still up: under a producer/watcher race where the watch
+      // callback fires first, keyFound already holds whatever PUT the watcher
+      // observed and dequeue returns that available item rather than the
+      // strict highest-priority/oldest one. Delivery is still safe regardless
+      // of which side wins — no loss or duplication — because the
+      // deleteRevKey CAS rejects a stale candidate and the outer retry loop
+      // re-reads the queue.
       if (watchLatch.count > 0) {
         val waitingChildList = client.getFirstChild(queuePath, target).kvs
         if (waitingChildList.isNotEmpty()) {

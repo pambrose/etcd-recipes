@@ -38,7 +38,6 @@ import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
-import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicBoolean
@@ -87,7 +86,7 @@ constructor(
       // Create unique token to avoid collision from clients with same id
       val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
 
-      // Prime lease with 2 seconds to give keepAlive a chance to get started
+      // Grant the barrier lease with the configurable TTL; keepAlive renews it until the barrier is removed
       val lease = client.leaseGrant(leaseTtlSecs.seconds)
 
       // Do a CAS on the key name. If it is not found, then set it
@@ -175,8 +174,6 @@ constructor(
   }
 
   companion object {
-    private val logger = KotlinLogging.logger {}
-
     internal fun defaultClientId() = EtcdConnector.defaultClientId(DistributedBarrier::class.simpleName!!)
   }
 }

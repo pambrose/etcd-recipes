@@ -45,7 +45,7 @@ class ServiceProvider(
     getAllInstances().randomOrNull() ?: throw EtcdRecipeException("No instances available for service $serviceName")
 
   fun getAllInstances(): List<ServiceInstance> =
-    client.getChildrenValues(instancesPath).map { it.asString }.map { ServiceInstance.toObject(it) }
+    client.getChildrenValues(instancesPath).map { ServiceInstance.toObject(it.asString) }
 
   override fun close() {
     // No owned resources: provider does not hold a watcher, lease, or executor.

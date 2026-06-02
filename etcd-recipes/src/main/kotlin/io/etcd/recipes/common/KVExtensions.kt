@@ -27,6 +27,8 @@ import io.etcd.jetcd.kv.PutResponse
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 
+private const val MAX_GET_ATTEMPTS = 10
+
 @JvmOverloads
 fun Client.putValue(
   keyName: String,
@@ -68,8 +70,10 @@ internal fun Client.getResponse(
 ): GetResponse {
   val response = kvClient.get(keyName, option).get()
   return if (response.kvs.isEmpty() && response.isMore) {
-    if (iteration == 10)
-      throw EtcdRecipeRuntimeException("Unable to fulfill call to getResponse after multiple attempts")
+    if (iteration >= MAX_GET_ATTEMPTS)
+      throw EtcdRecipeRuntimeException(
+        "Unable to fulfill call to getResponse for key ${keyName.asString} after $iteration attempts",
+      )
     getResponse(keyName, option, iteration + 1)
   } else {
     response

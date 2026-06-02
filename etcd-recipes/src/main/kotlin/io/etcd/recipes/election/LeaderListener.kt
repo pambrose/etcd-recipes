@@ -22,4 +22,12 @@ interface LeaderListener {
   fun takeLeadership(leaderName: String)
 
   fun relinquishLeadership()
+
+  /**
+   * Invoked when a [takeLeadership] or [relinquishLeadership] callback throws while being
+   * dispatched from the leader watch loop. The default is a no-op, so existing Kotlin and Java
+   * implementors remain source- and binary-compatible; override it to surface the failure
+   * programmatically. The watch loop continues running after this is called.
+   */
+  fun onError(e: Throwable) {}
 }
