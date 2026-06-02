@@ -32,6 +32,7 @@ import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.keepAlive
 import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.leaseRevoke
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
@@ -80,8 +81,6 @@ constructor(
     val instancePath = getNamesPath(service)
     val context = ServiceInstanceContext(service, client, instancePath)
 
-    serviceContextMap[service.id] = context
-
     context.lease = client.leaseGrant(leaseTtlSecs.seconds)
 
     val txn =
@@ -90,10 +89,18 @@ constructor(
         Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.lease.id) }))
       }
 
-    if (txn.isSucceeded)
-      context.keepAlive = client.keepAlive(context.lease)
-    else
+    if (!txn.isSucceeded) {
+      // CAS lost (key already present). Revoke the lease we just granted so it does
+      // not linger until its TTL, and leave serviceContextMap untouched so a
+      // half-built context (with an unset keepAlive) is never published — doClose()
+      // would otherwise crash reading the unset delegate and abort the whole close.
+      client.leaseRevoke(context.lease)
       throw EtcdRecipeException("Service registration failed for $instancePath")
+    }
+
+    // Only publish a fully-built context (lease + keepAlive set) into the map.
+    context.keepAlive = client.keepAlive(context.lease) { e -> exceptionList.value += e }
+    serviceContextMap[service.id] = context
   }
 
   @Synchronized

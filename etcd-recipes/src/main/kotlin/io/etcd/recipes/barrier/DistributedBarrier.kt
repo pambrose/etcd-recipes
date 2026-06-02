@@ -99,7 +99,7 @@ constructor(
 
       // Check to see if unique value was successfully set in the CAS step
       if (txn.isSucceeded && client.getValue(barrierPath)?.asString == uniqueToken) {
-        keepAliveLease = client.keepAlive(lease)
+        keepAliveLease = client.keepAlive(lease) { e -> exceptionList.value += e }
         true
       } else {
         // Lease leaked the original implementation: when the CAS lost or the

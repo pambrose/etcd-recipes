@@ -50,7 +50,7 @@ fun Client.putValueWithKeepAlive(
   keyval: ByteSequence,
   ttlSecs: Long,
   block: () -> Unit,
-) = putValuesWithKeepAlive(listOf(keyName to keyval), ttlSecs, block)
+) = putValuesWithKeepAlive(listOf(keyName to keyval), ttlSecs, block = block)
 
 @JvmName("putValueWithKeepAliveDur")
 fun Client.putValueWithKeepAlive(
@@ -82,18 +82,20 @@ fun Client.putValueWithKeepAlive(
   keyval: ByteSequence,
   ttl: Duration,
   block: () -> Unit,
-) = putValuesWithKeepAlive(listOf(keyName to keyval), ttl, block)
+) = putValuesWithKeepAlive(listOf(keyName to keyval), ttl, block = block)
 
 fun Client.putValuesWithKeepAlive(
   kvs: Collection<Pair<String, ByteSequence>>,
   ttlSecs: Long,
+  onKeepAliveError: (Throwable) -> Unit = {},
   block: () -> Unit,
-) = putValuesWithKeepAlive(kvs, ttlSecs.seconds, block)
+) = putValuesWithKeepAlive(kvs, ttlSecs.seconds, onKeepAliveError, block)
 
 @Suppress("TooGenericExceptionCaught")
 fun Client.putValuesWithKeepAlive(
   kvs: Collection<Pair<String, ByteSequence>>,
   ttl: Duration,
+  onKeepAliveError: (Throwable) -> Unit = {},
   block: () -> Unit,
 ) {
   val lease = leaseGrant(ttl)
@@ -108,5 +110,7 @@ fun Client.putValuesWithKeepAlive(
     leaseRevoke(lease)
     throw e
   }
-  keepAliveWith(lease) { block() }
+  // onKeepAliveError lets a holder observe the keep-alive dying after setup
+  // succeeds (renewal stream errors or stops) rather than only on close().
+  keepAliveWith(lease, onKeepAliveError) { block() }
 }

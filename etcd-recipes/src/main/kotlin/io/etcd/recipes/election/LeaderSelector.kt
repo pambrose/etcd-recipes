@@ -306,7 +306,7 @@ constructor(
     }
 
     // Run keep-alive until closed
-    client.keepAliveWith(lease) { terminateKeepAlive.waitUntilTrue() }
+    client.keepAliveWith(lease, { e -> exceptionList.value += e }) { terminateKeepAlive.waitUntilTrue() }
   }
 
   // This will not return until election failure or leader surrenders leadership after being elected
@@ -342,7 +342,7 @@ constructor(
 
     // Selected as leader. This will exit when leadership is relinquished
     try {
-      client.keepAliveWith(lease) {
+      client.keepAliveWith(lease, { e -> exceptionList.value += e }) {
         electedLeader.store(true)
         listener.takeLeadership(this)
       }
