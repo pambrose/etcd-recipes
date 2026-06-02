@@ -25,10 +25,13 @@ import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.jetcd.watch.WatchResponse
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+
+private val logger = KotlinLogging.logger {}
 
 val WatchEvent.keyAsString get() = keyValue.key.asString
 val WatchEvent.keyAsInt get() = keyValue.key.asInt
@@ -73,7 +76,17 @@ private class DispatchingWatcher(
     // returned — touching state the caller assumes is no longer in use. A
     // short bounded wait makes the close-then-touch contract real without
     // turning into a blocker on a misbehaving callback.
-    dispatcher.awaitTermination(5, TimeUnit.SECONDS)
+    try {
+      if (!dispatcher.awaitTermination(5, TimeUnit.SECONDS)) {
+        // The callback outran the bounded wait, so the close-then-touch contract
+        // cannot be honored — surface it rather than pretending the dispatcher drained.
+        logger.warn { "Watch dispatcher did not terminate within 5 seconds; a callback may still be running" }
+      }
+    } catch (e: InterruptedException) {
+      // awaitTermination clears the interrupt flag on InterruptedException; restore it
+      // so callers up the stack can still observe the interruption.
+      Thread.currentThread().interrupt()
+    }
   }
 }
 

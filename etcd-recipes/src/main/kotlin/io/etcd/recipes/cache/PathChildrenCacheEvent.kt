@@ -43,5 +43,5 @@ class PathChildrenCacheEvent(
    */
   val initialData: List<ChildData> get() = initialDataVal
 
-  override fun toString() = "PathChildrenCacheEvent{type=$type, data=$data}"
+  override fun toString() = "PathChildrenCacheEvent{type=$type, childName=$childName, data=$data}"
 }

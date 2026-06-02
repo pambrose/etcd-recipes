@@ -38,7 +38,7 @@ class ServiceProvider(
   fun getInstance(): ServiceInstance = getAllInstances().random()
 
   fun getAllInstances(): List<ServiceInstance> =
-    client.getChildrenValues(instancesPath).map { it.asString }.map { ServiceInstance.toObject(it) }
+    client.getChildrenValues(instancesPath).map { ServiceInstance.toObject(it.asString) }
 
   override fun close() {
     // No owned resources: provider does not hold a watcher, lease, or executor.

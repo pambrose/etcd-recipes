@@ -21,7 +21,6 @@ package io.etcd.recipes.util
 import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
-import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getChildren
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Duration.Companion.seconds
@@ -33,8 +32,9 @@ fun main() {
 
   connectToEtcd(urls) { client ->
     repeat(600) {
-      logger.info { client.getChildren(path).asString }
-      logger.info { client.getChildCount(path) }
+      val children = client.getChildren(path)
+      logger.info { children.asString }
+      logger.info { children.size }
       sleep(1.seconds)
     }
   }
