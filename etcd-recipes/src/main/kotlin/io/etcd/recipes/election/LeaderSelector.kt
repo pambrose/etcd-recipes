@@ -135,6 +135,14 @@ constructor(
   private val attemptLeadership = BooleanMonitor(true)
   private val electedLeader = AtomicBoolean(false)
   private val startCallLock = Any()
+
+  // Serializes the leadership-claim section of attemptToBecomeLeader (CAS + guard
+  // resets) across the start() worker and the watch-dispatcher thread. Deliberately
+  // NOT the instance monitor: close() is @Synchronized on the instance, so holding
+  // the instance monitor across takeLeadership (the previous @Synchronized) made a
+  // close() during active leadership deadlock. This lock is released before the
+  // takeLeadership block runs, so close() can flip the termination monitors meanwhile.
+  private val electionLock = Any()
   private val startCallAllowed = AtomicBoolean(true)
   private val leaderPath = electionPath.withLeaderSuffix
 
@@ -256,6 +264,23 @@ constructor(
     return leadershipComplete.waitUntilTrue(timeout)
   }
 
+  // Blocking form of [isFinished]: waits until leadership completes (set by close()
+  // or by relinquishing). Unlike waitOnLeadershipComplete it acquires no instance
+  // monitor and does not wait on startThreadComplete, so it is safe to call from
+  // inside takeLeadership as a stop signal — a close() from another thread flips
+  // leadershipComplete and releases this wait.
+  @Throws(InterruptedException::class)
+  fun waitUntilFinished(): Boolean = waitUntilFinished(Long.MAX_VALUE.days)
+
+  @Throws(InterruptedException::class)
+  fun waitUntilFinished(
+    timeout: Long,
+    timeUnit: TimeUnit,
+  ): Boolean = waitUntilFinished(timeUnitToDuration(timeout, timeUnit))
+
+  @Throws(InterruptedException::class)
+  fun waitUntilFinished(timeout: Duration): Boolean = leadershipComplete.waitUntilTrue(timeout)
+
   private fun markLeadershipComplete() {
     terminateWatch.set(true)
     terminateKeepAlive.set(true)
@@ -305,45 +330,63 @@ constructor(
       throw EtcdRecipeException("Participation registration failed [$path]")
     }
 
-    // Run keep-alive until closed
-    client.keepAliveWith(lease, { e -> exceptionList.value += e }) { terminateKeepAlive.waitUntilTrue() }
+    // Run keep-alive until closed, then revoke the participation lease promptly
+    // (#7) so the participant key is evicted on relinquish instead of lingering
+    // until TTL (which is what forces the pre-CAS wait loop above).
+    try {
+      client.keepAliveWith(lease, { e -> exceptionList.value += e }) { terminateKeepAlive.waitUntilTrue() }
+    } finally {
+      client.leaseRevoke(lease)
+    }
   }
 
   // This will not return until election failure or leader surrenders leadership after being elected
-  @Synchronized
   @Suppress("ReturnCount", "TooGenericExceptionCaught")
   private fun attemptToBecomeLeader(client: Client): Boolean {
-    if (isLeader || !attemptLeadership.get()) {
-      return false
-    }
+    // Phase 1 — claim leadership under electionLock (NOT the instance monitor) so
+    // concurrent candidates (start() worker vs watch-dispatcher) are serialized
+    // without blocking close(). Returns the granted lease on a win, or returns
+    // false on every losing path after revoking its own lease.
+    val lease =
+      synchronized(electionLock) {
+        if (isLeader || !attemptLeadership.get()) {
+          return false
+        }
 
-    // Create unique token to avoid collision from clients with same id
-    val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
+        // Create unique token to avoid collision from clients with same id
+        val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
 
-    // Prime lease to give keepAliveWith a chance to get started; route through
-    // the common/ extension layer rather than reaching into jetcd directly.
-    val lease = client.leaseGrant(leaseTtlSecs.seconds)
+        // Prime lease to give keepAliveWith a chance to get started; route through
+        // the common/ extension layer rather than reaching into jetcd directly.
+        val granted = client.leaseGrant(leaseTtlSecs.seconds)
 
-    // Check the key name. If it is not found, then set it
-    val txn =
-      client.transaction {
-        If(leaderPath.doesNotExist)
-        Then(leaderPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+        // Check the key name. If it is not found, then set it
+        val txn =
+          client.transaction {
+            If(leaderPath.doesNotExist)
+            Then(leaderPath.setTo(uniqueToken, putOption { withLeaseId(granted.id) }))
+          }
+
+        // Check to see if unique value was successfully set in the CAS step
+        if (!txn.isSucceeded || client.getValue(leaderPath)?.asString != uniqueToken) {
+          // Failed to become leader: revoke the lease we just created so it does
+          // not linger in etcd until TTL. Without this, every losing candidate in
+          // an election leaks a lease per turnover.
+          client.leaseRevoke(granted)
+          return false
+        }
+
+        // Mark elected inside the lock so a concurrent candidate sees isLeader and bails.
+        electedLeader.store(true)
+        granted
       }
 
-    // Check to see if unique value was successfully set in the CAS step
-    if (isLeader || !txn.isSucceeded || client.getValue(leaderPath)?.asString != uniqueToken) {
-      // Failed to become leader: revoke the lease we just created so it does
-      // not linger in etcd until TTL. Without this, every losing candidate in
-      // an election leaks a lease per turnover.
-      client.leaseRevoke(lease)
-      return false
-    }
-
-    // Selected as leader. This will exit when leadership is relinquished
+    // Phase 2 — hold leadership with NO lock held, so a close() on another thread
+    // can run doClose() -> markLeadershipComplete() and release a takeLeadership
+    // that is waiting on isFinished/waitUntilFinished. Exits when leadership is
+    // relinquished (takeLeadership returns).
     try {
       client.keepAliveWith(lease, { e -> exceptionList.value += e }) {
-        electedLeader.store(true)
         listener.takeLeadership(this)
       }
       // Leadership was relinquished
@@ -354,10 +397,16 @@ constructor(
       exceptionList.value += e
       return false
     } finally {
-      // Do this after leadership is complete so the thread does not terminate
-      attemptLeadership.set(false)
-      startCallAllowed.store(true)
-      electedLeader.store(false)
+      // Revoke the leadership lease promptly on relinquish (#7) instead of at TTL.
+      client.leaseRevoke(lease)
+      // Reset the election guards under the same lock Phase 1 reads them, so a
+      // concurrent candidate never observes a half-updated guard set.
+      synchronized(electionLock) {
+        attemptLeadership.set(false)
+        startCallAllowed.store(true)
+        electedLeader.store(false)
+      }
+      // Do this after leadership is complete so the thread does not terminate early
       markLeadershipComplete()
     }
   }

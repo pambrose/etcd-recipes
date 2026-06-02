@@ -69,6 +69,10 @@ constructor(
 
     override fun close() {
       keepAlive.close()
+      // Revoke the lease so it (and its bound key) is released promptly on
+      // unregister/close instead of lingering until TTL (#7). Revoking already
+      // deletes the lease-bound key; deleteKey is kept as belt-and-suspenders.
+      client.leaseRevoke(lease)
       client.deleteKey(instancePath)
     }
   }
