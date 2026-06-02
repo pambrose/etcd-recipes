@@ -256,16 +256,24 @@ class PathChildrenCache(
     return startThreadComplete.waitUntilTrue(timeout)
   }
 
+  // Re-sync the cache to etcd's current children. Build the fresh view first, then
+  // reconcile the live map in place (drop keys no longer present, upsert the rest)
+  // rather than clear()-then-refill, which left an empty/partial window where
+  // currentData reported no children. @Synchronized restores the class invariant by
+  // serializing against start()/doClose(). This is a coarse, manual re-sync: a live
+  // watch event on the same key can race the snapshot (last-writer-wins); rely on the
+  // watcher, not rebuild(), for strict event ordering.
+  @Synchronized
   fun rebuild() {
-    clear()
     val getOption = getOption {
       isPrefix(true)
       withSortField(GetOption.SortTarget.KEY)
     }
-    for ((k, v) in client.getKeyValuePairs(trailingPath, getOption)) {
-      val s = k.substring(trailingPath.length)
-      cacheMap[s] = v
-    }
+    val fresh =
+      client.getKeyValuePairs(trailingPath, getOption)
+        .associate { (k, v) -> k.substring(trailingPath.length) to v }
+    cacheMap.keys.retainAll(fresh.keys)
+    cacheMap.putAll(fresh)
   }
 
   // For consistency with Curator
@@ -276,6 +284,7 @@ class PathChildrenCache(
 
   val currentDataAsMap: Map<String, ByteSequence> get() = cacheMap.toMap()
 
+  @Synchronized
   fun clear() = cacheMap.clear()
 
   @Synchronized
