@@ -63,6 +63,13 @@ class PathChildrenCache(
   val cachePath: String,
   private val userExecutor: Executor? = null,
 ) : EtcdConnector(client) {
+  // Canonical prefix for the watched key range. Every child key is stripped
+  // relative to this, never cachePath.length + 1: when cachePath already ends in
+  // '/', that offset over-strips by one char and corrupts every child name, so the
+  // snapshot/rebuild paths would disagree with the live watcher (which already
+  // strips by trailingPath.length). One field keeps all three sites in lockstep.
+  private val trailingPath = cachePath.ensureSuffix("/")
+
   // Plain var: all reads/writes are inside @Synchronized methods on this instance.
   private var watcher: Watch.Watcher? = null
   private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
@@ -158,7 +165,6 @@ class PathChildrenCache(
   @Suppress("TooGenericExceptionCaught")
   private fun loadDataAndStartWatcher() {
     try {
-      val trailingPath = cachePath.ensureSuffix("/")
       val getOption = getOption {
         isPrefix(true)
         withSortField(GetOption.SortTarget.KEY)
@@ -168,7 +174,7 @@ class PathChildrenCache(
 
       for (kv in resp.kvs) {
         val k = kv.key.asString
-        val s = k.substring(cachePath.length + 1)
+        val s = k.substring(trailingPath.length)
         cacheMap[s] = kv.value
       }
 
@@ -181,7 +187,6 @@ class PathChildrenCache(
 
   @Suppress("TooGenericExceptionCaught")
   private fun setupWatcher(startRevision: Long) {
-    val trailingPath = cachePath.ensureSuffix("/")
     logger.debug { "Setting up watch for $trailingPath at rev $startRevision" }
     val watchOption = watchOption {
       isPrefix(true).also { if (startRevision > 0L) it.withRevision(startRevision) }
@@ -253,13 +258,12 @@ class PathChildrenCache(
 
   fun rebuild() {
     clear()
-    val trailingPath = cachePath.ensureSuffix("/")
     val getOption = getOption {
       isPrefix(true)
       withSortField(GetOption.SortTarget.KEY)
     }
     for ((k, v) in client.getKeyValuePairs(trailingPath, getOption)) {
-      val s = k.substring(cachePath.length + 1)
+      val s = k.substring(trailingPath.length)
       cacheMap[s] = v
     }
   }
