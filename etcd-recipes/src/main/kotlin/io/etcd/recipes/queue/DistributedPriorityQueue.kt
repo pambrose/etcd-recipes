@@ -53,22 +53,22 @@ class DistributedPriorityQueue(
   fun enqueue(
     value: String,
     priority: Int,
-  ) = enqueue(value.asByteSequence, priority.toUShort())
+  ) = enqueue(value.asByteSequence, priority.toCheckedPriority())
 
   fun enqueue(
     value: Int,
     priority: Int,
-  ) = enqueue(value.asByteSequence, priority.toUShort())
+  ) = enqueue(value.asByteSequence, priority.toCheckedPriority())
 
   fun enqueue(
     value: Long,
     priority: Int,
-  ) = enqueue(value.asByteSequence, priority.toUShort())
+  ) = enqueue(value.asByteSequence, priority.toCheckedPriority())
 
   fun enqueue(
     value: ByteSequence,
     priority: Int,
-  ) = enqueue(value, priority.toUShort())
+  ) = enqueue(value, priority.toCheckedPriority())
 
   fun enqueue(
     value: String,
@@ -92,6 +92,14 @@ class DistributedPriorityQueue(
     checkCloseNotCalled()
     val prefix = "%s/%05d".format(queuePath, priority.toInt())
     newSequentialKV(prefix, value)
+  }
+
+  // Validate Int priorities rather than silently truncating them. priority.toUShort()
+  // wraps mod 65536 (e.g. 70000 -> 4464, -1 -> 65535), which would file the entry in
+  // the wrong sort bucket with no diagnostic.
+  private fun Int.toCheckedPriority(): UShort {
+    require(this in 0..UShort.MAX_VALUE.toInt()) { "priority must be in 0..${UShort.MAX_VALUE.toInt()}, was $this" }
+    return toUShort()
   }
 
   private fun newSequentialKV(

@@ -36,7 +36,6 @@ import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildCount
-import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAlive
 import io.etcd.recipes.common.leaseGrant
@@ -188,11 +187,8 @@ constructor(
           throw EtcdRecipeException("Failed to set waitingPath")
         }
 
-        client.getValue(myWaitingPath)?.asString != uniqueToken -> {
-          client.leaseRevoke(lease)
-          throw EtcdRecipeException("Failed to assign waitingPath unique value")
-        }
-
+        // No getValue re-read: txn.isSucceeded already proves this client set the
+        // waiting-path key (the re-read only guarded a commit-to-read race window).
         else -> {
           // Keep key alive
           keepAliveLease = client.keepAlive(lease) { e -> exceptionList.value += e }

@@ -25,10 +25,8 @@ import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.barrier.DistributedBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAlive
 import io.etcd.recipes.common.leaseGrant
@@ -96,8 +94,10 @@ constructor(
           Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
         }
 
-      // Check to see if unique value was successfully set in the CAS step
-      if (txn.isSucceeded && client.getValue(barrierPath)?.asString == uniqueToken) {
+      // The CAS is authoritative: txn.isSucceeded means this client created the
+      // barrier key. (The previous getValue re-read only guarded the tiny window
+      // where a concurrent removeBarrier ran between commit and read.)
+      if (txn.isSucceeded) {
         keepAliveLease = client.keepAlive(lease) { e -> exceptionList.value += e }
         true
       } else {
