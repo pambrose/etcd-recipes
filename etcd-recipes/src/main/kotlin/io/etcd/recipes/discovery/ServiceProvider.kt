@@ -19,6 +19,7 @@
 package io.etcd.recipes.discovery
 
 import io.etcd.jetcd.Client
+import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.getChildrenValues
@@ -35,7 +36,13 @@ class ServiceProvider(
   // by the parent ServiceDiscovery.
   private val instancesPath: String = namesPath.appendToPath(serviceName)
 
-  fun getInstance(): ServiceInstance = getAllInstances().random()
+  // "No instances available" is an ordinary discovery condition, not a programming
+  // error, so surface the library's typed exception (matching ServiceDiscovery's
+  // absent-instance contract) instead of letting List.random() throw a bare,
+  // context-free NoSuchElementException.
+  @Throws(EtcdRecipeException::class)
+  fun getInstance(): ServiceInstance =
+    getAllInstances().randomOrNull() ?: throw EtcdRecipeException("No instances available for service $serviceName")
 
   fun getAllInstances(): List<ServiceInstance> =
     client.getChildrenValues(instancesPath).map { it.asString }.map { ServiceInstance.toObject(it) }

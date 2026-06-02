@@ -37,7 +37,17 @@ open class EtcdConnector(
     if (closeCalled.load()) throw EtcdRecipeRuntimeException("close() already called")
   }
 
-  val exceptions: List<Throwable> get() = if (exceptionList.isInitialized()) exceptionList.value else emptyList()
+  // Return a defensive snapshot taken under the synchronizedList's own monitor.
+  // The list is appended to from background recipe threads (keep-alive onError
+  // callbacks, watcher threads); synchronizedList only guards individual ops, so a
+  // caller iterating the live list while a worker adds would hit a
+  // ConcurrentModificationException. A bare toList() still iterates, hence the lock.
+  val exceptions: List<Throwable>
+    get() =
+      if (exceptionList.isInitialized())
+        synchronized(exceptionList.value) { exceptionList.value.toList() }
+      else
+        emptyList()
 
   val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.isNotEmpty()
 
