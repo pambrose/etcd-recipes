@@ -122,7 +122,7 @@ constructor(
   @Suppress("CyclomaticComplexMethod", "LongMethod")
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun waitOnBarrier(timeout: Duration): Boolean {
-    var keepAliveLease: CloseableClient? = null
+    val keepAliveLease = AtomicReference<CloseableClient?>(null)
     val keepAliveClosed = BooleanMonitor(false)
     val cancelled = BooleanMonitor(false)
     val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
@@ -132,12 +132,17 @@ constructor(
     checkCloseNotCalled()
 
     fun closeKeepAlive() {
-      if (!keepAliveClosed.get()) {
-        keepAliveLease?.close()
-        keepAliveLease = null
+      // Atomically claim the keep-alive client so it is closed exactly once across the
+      // waiter / watch-dispatcher / close() threads: whoever exchanges the non-null ref
+      // is the unique closer. Driving idempotency off the exchange (rather than a
+      // check-then-act on keepAliveClosed) also closes the leak where a close() that
+      // arrived before the client was assigned would flip keepAliveClosed and strand
+      // the just-created client. keepAliveClosed stays purely the wait/signal flag.
+      keepAliveLease.exchange(null)?.let { kac ->
+        kac.close()
         runCatching { client.deleteKey(myWaitingPath) }
-        keepAliveClosed.set(true)
       }
+      keepAliveClosed.set(true)
     }
 
     fun checkWaiterCount() {
@@ -191,7 +196,13 @@ constructor(
         // waiting-path key (the re-read only guarded a commit-to-read race window).
         else -> {
           // Keep key alive
-          keepAliveLease = client.keepAlive(lease) { e -> exceptionList.value += e }
+          keepAliveLease.store(client.keepAlive(lease) { e -> exceptionList.value += e })
+
+          // Reconcile with a close() that may have fired before the store above: its
+          // closeKeepAlive() would have found a null ref and closed nothing, stranding
+          // the just-created client. onCancel sets `cancelled` before calling
+          // closeKeepAlive(), so observing it here means we own closing our client.
+          if (cancelled.get()) closeKeepAlive()
 
           checkWaiterCount()
 
