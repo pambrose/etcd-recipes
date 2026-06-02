@@ -370,8 +370,10 @@ constructor(
             Then(leaderPath.setTo(uniqueToken, putOption { withLeaseId(granted.id) }))
           }
 
-        // Check to see if unique value was successfully set in the CAS step
-        if (!txn.isSucceeded || client.getValue(leaderPath)?.asString != uniqueToken) {
+        // The CAS is authoritative: txn.isSucceeded means this client created the
+        // leader key with uniqueToken. (The previous getValue re-read only guarded
+        // the tiny window where another client overwrote it between commit and read.)
+        if (!txn.isSucceeded) {
           // Failed to become leader: revoke the lease we just created so it does
           // not linger in etcd until TTL. Without this, every losing candidate in
           // an election leaks a lease per turnover.

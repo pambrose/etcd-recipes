@@ -121,16 +121,15 @@ constructor(
     }
   }
 
+  // The If(doesNotExist) predicate is itself the atomic "is it absent?" check, so the
+  // prior getResponse(counterPath).kvs.isEmpty() GET was a redundant extra round-trip.
+  // Returns true if this call created the counter, false if it already existed.
   private fun createCounterIfNotPresent(): Boolean =
-    if (client.getResponse(counterPath).kvs.isEmpty()) {
-      client
-        .transaction {
-          If(counterPath.doesNotExist)
-          Then(counterPath setTo default)
-        }.isSucceeded
-    } else {
-      false
-    }
+    client
+      .transaction {
+        If(counterPath.doesNotExist)
+        Then(counterPath setTo default)
+      }.isSucceeded
 
   private fun applyCounterTransaction(amount: Long): Pair<TxnResponse, Long> {
     val kvList: List<KeyValue> = client.getResponse(counterPath).kvs
