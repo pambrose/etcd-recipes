@@ -17,7 +17,7 @@ JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17
 - `make lint` — `./gradlew lintKotlin detekt`
 - `make coverage` — Kover HTML + XML reports + summary
 - `make kdocs` — Dokka HTML / Javadoc
-- `make versioncheck` — `./gradlew dependencyUpdates --no-parallel`
+- `make versions` — `./gradlew dependencyUpdates --no-parallel`
 - `make refresh` — refresh dependencies
 - `make upgrade-wrapper` — bumps the Gradle wrapper
 

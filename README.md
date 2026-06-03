@@ -148,7 +148,7 @@ make tests-container    # multi-container variant: each participant in its own c
 make lint               # kotlinter + detekt
 make coverage           # Kover HTML + XML reports
 make kdocs              # Dokka HTML / Javadoc
-make versioncheck       # gradle dependencyUpdates
+make versions           # gradle dependencyUpdates
 ```
 
 `make tests` and the examples expect a local etcd at `http://localhost:2379`. Start one with:
