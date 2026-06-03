@@ -19,6 +19,7 @@
 package io.etcd.recipes.queue
 
 import com.pambrose.common.concurrent.thread
+import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -192,6 +193,52 @@ class DistributedPriorityQueueTest : StringSpec() {
             dequeuedData.size shouldBe testData.size
             repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
             dequeuedData shouldBe testData
+        }
+
+        // #19: a consumer parked on an empty queue must deliver every item of a
+        // mixed-priority burst exactly once via the re-query-on-wake path. Strict
+        // ordering of the woken item comes from the same getFirstChild head-selection
+        // that serialTestNoWaitWithPriorities verifies; the burst-arrival race itself
+        // is not deterministically orderable, so this guards delivery, not order.
+        "emptyWaitDeliversEveryMixedPriorityItemExactlyOnce" {
+            val queuePath = "$basePath/emptyWaitMixedPriority"
+            val count = 25
+            val values = List(count) { "mp%03d".format(it) }
+            val dequeued = synchronizedList(mutableListOf<String>())
+            val dequeueLatch = CountDownLatch(1)
+            val enqueueLatch = CountDownLatch(1)
+            val consumerReady = CountDownLatch(1)
+
+            connectToEtcd(urls) { client ->
+                client.deleteChildren(queuePath)
+                client.getChildCount(queuePath) shouldBe 0
+            }
+
+            thread(dequeueLatch) {
+                connectToEtcd(urls) { client ->
+                    withDistributedPriorityQueue(client, queuePath) {
+                        consumerReady.countDown()
+                        repeat(count) { dequeued += dequeue().asString }
+                    }
+                }
+            }
+
+            thread(enqueueLatch) {
+                connectToEtcd(urls) { client ->
+                    consumerReady.await()
+                    // Let the consumer reach the empty-queue wait, then burst-enqueue
+                    // distinct priorities in descending order (the head is enqueued last).
+                    sleep(2.seconds)
+                    withDistributedPriorityQueue(client, queuePath) {
+                        values.forEachIndexed { i, v -> enqueue(v, count - i) }
+                    }
+                }
+            }
+
+            dequeueLatch.await()
+            enqueueLatch.await()
+
+            dequeued shouldContainExactlyInAnyOrder values
         }
 
         "threadedTestNoWait1" {
