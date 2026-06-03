@@ -5,6 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-06-03
+
+Hardening release. Most of the work closes lease leaks, `close()`/wait deadlocks,
+and keep-alive races found during a recipe-wide code review, plus cache key-handling
+and priority-queue input fixes. Adds a few small APIs, broadens test coverage, and
+bumps dependencies. No breaking API changes.
+
+### Added
+
+- `LeaderSelector.waitUntilFinished(...)` — a monitor-free blocking stop signal that
+  is safe to call from inside `takeLeadership`. (#39)
+- Optional `onKeepAliveError` callback threaded through `keepAlive`, `keepAliveWith`,
+  and `putValuesWithKeepAlive` (default no-op, backward compatible). Every lease-holding
+  recipe (`TransientKeyValue`, both barriers, `ServiceRegistry`, `LeaderSelector`) now
+  records keep-alive stream death on its `exceptions` list, so a dropped renewal is
+  observable instead of the key silently expiring while the recipe looks healthy. (#38)
+- No-op default `LeaderListener.onError(Throwable)`; `reportLeader` routes caught
+  callback failures to it. (#43)
+- MockK into the version catalog and testing bundle, plus broad new unit/integration
+  tests raising line coverage 82% → 88% and method coverage 74% → 84%. (#35, #36)
+
+### Changed
+
+- `DistributedPriorityQueue` Int-priority `enqueue` overloads now `require` the priority
+  to be in `0..65535` instead of silently wrapping mod 65536 via `toUShort()` (which
+  filed entries in the wrong sort bucket). (#44)
+- `ServiceProvider.getInstance()` throws a typed, service-named `EtcdRecipeException` when
+  no instances are registered, instead of a bare `NoSuchElementException` — consistent
+  with `ServiceDiscovery.queryForInstance`. (#42)
+- `EtcdConnector.exceptions` returns a defensive snapshot taken under the list monitor
+  rather than the live `synchronizedList`, so a caller iterating while a worker thread
+  appends can't hit a `ConcurrentModificationException`. (#42)
+- `PathChildrenCache.rebuild()` reconciles the live map in place (`retainAll` + `putAll`)
+  under `@Synchronized` instead of clear-then-refill, so `currentData`/`currentDataAsMap`
+  never observe an empty/partial window. (#41)
+- Leases are now revoked on normal cleanup (service, participation, and leadership leases)
+  rather than lingering until TTL. (#39)
+- `DistributedPriorityQueue.enqueue` retries on a lost optimistic CAS (bounded by
+  `MAX_ENQUEUE_ATTEMPTS`) instead of surfacing "Failed to set key" to the caller. (#38)
+- `deleteChildren` does a single atomic ranged prefix delete (`isPrefix` + `withPrevKV`)
+  instead of a GET plus N per-key deletes. (#43)
+- Dropped redundant post-CAS GET re-reads in `DistributedBarrier`,
+  `DistributedBarrierWithCount`, `LeaderSelector`, and `DistributedAtomicLong`; these
+  paths now gate solely on the authoritative `txn.isSucceeded`. (#44)
+- A batch of low-risk cleanups across `common/`, `election/`, `cache/`, `discovery/`, and
+  `util/` (findings #13–#25): bounded `getResponse` retry constant, `DispatchingWatcher`
+  interrupt handling, `getCurrentData` param rename + KDoc, `toString()` additions, dead
+  logger/import removal, and assorted read-coalescing. (#43)
+- Makefile: `:=`/`sed` version extraction, `versioncheck` renamed to `versions`, default
+  target is now `help`, and the `gradle` version-catalog key renamed to `gradle-wrapper`.
+  `etcd-recipes-test-runners` is wired to the shadow plugin via the catalog. (#33, #35)
+- Dependency bumps: Kotlin `2.4.0-RC2` → `2.4.0`, common-utils `2.8.2` → `2.9.0`,
+  logback `1.5.33` → `1.5.34`, mockk `1.14.9` → `1.14.11`. (#33)
+
+### Fixed
+
+- `DistributedPriorityQueue`: restore strict priority/FIFO ordering on the empty-queue
+  dequeue wait. After waking, re-query `getFirstChild` and prefer its head rather than
+  returning whichever PUT the watcher happened to observe first, so the highest-priority
+  (KEY) / oldest (MOD) item is always returned. (#46)
+- `DistributedBarrierWithCount`: fix a keep-alive client leak / double-close race by
+  promoting `keepAliveLease` to an `AtomicReference` claimed via a single `exchange(null)`,
+  making cleanup exactly-once across the waiter, watch dispatcher, and `close()` threads. (#45)
+- `LeaderSelector`: fix a `close()`/`takeLeadership` deadlock — the instance-wide
+  `@Synchronized` is replaced with a narrow `electionLock` guarding only the leadership-claim
+  CAS, so `close()` is uncontended while leadership is held. (#39)
+- `PathChildrenCache`: fix child-name key-stripping for a trailing-slash `cachePath` (it
+  over-stripped the first char of every child); all three sites now strip relative to one
+  canonical `trailingPath`. (#40)
+- Lease leaks on a failed CAS in `DistributedBarrierWithCount.waitOnBarrier`,
+  `LeaderSelector.advertiseParticipation`, and `registerService`; the lease is revoked
+  before returning/throwing. (#35, #38)
+- CI: pass `disable_search: true` to the codecov action so empty aggregate/module reports
+  can no longer reset the branch coverage badge to 0%. (#37)
+- Makefile: default `DOCKER_HOST` to the per-user routing socket
+  (`~/.docker/run/docker.sock`) so `make tests-container` no longer hangs on a dead
+  Docker Desktop raw socket. (#37)
+
 ## [0.10.1] - 2026-05-15
 
 Maintenance release: build/static-analysis tidy-up and documentation fixes. No
