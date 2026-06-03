@@ -1,5 +1,60 @@
 # Release Notes
 
+## 0.11.0 — 2026-06-03
+
+A hardening release. The bulk of the work is a recipe-wide code-review pass that
+closes lease leaks, `close()`/wait deadlocks, and keep-alive races, with a few
+small API additions, broader test coverage, and dependency bumps. No breaking
+API changes.
+
+### Highlights
+
+**Lease leaks closed.** Several paths granted an etcd lease and then failed (a lost
+CAS, an early `close()`) without revoking it, leaving the lease to linger until its
+TTL expired. Failed-CAS paths in `DistributedBarrierWithCount`, `LeaderSelector`, and
+`registerService` now revoke before returning, and normal cleanup revokes the service,
+participation, and leadership leases instead of waiting for TTL.
+
+**Deadlocks and races fixed.**
+
+- `LeaderSelector.close()` could deadlock against an active `takeLeadership`: the
+  instance-wide `@Synchronized` is now a narrow `electionLock` around only the
+  leadership-claim CAS, and a new monitor-free `waitUntilFinished(...)` is safe to call
+  from inside `takeLeadership`.
+- `DistributedBarrierWithCount` could leak a keep-alive stream when `close()` raced the
+  waiter; the keep-alive client is now an `AtomicReference` claimed via a single
+  `exchange(null)`, so close/delete happens exactly once.
+- `PathChildrenCache.rebuild()` reconciles its map in place under `@Synchronized` instead
+  of clear-then-refill, so readers never see an empty/partial window.
+
+**Keep-alive failures are now observable.** A dropped lease renewal used to let the key
+silently expire while the recipe still looked healthy. An optional `onKeepAliveError`
+callback (default no-op) is threaded through the keep-alive helpers, and every
+lease-holding recipe records keep-alive stream death on its `exceptions` list.
+
+**Input and key-handling correctness.**
+
+- `DistributedPriorityQueue` Int-priority `enqueue` overloads now reject priorities
+  outside `0..65535` instead of silently wrapping them into the wrong sort bucket, and
+  the empty-queue dequeue wait re-queries the head so strict priority/FIFO ordering holds
+  even under a producer/watcher race.
+- `PathChildrenCache` strips child names consistently for a trailing-slash `cachePath`
+  (it previously over-stripped the first character of every child).
+- `ServiceProvider.getInstance()` throws a typed, service-named `EtcdRecipeException` when
+  no instances are registered, and `EtcdConnector.exceptions` hands back a defensive
+  snapshot rather than the live list.
+
+**Tests, build, and dependencies.** New MockK and integration tests raise coverage to
+88% line / 84% method; the codecov badge no longer resets to 0% on aborted runs; the
+Makefile no longer hangs on a dead Docker socket; and Kotlin (`2.4.0`), common-utils,
+logback, and mockk were bumped.
+
+### Maven coordinates
+
+```kotlin
+implementation("com.pambrose:etcd-recipes:0.11.0")
+```
+
 ## 0.10.1 — 2026-05-15
 
 Maintenance release. No API or behavior changes — just build, static-analysis,

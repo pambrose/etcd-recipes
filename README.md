@@ -89,7 +89,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.pambrose:etcd-recipes:0.10.1")
+    implementation("com.pambrose:etcd-recipes:0.11.0")
 }
 ```
 
@@ -97,7 +97,7 @@ If you use a version catalog (`gradle/libs.versions.toml`):
 
 ```toml
 [versions]
-etcd-recipes = "0.10.1"
+etcd-recipes = "0.11.0"
 
 [libraries]
 etcd-recipes = { module = "com.pambrose:etcd-recipes", version.ref = "etcd-recipes" }
@@ -111,7 +111,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.pambrose:etcd-recipes:0.10.1'
+    implementation 'com.pambrose:etcd-recipes:0.11.0'
 }
 ```
 
@@ -122,7 +122,7 @@ dependencies {
     <dependency>
         <groupId>com.pambrose</groupId>
         <artifactId>etcd-recipes</artifactId>
-        <version>0.10.1</version>
+        <version>0.11.0</version>
     </dependency>
 </dependencies>
 ```
