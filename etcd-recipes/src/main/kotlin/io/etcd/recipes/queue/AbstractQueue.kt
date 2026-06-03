@@ -95,25 +95,12 @@ abstract class AbstractQueue(
         }
       },
     ) {
-      // Query again in case a value arrived just before watch was created.
-      // The gRPC call must run *outside* the synchronized block: the watcher
-      // callback executes on the jetcd Vert.x event loop and also takes
-      // watchLatch's monitor, so holding it while a gRPC response is pending
-      // deadlocks the event loop and never delivers the response.
-      //
-      // When the receiver poll wins the race (watchLatch is still latched),
-      // it is authoritative for ordering — it returns the queue's actual
-      // first item by mod revision, which may pre-date any PUT the watcher
-      // saw if PUTs slipped in between watcher.use { } and the watch actually
-      // being live in jetcd, so we override keyFound and dequeue the
-      // highest-priority/oldest item. But this override only runs while the
-      // latch is still up: under a producer/watcher race where the watch
-      // callback fires first, keyFound already holds whatever PUT the watcher
-      // observed and dequeue returns that available item rather than the
-      // strict highest-priority/oldest one. Delivery is still safe regardless
-      // of which side wins — no loss or duplication — because the
-      // deleteRevKey CAS rejects a stale candidate and the outer retry loop
-      // re-reads the queue.
+      // Poll once to UNBLOCK: a value may have arrived between watcher.use { } and the
+      // watch going live in jetcd, and the watcher never delivers such a pre-live PUT,
+      // so a poll is needed to count the latch down. The gRPC call must run *outside*
+      // the synchronized block — the watcher callback runs on the jetcd Vert.x event
+      // loop and also takes watchLatch's monitor, so holding it while a gRPC response
+      // is pending would deadlock the event loop and never deliver the response.
       if (watchLatch.count > 0) {
         val waitingChildList = client.getFirstChild(queuePath, target).kvs
         if (waitingChildList.isNotEmpty()) {
@@ -124,7 +111,16 @@ abstract class AbstractQueue(
         }
       }
       watchLatch.await()
-      keyFound.get()
+
+      // STRICT ORDERING: whichever PUT the watcher observed first (in keyFound) is not
+      // necessarily the head by sort order — a lower-priority key can be committed just
+      // before a higher-priority one. So after waking, re-query the actual first child
+      // by `target` and prefer it; this routes the wake-up path through the SAME
+      // head-selection as the non-empty fast path above, guaranteeing the
+      // highest-priority (KEY) / oldest (MOD) item. Fall back to the watcher's event only if the re-query is
+      // empty (a concurrent consumer already took the head) — the deleteRevKey CAS and
+      // the outer retry loop then still guarantee no loss or duplication.
+      client.getFirstChild(queuePath, target).kvs.firstOrNull() ?: keyFound.get()
     }
   }
 
