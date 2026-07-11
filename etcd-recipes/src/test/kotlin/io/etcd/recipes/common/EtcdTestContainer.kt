@@ -29,10 +29,9 @@ internal object EtcdTestContainer {
 
   // Lazy: the container is only started when a test in this JVM actually
   // asks for the endpoint. With forkEvery=1 each test class is its own JVM,
-  // so this gives one container per test class. We register a shutdown
-  // hook because Ryuk is disabled in this setup (Docker Desktop refuses
-  // the bind-mount Ryuk needs); the hook ensures the container is stopped
-  // when the test JVM exits.
+  // so this gives one container per test class. Testcontainers' Ryuk reaper
+  // handles cleanup; the explicit shutdown hook is belt-and-suspenders that
+  // stops the container promptly when the test JVM exits.
   private val container: GenericContainer<*> by lazy {
     val c = GenericContainer(DockerImageName.parse(ETCD_IMAGE))
       .withExposedPorts(CLIENT_PORT, PEER_PORT)
