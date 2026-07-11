@@ -49,6 +49,11 @@ class LeaderSelectorCloseDeadlockTests : StringSpec() {
     )
 
     init {
+        // Boot the (possibly Testcontainers) etcd fixture outside the tight per-test
+        // invocation timeouts below: the first `urls` access lazily starts the etcd +
+        // Ryuk containers, which can take over a minute on a busy Docker daemon.
+        beforeSpec { urls }
+
         // The bounded join + isAlive assertion turn a regression into a clean FAIL
         // (closer thread still alive after the timeout) rather than a hung suite.
         "close() releases a takeLeadership blocked on waitUntilFinished()".config(timeout = 60.seconds) {

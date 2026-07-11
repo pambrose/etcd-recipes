@@ -14,13 +14,21 @@
  * limitations under the License.
  */
 
-@file:Suppress("UndocumentedPublicClass", "UndocumentedPublicFunction")
-
 package io.etcd.recipes.common
 
-class EtcdRecipeRuntimeException
-  @JvmOverloads
-  constructor(
-    msg: String,
-    cause: Throwable? = null,
-  ) : RuntimeException(msg, cause)
+/**
+ * Bundles the resilience configuration a recipe applies to its etcd interactions.
+ * Resilience is ON by default; pass [DISABLED] to restore the pre-0.12 behavior
+ * (fatally dead watchers stay dead, silently).
+ */
+data class ResilienceConfig(
+  val watch: WatchResilience = WatchResilience.DEFAULT,
+) {
+  companion object {
+    @JvmField
+    val DEFAULT = ResilienceConfig()
+
+    @JvmField
+    val DISABLED = ResilienceConfig(watch = WatchResilience.DISABLED)
+  }
+}

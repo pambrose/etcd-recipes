@@ -21,9 +21,11 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.kv.CompactResponse
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.kv.PutResponse
+import io.etcd.jetcd.options.CompactOption
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.PutOption
 
@@ -118,6 +120,13 @@ fun Client.getValue(
   keyName: String,
   default: Long,
 ): Long = getValue(keyName)?.asLong ?: default
+
+// Compaction
+@JvmOverloads
+fun Client.compact(
+  revision: Long,
+  option: CompactOption = CompactOption.DEFAULT,
+): CompactResponse = kvClient.compact(revision, option).get()
 
 // Key checking
 fun Client.isKeyPresent(keyName: String) = transaction { If(keyName.doesExist) }.isSucceeded

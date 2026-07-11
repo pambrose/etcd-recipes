@@ -25,6 +25,7 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.getLastChild
@@ -43,11 +44,14 @@ fun <T> withDistributedPriorityQueue(
   receiver: DistributedPriorityQueue.() -> T,
 ): T = DistributedPriorityQueue(client, queuePath, minimumWaitTime).use { it.receiver() }
 
-class DistributedPriorityQueue(
-  client: Client,
-  queuePath: String,
-  val minimumWaitTime: Duration,
-) : AbstractQueue(client, queuePath, SortTarget.KEY) {
+class DistributedPriorityQueue
+  @JvmOverloads
+  constructor(
+    client: Client,
+    queuePath: String,
+    val minimumWaitTime: Duration,
+    resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+  ) : AbstractQueue(client, queuePath, SortTarget.KEY, resilience) {
   private var lastWriteTime = TimeSource.Monotonic.markNow()
 
   fun enqueue(

@@ -33,6 +33,11 @@ class PathChildrenCacheRebuildTests : StringSpec() {
     private val childCount = 20
 
     init {
+        // Boot the (possibly Testcontainers) etcd fixture outside the tight per-test
+        // invocation timeout below: the first `urls` access lazily starts the etcd +
+        // Ryuk containers, which can take over a minute on a busy Docker daemon.
+        beforeSpec { urls }
+
         // Regression test for #8: rebuild() must reconcile the live map in place, so a
         // reader never observes the empty/partial window that the old clear()-then-refill
         // produced. A concurrent reader sampling currentDataAsMap across many rebuilds

@@ -27,6 +27,7 @@ import kotlin.concurrent.atomics.AtomicBoolean
 
 open class EtcdConnector(
   protected val client: Client,
+  protected val resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
 ) : Closeable {
   protected val startCalled = AtomicBoolean(false)
   protected val startThreadComplete = BooleanMonitor(false)

@@ -26,6 +26,9 @@ import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.WatchRecoveryEvent
+import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asString
@@ -37,16 +40,20 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.CopyOnWriteArrayList
 
-class ServiceCache(
-  client: Client,
-  val namesPath: String,
-  val serviceName: String,
-) : EtcdConnector(client) {
+class ServiceCache
+  @JvmOverloads
+  constructor(
+    client: Client,
+    val namesPath: String,
+    val serviceName: String,
+    resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+  ) : EtcdConnector(client, resilience) {
   // Plain var: all reads/writes are inside @Synchronized methods on this instance.
   private var watcher: Watch.Watcher? = null
   private val servicePath = namesPath.appendToPath(serviceName)
   private val serviceMap: ConcurrentMap<String, String> = newConcurrentMap()
   private val listeners: MutableList<ServiceCacheListener> = CopyOnWriteArrayList()
+  private val recoveryListeners: MutableList<WatchRecoveryListener> = CopyOnWriteArrayList()
 
   init {
     require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }
@@ -66,24 +73,20 @@ class ServiceCache(
     // produced. Then start the watch anchored at revision+1 so the watch
     // stream has zero overlap and zero gap relative to the snapshot — this
     // is the standard etcd pattern for consistent cache initialization.
-    val getOption = getOption {
-      isPrefix(true)
-      withSortField(GetOption.SortTarget.KEY)
-    }
-    val resp = client.getResponse(trailingServicePath, getOption)
-    for (kv in resp.kvs) {
-      val k = kv.key.asString
-      val stripped = k.substring(trailingNamesPath.length)
-      serviceMap[stripped] = kv.value.asString
-    }
-    val anchorRevision = resp.header.revision + 1
+    val anchorRevision = reconcile()
 
     val watchOption = watchOption {
       isPrefix(true)
       withRevision(anchorRevision)
     }
 
-    watcher = client.watcher(trailingServicePath, watchOption) { watchResponse ->
+    watcher = client.watcher(
+      trailingServicePath,
+      watchOption,
+      resilience.watch,
+      recoveryListener = { event -> onRecoveryEvent(event) },
+      resyncWith = { reconcile() },
+    ) { watchResponse ->
       watchResponse.events
         .forEach { event ->
           val (k, v) = event.keyValue.asPair.asString
@@ -131,6 +134,41 @@ class ServiceCache(
     return this
   }
 
+  // Snapshot etcd's current instances, reconcile the live map in place (drop keys no
+  // longer present, upsert the rest), and return the next watch anchor (snapshot
+  // revision + 1). Runs during start() and, on the watch dispatcher thread, during
+  // compaction resync — deliberately not synchronized (see PathChildrenCache.reconcile).
+  private fun reconcile(): Long {
+    val trailingServicePath = servicePath.ensureSuffix("/")
+    val trailingNamesPath = namesPath.ensureSuffix("/")
+    val getOption = getOption {
+      isPrefix(true)
+      withSortField(GetOption.SortTarget.KEY)
+    }
+    val resp = client.getResponse(trailingServicePath, getOption)
+    val fresh =
+      resp.kvs.associate { kv -> kv.key.asString.substring(trailingNamesPath.length) to kv.value.asString }
+    serviceMap.keys.retainAll(fresh.keys)
+    serviceMap.putAll(fresh)
+    return resp.header.revision + 1
+  }
+
+  @Suppress("TooGenericExceptionCaught")
+  private fun onRecoveryEvent(event: WatchRecoveryEvent) {
+    if (event is WatchRecoveryEvent.Failed) {
+      exceptionList.value += event.cause
+        ?: EtcdRecipeRuntimeException("Watch on $servicePath abandoned; service cache is no longer updating")
+    }
+    recoveryListeners.forEach { listener ->
+      try {
+        listener.onRecoveryEvent(event)
+      } catch (e: Throwable) {
+        logger.error(e) { "Exception in recovery listener" }
+        exceptionList.value += e
+      }
+    }
+  }
+
   val instances: List<ServiceInstance>
     get() {
       checkCloseNotCalled()
@@ -140,6 +178,15 @@ class ServiceCache(
   fun addListenerForChanges(listener: ServiceCacheListener) {
     checkCloseNotCalled()
     listeners += listener
+  }
+
+  /**
+   * Registers a listener for watch-recovery events (resubscribes after fatal stream
+   * deaths, compaction resyncs, abandoned recovery).
+   */
+  fun addRecoveryListener(listener: WatchRecoveryListener) {
+    checkCloseNotCalled()
+    recoveryListeners += listener
   }
 
   @Synchronized

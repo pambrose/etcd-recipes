@@ -33,9 +33,11 @@ import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_REMOVED
 import io.etcd.recipes.cache.PathChildrenCacheEvent.Type.CHILD_UPDATED
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.WatchRecoveryEvent
+import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.asPair
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.getKeyValuePairs
 import io.etcd.recipes.common.getOption
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.watchOption
@@ -58,11 +60,14 @@ fun <T> withPathChildrenCache(
   receiver: PathChildrenCache.() -> T,
 ): T = PathChildrenCache(client, cachePath, userExecutor).use { it.receiver() }
 
-class PathChildrenCache(
-  client: Client,
-  val cachePath: String,
-  private val userExecutor: Executor? = null,
-) : EtcdConnector(client) {
+class PathChildrenCache
+  @JvmOverloads
+  constructor(
+    client: Client,
+    val cachePath: String,
+    private val userExecutor: Executor? = null,
+    resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+  ) : EtcdConnector(client, resilience) {
   // Canonical prefix for the watched key range. Every child key is stripped
   // relative to this, never cachePath.length + 1: when cachePath already ends in
   // '/', that offset over-strips by one char and corrupts every child name, so the
@@ -74,6 +79,7 @@ class PathChildrenCache(
   private var watcher: Watch.Watcher? = null
   private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
   private val listeners: MutableList<PathChildrenCacheListener> = CopyOnWriteArrayList()
+  private val recoveryListeners: MutableList<WatchRecoveryListener> = CopyOnWriteArrayList()
 
   // Use a single-threaded executor to maintain order
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
@@ -160,6 +166,14 @@ class PathChildrenCache(
     listeners += listener
   }
 
+  /**
+   * Registers a listener for watch-recovery events (resubscribes after fatal stream
+   * deaths, compaction resyncs, abandoned recovery).
+   */
+  fun addRecoveryListener(listener: WatchRecoveryListener) {
+    recoveryListeners += listener
+  }
+
   fun clearListeners() = listeners.clear()
 
   @Suppress("TooGenericExceptionCaught")
@@ -191,7 +205,13 @@ class PathChildrenCache(
     val watchOption = watchOption {
       isPrefix(true).also { if (startRevision > 0L) it.withRevision(startRevision) }
     }
-    watcher = client.watcher(trailingPath, watchOption) { watchResponse ->
+    watcher = client.watcher(
+      trailingPath,
+      watchOption,
+      resilience.watch,
+      recoveryListener = { event -> onRecoveryEvent(event) },
+      resyncWith = { reconcile() },
+    ) { watchResponse ->
       watchResponse.events
         .forEach { event ->
           val (k, v) = event.keyValue.asPair
@@ -265,15 +285,41 @@ class PathChildrenCache(
   // watcher, not rebuild(), for strict event ordering.
   @Synchronized
   fun rebuild() {
+    reconcile()
+  }
+
+  // Snapshot etcd's current children, reconcile the live map in place, and return
+  // the next watch anchor (snapshot revision + 1). Deliberately NOT synchronized:
+  // the compaction-resync path invokes this on the watch dispatcher thread, where
+  // taking the cache monitor could stall against a concurrent close(); map
+  // reconciliation is safe on the ConcurrentMap, and watch events are serialized on
+  // the same dispatcher thread anyway.
+  private fun reconcile(): Long {
     val getOption = getOption {
       isPrefix(true)
       withSortField(GetOption.SortTarget.KEY)
     }
-    val fresh =
-      client.getKeyValuePairs(trailingPath, getOption)
-        .associate { (k, v) -> k.substring(trailingPath.length) to v }
+    val resp = client.getResponse(trailingPath, getOption)
+    val fresh = resp.kvs.associate { kv -> kv.key.asString.substring(trailingPath.length) to kv.value }
     cacheMap.keys.retainAll(fresh.keys)
     cacheMap.putAll(fresh)
+    return resp.header.revision + 1
+  }
+
+  @Suppress("TooGenericExceptionCaught")
+  private fun onRecoveryEvent(event: WatchRecoveryEvent) {
+    if (event is WatchRecoveryEvent.Failed) {
+      exceptionList.value += event.cause
+        ?: EtcdRecipeRuntimeException("Watch on $cachePath abandoned; cache is no longer updating")
+    }
+    recoveryListeners.forEach { listener ->
+      try {
+        listener.onRecoveryEvent(event)
+      } catch (e: Throwable) {
+        logger.error(e) { "Exception in recovery listener" }
+        exceptionList.value += e
+      }
+    }
   }
 
   // For consistency with Curator

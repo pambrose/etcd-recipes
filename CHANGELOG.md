@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Connection-resilience release, part 1: watchers survive fatal stream deaths.
+
+### Added
+
+- `RetryPolicy` (exponential backoff / bounded / forever / never) pacing all watch
+  recovery, and `WatchResilience` / `ResilienceConfig` to tune or disable it
+  (`ResilienceConfig.DISABLED` restores pre-0.12 behavior). Every recipe constructor
+  takes an optional trailing `resilience` parameter.
+- Resilient watchers: `Client.watcher` now subscribes with jetcd's listener API,
+  tracks the last observed revision, auto-resubscribes after fatal stream deaths
+  (halt errors, "no leader"), and re-anchors after compaction via a resync hook.
+  Recovery is observable through `WatchRecoveryListener` events
+  (`Suspended` / `Resubscribed` / `Resynced` / `Failed`); `addRecoveryListener` on
+  `PathChildrenCache` and `ServiceCache`.
+- `Client.compact(revision, option)` KV extension.
+- Fault-injection test harness (container pause/unpause/restart with a
+  restart-stable client port) and fault tests under `io.etcd.recipes.fault`,
+  gated behind `-PuseTestcontainers`.
+
+### Changed
+
+- **Behavior:** watch-backed recipes no longer go silently stale after a fatal
+  watch death. `PathChildrenCache` and `ServiceCache` reconcile their maps during a
+  compaction resync; `LeaderSelector` re-probes the leader key after recovery (a
+  node can no longer permanently drop out of re-election); barrier waiters and
+  queue `dequeue()` re-check their condition after recovery and throw
+  `EtcdRecipeRuntimeException` if recovery is abandoned instead of parking forever.
+- Watchers request etcd progress notifications by default (`WatchResilience`),
+  so watch blocks may observe `WatchResponse`s with an empty event list.
+- `EtcdRecipeRuntimeException` gained an optional `cause` constructor parameter.
+
 ## [0.11.0] - 2026-06-03
 
 Hardening release. Most of the work closes lease leaks, `close()`/wait deadlocks,
