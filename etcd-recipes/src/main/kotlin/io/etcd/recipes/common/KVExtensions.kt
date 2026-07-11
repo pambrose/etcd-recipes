@@ -31,52 +31,64 @@ import io.etcd.jetcd.options.PutOption
 
 private const val MAX_GET_ATTEMPTS = 10
 
+// Puts are retried on retriable statuses: values here are last-writer-wins, so a
+// duplicate apply from an ambiguous first attempt is harmless. CAS puts go through
+// transaction { }, which is never retried.
 @JvmOverloads
 fun Client.putValue(
   keyName: String,
   keyval: ByteSequence,
   option: PutOption = PutOption.DEFAULT,
-): PutResponse = kvClient.put(keyName.asByteSequence, keyval, option).get()
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): PutResponse = retryRpc(rpc, "putValue($keyName)") { kvClient.put(keyName.asByteSequence, keyval, option) }
 
 @JvmOverloads
 fun Client.putValue(
   keyName: String,
   keyval: String,
   option: PutOption = PutOption.DEFAULT,
-): PutResponse = kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): PutResponse = putValue(keyName, keyval.asByteSequence, option, rpc)
 
 @JvmOverloads
 fun Client.putValue(
   keyName: String,
   keyval: Int,
   option: PutOption = PutOption.DEFAULT,
-): PutResponse = kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): PutResponse = putValue(keyName, keyval.asByteSequence, option, rpc)
 
 @JvmOverloads
 fun Client.putValue(
   keyName: String,
   keyval: Long,
   option: PutOption = PutOption.DEFAULT,
-): PutResponse = kvClient.put(keyName.asByteSequence, keyval.asByteSequence, option).get()
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): PutResponse = putValue(keyName, keyval.asByteSequence, option, rpc)
 
 // Delete keys
 fun Client.deleteKeys(vararg keyNames: String) = keyNames.forEach { deleteKey(it) }
 
-fun Client.deleteKey(keyName: String): DeleteResponse = kvClient.delete(keyName.asByteSequence).get()
+@JvmOverloads
+fun Client.deleteKey(
+  keyName: String,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): DeleteResponse = retryRpc(rpc, "deleteKey($keyName)") { kvClient.delete(keyName.asByteSequence) }
 
 // Get responses
 internal fun Client.getResponse(
   keyName: ByteSequence,
   option: GetOption = GetOption.DEFAULT,
   iteration: Int = 0,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
 ): GetResponse {
-  val response = kvClient.get(keyName, option).get()
+  val response = retryRpc(rpc, "getResponse(${keyName.asString})") { kvClient.get(keyName, option) }
   return if (response.kvs.isEmpty() && response.isMore) {
     if (iteration >= MAX_GET_ATTEMPTS)
       throw EtcdRecipeRuntimeException(
         "Unable to fulfill call to getResponse for key ${keyName.asString} after $iteration attempts",
       )
-    getResponse(keyName, option, iteration + 1)
+    getResponse(keyName, option, iteration + 1, rpc)
   } else {
     response
   }
@@ -86,49 +98,73 @@ internal fun Client.getResponse(
 fun Client.getResponse(
   keyName: String,
   option: GetOption = GetOption.DEFAULT,
-): GetResponse = getResponse(keyName.asByteSequence, option)
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): GetResponse = getResponse(keyName.asByteSequence, option, 0, rpc)
 
 // Get children key value pairs
+@JvmOverloads
 fun Client.getKeyValuePairs(
   keyName: ByteSequence,
   getOption: GetOption,
-): List<Pair<String, ByteSequence>> = getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): List<Pair<String, ByteSequence>> = getResponse(keyName, getOption, 0, rpc).kvs.map { it.key.asString to it.value }
 
+@JvmOverloads
 fun Client.getKeyValuePairs(
   keyName: String,
   getOption: GetOption,
-): List<Pair<String, ByteSequence>> = getResponse(keyName, getOption).kvs.map { it.key.asString to it.value }
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): List<Pair<String, ByteSequence>> = getKeyValuePairs(keyName.asByteSequence, getOption, rpc)
 
 // Get single key value
-fun Client.getValue(keyName: String): ByteSequence? {
+@JvmOverloads
+fun Client.getValue(
+  keyName: String,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): ByteSequence? {
   val getOption = getOption { withLimit(1) }
-  return getResponse(keyName, getOption).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value
+  return getResponse(keyName, getOption, rpc).kvs.takeIf { it.isNotEmpty() }?.get(0)?.value
 }
 
 // Get single key value with default
+@JvmOverloads
 fun Client.getValue(
   keyName: String,
   default: String,
-): String = getValue(keyName)?.asString ?: default
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): String = getValue(keyName, rpc)?.asString ?: default
 
+@JvmOverloads
 fun Client.getValue(
   keyName: String,
   default: Int,
-): Int = getValue(keyName)?.asInt ?: default
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): Int = getValue(keyName, rpc)?.asInt ?: default
 
+@JvmOverloads
 fun Client.getValue(
   keyName: String,
   default: Long,
-): Long = getValue(keyName)?.asLong ?: default
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): Long = getValue(keyName, rpc)?.asLong ?: default
 
 // Compaction
 @JvmOverloads
 fun Client.compact(
   revision: Long,
   option: CompactOption = CompactOption.DEFAULT,
-): CompactResponse = kvClient.compact(revision, option).get()
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): CompactResponse = retryRpc(rpc, "compact($revision)") { kvClient.compact(revision, option) }
 
 // Key checking
-fun Client.isKeyPresent(keyName: String) = transaction { If(keyName.doesExist) }.isSucceeded
+@JvmOverloads
+fun Client.isKeyPresent(
+  keyName: String,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+) = transaction(rpc) { If(keyName.doesExist) }.isSucceeded
 
-fun Client.isKeyNotPresent(keyName: String) = !isKeyPresent(keyName)
+@JvmOverloads
+fun Client.isKeyNotPresent(
+  keyName: String,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+) = !isKeyPresent(keyName, rpc)

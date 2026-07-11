@@ -49,7 +49,7 @@ class DistributedQueue
   fun enqueue(value: ByteSequence) {
     checkCloseNotCalled()
     val key = keyFormat.format(queuePath, System.currentTimeMillis(), randomId(3))
-    client.putValue(key, value)
+    client.putValue(key, value, rpc = resilience.rpc)
   }
 
   companion object {

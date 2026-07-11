@@ -25,6 +25,7 @@ import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.asLong
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesNotExist
@@ -50,7 +51,8 @@ constructor(
   client: Client,
   val counterPath: String,
   private val default: Long = 0L,
-) : EtcdConnector(client) {
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+) : EtcdConnector(client, resilience) {
   init {
     require(counterPath.isNotEmpty()) { "Counter path cannot be empty" }
   }
@@ -72,7 +74,7 @@ constructor(
 
   fun get(): Long {
     ensureStarted()
-    return client.getValue(counterPath, -1L)
+    return client.getValue(counterPath, -1L, resilience.rpc)
   }
 
   fun increment(): Long = modifyCounterValue(1L)
@@ -132,12 +134,12 @@ constructor(
       }.isSucceeded
 
   private fun applyCounterTransaction(amount: Long): Pair<TxnResponse, Long> {
-    val kvList: List<KeyValue> = client.getResponse(counterPath).kvs
+    val kvList: List<KeyValue> = client.getResponse(counterPath, rpc = resilience.rpc).kvs
     check(kvList.isNotEmpty()) { "Empty KeyValue list" }
     val kv = kvList.first()
     val newValue = kv.value.asLong + amount
     val txn =
-      client.transaction {
+      client.transaction(resilience.rpc) {
         If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
         Then(counterPath setTo newValue)
       }
