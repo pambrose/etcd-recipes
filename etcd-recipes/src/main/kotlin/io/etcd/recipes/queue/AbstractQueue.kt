@@ -25,6 +25,10 @@ import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.WatchRecoveryEvent
+import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.equalTo
 import io.etcd.recipes.common.getFirstChild
@@ -39,7 +43,8 @@ abstract class AbstractQueue(
   client: Client,
   val queuePath: String,
   val target: SortTarget,
-) : EtcdConnector(client) {
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+) : EtcdConnector(client, resilience) {
   init {
     require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
   }
@@ -79,10 +84,15 @@ abstract class AbstractQueue(
         withNoDelete(true)
       }
     val keyFound = AtomicReference<KeyValue?>()
+    val watchFailure = AtomicReference<Throwable?>()
+    val recoveryListener = waiterRecoveryListener(watchLatch, keyFound, watchFailure)
 
     return client.withWatcher(
       queuePath,
       watchOption,
+      resilience.watch,
+      recoveryListener,
+      resyncWith = null,
       { watchResponse ->
         synchronized(watchLatch) {
           for (watchEvent in watchResponse.events) {
@@ -120,9 +130,53 @@ abstract class AbstractQueue(
       // highest-priority (KEY) / oldest (MOD) item. Fall back to the watcher's event only if the re-query is
       // empty (a concurrent consumer already took the head) — the deleteRevKey CAS and
       // the outer retry loop then still guarantee no loss or duplication.
-      client.getFirstChild(queuePath, target).kvs.firstOrNull() ?: keyFound.get()
+      val head = client.getFirstChild(queuePath, target).kvs.firstOrNull() ?: keyFound.get()
+      if (head == null) {
+        watchFailure.get()?.let { cause ->
+          throw EtcdRecipeRuntimeException("Queue watch on $queuePath failed while waiting for an item", cause)
+        }
+      }
+      head
     }
   }
+
+  // A PUT can land while the watch stream is fatally dead and never be delivered.
+  // After each recovery, poll the head the same way the pre-live gap poll in
+  // waitForFirstChild does (gRPC outside the latch monitor, on the watch dispatcher
+  // thread). An abandoned recovery unparks the waiter with the failure recorded so
+  // the caller errors out instead of parking forever.
+  private fun waiterRecoveryListener(
+    watchLatch: CountDownLatch,
+    keyFound: AtomicReference<KeyValue?>,
+    watchFailure: AtomicReference<Throwable?>,
+  ): WatchRecoveryListener =
+    WatchRecoveryListener { event ->
+      when (event) {
+        is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+          val children = client.getFirstChild(queuePath, target).kvs
+          if (children.isNotEmpty()) {
+            synchronized(watchLatch) {
+              keyFound.compareAndSet(null, children.first())
+              if (watchLatch.count > 0) watchLatch.countDown()
+            }
+          }
+        }
+
+        is WatchRecoveryEvent.Failed -> {
+          val cause = event.cause
+            ?: EtcdRecipeRuntimeException("Watch on $queuePath abandoned while waiting for an item")
+          watchFailure.set(cause)
+          exceptionList.value += cause
+          synchronized(watchLatch) {
+            if (watchLatch.count > 0) watchLatch.countDown()
+          }
+        }
+
+        is WatchRecoveryEvent.Suspended -> {
+          // jetcd (transient) or the recovery loop (fatal) is already on it
+        }
+      }
+    }
 
   private fun deleteRevKey(kv: KeyValue): Boolean =
     client.transaction {

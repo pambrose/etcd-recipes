@@ -49,6 +49,8 @@ DOCKER_HOST ?= unix://$(HOME)/.docker/run/docker.sock
 endif
 
 tests-tc: ## Run the full test suite under Testcontainers (no local etcd required)
+	# Fault-injection tests (io.etcd.recipes.fault.*) only run here: they pause/restart/
+	# compact their per-class etcd container and skip cleanly against a shared local etcd.
 	DOCKER_HOST="$(DOCKER_HOST)" ./gradlew check --rerun-tasks --no-build-cache -PuseTestcontainers
 
 tests-container: ## Run only the multi-container tests (each participant in its own container)

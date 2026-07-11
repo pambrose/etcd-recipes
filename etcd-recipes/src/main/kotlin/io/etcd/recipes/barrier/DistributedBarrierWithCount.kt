@@ -29,6 +29,10 @@ import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.barrier.DistributedBarrierWithCount.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.WatchRecoveryEvent
+import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.deleteKey
@@ -77,7 +81,8 @@ constructor(
   val memberCount: Int,
   val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   val clientId: String = defaultClientId(),
-) : EtcdConnector(client) {
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+) : EtcdConnector(client, resilience) {
   private val readyPath = barrierPath.appendToPath("ready")
   private val waitingPath = barrierPath.appendToPath("waiting")
 
@@ -215,9 +220,40 @@ constructor(
             // Watch for DELETE of /ready and PUTS on /waiters/*
             val trailingKey = barrierPath.ensureSuffix("/")
             val watchOption = watchOption { isPrefix(true) }
+            val watchFailure = java.util.concurrent.atomic.AtomicReference<Throwable?>()
+
+            // A ready-key DELETE or waiter PUT can be lost while the watch stream is
+            // fatally dead. After each recovery, checkWaiterCount() re-probes both
+            // conditions (ready gone / member count reached) exactly like the
+            // pre-park recheck below. An abandoned recovery unparks the waiter with
+            // the failure recorded so the caller errors out instead of parking.
+            val recoveryListener =
+              WatchRecoveryListener { event ->
+                when (event) {
+                  is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+                    checkWaiterCount()
+                  }
+
+                  is WatchRecoveryEvent.Failed -> {
+                    val cause = event.cause
+                      ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
+                    watchFailure.set(cause)
+                    exceptionList.value += cause
+                    closeKeepAlive()
+                  }
+
+                  is WatchRecoveryEvent.Suspended -> {
+                    // jetcd (transient) or the recovery loop (fatal) is already on it
+                  }
+                }
+              }
+
             client.withWatcher(
               trailingKey,
               watchOption,
+              resilience.watch,
+              recoveryListener,
+              resyncWith = null,
               { watchResponse ->
                 watchResponse.events
                   .forEach { watchEvent ->
@@ -237,6 +273,10 @@ constructor(
               if (!signalled) {
                 closeKeepAlive()
                 client.deleteKey(myWaitingPath)  // This is redundant but waiting for keep-alive to stop is slower
+              }
+
+              watchFailure.get()?.let { cause ->
+                throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
               }
 
               // Distinguish natural completion from cancellation.

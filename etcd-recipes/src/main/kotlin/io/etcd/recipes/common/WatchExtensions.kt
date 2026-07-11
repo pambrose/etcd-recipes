@@ -21,15 +21,22 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
+import io.etcd.jetcd.common.exception.CompactedException
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.jetcd.watch.WatchResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.math.max
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 private val logger = KotlinLogging.logger {}
 
@@ -41,34 +48,113 @@ val WatchEvent.valueAsString get() = keyValue.value.asString
 val WatchEvent.valueAsInt get() = keyValue.value.asInt
 val WatchEvent.valueAsLong get() = keyValue.value.asLong
 
-// fun WatchOption.Builder.withPrefix(prefix: String): WatchOption.Builder = withPrefix(prefix.asByteSequence)
-
 @JvmOverloads
 fun Client.watcher(
   keyName: String,
   option: WatchOption = WatchOption.DEFAULT,
   block: (WatchResponse) -> Unit,
-): Watch.Watcher {
-  // jetcd 0.7+ delivers watch events on its Vert.x gRPC event loop. Anything
-  // the callback does that needs another gRPC response — or contends with a
-  // lock the caller is holding while waiting on a gRPC response — would
-  // deadlock the event loop. Hop the callback onto a dedicated single-thread
-  // executor so blocking calls inside it stay off the gRPC threads.
-  val dispatcher = Executors.newSingleThreadExecutor { runnable ->
-    Thread(runnable, "etcd-watch-dispatcher").apply { isDaemon = true }
-  }
-  val delegate = watchClient.watch(keyName.asByteSequence, option) { response ->
-    dispatcher.execute { block(response) }
-  }
-  return DispatchingWatcher(delegate, dispatcher)
-}
+): Watch.Watcher = watcher(keyName, option, WatchResilience.DEFAULT, null, null, block)
 
-private class DispatchingWatcher(
-  private val delegate: Watch.Watcher,
-  private val dispatcher: ExecutorService,
-) : Watch.Watcher by delegate {
+/**
+ * Creates a watcher that survives fatal watch-stream deaths.
+ *
+ * jetcd transparently retries *transient* stream errors itself; what it abandons — and
+ * this watcher recovers per [resilience] — are *fatal* deaths (compaction of the watched
+ * revision, halt-error statuses, "etcdserver: no leader"). Recovery re-subscribes from
+ * the revision just past the last observed event, so no events are lost or duplicated
+ * across a recovery, except after compaction: there [resyncWith] is invoked so the
+ * caller can re-read its world (GET + rebuild derived state) and return the new anchor
+ * revision (typically the GET's `header.revision + 1`). Without [resyncWith] the watch
+ * resumes just past the compacted revision and the gap is reported via
+ * [WatchRecoveryEvent.Resynced] — callers with derived state should supply [resyncWith].
+ */
+fun Client.watcher(
+  keyName: String,
+  option: WatchOption,
+  resilience: WatchResilience,
+  recoveryListener: WatchRecoveryListener? = null,
+  resyncWith: (() -> Long)? = null,
+  block: (WatchResponse) -> Unit,
+): Watch.Watcher =
+  ResilientWatcher(this, keyName, option, resilience, recoveryListener, resyncWith, block)
+    .also { it.subscribeInitial() }
+
+/**
+ * A [Watch.Watcher] wrapping ephemeral jetcd watchers, re-subscribing across fatal
+ * stream deaths.
+ *
+ * Threading: jetcd 0.7+ delivers watch callbacks on its Vert.x gRPC event loop.
+ * Anything a callback does that needs another gRPC response — or contends with a lock
+ * the caller is holding while waiting on a gRPC response — would deadlock the event
+ * loop. Every callback therefore hops onto a dedicated single-thread scheduled
+ * executor; the recovery loop (including the blocking resync GET) runs on that same
+ * executor, and backoff delays are scheduled rather than slept so close() can cancel
+ * a pending attempt immediately.
+ */
+private class ResilientWatcher(
+  private val client: Client,
+  private val keyName: String,
+  private val baseOption: WatchOption,
+  private val resilience: WatchResilience,
+  private val recoveryListener: WatchRecoveryListener?,
+  private val resyncWith: (() -> Long)?,
+  private val block: (WatchResponse) -> Unit,
+) : Watch.Watcher {
+  private val dispatcher: ScheduledExecutorService =
+    Executors.newSingleThreadScheduledExecutor { runnable ->
+      Thread(runnable, "etcd-watch-dispatcher").apply { isDaemon = true }
+    }
+  private val closed = AtomicBoolean(false)
+  private val lock = Any() // guards delegate + pendingAttempt against close() racing recovery
+  private var delegate: Watch.Watcher? = null
+  private var pendingAttempt: ScheduledFuture<*>? = null
+
+  // Dispatcher-thread-confined after construction:
+  private var resumeRevision = baseOption.revision // 0 = "current revision"
+  private var lastCause: Throwable? = null
+  private var suspendedReported = false
+  private var attempt = 0
+  private var recoveryStart: TimeMark? = null
+
+  private val listener =
+    object : Watch.Listener {
+      override fun onNext(response: WatchResponse) {
+        dispatch {
+          advanceRevision(response)
+          suspendedReported = false
+          runCatching { block(response) }
+            .onFailure { e -> logger.error(e) { "Watch block for $keyName threw" } }
+        }
+      }
+
+      override fun onError(throwable: Throwable) {
+        dispatch {
+          lastCause = throwable
+          if (!suspendedReported) {
+            suspendedReported = true
+            emit(WatchRecoveryEvent.Suspended(keyName, throwable))
+          }
+        }
+      }
+
+      override fun onCompleted() {
+        // jetcd fires this when it abandons the watch as fatally dead — and also as a
+        // side effect of our own close(); the closed flag inside dispatch() filters that.
+        dispatch { startRecovery() }
+      }
+    }
+
+  fun subscribeInitial() {
+    val watcher = client.watchClient.watch(keyName.asByteSequence, buildOption(), listener)
+    synchronized(lock) { delegate = watcher }
+  }
+
   override fun close() {
-    delegate.close()
+    if (!closed.compareAndSet(false, true)) return
+    synchronized(lock) {
+      pendingAttempt?.cancel(false)
+      delegate?.close()
+    }
     dispatcher.shutdown()
     // shutdown() refuses new tasks but does not wait for the currently-running
     // callback task. Without awaiting, the user's `block` could still be
@@ -88,6 +174,123 @@ private class DispatchingWatcher(
       Thread.currentThread().interrupt()
     }
   }
+
+  override fun isClosed(): Boolean = closed.load()
+
+  override fun requestProgress() {
+    synchronized(lock) { delegate }?.requestProgress()
+  }
+
+  private fun dispatch(task: () -> Unit) {
+    if (closed.load()) return
+    try {
+      dispatcher.execute {
+        if (closed.load()) return@execute
+        runCatching(task).onFailure { e -> logger.error(e) { "Watch dispatch for $keyName threw" } }
+      }
+    } catch (_: RejectedExecutionException) {
+      // closed concurrently; nothing left to deliver to
+    }
+  }
+
+  private fun advanceRevision(response: WatchResponse) {
+    val events = response.events
+    resumeRevision =
+      if (events.isNotEmpty()) {
+        max(resumeRevision, events.maxOf { it.keyValue.modRevision } + 1)
+      } else {
+        // progress notification: synced through header.revision
+        max(resumeRevision, response.header.revision + 1)
+      }
+  }
+
+  private fun buildOption(): WatchOption =
+    watchOption {
+      if (resumeRevision > 0L) withRevision(resumeRevision)
+      if (baseOption.isPrefix) isPrefix(true)
+      baseOption.endKey.ifPresent { withRange(it) }
+      withPrevKV(baseOption.isPrevKV)
+      withProgressNotify(baseOption.isProgressNotify || resilience.progressNotify)
+      withCreateNotify(baseOption.isCreatedNotify)
+      withNoPut(baseOption.isNoPut)
+      withNoDelete(baseOption.isNoDelete)
+      withRequireLeader(baseOption.withRequireLeader())
+    }
+
+  private fun startRecovery() {
+    if (!suspendedReported) {
+      suspendedReported = true
+      emit(
+        WatchRecoveryEvent.Suspended(
+          keyName,
+          lastCause ?: EtcdRecipeRuntimeException("Watch stream for $keyName completed unexpectedly"),
+        ),
+      )
+    }
+    attempt = 0
+    recoveryStart = TimeSource.Monotonic.markNow()
+    scheduleNextAttempt()
+  }
+
+  private fun scheduleNextAttempt() {
+    attempt += 1
+    val elapsed = recoveryStart?.elapsedNow() ?: kotlin.time.Duration.ZERO
+    val delay = resilience.retryPolicy.nextDelay(attempt, elapsed)
+    if (delay == null) {
+      logger.error(lastCause) { "Abandoning watch on $keyName: retry policy exhausted after ${attempt - 1} attempts" }
+      emit(WatchRecoveryEvent.Failed(keyName, lastCause))
+      return
+    }
+    synchronized(lock) {
+      if (closed.load()) return
+      pendingAttempt = dispatcher.schedule(::runAttempt, delay.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+    }
+  }
+
+  @Suppress("TooGenericExceptionCaught")
+  private fun runAttempt() {
+    if (closed.load()) return
+    try {
+      val compactRevision = compactedRevisionOf(lastCause)
+      if (compactRevision != null) {
+        // Events between compactRevision and the new anchor are unrecoverable; the
+        // resync hook re-reads the world so derived state converges despite the gap.
+        resumeRevision = resyncWith?.invoke() ?: (compactRevision + 1)
+      }
+      val watcher = client.watchClient.watch(keyName.asByteSequence, buildOption(), listener)
+      synchronized(lock) {
+        if (closed.load()) {
+          watcher.close()
+          return
+        }
+        delegate = watcher
+      }
+      lastCause = null
+      suspendedReported = false
+      emit(
+        if (compactRevision != null) {
+          WatchRecoveryEvent.Resynced(keyName, compactRevision, resumeRevision)
+        } else {
+          WatchRecoveryEvent.Resubscribed(keyName, resumeRevision)
+        },
+      )
+      logger.info { "Watch on $keyName re-established (attempt $attempt, resume revision $resumeRevision)" }
+    } catch (e: Throwable) {
+      lastCause = e
+      scheduleNextAttempt()
+    }
+  }
+
+  private fun compactedRevisionOf(cause: Throwable?): Long? =
+    generateSequence(cause) { it.cause.takeIf { c -> c !== it } }
+      .filterIsInstance<CompactedException>()
+      .firstOrNull()
+      ?.compactedRevision
+
+  private fun emit(event: WatchRecoveryEvent) {
+    runCatching { recoveryListener?.onRecoveryEvent(event) }
+      .onFailure { e -> logger.error(e) { "Watch recovery listener for $keyName threw on $event" } }
+  }
 }
 
 @JvmOverloads
@@ -96,8 +299,18 @@ fun <T> Client.withWatcher(
   option: WatchOption = WatchOption.DEFAULT,
   block: (WatchResponse) -> Unit,
   receiver: Watch.Watcher.() -> T,
+): T = withWatcher(keyName, option, WatchResilience.DEFAULT, null, null, block, receiver)
+
+fun <T> Client.withWatcher(
+  keyName: String,
+  option: WatchOption,
+  resilience: WatchResilience,
+  recoveryListener: WatchRecoveryListener? = null,
+  resyncWith: (() -> Long)? = null,
+  block: (WatchResponse) -> Unit,
+  receiver: Watch.Watcher.() -> T,
 ): T =
-  watcher(keyName, option, block)
+  watcher(keyName, option, resilience, recoveryListener, resyncWith, block)
     .use { watcher ->
       watcher.receiver()
     }

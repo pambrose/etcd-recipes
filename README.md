@@ -72,6 +72,48 @@ See the `etcd-recipes-examples/` module for runnable
 and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples)
 demos of every recipe.
 
+## Connection resilience
+
+Watchers created through this library survive fatal watch-stream deaths — **on by
+default** as of 0.12.0. The division of labor:
+
+| Failure | Handled by | How |
+|---|---|---|
+| Connection blip, etcd restart | jetcd | Internal stream resume with revision continuity (~500&nbsp;ms retry) |
+| Compaction of the watched revision | etcd-recipes | Re-read state (recipe resync), re-anchor the watch at the fresh revision |
+| Halt-error statuses, "no leader" | etcd-recipes | Re-subscribe from the last observed revision with configurable backoff |
+
+Recipes that maintain derived state (`PathChildrenCache`, `ServiceCache`) reconcile
+their maps during a compaction resync instead of going silently stale; parked waiters
+(barriers, queue `dequeue()`, `LeaderSelector` re-election) re-probe their condition
+after every recovery, and an abandoned recovery unparks them with an error rather
+than hanging forever.
+
+Recovery pacing is a [`RetryPolicy`](etcd-recipes/src/main/kotlin/io/etcd/recipes/common/RetryPolicy.kt)
+(default: exponential backoff, 250&nbsp;ms → 15&nbsp;s, unbounded). Every recipe takes an
+optional trailing `ResilienceConfig`:
+
+```kotlin
+import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.RetryPolicy
+import io.etcd.recipes.common.WatchResilience
+
+// Tune the backoff (or pass ResilienceConfig.DISABLED for pre-0.12 behavior):
+val resilience = ResilienceConfig(watch = WatchResilience(RetryPolicy.exponentialBackoff(maxAttempts = 20)))
+val cache = PathChildrenCache(client, cachePath, resilience = resilience)
+
+// Observe recovery from application code:
+cache.addRecoveryListener { event -> println("cache watch recovery: $event") }
+```
+
+Recovery events (`Suspended`, `Resubscribed`, `Resynced`, `Failed`) are exposed via
+`addRecoveryListener` on the caches and via the low-level
+`client.watcher(key, option, resilience, recoveryListener, resyncWith) { ... }`
+extension. `Failed` (retry policy exhausted) is also recorded in the connector's
+`exceptions` list. Watchers request etcd progress notifications by default so the
+resume revision stays fresh on quiet keys; watch blocks see them as
+`WatchResponse`s with an empty event list.
+
 ## Compatibility
 
 - Built on [jetcd](https://github.com/etcd-io/jetcd) and targets etcd v3.

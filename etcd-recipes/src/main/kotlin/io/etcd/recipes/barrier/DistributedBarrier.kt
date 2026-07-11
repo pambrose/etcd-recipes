@@ -25,6 +25,10 @@ import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.barrier.DistributedBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.WatchRecoveryEvent
+import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.isKeyPresent
@@ -38,6 +42,7 @@ import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -61,7 +66,8 @@ constructor(
   val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   private val waitOnMissingBarriers: Boolean = true,
   val clientId: String = defaultClientId(),
-) : EtcdConnector(client) {
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+) : EtcdConnector(client, resilience) {
   // Plain var: all reads/writes are inside @Synchronized methods on this instance.
   private var keepAliveLease: CloseableClient? = null
   private val barrierRemoved = AtomicBoolean(false)
@@ -144,12 +150,21 @@ constructor(
     return if (!waitOnMissingBarriers && !isBarrierSet()) {
       true
     } else {
+      // Presence at wait start bounds the recovery recheck below: with
+      // waitOnMissingBarriers=true a waiter on a never-set barrier must keep
+      // waiting across recoveries, not release spuriously.
+      val barrierPresentAtStart = isBarrierSet()
       val waitLatch = CountDownLatch(1)
       val watchOption = watchOption { withNoPut(true) }
+      val watchFailure = AtomicReference<Throwable?>()
+      val recoveryListener = waiterRecoveryListener(barrierPresentAtStart, waitLatch, watchFailure)
 
       client.withWatcher(
         barrierPath,
         watchOption,
+        resilience.watch,
+        recoveryListener,
+        resyncWith = null,
         { watchResponse ->
           for (event in watchResponse.events) {
             if (event.eventType == DELETE) {
@@ -162,10 +177,45 @@ constructor(
         if (!waitOnMissingBarriers && !isBarrierSet())
           waitLatch.countDown()
 
-        waitLatch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        val released = waitLatch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        watchFailure.get()?.let { cause ->
+          throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
+        }
+        released
       }
     }
   }
+
+  // The DELETE can be lost while the watch stream is fatally dead (compaction
+  // resync, or a death before any event was ever observed). After each recovery,
+  // re-probe the barrier and release the waiter if it is gone. An abandoned
+  // recovery unparks the waiter with the failure recorded so the caller errors
+  // out instead of parking until timeout.
+  private fun waiterRecoveryListener(
+    barrierPresentAtStart: Boolean,
+    waitLatch: CountDownLatch,
+    watchFailure: AtomicReference<Throwable?>,
+  ): WatchRecoveryListener =
+    WatchRecoveryListener { event ->
+      when (event) {
+        is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+          if (!isBarrierSet() && (barrierPresentAtStart || !waitOnMissingBarriers))
+            waitLatch.countDown()
+        }
+
+        is WatchRecoveryEvent.Failed -> {
+          val cause = event.cause
+            ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
+          watchFailure.set(cause)
+          exceptionList.value += cause
+          waitLatch.countDown()
+        }
+
+        is WatchRecoveryEvent.Suspended -> {
+          // jetcd (transient) or the recovery loop (fatal) is already on it
+        }
+      }
+    }
 
   @Synchronized
   override fun doClose() {

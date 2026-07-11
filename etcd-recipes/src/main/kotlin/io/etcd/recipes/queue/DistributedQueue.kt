@@ -23,6 +23,7 @@ import com.pambrose.common.util.randomId
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.GetOption.SortTarget
+import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.putValue
 
@@ -32,10 +33,13 @@ fun <T> withDistributedQueue(
   receiver: DistributedQueue.() -> T,
 ): T = DistributedQueue(client, queuePath).use { it.receiver() }
 
-class DistributedQueue(
-  client: Client,
-  queuePath: String,
-) : AbstractQueue(client, queuePath, SortTarget.MOD) {
+class DistributedQueue
+  @JvmOverloads
+  constructor(
+    client: Client,
+    queuePath: String,
+    resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+  ) : AbstractQueue(client, queuePath, SortTarget.MOD, resilience) {
   fun enqueue(value: String) = enqueue(value.asByteSequence)
 
   fun enqueue(value: Int) = enqueue(value.asByteSequence)

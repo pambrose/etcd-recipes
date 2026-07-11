@@ -23,6 +23,7 @@ import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.randomId
 import com.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
@@ -30,12 +31,17 @@ import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.WatchRecoveryEvent
+import io.etcd.recipes.common.WatchRecoveryListener
+import io.etcd.recipes.common.WatchResilience
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.isKeyNotPresent
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.keepAliveWith
 import io.etcd.recipes.common.leaseGrant
@@ -99,7 +105,8 @@ constructor(
   val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   private val userExecutor: Executor? = null,
   val clientId: String = defaultClientId(),
-) : EtcdConnector(client) {
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+) : EtcdConnector(client, resilience) {
   // For Kotlin clients
   @JvmOverloads
   constructor(
@@ -188,9 +195,39 @@ constructor(
         executor.execute {
           try {
             val watchOption = watchOption { withNoPut(true) }
+
+            // The leader-key DELETE is this node's only re-election trigger. If it
+            // is lost while the watch stream is fatally dead (compaction resync, or
+            // a death before any event), the node would never run for leader again —
+            // so after each recovery, re-probe the leader key and run if it is gone.
+            // attemptToBecomeLeader CAS-guards against a concurrent winner.
+            val recoveryListener =
+              WatchRecoveryListener { event ->
+                when (event) {
+                  is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+                    if (client.isKeyNotPresent(leaderPath))
+                      attemptToBecomeLeader(client)
+                  }
+
+                  is WatchRecoveryEvent.Failed -> {
+                    val cause = event.cause
+                      ?: EtcdRecipeRuntimeException("Watch on $leaderPath abandoned; no further re-election attempts")
+                    logger.error(cause) { "Leader watch on $leaderPath abandoned" }
+                    exceptionList.value += cause
+                  }
+
+                  is WatchRecoveryEvent.Suspended -> {
+                    // jetcd (transient) or the recovery loop (fatal) is already on it
+                  }
+                }
+              }
+
             client.withWatcher(
               leaderPath,
               watchOption,
+              resilience.watch,
+              recoveryListener,
+              resyncWith = null,
               { watchResponse ->
                 for (event in watchResponse.events) {
                   if (event.eventType == DELETE) {
@@ -440,6 +477,46 @@ constructor(
       return participants
     }
 
+    // A leader PUT/DELETE can be lost while the watch stream is fatally dead:
+    // always for a compaction resync, and for a plain resubscribe only when nothing
+    // had ever been observed (resumeRevision 0 — no revision to replay from). In
+    // those cases re-read the leader key and replay the current state to the
+    // listener.
+    @Suppress("TooGenericExceptionCaught")
+    private fun reportLeaderRecoveryListener(
+      client: Client,
+      electionPath: String,
+      listener: LeaderListener,
+    ): WatchRecoveryListener =
+      WatchRecoveryListener { event ->
+        try {
+          when (event) {
+            is WatchRecoveryEvent.Resynced,
+            is WatchRecoveryEvent.Resubscribed,
+            -> {
+              val gapPossible = event !is WatchRecoveryEvent.Resubscribed || event.resumeRevision == 0L
+              if (gapPossible) {
+                val leader = client.getValue(electionPath.withLeaderSuffix)?.asString?.stripUniqueSuffix
+                if (leader != null) listener.takeLeadership(leader) else listener.relinquishLeadership()
+              }
+            }
+
+            is WatchRecoveryEvent.Failed -> {
+              listener.onError(
+                event.cause ?: EtcdRecipeRuntimeException("Leader watch on $electionPath abandoned"),
+              )
+            }
+
+            is WatchRecoveryEvent.Suspended -> {
+              // jetcd (transient) or the recovery loop (fatal) is already on it
+            }
+          }
+        } catch (e: Throwable) {
+          logger.error(e) { "Exception in reportLeader() recovery" }
+          listener.onError(e)
+        }
+      }
+
     @Suppress("TooGenericExceptionCaught")
     @JvmStatic
     fun reportLeader(
@@ -454,8 +531,14 @@ constructor(
       val terminateListener = CountDownLatch(1)
       executor.execute {
         connectToEtcd(urls) { client ->
+          val recoveryListener = reportLeaderRecoveryListener(client, electionPath, listener)
+
           client.withWatcher(
             electionPath.withLeaderSuffix,
+            WatchOption.DEFAULT,
+            WatchResilience.DEFAULT,
+            recoveryListener,
+            resyncWith = null,
             block = { watchResponse ->
               for (event in watchResponse.events) {
                 try {
