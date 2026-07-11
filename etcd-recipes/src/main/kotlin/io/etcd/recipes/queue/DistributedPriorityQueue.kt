@@ -124,7 +124,7 @@ class DistributedPriorityQueue
       // dequeue()'s retry-on-CAS-conflict loop. synchronized(this) only serializes
       // writers within this JVM; cross-instance correctness comes from this retry.
       repeat(MAX_ENQUEUE_ATTEMPTS) { attempt ->
-        val resp = client.getLastChild(prefix, SortTarget.KEY)
+        val resp = client.getLastChild(prefix, SortTarget.KEY, resilience.rpc)
         val kvs = resp.kvs
 
         var newSeqNum = 0
@@ -134,7 +134,7 @@ class DistributedPriorityQueue
         }
 
         val txn =
-          client.transaction {
+          client.transaction(resilience.rpc) {
             val newKey = "%s/%016d".format(prefix, newSeqNum)
             val baseKey = "__$prefix"
             If(lessThan(baseKey, CmpTarget.modRevision(resp.header.revision + 1)))

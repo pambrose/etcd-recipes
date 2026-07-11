@@ -183,7 +183,7 @@ class PathChildrenCache
         isPrefix(true)
         withSortField(GetOption.SortTarget.KEY)
       }
-      val resp = client.getResponse(trailingPath, getOption)
+      val resp = client.getResponse(trailingPath, getOption, resilience.rpc)
       val anchorRevision = resp.header.revision + 1
 
       for (kv in resp.kvs) {
@@ -299,7 +299,7 @@ class PathChildrenCache
       isPrefix(true)
       withSortField(GetOption.SortTarget.KEY)
     }
-    val resp = client.getResponse(trailingPath, getOption)
+    val resp = client.getResponse(trailingPath, getOption, resilience.rpc)
     val fresh = resp.kvs.associate { kv -> kv.key.asString.substring(trailingPath.length) to kv.value }
     cacheMap.keys.retainAll(fresh.keys)
     cacheMap.putAll(fresh)

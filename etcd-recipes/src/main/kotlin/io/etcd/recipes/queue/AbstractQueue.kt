@@ -58,7 +58,7 @@ abstract class AbstractQueue(
     // could allocate a new watcher (with its own dispatcher executor).
     // Under high contention the resulting churn was unbounded.
     while (true) {
-      val childList = client.getFirstChild(queuePath, target).kvs
+      val childList = client.getFirstChild(queuePath, target, resilience.rpc).kvs
       if (childList.isNotEmpty()) {
         val child = childList.first()
         if (deleteRevKey(child)) {
@@ -112,7 +112,7 @@ abstract class AbstractQueue(
       // loop and also takes watchLatch's monitor, so holding it while a gRPC response
       // is pending would deadlock the event loop and never deliver the response.
       if (watchLatch.count > 0) {
-        val waitingChildList = client.getFirstChild(queuePath, target).kvs
+        val waitingChildList = client.getFirstChild(queuePath, target, resilience.rpc).kvs
         if (waitingChildList.isNotEmpty()) {
           synchronized(watchLatch) {
             keyFound.set(waitingChildList.first())
@@ -130,7 +130,7 @@ abstract class AbstractQueue(
       // highest-priority (KEY) / oldest (MOD) item. Fall back to the watcher's event only if the re-query is
       // empty (a concurrent consumer already took the head) — the deleteRevKey CAS and
       // the outer retry loop then still guarantee no loss or duplication.
-      val head = client.getFirstChild(queuePath, target).kvs.firstOrNull() ?: keyFound.get()
+      val head = client.getFirstChild(queuePath, target, resilience.rpc).kvs.firstOrNull() ?: keyFound.get()
       if (head == null) {
         watchFailure.get()?.let { cause ->
           throw EtcdRecipeRuntimeException("Queue watch on $queuePath failed while waiting for an item", cause)
@@ -154,7 +154,7 @@ abstract class AbstractQueue(
       reportRecoveryEvent(event)
       when (event) {
         is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-          val children = client.getFirstChild(queuePath, target).kvs
+          val children = client.getFirstChild(queuePath, target, resilience.rpc).kvs
           if (children.isNotEmpty()) {
             synchronized(watchLatch) {
               keyFound.compareAndSet(null, children.first())
@@ -180,7 +180,7 @@ abstract class AbstractQueue(
     }
 
   private fun deleteRevKey(kv: KeyValue): Boolean =
-    client.transaction {
+    client.transaction(resilience.rpc) {
       If(equalTo(kv.key, CmpTarget.modRevision(kv.modRevision)))
       Then(deleteOp(kv.key))
     }.isSucceeded

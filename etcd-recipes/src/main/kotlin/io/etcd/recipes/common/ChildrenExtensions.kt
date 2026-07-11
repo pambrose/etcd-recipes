@@ -33,6 +33,7 @@ fun Client.getChildren(
   target: GetOption.SortTarget = GetOption.SortTarget.KEY,
   order: SortOrder = SortOrder.ASCEND,
   keysOnly: Boolean = false,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
 ): List<Pair<String, ByteSequence>> {
   val trailingKey = keyName.ensureSuffix("/")
   val getOption =
@@ -42,18 +43,22 @@ fun Client.getChildren(
       withSortOrder(order)
       withKeysOnly(keysOnly)
     }
-  return getKeyValuePairs(trailingKey, getOption)
+  return getKeyValuePairs(trailingKey, getOption, rpc)
 }
 
+@JvmOverloads
 fun Client.getFirstChild(
   keyName: String,
   target: GetOption.SortTarget,
-): GetResponse = getSingleChild(keyName, target, SortOrder.ASCEND)
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): GetResponse = getSingleChild(keyName, target, SortOrder.ASCEND, rpc)
 
+@JvmOverloads
 fun Client.getLastChild(
   keyName: String,
   target: GetOption.SortTarget,
-): GetResponse = getSingleChild(keyName, target, SortOrder.DESCEND)
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): GetResponse = getSingleChild(keyName, target, SortOrder.DESCEND, rpc)
 
 // fun GetOption.Builder.withPrefix(prefix: String): GetOption.Builder = withPrefix(prefix.asByteSequence)
 
@@ -61,6 +66,7 @@ private fun Client.getSingleChild(
   keyName: String,
   target: GetOption.SortTarget,
   order: SortOrder,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
 ): GetResponse {
   val trailingKey = keyName.ensureSuffix("/")
   val getOption =
@@ -70,7 +76,7 @@ private fun Client.getSingleChild(
       withSortOrder(order)
       withLimit(1)
     }
-  return getResponse(trailingKey, getOption)
+  return getResponse(trailingKey, getOption, rpc)
 }
 
 @JvmOverloads
@@ -78,7 +84,8 @@ fun Client.getChildrenKeys(
   keyName: String,
   target: GetOption.SortTarget = GetOption.SortTarget.KEY,
   order: SortOrder = SortOrder.ASCEND,
-): List<String> = getChildren(keyName, target, order, true).keys
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): List<String> = getChildren(keyName, target, order, true, rpc).keys
 
 @JvmOverloads
 fun Client.getChildrenValues(
@@ -87,24 +94,32 @@ fun Client.getChildrenValues(
   order: SortOrder = SortOrder.ASCEND,
 ): List<ByteSequence> = getChildren(keyName, target, order).values
 
-// Delete children keys
-fun Client.deleteChildren(keyName: String): List<String> {
-  val trailingKey = keyName.ensureSuffix("/")
-  val deleteOption =
-    deleteOption {
-      isPrefix(true)
-      withPrevKV(true)
-    }
-  return kvClient.delete(trailingKey.asByteSequence, deleteOption).get().prevKvs.map { it.key.asString }
-}
-
-// Count children keys
-fun Client.getChildCount(keyName: String): Long {
+@JvmOverloads
+fun Client.getChildCount(
+  keyName: String,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): Long {
   val trailingKey = keyName.ensureSuffix("/")
   val getOption =
     getOption {
       isPrefix(true)
       withCountOnly(true)
     }
-  return getResponse(trailingKey, getOption).count
+  return getResponse(trailingKey, getOption, rpc).count
+}
+
+// Delete children keys
+@JvmOverloads
+fun Client.deleteChildren(
+  keyName: String,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): List<String> {
+  val trailingKey = keyName.ensureSuffix("/")
+  val deleteOption =
+    deleteOption {
+      isPrefix(true)
+      withPrevKV(true)
+    }
+  return retryRpc(rpc, "deleteChildren($keyName)") { kvClient.delete(trailingKey.asByteSequence, deleteOption) }
+    .prevKvs.map { it.key.asString }
 }

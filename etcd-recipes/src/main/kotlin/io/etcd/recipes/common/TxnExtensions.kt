@@ -29,11 +29,22 @@ import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.PutOption
 
-fun Client.transaction(receiver: Txn.() -> Txn): TxnResponse =
-  kvClient.txn().run {
-    receiver()
-    commit()
-  }.get()
+// Transactions get the operation timeout but are NEVER retried: a failed commit is
+// ambiguous (it may have been applied), and CAS retry decisions belong to the
+// recipes' own loops (queue dequeue, DistributedAtomicLong).
+@JvmOverloads
+fun Client.transaction(
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+  receiver: Txn.() -> Txn,
+): TxnResponse =
+  awaitRpc(
+    rpc,
+    "transaction",
+    kvClient.txn().run {
+      receiver()
+      commit()
+    },
+  )
 
 fun <T> equalTo(
   bytes: ByteSequence,

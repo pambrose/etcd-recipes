@@ -150,6 +150,30 @@ selector.addConnectionStateListener { new, prev ->
 `LOST` means a lease expired or recovery was abandoned — ownership may have been
 lost during the outage (a leader, for example, has already stepped down by then).
 
+### RPC timeouts and retries
+
+Every blocking extension call (`putValue`, `getValue`, `deleteKey`, `leaseGrant`,
+...) used to block on an unbounded `future.get()` — against an unreachable cluster
+it parked forever. Each attempt is now bounded by a 30&nbsp;s operation timeout,
+and retriable failures (`UNAVAILABLE`, `INTERNAL`, `DEADLINE_EXCEEDED`, or a
+timeout) are retried under a bounded policy (4 attempts, 250&nbsp;ms apart) —
+configurable per call or per recipe via `ResilienceConfig.rpc`:
+
+```kotlin
+// One-shot with a tight deadline for a latency-sensitive path:
+val value = client.getValue("/config/flag", "default", RpcResilience(RetryPolicy.never, 2.seconds))
+```
+
+`transaction { }` is **never retried** regardless of policy — a failed commit is
+ambiguous (it may have been applied), and CAS retry decisions belong to the
+recipes' own loops. The timeout still applies.
+
+`connectToEtcd` also applies recipe-tuned client defaults before your own builder
+settings (which win): a 5&nbsp;s `connectTimeout` and a 30&nbsp;s
+`retryMaxDuration` bound on jetcd's internal per-call retries. jetcd 0.8.6's own
+defaults already enable `waitForReady` and gRPC keepalive (30&nbsp;s /
+10&nbsp;s timeout).
+
 ## Compatibility
 
 - Built on [jetcd](https://github.com/etcd-io/jetcd) and targets etcd v3.

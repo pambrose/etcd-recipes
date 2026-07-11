@@ -65,19 +65,30 @@ fun Client.keepAlive(
       .build(),
   )
 
-fun Client.leaseGrant(ttl: Duration): LeaseGrantResponse =
-  leaseClient.grant(ttl.toDouble(DurationUnit.SECONDS).toLong()).get()
+// Retried on retriable statuses: a duplicate grant from an ambiguous first attempt
+// orphans a lease that dies at its TTL — harmless.
+@JvmOverloads
+fun Client.leaseGrant(
+  ttl: Duration,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): LeaseGrantResponse =
+  retryRpc(rpc, "leaseGrant($ttl)") { leaseClient.grant(ttl.toDouble(DurationUnit.SECONDS).toLong()) }
 
 /**
  * Best-effort revoke of a lease. Failures are logged and swallowed because
  * callers use this on cleanup paths (failed CAS, exception in put loop) where
  * raising a secondary failure would mask the original problem; the lease's TTL
  * is the upper bound on resource retention if the revoke RPC itself fails.
+ * The operation timeout applies so cleanup paths cannot park forever.
  */
 @Suppress("TooGenericExceptionCaught")
-fun Client.leaseRevoke(lease: LeaseGrantResponse) {
+@JvmOverloads
+fun Client.leaseRevoke(
+  lease: LeaseGrantResponse,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+) {
   try {
-    leaseClient.revoke(lease.id).get()
+    awaitRpc(rpc, "leaseRevoke(${lease.id})", leaseClient.revoke(lease.id))
   } catch (e: Throwable) {
     logger.debug(e) { "leaseRevoke(${lease.id}) failed; lease will expire on TTL" }
   }

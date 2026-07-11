@@ -86,7 +86,7 @@ constructor(
       // until TTL (#7). Revoking already deletes the lease-bound key; deleteKey is
       // kept as belt-and-suspenders.
       healer.close()
-      client.deleteKey(instancePath)
+      client.deleteKey(instancePath)  // best-effort; healer already revoked the lease
     }
   }
 
@@ -108,7 +108,7 @@ constructor(
         resilience.lease,
         leaseListener = { event -> onLeaseEvent(instancePath, event) },
       ) { lease ->
-        client.transaction {
+        client.transaction(resilience.rpc) {
           If(instancePath.doesNotExist)
           Then(instancePath.setTo(context.currentJson, putOption { withLeaseId(lease.id) }))
         }.isSucceeded
@@ -131,7 +131,7 @@ constructor(
     val context = serviceContextMap[service.id]
       ?: throw EtcdRecipeException("ServiceInstance ${service.name} was not first registered with registerService()")
     val txn =
-      client.transaction {
+      client.transaction(resilience.rpc) {
         If(instancePath.doesExist)
         Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.healer.currentLeaseId) }))
       }

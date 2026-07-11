@@ -78,13 +78,13 @@ constructor(
 
   fun isBarrierSet(): Boolean {
     checkCloseNotCalled()
-    return client.isKeyPresent(barrierPath)
+    return client.isKeyPresent(barrierPath, resilience.rpc)
   }
 
   @Synchronized
   fun setBarrier(): Boolean {
     checkCloseNotCalled()
-    return if (client.isKeyPresent(barrierPath)) {
+    return if (client.isKeyPresent(barrierPath, resilience.rpc)) {
       false
     } else {
       // Create unique token to avoid collision from clients with same id
@@ -107,7 +107,7 @@ constructor(
           if (barrierRemoved.load()) {
             false // explicitly removed: do not re-arm
           } else {
-            client.transaction {
+            client.transaction(resilience.rpc) {
               If(barrierPath.doesNotExist)
               Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
             }.isSucceeded
@@ -153,7 +153,7 @@ constructor(
       keepAliveLease?.close()
       keepAliveLease = null
 
-      client.deleteKey(barrierPath)
+      client.deleteKey(barrierPath, resilience.rpc)
 
       barrierRemoved.store(true)
 

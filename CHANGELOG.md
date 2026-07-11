@@ -8,7 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 Connection-resilience release: watchers survive fatal stream deaths (part 1),
-leases self-heal and leaders step down on lease loss (part 2).
+leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
+gain timeouts and retries (part 3).
+
+### Added (part 3: RPC timeouts/retries, client defaults)
+
+- `RpcResilience` (`ResilienceConfig.rpc`): every blocking extension call
+  (`putValue`, `getValue`, `deleteKey`, `leaseGrant`, ...) is bounded by a 30s
+  per-attempt operation timeout and retries retriable statuses (UNAVAILABLE /
+  INTERNAL / DEADLINE_EXCEEDED / timeout) under a bounded policy (4 × 250ms).
+  Extension functions take an optional trailing `rpc` parameter; recipes pass
+  their `resilience.rpc`.
+- `ClientBuilder.withRecipeDefaults()` — `connectTimeout(5s)` +
+  `retryMaxDuration(30s)`; `connectToEtcd` applies it before the caller's builder
+  block, so user settings win.
+
+### Changed (part 3)
+
+- **Behavior:** blocking RPCs no longer park forever against an unreachable
+  cluster — they fail after the operation timeout (`RpcResilience.DISABLED`
+  restores unbounded one-shot semantics). `transaction { }` gets the timeout but
+  is never retried: failed commits are ambiguous and CAS retries belong to the
+  recipes' own loops.
 
 ### Added (part 2: self-healing leases, connection state)
 

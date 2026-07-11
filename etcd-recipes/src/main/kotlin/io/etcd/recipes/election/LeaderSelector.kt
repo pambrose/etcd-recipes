@@ -223,7 +223,7 @@ constructor(
                 reportRecoveryEvent(event)
                 when (event) {
                   is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-                    if (client.isKeyNotPresent(leaderPath))
+                    if (client.isKeyNotPresent(leaderPath, resilience.rpc))
                       attemptToBecomeLeader(client)
                   }
 
@@ -359,7 +359,7 @@ constructor(
     // Wait until key goes away when previous keep alive finishes
     val attemptCount = leaseTtlSecs * 2
     for (i in 0 until attemptCount) {
-      if (!client.isKeyPresent(path)) {
+      if (!client.isKeyPresent(path, resilience.rpc)) {
         break
       }
 
@@ -383,7 +383,7 @@ constructor(
           resilience.lease,
           leaseListener = { event -> onParticipationLeaseEvent(event) },
         ) { lease ->
-          client.transaction {
+          client.transaction(resilience.rpc) {
             If(path.doesNotExist)
             Then(path.setTo(clientId, putOption { withLeaseId(lease.id) }))
           }.isSucceeded
@@ -441,11 +441,11 @@ constructor(
 
         // Prime lease to give keepAliveWith a chance to get started; route through
         // the common/ extension layer rather than reaching into jetcd directly.
-        val granted = client.leaseGrant(leaseTtlSecs.seconds)
+        val granted = client.leaseGrant(leaseTtlSecs.seconds, resilience.rpc)
 
         // Check the key name. If it is not found, then set it
         val txn =
-          client.transaction {
+          client.transaction(resilience.rpc) {
             If(leaderPath.doesNotExist)
             Then(leaderPath.setTo(uniqueToken, putOption { withLeaseId(granted.id) }))
           }
@@ -457,7 +457,7 @@ constructor(
           // Failed to become leader: revoke the lease we just created so it does
           // not linger in etcd until TTL. Without this, every losing candidate in
           // an election leaks a lease per turnover.
-          client.leaseRevoke(granted)
+          client.leaseRevoke(granted, resilience.rpc)
           return false
         }
 

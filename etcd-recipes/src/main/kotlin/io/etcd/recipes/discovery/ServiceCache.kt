@@ -145,7 +145,7 @@ class ServiceCache
       isPrefix(true)
       withSortField(GetOption.SortTarget.KEY)
     }
-    val resp = client.getResponse(trailingServicePath, getOption)
+    val resp = client.getResponse(trailingServicePath, getOption, resilience.rpc)
     val fresh =
       resp.kvs.associate { kv -> kv.key.asString.substring(trailingNamesPath.length) to kv.value.asString }
     serviceMap.keys.retainAll(fresh.keys)

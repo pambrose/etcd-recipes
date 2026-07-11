@@ -107,7 +107,7 @@ constructor(
           resilience.lease,
           leaseListener = { event -> onLeaseEvent(event) },
         ) { lease ->
-          client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) })
+          client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) }, resilience.rpc)
           true
         }
         keepAliveStartedLatch.countDown()

@@ -106,13 +106,13 @@ constructor(
   private val isReadySet: Boolean
     get() {
       checkCloseNotCalled()
-      return client.isKeyPresent(readyPath)
+      return client.isKeyPresent(readyPath, resilience.rpc)
     }
 
   val waiterCount: Long
     get() {
       checkCloseNotCalled()
-      return client.getChildCount(waitingPath)
+      return client.getChildCount(waitingPath, resilience.rpc)
     }
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
@@ -145,7 +145,7 @@ constructor(
       // the just-created client. keepAliveClosed stays purely the wait/signal flag.
       keepAliveLease.exchange(null)?.let { kac ->
         kac.close()
-        runCatching { client.deleteKey(myWaitingPath) }
+        runCatching { client.deleteKey(myWaitingPath, resilience.rpc) }
       }
       keepAliveClosed.set(true)
     }
@@ -159,7 +159,7 @@ constructor(
           closeKeepAlive()
 
           // Delete /ready key
-          client.transaction {
+          client.transaction(resilience.rpc) {
             If(readyPath.doesExist)
             Then(deleteOp(readyPath))
           }
@@ -176,7 +176,7 @@ constructor(
 
     try {
       // Do a CAS on the /ready name. If it is not found, then set it
-      client.transaction {
+      client.transaction(resilience.rpc) {
         If(readyPath.doesNotExist)
         Then(readyPath setTo uniqueToken)
       }
@@ -196,7 +196,7 @@ constructor(
             if (keepAliveClosed.get()) {
               false
             } else {
-              client.transaction {
+              client.transaction(resilience.rpc) {
                 If(myWaitingPath.doesNotExist)
                 Then(myWaitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
               }.isSucceeded
@@ -284,7 +284,8 @@ constructor(
               // Cleanup if a time-out occurred
               if (!signalled) {
                 closeKeepAlive()
-                client.deleteKey(myWaitingPath)  // This is redundant but waiting for keep-alive to stop is slower
+                // Redundant, but waiting for the keep-alive to stop is slower
+                client.deleteKey(myWaitingPath, resilience.rpc)
               }
 
               watchFailure.get()?.let { cause ->

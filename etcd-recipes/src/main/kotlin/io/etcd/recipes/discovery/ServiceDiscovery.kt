@@ -22,6 +22,7 @@ import io.etcd.jetcd.Client
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.getChildrenKeys
@@ -53,8 +54,9 @@ constructor(
   val servicePath: String,
   val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   val clientId: String = defaultClientId(),
-) : EtcdConnector(client) {
-  private val registry = ServiceRegistry(client, servicePath, leaseTtlSecs)
+  private val resilienceConfig: ResilienceConfig = ResilienceConfig.DEFAULT,
+) : EtcdConnector(client, resilienceConfig) {
+  private val registry = ServiceRegistry(client, servicePath, leaseTtlSecs, resilienceConfig)
   private val namesPath = servicePath.appendToPath("/names")
   private val serviceCacheList: MutableList<ServiceCache> = CopyOnWriteArrayList()
   private val serviceProviderList: MutableList<ServiceProvider> = CopyOnWriteArrayList()
@@ -122,7 +124,7 @@ constructor(
   ): ServiceInstance {
     checkCloseNotCalled()
     val path = namesPath.appendToPath("$name/$id")
-    val json = client.getValue(path)?.asString
+    val json = client.getValue(path, resilience.rpc)?.asString
       ?: throw EtcdRecipeException("ServiceInstance $path not present")
     return ServiceInstance.toObject(json)
   }
