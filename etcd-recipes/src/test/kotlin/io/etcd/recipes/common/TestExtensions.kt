@@ -21,16 +21,50 @@ package io.etcd.recipes.common
 import com.pambrose.common.concurrent.thread
 import com.pambrose.common.util.isNotNull
 import org.junit.jupiter.api.Assertions.fail
+import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+
+private const val LOCAL_ETCD_HOST = "localhost"
+private const val LOCAL_ETCD_PORT = 2379
 
 val urls: List<String> by lazy {
-  if (System.getProperty("etcd.recipes.testcontainers") == "true")
+  if (System.getProperty("etcd.recipes.testcontainers") == "true") {
     listOf(EtcdTestContainer.endpoint())
-  else
-    listOf("http://localhost:2379")
+  } else {
+    assertLocalEtcdReachable(LOCAL_ETCD_HOST, LOCAL_ETCD_PORT)
+    listOf("http://$LOCAL_ETCD_HOST:$LOCAL_ETCD_PORT")
+  }
+}
+
+/**
+ * Fail fast if nothing is accepting TCP connections at [host]:[port]. Runs only on the
+ * local-etcd path; the Testcontainers path waits for readiness before handing back an
+ * endpoint. Without this, jetcd blocks indefinitely on the initial connection when the
+ * local etcd was never started, so the whole suite hangs instead of failing with a
+ * clear message.
+ */
+private fun assertLocalEtcdReachable(
+  host: String,
+  port: Int,
+  timeout: Duration = 2.seconds,
+) {
+  try {
+    Socket().use { it.connect(InetSocketAddress(host, port), timeout.inWholeMilliseconds.toInt()) }
+  } catch (e: IOException) {
+    error(
+      """
+      No etcd reachable at $host:$port (${e.message}).
+      Start a local etcd with ./etcd.sh, or run the suite under Testcontainers:
+        make tests-tc      (./gradlew check -PuseTestcontainers)
+      """.trimIndent(),
+    )
+  }
 }
 
 /**
