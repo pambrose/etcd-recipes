@@ -186,7 +186,13 @@ class BugFixesTests : StringSpec() {
 
     "fix #5: DistributedBarrier source revokes the lease when CAS fails" {
       val src = readSource("src/main/kotlin/io/etcd/recipes/barrier/DistributedBarrier.kt")
-      src.contains("client.leaseRevoke(lease)") shouldBe true
+      // Since 0.12 the barrier lease is owned by selfHealingKeepAlive, whose
+      // establish-declined path revokes the lease it granted — the leak-on-failed-CAS
+      // fix lives there now (see SelfHealingKeepAliveTests "initial establish
+      // returning false aborts and revokes the lease"). The barrier source must keep
+      // routing lease ownership through it rather than hand-rolling grant/keepAlive.
+      src.contains("selfHealingKeepAlive(") shouldBe true
+      src.contains("leaseClient.grant") shouldBe false
     }
 
     "fix #5: losing setBarrier returns false cleanly and the winner remains active" {

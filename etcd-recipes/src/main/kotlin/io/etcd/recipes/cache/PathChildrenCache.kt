@@ -308,6 +308,7 @@ class PathChildrenCache
 
   @Suppress("TooGenericExceptionCaught")
   private fun onRecoveryEvent(event: WatchRecoveryEvent) {
+    reportRecoveryEvent(event)
     if (event is WatchRecoveryEvent.Failed) {
       exceptionList.value += event.cause
         ?: EtcdRecipeRuntimeException("Watch on $cachePath abandoned; cache is no longer updating")

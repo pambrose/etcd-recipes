@@ -21,23 +21,26 @@ package io.etcd.recipes.discovery
 import com.google.common.collect.Maps.newConcurrentMap
 import com.pambrose.common.delegate.AtomicDelegates.nonNullableReference
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.lease.LeaseGrantResponse
-import io.etcd.jetcd.support.CloseableClient
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.LeaseEvent
+import io.etcd.recipes.common.LeaseListener
+import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.SelfHealingKeepAlive
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
-import io.etcd.recipes.common.keepAlive
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.leaseRevoke
 import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.selfHealingKeepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.Closeable
 import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -51,9 +54,16 @@ constructor(
   client: Client,
   val servicePath: String,
   val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
-) : EtcdConnector(client) {
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+) : EtcdConnector(client, resilience) {
   private val namesPath = servicePath.appendToPath("/names")
   private val serviceContextMap: ConcurrentMap<String, ServiceInstanceContext> = newConcurrentMap()
+  private val leaseListeners = CopyOnWriteArrayList<LeaseListener>()
+
+  /** Registers a listener for lease lifecycle events (expiry, healing, failure). */
+  fun addLeaseListener(listener: LeaseListener) {
+    leaseListeners += listener
+  }
 
   init {
     require(servicePath.isNotEmpty()) { "Service base path cannot be empty" }
@@ -64,15 +74,18 @@ constructor(
     val client: Client,
     val instancePath: String,
   ) : Closeable {
-    var lease: LeaseGrantResponse by nonNullableReference()
-    var keepAlive: CloseableClient by nonNullableReference()
+    // The JSON re-put on every heal; updateService refreshes it so a heal that
+    // races an update never resurrects a stale payload.
+    @Volatile
+    var currentJson: String = service.toJson()
+    var healer: SelfHealingKeepAlive by nonNullableReference()
 
     override fun close() {
-      keepAlive.close()
-      // Revoke the lease so it (and its bound key) is released promptly on
-      // unregister/close instead of lingering until TTL (#7). Revoking already
-      // deletes the lease-bound key; deleteKey is kept as belt-and-suspenders.
-      client.leaseRevoke(lease)
+      // Closing the healer stops any healing and revokes the current lease, so the
+      // instance key is released promptly on unregister/close instead of lingering
+      // until TTL (#7). Revoking already deletes the lease-bound key; deleteKey is
+      // kept as belt-and-suspenders.
+      healer.close()
       client.deleteKey(instancePath)
     }
   }
@@ -85,25 +98,28 @@ constructor(
     val instancePath = getNamesPath(service)
     val context = ServiceInstanceContext(service, client, instancePath)
 
-    context.lease = client.leaseGrant(leaseTtlSecs.seconds)
-
-    val txn =
-      client.transaction {
-        If(instancePath.doesNotExist)
-        Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.lease.id) }))
+    // Self-healing: if the instance lease expires (partition longer than the TTL),
+    // the healer re-grants it and re-runs this CAS, re-registering the instance.
+    // Re-registration is safe because instance ids are unique to this process; a
+    // CAS loss means the key unexpectedly exists, so ownership is not reclaimed.
+    try {
+      context.healer = client.selfHealingKeepAlive(
+        leaseTtlSecs.seconds,
+        resilience.lease,
+        leaseListener = { event -> onLeaseEvent(instancePath, event) },
+      ) { lease ->
+        client.transaction {
+          If(instancePath.doesNotExist)
+          Then(instancePath.setTo(context.currentJson, putOption { withLeaseId(lease.id) }))
+        }.isSucceeded
       }
-
-    if (!txn.isSucceeded) {
-      // CAS lost (key already present). Revoke the lease we just granted so it does
-      // not linger until its TTL, and leave serviceContextMap untouched so a
-      // half-built context (with an unset keepAlive) is never published — doClose()
-      // would otherwise crash reading the unset delegate and abort the whole close.
-      client.leaseRevoke(context.lease)
+    } catch (e: EtcdRecipeRuntimeException) {
+      // Initial CAS lost (key already present); the healer already revoked its lease.
+      logger.debug(e) { "Registration CAS lost for $instancePath" }
       throw EtcdRecipeException("Service registration failed for $instancePath")
     }
 
-    // Only publish a fully-built context (lease + keepAlive set) into the map.
-    context.keepAlive = client.keepAlive(context.lease) { e -> exceptionList.value += e }
+    // Only publish a fully-built context (healer set) into the map.
     serviceContextMap[service.id] = context
   }
 
@@ -117,9 +133,49 @@ constructor(
     val txn =
       client.transaction {
         If(instancePath.doesExist)
-        Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.lease.id) }))
+        Then(instancePath.setTo(service.toJson(), putOption { withLeaseId(context.healer.currentLeaseId) }))
       }
     if (!txn.isSucceeded) throw EtcdRecipeException("Service update failed for $instancePath")
+    context.currentJson = service.toJson()
+  }
+
+  // Record lease trouble on the exceptions list the way the old keep-alive error
+  // callback did, drive connection state, and forward to user listeners.
+  @Suppress("TooGenericExceptionCaught")
+  private fun onLeaseEvent(
+    instancePath: String,
+    event: LeaseEvent,
+  ) {
+    reportLeaseEvent(event)
+    when (event) {
+      is LeaseEvent.Suspended -> {
+        exceptionList.value += event.cause
+      }
+
+      is LeaseEvent.Expired -> {
+        event.cause?.let { exceptionList.value += it }
+        ?: run { exceptionList.value += EtcdRecipeRuntimeException("Lease for $instancePath expired; healing") }
+      }
+
+      is LeaseEvent.Failed -> {
+        exceptionList.value += event.cause
+        ?: EtcdRecipeRuntimeException("Lease healing for $instancePath abandoned; instance is unregistered")
+      }
+
+      is LeaseEvent.Restored -> {
+        logger.info {
+        "Lease for $instancePath healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+      }
+      }
+    }
+    leaseListeners.forEach { listener ->
+      try {
+        listener.onLeaseEvent(event)
+      } catch (e: Throwable) {
+        logger.error(e) { "Exception in lease listener" }
+        exceptionList.value += e
+      }
+    }
   }
 
   @Synchronized
@@ -144,4 +200,8 @@ constructor(
   internal val namesBasePath: String get() = namesPath
 
   private fun getNamesPath(service: ServiceInstance) = namesPath.appendToPath("${service.name}/${service.id}")
+
+  companion object {
+    private val logger = KotlinLogging.logger {}
+  }
 }

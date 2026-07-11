@@ -151,6 +151,7 @@ abstract class AbstractQueue(
     watchFailure: AtomicReference<Throwable?>,
   ): WatchRecoveryListener =
     WatchRecoveryListener { event ->
+      reportRecoveryEvent(event)
       when (event) {
         is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
           val children = client.getFirstChild(queuePath, target).kvs
