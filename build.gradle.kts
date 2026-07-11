@@ -160,11 +160,15 @@ subprojects {
                     "TESTCONTAINERS_DOCKER_CLIENT_STRATEGY",
                     "org.testcontainers.dockerclient.EnvironmentAndSystemPropertyClientProviderStrategy",
                 )
-                // Disable Ryuk: on Docker Desktop the reaper container
-                // tries to bind-mount the docker socket, which the engine
-                // refuses with "operation not supported". We register an
-                // explicit JVM shutdown hook in EtcdTestContainer instead.
-                environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+                // Enable Ryuk (the single sidecar reaper) and explicitly override
+                // any ryuk.disabled=true left in ~/.testcontainers.properties — the
+                // env var takes precedence. With Ryuk off, Testcontainers falls back
+                // to JVMHookResourceReaper, whose per-JVM `docker prune` at shutdown
+                // races across parallel forks and floods stderr with 409 "a prune
+                // operation is already running". Ryuk avoids that; the explicit
+                // stop()/close() shutdown hooks in the fixtures remain as
+                // belt-and-suspenders cleanup.
+                environment("TESTCONTAINERS_RYUK_DISABLED", "false")
             }
 
             // The container-based tests (etcd-recipes/src/test/.../container) need
