@@ -21,10 +21,16 @@ package io.etcd.recipes.keyvalue
 import io.etcd.jetcd.Client
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
-import io.etcd.recipes.common.asByteSequence
-import io.etcd.recipes.common.putValuesWithKeepAlive
+import io.etcd.recipes.common.LeaseEvent
+import io.etcd.recipes.common.LeaseListener
+import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.SelfHealingKeepAlive
+import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.selfHealingKeepAlive
 import io.etcd.recipes.keyvalue.TransientKeyValue.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -62,10 +68,17 @@ constructor(
   autoStart: Boolean = true,
   private val userExecutor: Executor? = null,
   val clientId: String = defaultClientId(),
-) : EtcdConnector(client) {
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+) : EtcdConnector(client, resilience) {
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
   private val keepAliveWaitLatch = CountDownLatch(1)
   private val keepAliveStartedLatch = CountDownLatch(1)
+  private val leaseListeners = CopyOnWriteArrayList<LeaseListener>()
+
+  /** Registers a listener for lease lifecycle events (expiry, healing, failure). */
+  fun addLeaseListener(listener: LeaseListener) {
+    leaseListeners += listener
+  }
 
   init {
     require(keyPath.isNotEmpty()) { "Key path cannot be empty" }
@@ -82,24 +95,29 @@ constructor(
     checkCloseNotCalled()
 
     executor.execute {
+      var healer: SelfHealingKeepAlive? = null
       try {
         val leaseTtl = leaseTtlSecs.seconds
         logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
-        client.putValuesWithKeepAlive(
-          listOf(keyPath to keyValue.asByteSequence),
+        // Self-healing: if the lease expires (partition longer than the TTL), the
+        // healer re-grants it and re-puts the key, instead of the key silently
+        // vanishing while this recipe still looks healthy.
+        healer = client.selfHealingKeepAlive(
           leaseTtl,
-          // Record a keep-alive death so a caller polling exceptions/hasExceptions
-          // sees the key is no longer being renewed, instead of it silently expiring.
-          onKeepAliveError = { e -> exceptionList.value += e },
-        ) {
-          keepAliveStartedLatch.countDown()
-          keepAliveWaitLatch.await()
-          logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
+          resilience.lease,
+          leaseListener = { event -> onLeaseEvent(event) },
+        ) { lease ->
+          client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) })
+          true
         }
+        keepAliveStartedLatch.countDown()
+        keepAliveWaitLatch.await()
+        logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
       } catch (e: Throwable) {
         logger.error(e) { "In start()" }
         exceptionList.value += e
       } finally {
+        runCatching { healer?.close() }
         // Always release the start() caller, even on failure. The previous
         // version only counted down inside the keepAlive callback, so if the
         // initial put / lease grant threw, start() would block on
@@ -135,6 +153,41 @@ constructor(
     startThreadComplete.waitUntilTrue()
 
     if (userExecutor == null) (executor as ExecutorService).shutdown()
+  }
+
+  // Record every lease event on the exceptions list the way the old keep-alive
+  // error callback did (a caller polling exceptions must still see renewal
+  // trouble), drive connection state, and forward to user listeners.
+  @Suppress("TooGenericExceptionCaught")
+  private fun onLeaseEvent(event: LeaseEvent) {
+    reportLeaseEvent(event)
+    when (event) {
+      is LeaseEvent.Suspended -> {
+        exceptionList.value += event.cause
+      }
+
+      is LeaseEvent.Expired -> {
+        event.cause?.let { exceptionList.value += it }
+        ?: run { exceptionList.value += EtcdRecipeRuntimeException("Lease for $keyPath expired; healing") }
+      }
+
+      is LeaseEvent.Failed -> {
+        exceptionList.value += event.cause
+        ?: EtcdRecipeRuntimeException("Lease healing for $keyPath abandoned; key is gone")
+      }
+
+      is LeaseEvent.Restored -> {
+        logger.info { "Lease for $keyPath healed: ${event.oldLeaseId} -> ${event.newLeaseId}" }
+      }
+    }
+    leaseListeners.forEach { listener ->
+      try {
+        listener.onLeaseEvent(event)
+      } catch (e: Throwable) {
+        logger.error(e) { "Exception in lease listener" }
+        exceptionList.value += e
+      }
+    }
   }
 
   companion object {

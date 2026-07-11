@@ -43,11 +43,19 @@ data class ServiceInstance(
     require(name.isNotEmpty()) { "Name cannot be empty" }
   }
 
-  fun toJson() = Json.encodeToString(serializer(), this)
+  fun toJson() = wireFormat.encodeToString(serializer(), this)
 
   companion object {
+    // encodeDefaults: registrationTimeUTC's default is Instant.now(), so with the
+    // stock configuration kotlinx omits the field whenever serialization runs in
+    // the same clock millisecond as construction — and a later parse back-fills a
+    // fresh (different) timestamp, corrupting the round-trip. Encoding defaults
+    // makes the wire format stable regardless of serialization timing; readers of
+    // the old format are unaffected (fields only become more complete).
+    private val wireFormat = Json { encodeDefaults = true }
+
     @JvmStatic
-    fun toObject(json: String) = Json.decodeFromString(serializer(), json)
+    fun toObject(json: String) = wireFormat.decodeFromString(serializer(), json)
 
     class ServiceInstanceBuilder(
       val name: String,

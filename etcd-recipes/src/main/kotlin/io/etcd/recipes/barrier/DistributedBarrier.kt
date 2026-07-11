@@ -21,25 +21,25 @@ package io.etcd.recipes.barrier
 import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.barrier.DistributedBarrier.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.LeaseEvent
 import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.SelfHealingKeepAlive
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.keepAlive
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.leaseRevoke
 import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.selfHealingKeepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -69,7 +69,7 @@ constructor(
   resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
 ) : EtcdConnector(client, resilience) {
   // Plain var: all reads/writes are inside @Synchronized methods on this instance.
-  private var keepAliveLease: CloseableClient? = null
+  private var keepAliveLease: SelfHealingKeepAlive? = null
   private val barrierRemoved = AtomicBoolean(false)
 
   init {
@@ -90,28 +90,56 @@ constructor(
       // Create unique token to avoid collision from clients with same id
       val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
 
-      // Grant the barrier lease with the configurable TTL; keepAlive renews it until the barrier is removed
-      val lease = client.leaseGrant(leaseTtlSecs.seconds)
-
-      // Do a CAS on the key name. If it is not found, then set it
-      val txn =
-        client.transaction {
-          If(barrierPath.doesNotExist)
-          Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+      // The barrier key is bound to a self-healing lease: if the lease expires
+      // (partition longer than the TTL), waiters see a spurious lift — that window
+      // is unavoidable, etcd deleted the key — but the healer re-arms the barrier
+      // for future waiters and surfaces an Expired event so the owner knows. The
+      // CAS is authoritative: on the initial attempt a loss aborts (another client
+      // holds the barrier; the healer revokes its own lease before throwing). On a
+      // heal-time loss another client re-set the barrier meanwhile — the barrier
+      // stays armed, just not maintained by this instance (a Failed event says so).
+      try {
+        keepAliveLease = client.selfHealingKeepAlive(
+          leaseTtlSecs.seconds,
+          resilience.lease,
+          leaseListener = { event -> onBarrierLeaseEvent(event) },
+        ) { lease ->
+          if (barrierRemoved.load()) {
+            false // explicitly removed: do not re-arm
+          } else {
+            client.transaction {
+              If(barrierPath.doesNotExist)
+              Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+            }.isSucceeded
+          }
         }
-
-      // The CAS is authoritative: txn.isSucceeded means this client created the
-      // barrier key. (The previous getValue re-read only guarded the tiny window
-      // where a concurrent removeBarrier ran between commit and read.)
-      if (txn.isSucceeded) {
-        keepAliveLease = client.keepAlive(lease) { e -> exceptionList.value += e }
         true
-      } else {
-        // Lease leaked the original implementation: when the CAS lost or the
-        // value verification failed we returned without ever revoking the
-        // lease, so it sat in etcd until TTL — wasteful in tight retry loops.
-        client.leaseRevoke(lease)
+      } catch (e: EtcdRecipeRuntimeException) {
+        // Initial CAS lost: another client set the barrier between the presence
+        // check and the txn. The healer already revoked the lease it granted.
+        logger.debug(e) { "setBarrier lost the CAS for $barrierPath" }
         false
+      }
+    }
+  }
+
+  // Record lease trouble on the exceptions list, drive connection state, and log
+  // healing outcomes.
+  private fun onBarrierLeaseEvent(event: LeaseEvent) {
+    reportLeaseEvent(event)
+    when (event) {
+      is LeaseEvent.Suspended -> exceptionList.value += event.cause
+
+      is LeaseEvent.Expired -> exceptionList.value += (
+        event.cause ?: EtcdRecipeRuntimeException("Barrier lease for $barrierPath expired; healing")
+      )
+
+      is LeaseEvent.Failed -> exceptionList.value += (
+        event.cause ?: EtcdRecipeRuntimeException("Barrier lease healing for $barrierPath abandoned")
+      )
+
+      is LeaseEvent.Restored -> logger.info {
+        "Barrier lease for $barrierPath healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
       }
     }
   }
@@ -197,6 +225,7 @@ constructor(
     watchFailure: AtomicReference<Throwable?>,
   ): WatchRecoveryListener =
     WatchRecoveryListener { event ->
+      reportRecoveryEvent(event)
       when (event) {
         is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
           if (!isBarrierSet() && (barrierPresentAtStart || !waitOnMissingBarriers))
@@ -224,6 +253,8 @@ constructor(
   }
 
   companion object {
+    private val logger = KotlinLogging.logger {}
+
     internal fun defaultClientId() = EtcdConnector.defaultClientId(DistributedBarrier::class.simpleName!!)
   }
 }

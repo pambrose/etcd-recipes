@@ -7,9 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Connection-resilience release, part 1: watchers survive fatal stream deaths.
+Connection-resilience release: watchers survive fatal stream deaths (part 1),
+leases self-heal and leaders step down on lease loss (part 2).
 
-### Added
+### Added (part 2: self-healing leases, connection state)
+
+- `Client.selfHealingKeepAlive(ttl, resilience, listener, establish)` — a keep-alive
+  that re-grants an expired lease and re-runs the caller's establish hook, paced by
+  `LeaseResilience`/`RetryPolicy`. Lease lifecycle is observable via `LeaseListener`
+  events (`Suspended` / `Expired` / `Restored` / `Failed`); `addLeaseListener` on
+  `TransientKeyValue` and `ServiceRegistry`.
+- Connection-state machinery on `EtcdConnector`: `connectionState`
+  (`CONNECTED` / `SUSPENDED` / `RECONNECTED` / `LOST`) derived passively from each
+  recipe's own watch and lease streams, with `addConnectionStateListener`.
+- `interruptOnLeaseLoss` constructor parameter on `LeaderSelector` (default true).
+
+### Changed (part 2)
+
+- **Behavior:** lease-holding recipes no longer lose their keys permanently after a
+  partition longer than the TTL. `TransientKeyValue` re-puts its key,
+  `ServiceRegistry` re-registers instances, `DistributedBarrier` re-arms, and a
+  parked `DistributedBarrierWithCount` waiter's registration heals.
+- **Behavior:** `LeaderSelector` steps down on leadership-lease loss instead of
+  reporting `isLeader=true` while another node takes over (split-brain fix):
+  `isLeader` turns false immediately, `waitUntilFinished()` releases, the
+  `takeLeadership` thread is interrupted if still parked in user code, and
+  `relinquishLeadership` always runs once leadership was taken (previously skipped
+  when `takeLeadership` threw). Leadership is never auto-reclaimed.
+- `ServiceInstance` JSON now encodes default field values (`encodeDefaults`), fixing
+  a round-trip corruption where `registrationTimeUTC` was omitted whenever
+  serialization ran in the same millisecond as construction — a later parse then
+  back-filled a different timestamp. Old-format JSON still parses.
+
+### Added (part 1: resilient watchers)
 
 - `RetryPolicy` (exponential backoff / bounded / forever / never) pacing all watch
   recovery, and `WatchResilience` / `ResilienceConfig` to tune or disable it
@@ -26,7 +56,7 @@ Connection-resilience release, part 1: watchers survive fatal stream deaths.
   restart-stable client port) and fault tests under `io.etcd.recipes.fault`,
   gated behind `-PuseTestcontainers`.
 
-### Changed
+### Changed (part 1)
 
 - **Behavior:** watch-backed recipes no longer go silently stale after a fatal
   watch death. `PathChildrenCache` and `ServiceCache` reconcile their maps during a

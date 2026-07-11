@@ -23,12 +23,13 @@ package io.etcd.recipes.common
  */
 data class ResilienceConfig(
   val watch: WatchResilience = WatchResilience.DEFAULT,
+  val lease: LeaseResilience = LeaseResilience.DEFAULT,
 ) {
   companion object {
     @JvmField
     val DEFAULT = ResilienceConfig()
 
     @JvmField
-    val DISABLED = ResilienceConfig(watch = WatchResilience.DISABLED)
+    val DISABLED = ResilienceConfig(watch = WatchResilience.DISABLED, lease = LeaseResilience.DISABLED)
   }
 }

@@ -155,6 +155,7 @@ class ServiceCache
 
   @Suppress("TooGenericExceptionCaught")
   private fun onRecoveryEvent(event: WatchRecoveryEvent) {
+    reportRecoveryEvent(event)
     if (event is WatchRecoveryEvent.Failed) {
       exceptionList.value += event.cause
         ?: EtcdRecipeRuntimeException("Watch on $servicePath abandoned; service cache is no longer updating")

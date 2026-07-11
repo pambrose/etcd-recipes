@@ -26,6 +26,7 @@ import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lease.LeaseKeepAliveResponse
 import io.etcd.jetcd.lease.LeaseRevokeResponse
 import io.etcd.jetcd.support.CloseableClient
+import io.etcd.recipes.common.pollUntil
 import io.grpc.stub.StreamObserver
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
@@ -34,6 +35,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import java.util.concurrent.CompletableFuture
+import kotlin.time.Duration.Companion.seconds
 
 class TransientKeyValueKeepAliveErrorTests : StringSpec() {
     init {
@@ -68,7 +70,9 @@ class TransientKeyValueKeepAliveErrorTests : StringSpec() {
             val boom = RuntimeException("keep-alive stream died")
             observerSlot.captured.onError(boom)
 
-            tkv.hasExceptions shouldBe true
+            // Lease events are dispatched on the healer thread (off jetcd's callback
+            // thread), so the recording is asynchronous.
+            pollUntil(10.seconds) { tkv.hasExceptions } shouldBe true
             tkv.exceptions shouldContain boom
 
             tkv.close()
