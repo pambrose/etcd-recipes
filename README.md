@@ -114,6 +114,42 @@ extension. `Failed` (retry policy exhausted) is also recorded in the connector's
 resume revision stays fresh on quiet keys; watch blocks see them as
 `WatchResponse`s with an empty event list.
 
+### Self-healing leases
+
+Lease-holding recipes survive lease expiry (a partition longer than the TTL) — also
+on by default. jetcd restarts a keep-alive stream after transient errors by itself;
+what it cannot recover is an *expired* lease, whose bound keys etcd has deleted.
+The `Client.selfHealingKeepAlive(ttl, resilience, listener) { lease -> ... }`
+primitive re-grants the lease and re-runs the recipe's establish hook, and every
+lease-holding recipe uses it:
+
+| Recipe | On lease expiry |
+|---|---|
+| `TransientKeyValue` | Key is re-put under the healed lease |
+| `ServiceRegistry` | Instance is re-registered (CAS; unique ids make this safe) |
+| `DistributedBarrier` | Barrier re-arms for future waiters (waiters that saw the expiry DELETE already passed — that window is unavoidable; the `Expired` event is the signal) |
+| `DistributedBarrierWithCount` | A parked waiter's registration heals so the barrier can still trip |
+| `LeaderSelector` (participation) | Candidacy is re-advertised |
+| `LeaderSelector` (leadership) | **Never healed — the leader steps down**: `isLeader` turns false, the `takeLeadership` block is released (interrupted if parked in its own code; disable via the `interruptOnLeaseLoss` constructor parameter), and `relinquishLeadership` runs. Another node may already lead; reclaiming would race it. |
+
+Lease events (`Suspended`, `Expired`, `Restored`, `Failed`) are observable via
+`addLeaseListener` on `TransientKeyValue` and `ServiceRegistry`, and are recorded
+on the connector's `exceptions` list.
+
+### Connection-state listeners
+
+Every recipe derives a coarse connection state — `CONNECTED`, `SUSPENDED`,
+`RECONNECTED`, `LOST` — passively from its own watch and lease streams:
+
+```kotlin
+selector.addConnectionStateListener { new, prev ->
+    if (new == ConnectionState.LOST) log.warn("ownership may be gone")
+}
+```
+
+`LOST` means a lease expired or recovery was abandoned — ownership may have been
+lost during the outage (a leader, for example, has already stepped down by then).
+
 ## Compatibility
 
 - Built on [jetcd](https://github.com/etcd-io/jetcd) and targets etcd v3.

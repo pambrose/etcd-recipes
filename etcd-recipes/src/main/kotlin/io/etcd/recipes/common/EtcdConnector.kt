@@ -23,7 +23,9 @@ import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import java.io.Closeable
 import java.util.Collections.synchronizedList
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicReference
 
 open class EtcdConnector(
   protected val client: Client,
@@ -58,6 +60,60 @@ open class EtcdConnector(
 
   protected fun checkStartCalled() {
     if (!startCalled.load()) throw EtcdRecipeRuntimeException("start() not called")
+  }
+
+  private val connectionStateRef = AtomicReference(ConnectionState.CONNECTED)
+  private val connectionStateListeners = CopyOnWriteArrayList<ConnectionStateListener>()
+
+  /**
+   * Coarse connection health, derived passively from the watch-recovery and lease
+   * events this connector's own streams report — see [ConnectionState].
+   */
+  val connectionState: ConnectionState get() = connectionStateRef.load()
+
+  fun addConnectionStateListener(listener: ConnectionStateListener) {
+    connectionStateListeners += listener
+  }
+
+  fun removeConnectionStateListener(listener: ConnectionStateListener) {
+    connectionStateListeners -= listener
+  }
+
+  /** Recipes feed their watch-recovery events here to drive [connectionState]. */
+  protected fun reportRecoveryEvent(event: WatchRecoveryEvent) {
+    when (event) {
+      is WatchRecoveryEvent.Suspended -> transitionTo(ConnectionState.SUSPENDED)
+      is WatchRecoveryEvent.Resubscribed -> transitionTo(ConnectionState.RECONNECTED)
+      is WatchRecoveryEvent.Resynced -> transitionTo(ConnectionState.RECONNECTED)
+      is WatchRecoveryEvent.Failed -> transitionTo(ConnectionState.LOST)
+    }
+  }
+
+  /** Recipes feed their lease events here to drive [connectionState]. */
+  protected fun reportLeaseEvent(event: LeaseEvent) {
+    when (event) {
+      is LeaseEvent.Suspended -> transitionTo(ConnectionState.SUSPENDED)
+      is LeaseEvent.Expired -> transitionTo(ConnectionState.LOST)
+      is LeaseEvent.Restored -> transitionTo(ConnectionState.RECONNECTED)
+      is LeaseEvent.Failed -> transitionTo(ConnectionState.LOST)
+    }
+  }
+
+  @Suppress("TooGenericExceptionCaught")
+  private fun transitionTo(newState: ConnectionState) {
+    // exchange() makes the transition atomic; equal states are dropped so repeated
+    // Suspended reports during one outage notify once. Listeners run on the
+    // reporting thread — recipes report from their own dispatcher/healer threads,
+    // never from jetcd's event loop.
+    val previous = connectionStateRef.exchange(newState)
+    if (previous == newState) return
+    connectionStateListeners.forEach { listener ->
+      try {
+        listener.stateChanged(newState, previous)
+      } catch (e: Throwable) {
+        exceptionList.value += e
+      }
+    }
   }
 
   // Template-method close: idempotency is enforced here so subclasses cannot

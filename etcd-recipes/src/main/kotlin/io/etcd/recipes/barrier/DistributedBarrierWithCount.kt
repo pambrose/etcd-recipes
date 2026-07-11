@@ -23,14 +23,15 @@ import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.ensureSuffix
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.barrier.DistributedBarrierWithCount.Companion.defaultClientId
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.LeaseEvent
 import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.SelfHealingKeepAlive
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.appendToPath
@@ -41,14 +42,13 @@ import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.keepAlive
-import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.leaseRevoke
 import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.selfHealingKeepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
@@ -127,7 +127,7 @@ constructor(
   @Suppress("CyclomaticComplexMethod", "LongMethod")
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun waitOnBarrier(timeout: Duration): Boolean {
-    val keepAliveLease = AtomicReference<CloseableClient?>(null)
+    val keepAliveLease = AtomicReference<SelfHealingKeepAlive?>(null)
     val keepAliveClosed = BooleanMonitor(false)
     val cancelled = BooleanMonitor(false)
     val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
@@ -181,38 +181,49 @@ constructor(
         Then(readyPath setTo uniqueToken)
       }
 
-      val lease = client.leaseGrant(leaseTtlSecs.seconds)
-
-      val txn =
-        client.transaction {
-          If(myWaitingPath.doesNotExist)
-          Then(myWaitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
-        }
-
-      when {
-        !txn.isSucceeded -> {
-          // Revoke the lease we just granted; otherwise it lingers in etcd
-          // until its TTL expires — wasteful in tight retry loops.
-          client.leaseRevoke(lease)
+      // The waiting key is bound to a self-healing lease: if it expires while the
+      // waiter is parked (partition longer than the TTL), the healer re-registers
+      // it so the barrier can still trip. Healing stops once the barrier lifted or
+      // the wait was cancelled (keepAliveClosed). A heal-time CAS loss means the
+      // key unexpectedly exists — ownership is not reclaimed.
+      val healer =
+        try {
+          client.selfHealingKeepAlive(
+            leaseTtlSecs.seconds,
+            resilience.lease,
+            leaseListener = { event -> onWaiterLeaseEvent(event) },
+          ) { lease ->
+            if (keepAliveClosed.get()) {
+              false
+            } else {
+              client.transaction {
+                If(myWaitingPath.doesNotExist)
+                Then(myWaitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+              }.isSucceeded
+            }
+          }
+        } catch (e: EtcdRecipeRuntimeException) {
+          // Initial CAS lost (the healer already revoked its lease).
+          logger.debug(e) { "Waiting-path CAS lost for $myWaitingPath" }
           throw EtcdRecipeException("Failed to set waitingPath")
         }
 
-        // No getValue re-read: txn.isSucceeded already proves this client set the
-        // waiting-path key (the re-read only guarded a commit-to-read race window).
-        else -> {
-          // Keep key alive
-          keepAliveLease.store(client.keepAlive(lease) { e -> exceptionList.value += e })
+      // No getValue re-read: the establish CAS already proves this client set the
+      // waiting-path key (the re-read only guarded a commit-to-read race window).
 
-          // Reconcile with a close() that may have fired before the store above: its
-          // closeKeepAlive() would have found a null ref and closed nothing, stranding
-          // the just-created client. onCancel sets `cancelled` before calling
-          // closeKeepAlive(), so observing it here means we own closing our client.
-          if (cancelled.get()) closeKeepAlive()
+      // Keep key alive (self-healing across lease expiry)
+      keepAliveLease.store(healer)
 
-          checkWaiterCount()
+      // Reconcile with a close() that may have fired before the store above: its
+      // closeKeepAlive() would have found a null ref and closed nothing, stranding
+      // the just-created client. onCancel sets `cancelled` before calling
+      // closeKeepAlive(), so observing it here means we own closing our client.
+      if (cancelled.get()) closeKeepAlive()
 
-          // Do not bother starting watcher if latch is already done
-          return if (keepAliveClosed.get()) {
+      checkWaiterCount()
+
+      // Do not bother starting watcher if latch is already done
+      return if (keepAliveClosed.get()) {
             // Cancellation by close() also flips keepAliveClosed; report
             // satisfied-only-when-not-cancelled.
             !cancelled.get()
@@ -229,6 +240,7 @@ constructor(
             // the failure recorded so the caller errors out instead of parking.
             val recoveryListener =
               WatchRecoveryListener { event ->
+                reportRecoveryEvent(event)
                 when (event) {
                   is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
                     checkWaiterCount()
@@ -283,8 +295,6 @@ constructor(
               signalled && !cancelled.get()
             }
           }
-        }
-      }
     } finally {
       activeWaiter.compareAndSet(active, null)
     }
@@ -294,7 +304,30 @@ constructor(
     activeWaiter.exchange(null)?.onCancel?.invoke()
   }
 
+  // Record lease trouble on the exceptions list, drive connection state, and log
+  // healing outcomes.
+  private fun onWaiterLeaseEvent(event: LeaseEvent) {
+    reportLeaseEvent(event)
+    when (event) {
+      is LeaseEvent.Suspended -> exceptionList.value += event.cause
+
+      is LeaseEvent.Expired -> exceptionList.value += (
+        event.cause ?: EtcdRecipeRuntimeException("Waiter lease for $barrierPath expired; healing")
+      )
+
+      is LeaseEvent.Failed -> exceptionList.value += (
+        event.cause ?: EtcdRecipeRuntimeException("Waiter lease healing for $barrierPath abandoned")
+      )
+
+      is LeaseEvent.Restored -> logger.info {
+        "Waiter lease for $barrierPath healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+      }
+    }
+  }
+
   companion object {
+    private val logger = KotlinLogging.logger {}
+
     internal fun defaultClientId() = defaultClientId(DistributedBarrierWithCount::class.simpleName!!)
   }
 }

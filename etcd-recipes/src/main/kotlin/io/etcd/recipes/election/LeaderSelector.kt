@@ -23,7 +23,9 @@ import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.randomId
 import com.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.lease.LeaseKeepAliveResponse
 import io.etcd.jetcd.options.WatchOption
+import io.etcd.jetcd.support.Observers
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
@@ -31,6 +33,7 @@ import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.LeaseEvent
 import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
@@ -43,10 +46,11 @@ import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyNotPresent
 import io.etcd.recipes.common.isKeyPresent
-import io.etcd.recipes.common.keepAliveWith
+import io.etcd.recipes.common.isLeaseNotFound
 import io.etcd.recipes.common.leaseGrant
 import io.etcd.recipes.common.leaseRevoke
 import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.selfHealingKeepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
@@ -59,6 +63,8 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
@@ -106,6 +112,7 @@ constructor(
   private val userExecutor: Executor? = null,
   val clientId: String = defaultClientId(),
   resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+  private val interruptOnLeaseLoss: Boolean = true,
 ) : EtcdConnector(client, resilience) {
   // For Kotlin clients
   @JvmOverloads
@@ -117,6 +124,8 @@ constructor(
     leaseTtlSecs: Long = DEFAULT_TTL_SECS,
     executorService: ExecutorService? = null,
     clientId: String = defaultClientId(),
+    resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+    interruptOnLeaseLoss: Boolean = true,
   ) :
     this(
       client,
@@ -133,6 +142,8 @@ constructor(
       leaseTtlSecs,
       executorService,
       clientId,
+      resilience,
+      interruptOnLeaseLoss,
     )
 
   private var executor: Executor = userExecutor ?: Executors.newFixedThreadPool(3)
@@ -152,6 +163,12 @@ constructor(
   private val electionLock = Any()
   private val startCallAllowed = AtomicBoolean(true)
   private val leaderPath = electionPath.withLeaderSuffix
+
+  // Step-down machinery: set for the duration of a leadership hold so a fatal
+  // keep-alive event (lease gone) can end leadership from the observer thread.
+  private val leadershipThreadRef = AtomicReference<Thread?>(null)
+  private val leadershipLeaseId = AtomicLong(-1L)
+  private val leaseLostDuringLeadership = AtomicBoolean(false)
 
   init {
     require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
@@ -203,6 +220,7 @@ constructor(
             // attemptToBecomeLeader CAS-guards against a concurrent winner.
             val recoveryListener =
               WatchRecoveryListener { event ->
+                reportRecoveryEvent(event)
                 when (event) {
                   is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
                     if (client.isKeyNotPresent(leaderPath))
@@ -355,28 +373,53 @@ constructor(
       }
     }
 
-    // Prime lease with leaseTtlSecs seconds to give keepAlive a chance to get started
-    val lease = client.leaseGrant(leaseTtlSecs.seconds)
-    val txn =
-      client.transaction {
-        If(path.doesNotExist)
-        Then(path.setTo(clientId, putOption { withLeaseId(lease.id) }))
+    // Participation is self-healing: if its lease expires (partition longer than
+    // the TTL), the healer re-grants it and re-registers this candidate, so the
+    // node stays visible in getParticipants() instead of silently disappearing.
+    val healer =
+      try {
+        client.selfHealingKeepAlive(
+          leaseTtlSecs.seconds,
+          resilience.lease,
+          leaseListener = { event -> onParticipationLeaseEvent(event) },
+        ) { lease ->
+          client.transaction {
+            If(path.doesNotExist)
+            Then(path.setTo(clientId, putOption { withLeaseId(lease.id) }))
+          }.isSucceeded
+        }
+      } catch (e: EtcdRecipeRuntimeException) {
+        // Initial CAS lost (the healer already revoked its lease).
+        logger.debug(e) { "Participation CAS lost for $path" }
+        throw EtcdRecipeException("Participation registration failed [$path]")
       }
 
-    if (!txn.isSucceeded) {
-      // Revoke the lease we just granted; otherwise it lingers in etcd until
-      // its TTL expires whenever registration loses the CAS.
-      client.leaseRevoke(lease)
-      throw EtcdRecipeException("Participation registration failed [$path]")
-    }
-
-    // Run keep-alive until closed, then revoke the participation lease promptly
+    // Run until closed; closing the healer revokes the participation lease promptly
     // (#7) so the participant key is evicted on relinquish instead of lingering
     // until TTL (which is what forces the pre-CAS wait loop above).
     try {
-      client.keepAliveWith(lease, { e -> exceptionList.value += e }) { terminateKeepAlive.waitUntilTrue() }
+      terminateKeepAlive.waitUntilTrue()
     } finally {
-      client.leaseRevoke(lease)
+      healer.close()
+    }
+  }
+
+  private fun onParticipationLeaseEvent(event: LeaseEvent) {
+    reportLeaseEvent(event)
+    when (event) {
+      is LeaseEvent.Suspended -> exceptionList.value += event.cause
+
+      is LeaseEvent.Expired -> exceptionList.value += (
+        event.cause ?: EtcdRecipeRuntimeException("Participation lease for $clientId expired; healing")
+      )
+
+      is LeaseEvent.Failed -> exceptionList.value += (
+        event.cause ?: EtcdRecipeRuntimeException("Participation lease healing for $clientId abandoned")
+      )
+
+      is LeaseEvent.Restored -> logger.info {
+        "Participation lease for $clientId healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+      }
     }
   }
 
@@ -426,21 +469,48 @@ constructor(
     // Phase 2 — hold leadership with NO lock held, so a close() on another thread
     // can run doClose() -> markLeadershipComplete() and release a takeLeadership
     // that is waiting on isFinished/waitUntilFinished. Exits when leadership is
-    // relinquished (takeLeadership returns).
+    // relinquished (takeLeadership returns) or the lease is lost (step-down).
+    //
+    // Leadership is intentionally NOT self-healed: an expired lease means etcd
+    // deleted the leader key and another candidate may already lead — reclaiming
+    // would race the new leader. A fatal keep-alive event (stream completed, or
+    // NOT_FOUND "requested lease not found") instead steps this leader down.
+    leadershipThreadRef.store(Thread.currentThread())
+    leadershipLeaseId.store(lease.id)
+    leaseLostDuringLeadership.store(false)
+    val registration = client.leaseClient.keepAlive(lease.id, leadershipKeepAliveObserver(lease.id))
     try {
-      client.keepAliveWith(lease, { e -> exceptionList.value += e }) {
+      var takeLeadershipError: Throwable? = null
+      try {
         listener.takeLeadership(this)
+      } catch (e: Throwable) {
+        if (!leaseLostDuringLeadership.load()) takeLeadershipError = e
       }
-      // Leadership was relinquished
-      listener.relinquishLeadership(this)
-      return true
+      // Clear a step-down interrupt that may have landed after (or instead of)
+      // unblocking takeLeadership, so cleanup below is not disrupted by it.
+      if (leaseLostDuringLeadership.load()) Thread.interrupted()
+
+      // Leadership is over (relinquished or stepped down): always notify, even when
+      // takeLeadership threw, so the listener can release its resources. (Pre-0.12
+      // a throw skipped relinquishLeadership.)
+      try {
+        listener.relinquishLeadership(this)
+      } catch (e: Throwable) {
+        logger.error(e) { "In relinquishLeadership()" }
+        exceptionList.value += e
+      }
+
+      takeLeadershipError?.let { throw it }
+      return !leaseLostDuringLeadership.load()
     } catch (e: Throwable) {
       logger.error(e) { "In attemptToBecomeLeader()" }
       exceptionList.value += e
       return false
     } finally {
+      registration.close()
       // Revoke the leadership lease promptly on relinquish (#7) instead of at TTL.
       client.leaseRevoke(lease)
+      leadershipThreadRef.store(null)
       // Reset the election guards under the same lock Phase 1 reads them, so a
       // concurrent candidate never observes a half-updated guard set.
       synchronized(electionLock) {
@@ -451,6 +521,44 @@ constructor(
       // Do this after leadership is complete so the thread does not terminate early
       markLeadershipComplete()
     }
+  }
+
+  // Discriminates leadership keep-alive stream events: fatal (stream completed =
+  // lease outlived its TTL unrenewed, or NOT_FOUND = lease gone) steps the leader
+  // down; anything else is transient — jetcd restarts the stream itself.
+  private fun leadershipKeepAliveObserver(leaseId: Long) =
+    Observers.builder<LeaseKeepAliveResponse>()
+      .onNext { next -> logger.debug { "Leadership keep-alive resp: $next" } }
+      .onError { e ->
+        if (e.isLeaseNotFound()) {
+          stepDownFromLeadership(e)
+        } else {
+          exceptionList.value += e
+          reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
+        }
+      }
+      .onCompleted { stepDownFromLeadership(null) }
+      .build()
+
+  // Ends leadership when the lease is gone: isLeader turns false immediately, the
+  // finished monitors are flipped so waitUntilFinished()/waitOnLeadershipComplete()
+  // release, and (when [interruptOnLeaseLoss]) the takeLeadership thread is
+  // interrupted in case it is parked in its own code where only an interrupt
+  // reaches it. Runs on jetcd's lease callback thread — no blocking work here.
+  // internal (not private) so step-down mechanics can be driven directly in tests.
+  internal fun stepDownFromLeadership(cause: Throwable?) {
+    if (!electedLeader.load()) return
+    if (!leaseLostDuringLeadership.compareAndSet(false, true)) return
+
+    logger.warn(cause) { "Leadership lease lost for $clientId; stepping down" }
+    exceptionList.value += (cause ?: EtcdRecipeRuntimeException("Leadership lease expired; stepping down"))
+    electedLeader.store(false)
+    reportLeaseEvent(LeaseEvent.Expired(leadershipLeaseId.load(), cause))
+
+    // Release monitor-parked holders first; then interrupt for user code parked
+    // elsewhere (sleep/IO). waitUntilFinished callers wake without an interrupt.
+    leadershipComplete.set(true)
+    if (interruptOnLeaseLoss) leadershipThreadRef.load()?.interrupt()
   }
 
   companion object {
