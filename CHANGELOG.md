@@ -12,6 +12,23 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (coroutines: suspend KV/lease/txn + Flow watches)
+
+- New `io.etcd.recipes.coroutines` package: a Kotlin-first async surface alongside
+  the unchanged blocking API. Suspending twins of the `common` extensions
+  (`awaitPutValue`, `awaitGetValue`, `awaitGetChildren`, `awaitTransaction`,
+  `awaitLeaseGrant`, `awaitLock`, ...) share the blocking engine's retry policies
+  and operation timeouts, backing off with `delay` instead of `Thread.sleep`;
+  coroutine cancellation cancels the in-flight RPC future and is never retried.
+- `Client.watchAsFlow(...)`: etcd watches as `Flow<WatchFlowEvent>`, backed by the
+  existing resilient watcher — recovery transitions (`Suspended` / `Resubscribed` /
+  `Resynced` / `Failed`) arrive in-band, compaction resync works through
+  `resyncWith`, cancelling the collector closes the watcher, and the default
+  unlimited buffer keeps a slow collector from ever stalling the watch dispatcher.
+  `Client.watchEventsAsFlow(...)` flattens to `Flow<WatchEvent>`.
+- `kotlinx-coroutines-core` is now an `api` dependency (Flow and suspend appear in
+  public signatures).
+
 ### Added (locks: semaphore)
 
 - `DistributedSemaphore` — distributed counting semaphore: the canonical permit

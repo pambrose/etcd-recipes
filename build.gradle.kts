@@ -70,7 +70,8 @@ subprojects {
 
     dependencies {
         "implementation"(rootProject.libs.kotlinx.serialization.json)
-        "implementation"(rootProject.libs.kotlinx.coroutines.core)
+        // api: Flow and suspend modifiers appear in the io.etcd.recipes.coroutines public surface
+        "api"(rootProject.libs.kotlinx.coroutines.core)
 
         "implementation"(rootProject.libs.jetcd.core)
 
