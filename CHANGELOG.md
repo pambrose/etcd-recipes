@@ -12,6 +12,22 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (locks: semaphore)
+
+- `DistributedSemaphore` — distributed counting semaphore: the canonical permit
+  count is CAS-created at the semaphore path and validated by every instance
+  (mismatch throws `SemaphorePermitMismatchException` naming both values);
+  lease-bound holder entries are admitted by create-revision rank, so capacity
+  is provably never exceeded and grants are FIFO. Java-`Semaphore`-style
+  instance-level holds: any thread may `release()` (LIFO among the instance's
+  holds), acquisitions are never reentrant, and `withPermit { }` scopes a
+  permit. Cooperative permit-lost semantics (`PermitLostListener`,
+  `ConnectionState.LOST`, `release()` returns false, opt-in
+  `interruptOnPermitLoss`) and leak-free `tryAcquire(timeout)` match the rest
+  of the lock suite.
+- `EtcdRecipeRuntimeException` is now `open`, so library exception subtypes
+  (like `SemaphorePermitMismatchException`) stay catchable as the base type.
+
 ### Added (locks: read-write lock)
 
 - `DistributedReadWriteLock` — fair (FIFO by create revision) shared/exclusive

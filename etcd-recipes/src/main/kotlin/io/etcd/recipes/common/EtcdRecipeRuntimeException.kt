@@ -18,7 +18,7 @@
 
 package io.etcd.recipes.common
 
-class EtcdRecipeRuntimeException
+open class EtcdRecipeRuntimeException
   @JvmOverloads
   constructor(
     msg: String,
