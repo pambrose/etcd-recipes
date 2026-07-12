@@ -72,6 +72,42 @@ See the `etcd-recipes-examples/` module for runnable
 and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples)
 demos of every recipe.
 
+## Reliable work queue
+
+`DistributedQueue`'s take is at-most-once by construction: the item is deleted
+before the consumer processes it, so a crash between the two loses the message.
+`DistributedWorkQueue` is the at-least-once alternative — an item survives until
+it is explicitly acknowledged:
+
+```kotlin
+import io.etcd.recipes.queue.DistributedWorkQueue
+import io.etcd.recipes.queue.WorkQueueConfig
+
+DistributedWorkQueue(client, "/queues/emails", WorkQueueConfig(maxDeliveries = 3)).use { queue ->
+    queue.enqueue("send-invoice-42")
+
+    val item = queue.receive()      // or receive(timeout) / tryReceive()
+    try {
+        process(item.value)
+        item.ack()                  // false = the claim was lost; work may have been redone
+    } catch (e: Exception) {
+        item.requeue()              // early nack: back to its original position
+    }
+}
+```
+
+Received items are *claimed*, not deleted: the payload stays in etcd and only the
+claim marker is bound to the consumer's lease. If the consumer crashes (or is
+partitioned longer than `visibilityTimeoutSecs`), the marker expires and any
+consumer's reclaim sweep returns the item to its original FIFO position — with
+`attempt` incremented — or moves it to the dead-letter space once `maxDeliveries`
+is exhausted (`deadLetters()` / `requeueDeadLetter(id)` / `purgeDeadLetter(id)`).
+A live consumer renews its lease, so processing may take longer than the
+visibility timeout — it bounds crash detection, not processing time.
+
+For fire-and-forget delivery the plain queues also gained bounded consumption:
+`tryDequeue()` (non-blocking), `poll(timeout)`, and atomic `enqueueAll(values)`.
+
 ## Connection resilience
 
 Watchers created through this library survive fatal watch-stream deaths — **on by
