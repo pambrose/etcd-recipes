@@ -23,9 +23,24 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.lock.LockResponse
 import io.etcd.jetcd.lock.UnlockResponse
 
+/**
+ * Raw pass-through to etcd's lock service; prefer [io.etcd.recipes.lock.DistributedMutex].
+ *
+ * The default rpc config is [RpcResilience.DISABLED] — unlike every other
+ * extension — because a lock call legitimately WAITS server-side for the current
+ * holder; a 30s operation timeout would abort valid waits. Pass a bounded config
+ * only when a bounded wait is what you mean. (jetcd already retries this RPC
+ * internally on safe-redo failures, idempotently per lease.)
+ */
+@JvmOverloads
 fun Client.lock(
   keyName: String,
   leaseId: Long,
-): LockResponse = lockClient.lock(keyName.asByteSequence, leaseId).get()
+  rpc: RpcResilience = RpcResilience.DISABLED,
+): LockResponse = awaitRpc(rpc, "lock($keyName)", lockClient.lock(keyName.asByteSequence, leaseId))
 
-fun Client.unlock(keyName: String): UnlockResponse = lockClient.unlock(keyName.asByteSequence).get()
+@JvmOverloads
+fun Client.unlock(
+  keyName: String,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): UnlockResponse = retryRpc(rpc, "unlock($keyName)") { lockClient.unlock(keyName.asByteSequence) }
