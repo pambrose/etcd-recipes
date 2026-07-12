@@ -63,6 +63,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
@@ -116,6 +117,7 @@ class DistributedWorkQueue
   private val claimsPath = "$queuePath/claims"
   private val attemptsPath = "$queuePath/attempts"
   private val dlqPath = "$queuePath/dlq"
+  private val delayedPath = "$queuePath/delayed"
   private val leaseListeners = CopyOnWriteArrayList<LeaseListener>()
 
   init {
@@ -168,6 +170,31 @@ class DistributedWorkQueue
     client.putValue(key, value, rpc = resilience.rpc)
   }
 
+  fun enqueue(
+    value: String,
+    delay: Duration,
+  ) = enqueue(value.asByteSequence, delay)
+
+  /**
+   * Enqueues [value] for delivery no earlier than [delay] from now (a zero or
+   * negative delay enqueues immediately). Maturity is judged against client
+   * clocks — skew between producers and consumers shifts delivery by the skew,
+   * which is tolerable at visibility-timeout scale.
+   */
+  fun enqueue(
+    value: ByteSequence,
+    delay: Duration,
+  ) {
+    checkCloseNotCalled()
+    if (delay <= Duration.ZERO) {
+      enqueue(value)
+      return
+    }
+    val readyAt = System.currentTimeMillis() + delay.inWholeMilliseconds
+    val key = keyFormat.format(delayedPath, readyAt, randomId(3))
+    client.putValue(key, value, rpc = resilience.rpc)
+  }
+
   /** Enqueues every value in one transaction (all-or-nothing), preserving order. */
   fun enqueueAll(values: Collection<ByteSequence>) {
     checkCloseNotCalled()
@@ -197,6 +224,7 @@ class DistributedWorkQueue
   /** Non-blocking receive: a claimed item, or null when nothing is claimable. */
   fun tryReceive(): WorkItem? {
     checkCloseNotCalled()
+    promoteMatured()
     claimHead()?.let { return it }
     reclaimOrphans()
     return claimHead()
@@ -283,6 +311,7 @@ class DistributedWorkQueue
   private fun receiveWithDeadline(deadline: ComparableTimeMark?): WorkItem? {
     checkCloseNotCalled()
     while (true) {
+      promoteMatured()
       claimHead()?.let { return it }
       reclaimOrphans()
       claimHead()?.let { return it }
@@ -360,11 +389,40 @@ class DistributedWorkQueue
   @Suppress("TooGenericExceptionCaught")
   private fun sweepSafely() {
     try {
-      if (!closeCalled.load()) reclaimOrphans()
+      if (!closeCalled.load()) {
+        promoteMatured()
+        reclaimOrphans()
+      }
     } catch (e: Throwable) {
       logger.debug(e) { "Reclaim sweep failed; next interval will retry" }
     }
   }
+
+  // Moves matured delayed items into items/ in ready-time order. The delayed key's
+  // basename is "<readyMillis>-<uniq>", which becomes the item key — so promoted
+  // items sort by ready time among themselves and interleave correctly with
+  // immediate items. CAS races between promoting consumers pick one winner.
+  private fun promoteMatured() {
+    while (true) {
+      val head = client.getFirstChild(delayedPath, SortTarget.KEY, resilience.rpc).kvs.firstOrNull() ?: return
+      val basename = head.key.asString.substringAfterLast('/')
+      if (readyMillisOf(basename) > System.currentTimeMillis()) return
+      client.transaction(resilience.rpc) {
+        If(equalTo(head.key, CmpTarget.modRevision(head.modRevision)))
+        Then(deleteOp(head.key), "$itemsPath/$basename" setTo head.value)
+      }
+      // win or lose, re-read: the next head may also be mature
+    }
+  }
+
+  // How long until the earliest delayed item matures, or null when none exist.
+  private fun delayedHeadRemaining(): Duration? {
+    val head = client.getFirstChild(delayedPath, SortTarget.KEY, resilience.rpc).kvs.firstOrNull() ?: return null
+    val basename = head.key.asString.substringAfterLast('/')
+    return (readyMillisOf(basename) - System.currentTimeMillis()).coerceAtLeast(0L).milliseconds
+  }
+
+  private fun readyMillisOf(basename: String): Long = basename.substringBefore('-').toLong()
 
   // Parks until an item lands in items/ (or the deadline passes), on the resilient
   // watcher. Also wakes at least every sweepInterval so a parked consumer keeps
@@ -413,7 +471,10 @@ class DistributedWorkQueue
       if (latch.count > 0 && client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc).kvs.isNotEmpty()) {
         latch.countDown()
       }
-      val cap = config.sweepInterval
+      // Wake when the deadline passes, the sweep interval elapses, or the earliest
+      // delayed item matures — whichever comes first.
+      var cap = config.sweepInterval
+      delayedHeadRemaining()?.let { cap = minOf(cap, it) }
       val wait =
         if (deadline == null) cap else minOf(cap, -deadline.elapsedNow())
       if (wait > Duration.ZERO) {

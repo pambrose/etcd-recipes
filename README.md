@@ -105,6 +105,11 @@ is exhausted (`deadLetters()` / `requeueDeadLetter(id)` / `purgeDeadLetter(id)`)
 A live consumer renews its lease, so processing may take longer than the
 visibility timeout — it bounds crash detection, not processing time.
 
+Delivery can be deferred: `enqueue(value, delay)` keeps the item invisible until
+it matures, then it flows through the normal claim/ack lifecycle in ready-time
+order, without blocking immediate items. Maturity rides on client clocks —
+producer/consumer skew shifts delivery by the skew.
+
 For fire-and-forget delivery the plain queues also gained bounded consumption:
 `tryDequeue()` (non-blocking), `poll(timeout)`, and atomic `enqueueAll(values)`.
 
