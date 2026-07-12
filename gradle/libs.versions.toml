@@ -18,7 +18,7 @@ kotlin-logging = "8.0.4"
 logback = "1.5.38"
 
 # Testing
-junit = "6.1.1"
+junit = "6.1.2"
 kotest = "6.2.2"
 mockk = "1.14.11"
 testcontainers = "2.0.5"
