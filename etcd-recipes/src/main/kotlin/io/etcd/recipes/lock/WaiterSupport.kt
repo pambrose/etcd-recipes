@@ -19,6 +19,7 @@
 package io.etcd.recipes.lock
 
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.ResilienceConfig
@@ -34,20 +35,73 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 
 /**
- * Shared wait-on-predecessor machinery for the hand-rolled locks (read-write lock,
- * semaphore): parks on [latch] until [key] is DELETEd (or found already absent —
- * the pre-live gap and every recovery are re-checked), someone else counts the
- * latch down (lease-fatal, close), or the deadline passes. Watch failures unpark
- * and throw. Follows the queue/barrier watcher discipline: recheck RPCs run on
- * the watch dispatcher thread, never on jetcd's event loop.
+ * Shared wait-on-DELETE machinery for the hand-rolled locks (read-write lock,
+ * semaphore): parks on [CountDownLatch] until a DELETE fires (or [shouldWake]
+ * says the predicate already holds — the pre-live gap and every recovery are
+ * re-checked), someone else counts the latch down (lease-fatal, close), or the
+ * deadline passes. Watch failures unpark and throw. Follows the queue/barrier
+ * watcher discipline: recheck RPCs run on the watch dispatcher thread, never on
+ * jetcd's event loop.
  */
 internal object WaiterSupport {
+  /** Waits for the DELETE of exactly [key]; the wake predicate is key absence. */
   fun awaitKeyDeletion(
     client: Client,
     key: String,
     resilience: ResilienceConfig,
     latch: CountDownLatch,
     deadline: ComparableTimeMark?,
+    reportRecovery: (WatchRecoveryEvent) -> Unit,
+    recordException: (Throwable) -> Unit,
+  ) = await(
+    client,
+    key,
+    watchOption { withNoPut(true) },
+    resilience,
+    latch,
+    deadline,
+    shouldWake = { client.isKeyNotPresent(key, resilience.rpc) },
+    reportRecovery,
+    recordException,
+  )
+
+  /**
+   * Waits for ANY DELETE under [prefix] — rank-based admission (the semaphore)
+   * cannot watch a single predecessor, so every deletion wakes the waiter and
+   * [shouldWake] re-evaluates the full predicate on the pre-live gap and after
+   * each recovery. Spurious wakes are safe: callers loop and re-check.
+   */
+  @Suppress("LongParameterList")
+  fun awaitPrefixDeletion(
+    client: Client,
+    prefix: String,
+    resilience: ResilienceConfig,
+    latch: CountDownLatch,
+    deadline: ComparableTimeMark?,
+    shouldWake: () -> Boolean,
+    reportRecovery: (WatchRecoveryEvent) -> Unit,
+    recordException: (Throwable) -> Unit,
+  ) = await(
+    client,
+    prefix,
+    watchOption { withNoPut(true).isPrefix(true) },
+    resilience,
+    latch,
+    deadline,
+    shouldWake,
+    reportRecovery,
+    recordException,
+  )
+
+  @Suppress("LongParameterList")
+  private fun await(
+    client: Client,
+    watchKey: String,
+    option: WatchOption,
+    resilience: ResilienceConfig,
+    latch: CountDownLatch,
+    deadline: ComparableTimeMark?,
+    shouldWake: () -> Boolean,
     reportRecovery: (WatchRecoveryEvent) -> Unit,
     recordException: (Throwable) -> Unit,
   ) {
@@ -57,12 +111,12 @@ internal object WaiterSupport {
         reportRecovery(event)
         when (event) {
           is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-            // The DELETE may have been lost while the stream was dead
-            if (client.isKeyNotPresent(key, resilience.rpc)) latch.countDown()
+            // A DELETE may have been lost while the stream was dead
+            if (shouldWake()) latch.countDown()
           }
 
           is WatchRecoveryEvent.Failed -> {
-            val cause = event.cause ?: EtcdRecipeRuntimeException("Watch on $key abandoned while waiting")
+            val cause = event.cause ?: EtcdRecipeRuntimeException("Watch on $watchKey abandoned while waiting")
             failure.set(cause)
             recordException(cause)
             latch.countDown()
@@ -75,8 +129,8 @@ internal object WaiterSupport {
       }
 
     client.withWatcher(
-      key,
-      watchOption { withNoPut(true) },
+      watchKey,
+      option,
       resilience.watch,
       recoveryListener,
       resyncWith = null,
@@ -84,8 +138,8 @@ internal object WaiterSupport {
         if (watchResponse.events.any { it.eventType == WatchEvent.EventType.DELETE }) latch.countDown()
       },
     ) {
-      // Pre-live gap: the key may have been deleted before the watch went live
-      if (latch.count > 0 && client.isKeyNotPresent(key, resilience.rpc)) latch.countDown()
+      // Pre-live gap: the awaited DELETE may have landed before the watch went live
+      if (latch.count > 0 && shouldWake()) latch.countDown()
       if (deadline == null) {
         latch.await()
       } else {
@@ -95,7 +149,7 @@ internal object WaiterSupport {
         }
       }
       failure.get()?.let { cause ->
-        throw EtcdRecipeRuntimeException("Lock watch on $key failed while waiting", cause)
+        throw EtcdRecipeRuntimeException("Lock watch on $watchKey failed while waiting", cause)
       }
     }
   }

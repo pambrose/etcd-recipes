@@ -24,7 +24,7 @@ what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zook
 | `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider` |
 | `io.etcd.recipes.election` | `LeaderSelector`, `LeaderSelectorListener`, `Participant` |
 | `io.etcd.recipes.keyvalue` | `TransientKeyValue` (lease-backed key/value) |
-| `io.etcd.recipes.lock` | `DistributedMutex`, `DistributedReadWriteLock` |
+| `io.etcd.recipes.lock` | `DistributedMutex`, `DistributedReadWriteLock`, `DistributedSemaphore` |
 | `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue`, `DistributedWorkQueue` (at-least-once) |
 | `io.etcd.recipes.common` | Kotlin extensions over jetcd `Client`, `KV`, `Lease`, `Watch`, `Txn` |
 
@@ -108,6 +108,15 @@ surface (`rw.readLock` / `rw.writeLock`, both `EtcdLock`s): readers share,
 writers exclude, and grants are **fair** — FIFO by arrival revision, so a queued
 writer is never starved by later readers. Write→read downgrade is supported;
 read→write upgrade throws (it would self-deadlock).
+
+`DistributedSemaphore` caps concurrency across processes with a counting
+semaphore (`acquire()` / `tryAcquire(timeout)` / `release()` /
+`withPermit { }`). The permit count is stored once at the semaphore path and
+validated by every instance, grants are FIFO, and capacity is never exceeded.
+Holds are instance-level, Java-`Semaphore`-style: any thread may release
+(releases are LIFO among the instance's holds), and a permit whose lease
+expires is lost cooperatively — a `PermitLostListener` fires and the matching
+`release()` returns false.
 
 ## Reliable work queue
 
