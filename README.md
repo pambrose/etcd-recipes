@@ -27,6 +27,7 @@ what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zook
 | `io.etcd.recipes.lock` | `DistributedMutex`, `DistributedReadWriteLock`, `DistributedSemaphore` |
 | `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue`, `DistributedWorkQueue` (at-least-once) |
 | `io.etcd.recipes.common` | Kotlin extensions over jetcd `Client`, `KV`, `Lease`, `Watch`, `Txn` |
+| `io.etcd.recipes.coroutines` | Suspending twins of the `common` extensions, `Flow`-based watches |
 
 ## Usage
 
@@ -72,6 +73,42 @@ See the `etcd-recipes-examples/` module for runnable
 [Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples)
 and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples)
 demos of every recipe.
+
+## Coroutines API
+
+Every blocking operation stays as-is (Java parity); a Kotlin-first async surface
+lives alongside it in `io.etcd.recipes.coroutines`. Suspending twins of the
+`common` extensions take the `await` prefix (`awaitPutValue`, `awaitGetValue`,
+`awaitTransaction`, ...) and share the same retry policies and operation
+timeouts — backing off with `delay` instead of parking a thread, and treating
+coroutine cancellation as authoritative (the in-flight RPC future is cancelled,
+never retried).
+
+Watches become `Flow`s:
+
+```kotlin
+import io.etcd.recipes.common.connectToEtcd
+import io.etcd.recipes.common.watchOption
+import io.etcd.recipes.coroutines.WatchFlowEvent
+import io.etcd.recipes.coroutines.watchAsFlow
+
+connectToEtcd(urls).use { client ->
+    client.watchAsFlow("/config", watchOption { isPrefix(true) }).collect { element ->
+        when (element) {
+            is WatchFlowEvent.Response -> element.response.events.forEach { /* react */ }
+            is WatchFlowEvent.Recovery -> { /* Suspended / Resubscribed / Resynced / Failed */ }
+        }
+    }
+}
+```
+
+`watchAsFlow` rides the same resilient watcher as the blocking API: fatal stream
+deaths recover automatically, and compaction resyncs surface in-band as
+`WatchFlowEvent.Recovery` so collectors with derived state can rebuild. The
+default unlimited buffer means a slow collector can never stall the watch
+dispatcher; cancelling the collector closes the watcher. Use
+`watchEventsAsFlow` for a flattened `Flow<WatchEvent>` when no derived state is
+kept.
 
 ## Distributed locks
 

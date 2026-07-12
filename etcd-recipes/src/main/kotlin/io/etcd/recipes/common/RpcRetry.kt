@@ -73,7 +73,8 @@ internal fun <T> retryRpc(
   }
 }
 
-private fun Throwable.isRetriableRpcFailure(): Boolean =
+// internal: the suspend RPC engine in io.etcd.recipes.coroutines shares this predicate
+internal fun Throwable.isRetriableRpcFailure(): Boolean =
   generateSequence(this) { it.cause.takeIf { c -> c !== it } }
     .any { t -> t is TimeoutException || (t is EtcdException && t.errorCode in RETRIABLE_CODES) }
 
