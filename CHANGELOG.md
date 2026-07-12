@@ -9,7 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Connection-resilience release: watchers survive fatal stream deaths (part 1),
 leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
-gain timeouts and retries (part 3).
+gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
+non-blocking consumption on the existing queues.
+
+### Added (queues: bounded and non-blocking consumption)
+
+- `tryDequeue(): ByteSequence?` (non-blocking) and `poll(timeout): ByteSequence?`
+  (bounded, Duration and Long/TimeUnit overloads) on `DistributedQueue` and
+  `DistributedPriorityQueue` — removes the "the only take blocks forever" footgun.
+  `dequeue()` is unchanged: it is now the unbounded case of the same internal loop.
+- `DistributedQueue.enqueueAll(values)` — atomic batch enqueue in one transaction;
+  entries share the transaction's revision and keys embed the argument index so
+  within-batch order follows argument order.
 
 ### Added (part 3: RPC timeouts/retries, client defaults)
 

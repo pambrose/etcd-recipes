@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.queue
 
+import com.pambrose.common.time.timeUnitToDuration
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
@@ -37,7 +38,11 @@ import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 abstract class AbstractQueue(
   client: Client,
@@ -49,13 +54,39 @@ abstract class AbstractQueue(
     require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
   }
 
-  @Suppress("LoopWithTooManyJumpStatements")
-  fun dequeue(): ByteSequence {
+  fun dequeue(): ByteSequence = checkNotNull(takeWithDeadline(null)) { "unbounded take returned empty" }
+
+  /** Non-blocking take: the head item, or null when the queue is empty. */
+  fun tryDequeue(): ByteSequence? {
+    checkCloseNotCalled()
+    while (true) {
+      val childList = client.getFirstChild(queuePath, target, resilience.rpc).kvs
+      if (childList.isEmpty()) return null
+      val child = childList.first()
+      if (deleteRevKey(child)) return child.value
+      // CAS lost to a concurrent consumer; retry until a win or the queue drains
+    }
+  }
+
+  /** Bounded take: the head item, or null once [timeout] elapses without one. */
+  fun poll(timeout: Duration): ByteSequence? {
+    require(timeout > Duration.ZERO) { "Timeout must be positive: $timeout" }
+    return takeWithDeadline(TimeSource.Monotonic.markNow() + timeout)
+  }
+
+  fun poll(
+    timeout: Long,
+    timeUnit: TimeUnit,
+  ): ByteSequence? = poll(timeUnitToDuration(timeout, timeUnit))
+
+  // The single consumption loop: a null [deadline] never expires (the unbounded
+  // take), otherwise the wait is bounded and an expired deadline yields null.
+  @Suppress("LoopWithTooManyJumpStatements", "ReturnCount")
+  private fun takeWithDeadline(deadline: ComparableTimeMark?): ByteSequence? {
     checkCloseNotCalled()
 
-    // Loop instead of recursing on CAS-conflict retries: the previous
-    // implementation called itself recursively, and each recursive frame
-    // could allocate a new watcher (with its own dispatcher executor).
+    // Loop instead of recursing on CAS-conflict retries: a recursive frame per
+    // retry could allocate a new watcher (with its own dispatcher executor).
     // Under high contention the resulting churn was unbounded.
     while (true) {
       val childList = client.getFirstChild(queuePath, target, resilience.rpc).kvs
@@ -68,15 +99,17 @@ abstract class AbstractQueue(
         continue
       }
 
+      if (deadline != null && deadline.hasPassedNow()) return null
+
       // Queue is empty; wait under a single watcher. If the CAS delete fails
       // after waking up, loop and retry — withWatcher closes its dispatcher
       // before we retry, so no executor or watcher resources accumulate.
-      val winner = waitForFirstChild() ?: continue
+      val winner = waitForFirstChild(deadline) ?: continue
       if (deleteRevKey(winner)) return winner.value
     }
   }
 
-  private fun waitForFirstChild(): KeyValue? {
+  private fun waitForFirstChild(deadline: ComparableTimeMark? = null): KeyValue? {
     val watchLatch = CountDownLatch(1)
     val watchOption =
       watchOption {
@@ -120,7 +153,14 @@ abstract class AbstractQueue(
           }
         }
       }
-      watchLatch.await()
+      if (deadline == null) {
+        watchLatch.await()
+      } else {
+        val remaining = -deadline.elapsedNow() // negative elapsed = time still left
+        if (remaining > Duration.ZERO) {
+          watchLatch.await(remaining.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        }
+      }
 
       // STRICT ORDERING: whichever PUT the watcher observed first (in keyFound) is not
       // necessarily the head by sort order — a lower-priority key can be committed just
