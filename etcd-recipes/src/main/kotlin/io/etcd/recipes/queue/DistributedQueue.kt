@@ -26,6 +26,8 @@ import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.putValue
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
 
 fun <T> withDistributedQueue(
   client: Client,
@@ -52,7 +54,24 @@ class DistributedQueue
     client.putValue(key, value, rpc = resilience.rpc)
   }
 
+  /**
+   * Enqueues every value in one transaction (all-or-nothing). Entries share the
+   * transaction's revision; their keys embed the argument index so within-batch
+   * order follows argument order.
+   */
+  fun enqueueAll(values: Collection<ByteSequence>) {
+    checkCloseNotCalled()
+    if (values.isEmpty()) return
+    val millis = System.currentTimeMillis()
+    val puts =
+      values.mapIndexed { index, value ->
+        batchKeyFormat.format(queuePath, millis, index, randomId(3)) setTo value
+      }
+    client.transaction(resilience.rpc) { Then(*puts.toTypedArray()) }
+  }
+
   companion object {
     private val keyFormat = "%s/%0${Long.MAX_VALUE.length}d-%s"
+    private val batchKeyFormat = "%s/%0${Long.MAX_VALUE.length}d-%05d-%s"
   }
 }
