@@ -252,10 +252,18 @@ fun Client.selfHealingKeepAlive(
 
 /**
  * True when this failure (or any cause in its chain) is etcd's NOT_FOUND
- * "requested lease not found" — jetcd's signal that a lease is gone for good,
- * as opposed to a transient stream error it retries itself.
+ * "requested lease not found" — the signal that a lease is gone for good, as
+ * opposed to a transient stream error jetcd retries itself. Keep-alive streams
+ * surface it as jetcd's [EtcdException]; transactions and puts surface the raw
+ * gRPC [io.grpc.StatusRuntimeException] instead.
  */
 internal fun Throwable.isLeaseNotFound(): Boolean =
   generateSequence(this) { it.cause.takeIf { c -> c !== it } }
-    .filterIsInstance<EtcdException>()
-    .any { it.errorCode == ErrorCode.NOT_FOUND }
+    .any { t ->
+      (t is EtcdException && t.errorCode == ErrorCode.NOT_FOUND) ||
+        (
+          t is io.grpc.StatusRuntimeException &&
+            t.status.code == io.grpc.Status.Code.NOT_FOUND &&
+            t.message?.contains("lease not found") == true
+        )
+    }

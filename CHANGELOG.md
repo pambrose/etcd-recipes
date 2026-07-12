@@ -12,6 +12,17 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (queues: at-least-once work queue)
+
+- `DistributedWorkQueue` — claim-based at-least-once delivery: `receive()` claims
+  the head atomically (payload copied to `claimed/`, a lease-bound claim marker,
+  and an attempt counter, all in one CAS transaction) and returns a `WorkItem`
+  with `ack()` / `requeue()`. A crashed or partitioned consumer's markers expire
+  with its lease (`visibilityTimeoutSecs`); every consumer's reclaim sweep
+  returns orphaned items to their original FIFO position or dead-letters them
+  after `maxDeliveries` (`deadLetters()` / `requeueDeadLetter` / `purgeDeadLetter`).
+  Existing queues keep their at-most-once semantics untouched.
+
 ### Added (queues: bounded and non-blocking consumption)
 
 - `tryDequeue(): ByteSequence?` (non-blocking) and `poll(timeout): ByteSequence?`
