@@ -12,6 +12,16 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (locks: read-write lock)
+
+- `DistributedReadWriteLock` — fair (FIFO by create revision) shared/exclusive
+  lock: readers share, writers exclude, queued writers cannot be starved by
+  later readers. Lease-bound `read-`/`write-` entries with herd-free
+  wait-on-nearest-conflicting-predecessor; write→read downgrade supported,
+  read→write upgrade throws. Same thread-owned holds, reentrancy, leak-free
+  `tryLock(timeout)`, and cooperative lock-lost semantics as `DistributedMutex`
+  (both sides expose the shared `EtcdLock` surface).
+
 ### Added (locks: mutex)
 
 - `DistributedMutex` — reentrant distributed lock on etcd's native lock service

@@ -24,7 +24,7 @@ what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zook
 | `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider` |
 | `io.etcd.recipes.election` | `LeaderSelector`, `LeaderSelectorListener`, `Participant` |
 | `io.etcd.recipes.keyvalue` | `TransientKeyValue` (lease-backed key/value) |
-| `io.etcd.recipes.lock` | `DistributedMutex` (reentrant, on etcd's native lock service) |
+| `io.etcd.recipes.lock` | `DistributedMutex`, `DistributedReadWriteLock` |
 | `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue`, `DistributedWorkQueue` (at-least-once) |
 | `io.etcd.recipes.common` | Kotlin extensions over jetcd `Client`, `KV`, `Lease`, `Watch`, `Txn` |
 
@@ -102,6 +102,12 @@ waiter and the dispossessed holder observes it **cooperatively**:
 `isHeldByCurrentThread` turns false, its `LockLostListener` fires, connection
 state reports `LOST`, and `unlock()` returns false (interruption is opt-in via
 `interruptOnLockLoss`). The lock is deliberately never auto-reclaimed.
+
+`DistributedReadWriteLock` adds shared/exclusive semantics with the same lock
+surface (`rw.readLock` / `rw.writeLock`, both `EtcdLock`s): readers share,
+writers exclude, and grants are **fair** — FIFO by arrival revision, so a queued
+writer is never starved by later readers. Write→read downgrade is supported;
+read→write upgrade throws (it would self-deadlock).
 
 ## Reliable work queue
 

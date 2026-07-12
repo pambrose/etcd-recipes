@@ -34,45 +34,65 @@ internal object EtcdTestContainer {
   private const val ETCD_IMAGE = "gcr.io/etcd-development/etcd:v3.5.17"
   private const val CLIENT_PORT = 2379
 
-  // The client port is bound to a FIXED host port chosen once per JVM: Docker does
-  // NOT preserve randomly-assigned host ports across `docker restart` (verified:
-  // the port changes), and the fault tests restart the container while jetcd
-  // clients keep dialing the original endpoint. A fixed binding lives in the
-  // container's HostConfig and survives restarts. Probing a free port and then
-  // binding it is racy in principle; with one container per forked test JVM the
-  // window is negligible.
-  private val fixedClientHostPort: Int by lazy {
-    ServerSocket(0).use { it.localPort }
-  }
+  // The client port is bound to a FIXED host port: Docker does NOT preserve
+  // randomly-assigned host ports across `docker restart` (verified: the port
+  // changes), and the fault tests restart the container while jetcd clients keep
+  // dialing the original endpoint. A fixed binding lives in the container's
+  // HostConfig and survives restarts. Probing a free port and then binding it is
+  // racy across parallel test forks (observed: "port is already allocated" under
+  // a full-suite run), so startup retries with a fresh port on bind conflicts.
+  private const val START_ATTEMPTS = 5
+
+  private class RunningContainer(
+    val container: GenericContainer<*>,
+    val hostPort: Int,
+  )
 
   // Lazy: the container is only started when a test in this JVM actually
   // asks for the endpoint. With forkEvery=1 each test class is its own JVM,
   // so this gives one container per test class. Testcontainers' Ryuk reaper
   // handles cleanup; the explicit shutdown hook is belt-and-suspenders that
   // stops the container promptly when the test JVM exits.
-  private val container: GenericContainer<*> by lazy {
-    // Only the client port is exposed: the peer port is unused on a single node, and
-    // the fixed-binding modifier below replaces ALL host-port bindings — an exposed
-    // port without a binding would stall Testcontainers' startup port check.
-    val c = GenericContainer(DockerImageName.parse(ETCD_IMAGE))
-      .withExposedPorts(CLIENT_PORT)
-      .withCreateContainerCmdModifier { cmd ->
-        cmd.hostConfig?.withPortBindings(
-          PortBinding(Ports.Binding.bindPort(fixedClientHostPort), ExposedPort.tcp(CLIENT_PORT)),
+  private val running: RunningContainer by lazy {
+    var lastFailure: Exception? = null
+    repeat(START_ATTEMPTS) {
+      val hostPort = ServerSocket(0).use { it.localPort }
+      // Only the client port is exposed: the peer port is unused on a single node,
+      // and the fixed-binding modifier below replaces ALL host-port bindings — an
+      // exposed port without a binding would stall Testcontainers' startup check.
+      val c = GenericContainer(DockerImageName.parse(ETCD_IMAGE))
+        .withExposedPorts(CLIENT_PORT)
+        .withCreateContainerCmdModifier { cmd ->
+          cmd.hostConfig?.withPortBindings(
+            PortBinding(Ports.Binding.bindPort(hostPort), ExposedPort.tcp(CLIENT_PORT)),
+          )
+        }
+        .withCommand(
+          "etcd",
+          "--listen-client-urls=http://0.0.0.0:$CLIENT_PORT",
+          "--advertise-client-urls=http://0.0.0.0:$CLIENT_PORT",
         )
+        .waitingFor(Wait.forLogMessage(".*ready to serve client requests.*\\n", 1))
+      try {
+        c.start()
+        Runtime.getRuntime().addShutdownHook(Thread { runCatching { c.stop() } })
+        return@lazy RunningContainer(c, hostPort)
+      } catch (e: Exception) {
+        lastFailure = e
+        runCatching { c.stop() }
+        val portConflict =
+          generateSequence<Throwable>(e) { t -> t.cause?.takeIf { it !== t } }
+            .any { it.message?.contains("port is already allocated") == true }
+        if (!portConflict) throw e
+        // Another fork (or process) won the probed port; retry with a fresh one
       }
-      .withCommand(
-        "etcd",
-        "--listen-client-urls=http://0.0.0.0:$CLIENT_PORT",
-        "--advertise-client-urls=http://0.0.0.0:$CLIENT_PORT",
-      )
-      .waitingFor(Wait.forLogMessage(".*ready to serve client requests.*\\n", 1))
-    c.start()
-    Runtime.getRuntime().addShutdownHook(Thread { runCatching { c.stop() } })
-    c
+    }
+    throw IllegalStateException("etcd container failed to start after $START_ATTEMPTS attempts", lastFailure)
   }
 
-  fun endpoint(): String = "http://${container.host}:$fixedClientHostPort"
+  private val container: GenericContainer<*> get() = running.container
+
+  fun endpoint(): String = "http://${container.host}:${running.hostPort}"
 
   // ---- Fault-injection controls (used by io.etcd.recipes.fault tests) ----
   // These mutate the private container; they are only meaningful under
