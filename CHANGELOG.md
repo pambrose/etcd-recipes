@@ -12,6 +12,15 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (queues: delayed delivery)
+
+- `DistributedWorkQueue.enqueue(value, delay)` — the item stays invisible under
+  `delayed/` until it matures, then consumers promote it into the queue (CAS, one
+  winner) and it flows through the normal claim/ack lifecycle in ready-time
+  order. Empty-queue waits wake when the earliest delayed item matures, so
+  delivery is prompt without polling. Maturity is judged against client clocks
+  (documented; skew shifts delivery by the skew).
+
 ### Added (queues: at-least-once work queue)
 
 - `DistributedWorkQueue` — claim-based at-least-once delivery: `receive()` claims
