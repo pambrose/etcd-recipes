@@ -12,6 +12,17 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (locks: mutex)
+
+- `DistributedMutex` — reentrant distributed lock on etcd's native lock service
+  (server-side FIFO queuing, requireLeader applied by jetcd). Thread-per-acquisition
+  holds (Curator parity), `tryLock(timeout)` whose timed-out attempts leak nothing
+  (the per-acquisition lease revoke authoritatively aborts the server-side wait),
+  `withLock { }`, and cooperative lock-lost handling: listener + state flip +
+  `LOST` connection state, with interruption opt-in (`interruptOnLockLoss`). The
+  raw `Client.lock`/`unlock` extensions gained rpc-resilience parameters
+  (`lock` defaults to an unbounded wait by design).
+
 ### Added (queues: delayed delivery)
 
 - `DistributedWorkQueue.enqueue(value, delay)` — the item stays invisible under

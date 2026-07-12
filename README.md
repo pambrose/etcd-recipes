@@ -24,7 +24,8 @@ what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zook
 | `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider` |
 | `io.etcd.recipes.election` | `LeaderSelector`, `LeaderSelectorListener`, `Participant` |
 | `io.etcd.recipes.keyvalue` | `TransientKeyValue` (lease-backed key/value) |
-| `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue` |
+| `io.etcd.recipes.lock` | `DistributedMutex` (reentrant, on etcd's native lock service) |
+| `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue`, `DistributedWorkQueue` (at-least-once) |
 | `io.etcd.recipes.common` | Kotlin extensions over jetcd `Client`, `KV`, `Lease`, `Watch`, `Txn` |
 
 ## Usage
@@ -71,6 +72,36 @@ See the `etcd-recipes-examples/` module for runnable
 [Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples)
 and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples)
 demos of every recipe.
+
+## Distributed locks
+
+`DistributedMutex` is a reentrant distributed lock on etcd's **native lock
+service** — waiters queue server-side (FIFO by revision), and jetcd applies
+`requireLeader`, so a waiter never blocks silently against a partitioned server:
+
+```kotlin
+import io.etcd.recipes.lock.DistributedMutex
+import io.etcd.recipes.lock.withLock
+
+DistributedMutex(client, "/locks/inventory").use { mutex ->
+    mutex.withLock {
+        // exactly one holder across all processes and threads
+    }
+
+    if (mutex.tryLock(5.seconds)) {          // bounded acquisition; nothing leaks on timeout
+        try { /* ... */ } finally { mutex.unlock() }
+    }
+}
+```
+
+Holds are **per-thread** (Curator parity): a second thread on the same instance
+queues in etcd like a second process, and `unlock()` from a non-owner throws.
+Each acquisition owns a lease that is renewed through the wait and the hold. If
+a holder is partitioned longer than the TTL, etcd grants the lock to the next
+waiter and the dispossessed holder observes it **cooperatively**:
+`isHeldByCurrentThread` turns false, its `LockLostListener` fires, connection
+state reports `LOST`, and `unlock()` returns false (interruption is opt-in via
+`interruptOnLockLoss`). The lock is deliberately never auto-reclaimed.
 
 ## Reliable work queue
 
