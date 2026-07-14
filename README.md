@@ -21,7 +21,7 @@ what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zook
 | `io.etcd.recipes.barrier` | `DistributedBarrier`, `DistributedBarrierWithCount`, `DistributedDoubleBarrier` |
 | `io.etcd.recipes.cache` | `PathChildrenCache` (key-prefix cache with PUT/UPDATE/DELETE listeners) |
 | `io.etcd.recipes.counter` | `DistributedAtomicLong` |
-| `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider` |
+| `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider`, `ProviderStrategy` |
 | `io.etcd.recipes.election` | `LeaderSelector`, `LeaderLatch`, `LeaderObserver`, `LeaderSelectorListener`, `Participant` |
 | `io.etcd.recipes.keyvalue` | `TransientKeyValue` (lease-backed key/value) |
 | `io.etcd.recipes.lock` | `DistributedMutex`, `DistributedReadWriteLock`, `DistributedSemaphore` |
@@ -218,6 +218,35 @@ Holds are instance-level, Java-`Semaphore`-style: any thread may release
 (releases are LIFO among the instance's holds), and a permit whose lease
 expires is lost cooperatively — a `PermitLostListener` fires and the matching
 `release()` returns false.
+
+## Load-balancing service provider
+
+`ServiceProvider` hands out instances of a registered service with a pluggable
+[`ProviderStrategy`](etcd-recipes/src/main/kotlin/io/etcd/recipes/discovery/ProviderStrategy.kt)
+— `RandomStrategy` (the default), `RoundRobinStrategy`, or `StickyStrategy` (session
+affinity) — the basis for client-side load balancing. Call `start()` to back reads
+with a watch-updated `ServiceCache` (in-memory, current); without `start()` each read
+does a direct etcd lookup (the original behavior). Mark a failing instance with
+`noteError`: after an error threshold it is ejected from selection for a down window,
+then automatically becomes eligible again.
+
+```kotlin
+import io.etcd.recipes.discovery.RoundRobinStrategy
+import io.etcd.recipes.discovery.withServiceDiscovery
+
+withServiceDiscovery(client, "/services/app") {
+    withServiceProvider("worker", RoundRobinStrategy()) {
+        start()                         // watch-backed, in-memory reads
+        val instance = getInstance()    // round-robin pick
+        // … on a failed request to `instance`:
+        noteError(instance)             // eject it from rotation for a while
+    }
+}
+```
+
+Stateful strategies (`RoundRobinStrategy`, `StickyStrategy`) hold per-provider state —
+use a fresh one per provider. The observer-only `LeaderObserver` /
+`Client.leadershipAsFlow` are the election analogues.
 
 ## Reliable work queue
 

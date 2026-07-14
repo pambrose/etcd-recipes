@@ -31,6 +31,7 @@ import io.etcd.recipes.common.getValue
 import io.etcd.recipes.discovery.ServiceDiscovery.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Duration
 
 @JvmOverloads
 fun <T> withServiceDiscovery(
@@ -95,12 +96,28 @@ constructor(
     receiver: ServiceCache.() -> T,
   ) = serviceCache(name).use { it.receiver() }
 
-  fun serviceProvider(serviceName: String): ServiceProvider {
+  @JvmOverloads
+  fun serviceProvider(
+    serviceName: String,
+    strategy: ProviderStrategy = RandomStrategy,
+    errorThreshold: Int = ServiceProvider.DEFAULT_ERROR_THRESHOLD,
+    downPeriod: Duration = ServiceProvider.DEFAULT_DOWN_PERIOD,
+  ): ServiceProvider {
     checkCloseNotCalled()
-    val provider = ServiceProvider(client, namesPath, serviceName)
+    val provider =
+      ServiceProvider(client, namesPath, serviceName, strategy, errorThreshold, downPeriod, resilienceConfig)
     serviceProviderList += provider
     return provider
   }
+
+  @JvmOverloads
+  fun <T> withServiceProvider(
+    serviceName: String,
+    strategy: ProviderStrategy = RandomStrategy,
+    errorThreshold: Int = ServiceProvider.DEFAULT_ERROR_THRESHOLD,
+    downPeriod: Duration = ServiceProvider.DEFAULT_DOWN_PERIOD,
+    receiver: ServiceProvider.() -> T,
+  ): T = serviceProvider(serviceName, strategy, errorThreshold, downPeriod).use { it.receiver() }
 
   @Synchronized
   fun queryForNames(): List<String> {

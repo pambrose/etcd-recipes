@@ -12,6 +12,19 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (discovery: load-balancing ServiceProvider)
+
+- `ServiceProvider` now extends `EtcdConnector` and owns an internal `ServiceCache`:
+  `start()` backs reads with a watch-updated in-memory instance map (`close()` releases
+  it); without `start()` each read does a direct etcd lookup, so the existing 3-arg
+  constructor and `getAllInstances()`/`getInstance()` behavior is unchanged.
+- Pluggable `ProviderStrategy` (SAM): `RandomStrategy` (default), `RoundRobinStrategy`,
+  `StickyStrategy` (session affinity).
+- `noteError(instance)` ejects a failing instance from selection after an error
+  threshold for a down window, then auto-recovers (keyed by instance value, not the
+  unstable `id`).
+- `ServiceDiscovery.serviceProvider(name, strategy, …)` overload + `withServiceProvider { }`.
+
 ### Added (election: leader latch)
 
 - `LeaderLatch` — a Curator-style leader latch that acquires leadership and **holds
