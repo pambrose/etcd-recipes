@@ -17,10 +17,9 @@
 package io.etcd.recipes.coroutines
 
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runInterruptible
 
 /**
@@ -31,9 +30,12 @@ import kotlinx.coroutines.runInterruptible
  *
  * The blocking RPC engine catches a mid-call `InterruptedException` and rethrows it
  * wrapped in an [EtcdRecipeRuntimeException] (with the interrupt flag re-set), so
- * `runInterruptible` cannot recognize it as cancellation. This unwraps that case:
- * when the surrounding coroutine has been cancelled, a wrapped interrupt is surfaced
- * as the expected `CancellationException` rather than a spurious failure.
+ * `runInterruptible` cannot recognize it as cancellation. Inside `runInterruptible`
+ * the worker thread is interrupted ONLY by coroutine cancellation, so a wrapped
+ * `InterruptedException` reaching here unambiguously means the coroutine was cancelled
+ * — surface it as `CancellationException`. (An `ensureActive()`/`isActive` check here
+ * is racy: the interrupt can be delivered a hair before the `Job`'s state flips to
+ * cancelled, which let the wrapped failure escape intermittently.)
  */
 internal suspend fun <T> interruptibleOn(
   dispatcher: CoroutineDispatcher,
@@ -42,7 +44,7 @@ internal suspend fun <T> interruptibleOn(
   try {
     runInterruptible(dispatcher, block = block)
   } catch (e: EtcdRecipeRuntimeException) {
-    if (e.cause is InterruptedException) currentCoroutineContext().ensureActive()
+    if (e.cause is InterruptedException) throw CancellationException("Cancelled during a blocking etcd call")
     throw e
   }
 
