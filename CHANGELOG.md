@@ -12,6 +12,21 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (election: leader latch)
+
+- `LeaderLatch` — a Curator-style leader latch that acquires leadership and **holds
+  it until `close()`**, unlike the callback-scoped `LeaderSelector`. Query
+  `hasLeadership`, block on `await()` / `await(timeout)`, or register a
+  `LeaderLatchListener` (`isLeader`/`notLeader`). Composes a `LeaderSelector` per
+  leadership term (via a worker term-loop), so latches and selectors interoperate in
+  the same election; on lease loss it steps down, fires `notLeader`, and re-contests.
+  Plus a `withLeaderLatch { }` DSL.
+- `LeaderObserver` — a blocking/Java election observer (no candidacy): a
+  `currentLeader` snapshot and `LeaderListener` take/relinquish callbacks, backed by
+  the resilient watcher. The counterpart to the coroutine `Client.leadershipAsFlow`.
+- Internal `ElectionPaths` helper unifies the election key scheme; the duplicate in
+  the coroutine `leadershipAsFlow` now shares it.
+
 ### Added (coroutines: event flows)
 
 - Recipe event streams exposed as `Flow`s in `io.etcd.recipes.coroutines`:
