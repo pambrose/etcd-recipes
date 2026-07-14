@@ -315,8 +315,8 @@ constructor(
     checkStartCalled()
     checkCloseNotCalled()
     // Check startThreadComplete here in case start() was re-used without a call to close()
-    startThreadComplete.waitUntilTrue()
-    return leadershipComplete.waitUntilTrue(timeout)
+    startThreadComplete.waitUntilTrueWithInterruption()
+    return leadershipComplete.waitUntilTrueWithInterruption(timeout)
   }
 
   // Blocking form of [isFinished]: waits until leadership completes (set by close()
@@ -334,7 +334,7 @@ constructor(
   ): Boolean = waitUntilFinished(timeUnitToDuration(timeout, timeUnit))
 
   @Throws(InterruptedException::class)
-  fun waitUntilFinished(timeout: Duration): Boolean = leadershipComplete.waitUntilTrue(timeout)
+  fun waitUntilFinished(timeout: Duration): Boolean = leadershipComplete.waitUntilTrueWithInterruption(timeout)
 
   private fun markLeadershipComplete() {
     terminateWatch.set(true)

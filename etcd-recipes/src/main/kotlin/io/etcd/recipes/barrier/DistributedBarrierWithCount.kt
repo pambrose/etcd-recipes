@@ -124,7 +124,7 @@ constructor(
     timeUnit: TimeUnit,
   ): Boolean = waitOnBarrier(timeUnitToDuration(timeout, timeUnit))
 
-  @Suppress("CyclomaticComplexMethod", "LongMethod")
+  @Suppress("CyclomaticComplexMethod", "LongMethod", "ThrowsCount")
   @Throws(InterruptedException::class, EtcdRecipeException::class)
   fun waitOnBarrier(timeout: Duration): Boolean {
     val keepAliveLease = AtomicReference<SelfHealingKeepAlive?>(null)
@@ -280,7 +280,16 @@ constructor(
               // Check one more time in case watch missed the delete just after last check
               checkWaiterCount()
 
-              val signalled = keepAliveClosed.waitUntilTrue(timeout)
+              val signalled =
+                try {
+                  keepAliveClosed.waitUntilTrueWithInterruption(timeout)
+                } catch (e: InterruptedException) {
+                  // Interrupted mid-wait (e.g. a coroutine bridge was cancelled):
+                  // stop counting toward the barrier — closeKeepAlive() halts the
+                  // healer and deletes our waiting key — before propagating.
+                  closeKeepAlive()
+                  throw e
+                }
               // Cleanup if a time-out occurred
               if (!signalled) {
                 closeKeepAlive()

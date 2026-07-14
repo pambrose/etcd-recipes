@@ -273,7 +273,7 @@ class PathChildrenCache
   fun waitOnStartComplete(timeout: Duration): Boolean {
     checkStartCalled()
     checkCloseNotCalled()
-    return startThreadComplete.waitUntilTrue(timeout)
+    return startThreadComplete.waitUntilTrueWithInterruption(timeout)
   }
 
   // Re-sync the cache to etcd's current children. Build the fresh view first, then
