@@ -73,10 +73,18 @@ class LeaderLatchFaultTests : StringSpec() {
 
           revokeLeaseOf(client, "$electionPath/LEADER")
 
-          pollUntil(20.seconds) { !latch.hasLeadership } shouldBe true
-          // Alone in the election, it re-contests and wins again
+          // Assert on the durable notLeader event, not a poll of the transient
+          // hasLeadership flag: alone in the election the latch re-acquires almost
+          // immediately, so the false window can fall between polls. The step-down
+          // always fires notLeader, and re-contesting fires isLeader again.
+          pollUntil(30.seconds) { events.contains("notLeader") } shouldBe true
           pollUntil(30.seconds) { latch.hasLeadership } shouldBe true
-          events.take(3) shouldBe listOf("isLeader", "notLeader", "isLeader")
+          events.first() shouldBe "isLeader"
+          // Settles holding leadership: one more isLeader than notLeader, whatever the
+          // churn (poll so async listener dispatch can catch up to hasLeadership).
+          pollUntil(10.seconds) {
+            events.count { it == "isLeader" } - events.count { it == "notLeader" } == 1
+          } shouldBe true
         } finally {
           latch.close()
         }
