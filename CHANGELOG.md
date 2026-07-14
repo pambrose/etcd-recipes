@@ -12,6 +12,26 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (coroutines: event flows)
+
+- Recipe event streams exposed as `Flow`s in `io.etcd.recipes.coroutines`:
+  `PathChildrenCache.eventsAsFlow()` / `recoveryEventsAsFlow()`,
+  `ServiceCache.eventsAsFlow()` / `recoveryEventsAsFlow()`,
+  `EtcdConnector.connectionStateAsFlow()` (emits current state, conflated),
+  `leaseEventsAsFlow()` on `TransientKeyValue` / `DistributedWorkQueue` /
+  `ServiceRegistry`, `Client.leadershipAsFlow(path)` (observer of who holds
+  leadership, with a `LeadershipEvent` sealed type), and
+  `EtcdLock.lockLostAsFlow()` / `DistributedSemaphore.permitLostAsFlow()`.
+  Collecting a flow registers the underlying listener and cancelling the
+  collector unregisters it; collection never starts or closes the recipe.
+  Loss/lease flows fed from jetcd's lease-callback thread are unconditionally
+  unlimited-buffered so that thread can never block.
+- Listener-removal members completing existing add pairs:
+  `PathChildrenCache.removeListener` / `removeRecoveryListener`,
+  `ServiceCache.removeListenerForChanges` / `removeRecoveryListener`, and
+  `removeLeaseListener` on `TransientKeyValue`, `DistributedWorkQueue`, and
+  `ServiceRegistry`.
+
 ### Added (coroutines: suspending recipes)
 
 - Suspending twins for every recipe's blocking entry points, in

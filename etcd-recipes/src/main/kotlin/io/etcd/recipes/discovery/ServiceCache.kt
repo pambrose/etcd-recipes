@@ -181,6 +181,10 @@ class ServiceCache
     listeners += listener
   }
 
+  fun removeListenerForChanges(listener: ServiceCacheListener) {
+    listeners -= listener
+  }
+
   /**
    * Registers a listener for watch-recovery events (resubscribes after fatal stream
    * deaths, compaction resyncs, abandoned recovery).
@@ -188,6 +192,10 @@ class ServiceCache
   fun addRecoveryListener(listener: WatchRecoveryListener) {
     checkCloseNotCalled()
     recoveryListeners += listener
+  }
+
+  fun removeRecoveryListener(listener: WatchRecoveryListener) {
+    recoveryListeners -= listener
   }
 
   @Synchronized

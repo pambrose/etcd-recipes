@@ -166,12 +166,20 @@ class PathChildrenCache
     listeners += listener
   }
 
+  fun removeListener(listener: PathChildrenCacheListener) {
+    listeners -= listener
+  }
+
   /**
    * Registers a listener for watch-recovery events (resubscribes after fatal stream
    * deaths, compaction resyncs, abandoned recovery).
    */
   fun addRecoveryListener(listener: WatchRecoveryListener) {
     recoveryListeners += listener
+  }
+
+  fun removeRecoveryListener(listener: WatchRecoveryListener) {
+    recoveryListeners -= listener
   }
 
   fun clearListeners() = listeners.clear()

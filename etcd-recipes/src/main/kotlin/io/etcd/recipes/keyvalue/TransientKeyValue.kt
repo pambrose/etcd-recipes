@@ -80,6 +80,10 @@ constructor(
     leaseListeners += listener
   }
 
+  fun removeLeaseListener(listener: LeaseListener) {
+    leaseListeners -= listener
+  }
+
   init {
     require(keyPath.isNotEmpty()) { "Key path cannot be empty" }
 

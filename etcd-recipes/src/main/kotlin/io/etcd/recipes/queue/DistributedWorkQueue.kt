@@ -158,6 +158,10 @@ class DistributedWorkQueue
     leaseListeners += listener
   }
 
+  fun removeLeaseListener(listener: LeaseListener) {
+    leaseListeners -= listener
+  }
+
   fun enqueue(value: String) = enqueue(value.asByteSequence)
 
   fun enqueue(value: Int) = enqueue(value.asByteSequence)
