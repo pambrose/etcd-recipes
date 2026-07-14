@@ -12,6 +12,27 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (coroutines: suspending recipes)
+
+- Suspending twins for every recipe's blocking entry points, in
+  `io.etcd.recipes.coroutines`: queues (`receive`, `awaitEnqueue`, work-queue
+  `awaitReceive`/`awaitAck`), barriers (`await`), locks (scoped `withLock` for
+  the thread-owned mutex/RW-lock; `awaitAcquire`/`withPermit` for the semaphore),
+  `DistributedAtomicLong` arithmetic, and the `start`/`waitOn…` lifecycle waits
+  for cache, election, keyvalue, and discovery. Each runs the blocking call on
+  `Dispatchers.IO` via `runInterruptible`, so coroutine cancellation aborts the
+  wait and the recipe's existing cleanup (lease revoke / entry delete) runs.
+
+### Changed
+
+- `DistributedBarrierWithCount.waitOnBarrier`, `LeaderSelector`'s
+  `waitOnLeadershipComplete`/`waitUntilFinished`, and
+  `PathChildrenCache.waitOnStartComplete` now honor thread interruption (they
+  parked on an uninterruptible monitor despite declaring
+  `@Throws(InterruptedException)`). This makes the blocking API interruptible as
+  documented and lets the coroutine twins cancel these waits cleanly; an
+  interrupted barrier waiter stops counting toward the barrier before propagating.
+
 ### Added (coroutines: suspend KV/lease/txn + Flow watches)
 
 - New `io.etcd.recipes.coroutines` package: a Kotlin-first async surface alongside

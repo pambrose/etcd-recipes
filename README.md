@@ -110,6 +110,28 @@ dispatcher; cancelling the collector closes the watcher. Use
 `watchEventsAsFlow` for a flattened `Flow<WatchEvent>` when no derived state is
 kept.
 
+Every recipe's blocking entry points have suspending twins that run the
+blocking call on `Dispatchers.IO`, so a coroutine can wait on a queue, barrier,
+lock, or counter without dedicating a thread — and cancelling the coroutine
+aborts the wait, cleaning up any queued entry or lease:
+
+| Recipe | Blocking | Suspending |
+|---|---|---|
+| `DistributedQueue` | `dequeue()` / `poll(t)` / `enqueue(v)` | `receive()` / `receive(t)` / `awaitEnqueue(v)` |
+| `DistributedWorkQueue` | `receive()` / `WorkItem.ack()` | `awaitReceive()` / `WorkItem.awaitAck()` |
+| `DistributedBarrier` | `waitOnBarrier()` | `await()` / `await(t)` |
+| `DistributedBarrierWithCount` | `waitOnBarrier()` | `await()` / `await(t)` |
+| `DistributedMutex` / RW lock | `lock { }` (thread-owned) | `withLock { }` (scoped) |
+| `DistributedSemaphore` | `acquire()` / `withPermit { }` | `awaitAcquire()` / `withPermit { }` |
+| `DistributedAtomicLong` | `increment()` / `add(n)` | `awaitIncrement()` / `awaitAdd(n)` |
+| `LeaderSelector` / `PathChildrenCache` | `start()` / `waitOn…()` | `awaitStart()` / `await…()` |
+
+The thread-owned locks (`DistributedMutex`, `DistributedReadWriteLock`) expose
+only the scoped `withLock { }` — ownership is pinned to the acquiring thread, so
+acquisition and release are confined to one thread per call while the body runs
+in your coroutine. The instance-held `DistributedSemaphore` also offers the
+split `awaitAcquire()` / `awaitRelease()`.
+
 ## Distributed locks
 
 `DistributedMutex` is a reentrant distributed lock on etcd's **native lock
