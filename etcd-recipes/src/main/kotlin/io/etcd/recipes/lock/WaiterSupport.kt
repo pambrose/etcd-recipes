@@ -42,21 +42,32 @@ import kotlin.time.Duration
  * deadline passes. Watch failures unpark and throw. Follows the queue/barrier
  * watcher discipline: recheck RPCs run on the watch dispatcher thread, never on
  * jetcd's event loop.
+ *
+ * Every waiter anchors its watch at `observedRevision + 1`, where `observedRevision`
+ * is the store revision at which the caller's ranged read last saw the awaited
+ * predecessor present. An un-anchored watch starts at whatever revision etcd assigns
+ * when it processes the create — which races the pre-live recheck GET, so a DELETE
+ * landing in that establishment window is missed by both and an unbounded `lock()`
+ * parks forever. Anchoring replays every event after the observation, closing the
+ * window; the pre-live recheck then only shortcuts the already-satisfied case. Pass
+ * `observedRevision = 0` to opt out (watch from the current revision).
  */
 internal object WaiterSupport {
   /** Waits for the DELETE of exactly [key]; the wake predicate is key absence. */
+  @Suppress("LongParameterList")
   fun awaitKeyDeletion(
     client: Client,
     key: String,
     resilience: ResilienceConfig,
     latch: CountDownLatch,
     deadline: ComparableTimeMark?,
+    observedRevision: Long,
     reportRecovery: (WatchRecoveryEvent) -> Unit,
     recordException: (Throwable) -> Unit,
   ) = await(
     client,
     key,
-    watchOption { withNoPut(true) },
+    watchOption { withNoPut(true).anchorAt(observedRevision) },
     resilience,
     latch,
     deadline,
@@ -78,13 +89,14 @@ internal object WaiterSupport {
     resilience: ResilienceConfig,
     latch: CountDownLatch,
     deadline: ComparableTimeMark?,
+    observedRevision: Long,
     shouldWake: () -> Boolean,
     reportRecovery: (WatchRecoveryEvent) -> Unit,
     recordException: (Throwable) -> Unit,
   ) = await(
     client,
     prefix,
-    watchOption { withNoPut(true).isPrefix(true) },
+    watchOption { withNoPut(true).isPrefix(true).anchorAt(observedRevision) },
     resilience,
     latch,
     deadline,
@@ -92,6 +104,12 @@ internal object WaiterSupport {
     reportRecovery,
     recordException,
   )
+
+  // Anchor the watch just past the revision at which the predecessor was observed
+  // present, so its DELETE (necessarily at a later revision) is always (re)delivered.
+  // observedRevision <= 0 means "no anchor" — subscribe at the current revision.
+  private fun WatchOption.Builder.anchorAt(observedRevision: Long): WatchOption.Builder =
+    apply { if (observedRevision > 0L) withRevision(observedRevision + 1) }
 
   @Suppress("LongParameterList")
   private fun await(

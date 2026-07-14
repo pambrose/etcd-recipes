@@ -21,7 +21,6 @@ package io.etcd.recipes.lock
 import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.options.GetOption
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
@@ -274,10 +273,11 @@ class DistributedReadWriteLock
           if (attempt.phase.load() == Phase.DEAD) latch.countDown() // fatal raced the install
           WaiterSupport.awaitKeyDeletion(
             client,
-            conflict.key.asString,
+            conflict.key,
             resilience,
             latch,
             deadline,
+            observedRevision = conflict.observedRevision,
             reportRecovery = { event -> reportRecoveryEvent(event) },
             recordException = { e -> exceptionList.value += e },
           )
@@ -298,13 +298,15 @@ class DistributedReadWriteLock
 
   // One consistent snapshot (a single ranged read), sorted by create revision.
   // The nearest EARLIER conflicting entry is the wait target; the calling
-  // thread's own write entry is excluded so write→read downgrade admits.
+  // thread's own write entry is excluded so write→read downgrade admits. The
+  // snapshot's revision rides along so the wait can anchor its DELETE-watch at
+  // the point the conflict was observed present (see WaiterSupport).
   private fun nearestConflict(
     side: Side,
     thread: Thread,
     ownEntryKey: String,
     ownCreateRevision: Long,
-  ): KeyValue? {
+  ): Conflict? {
     val snapshot =
       client.getResponse(
         lockPath,
@@ -316,21 +318,31 @@ class DistributedReadWriteLock
         resilience.rpc,
       )
     val ownWriteEntry = writeHolds[thread]?.entryKey
-    return snapshot.kvs
-      .asSequence()
-      .filter { it.createRevision < ownCreateRevision }
-      .filter { kv ->
-        val basename = kv.key.asString.substringAfterLast('/')
-        when (side) {
-          Side.WRITE -> true
+    val conflict =
+      snapshot.kvs
+        .asSequence()
+        .filter { it.createRevision < ownCreateRevision }
+        .filter { kv ->
+          val basename = kv.key.asString.substringAfterLast('/')
+          when (side) {
+            Side.WRITE -> true
 
-          // any earlier entry conflicts with a writer
-          Side.READ -> basename.startsWith(Side.WRITE.entryPrefix)
+            // any earlier entry conflicts with a writer
+            Side.READ -> basename.startsWith(Side.WRITE.entryPrefix)
+          }
         }
-      }
-      .filter { it.key.asString != ownEntryKey && it.key.asString != ownWriteEntry }
-      .maxByOrNull { it.createRevision }
+        .filter { it.key.asString != ownEntryKey && it.key.asString != ownWriteEntry }
+        .maxByOrNull { it.createRevision }
+        ?: return null
+    return Conflict(conflict.key.asString, snapshot.header.revision)
   }
+
+  // Nearest earlier conflicting entry plus the revision at which the ranged read
+  // observed it present.
+  private data class Conflict(
+    val key: String,
+    val observedRevision: Long,
+  )
 
   // Runs on jetcd's lease callback thread — no blocking RPCs here. The phase
   // machine guarantees exactly one of {waiter-abort, lockLost} runs.
