@@ -253,13 +253,13 @@ class DistributedSemaphore
           }
           if (deadline != null && deadline.hasPassedNow()) return false
 
-          val rank = rankOf(entryKey)
+          val snap = rankOf(entryKey)
             ?: run {
               // Own entry gone: the lease died in the window
               Thread.sleep(LEASE_HEAL_PAUSE_MS)
               continue@outer
             }
-          if (rank < permits) {
+          if (snap.rank < permits) {
             // Admitted: publish the hold BEFORE claiming the phase (a fatal in
             // the win window must always find the hold — or the CAS failure
             // below rolls it back).
@@ -284,9 +284,10 @@ class DistributedSemaphore
             resilience,
             latch,
             deadline,
+            observedRevision = snap.observedRevision,
             shouldWake = {
               val now = rankOf(entryKey)
-              now == null || now < permits
+              now == null || now.rank < permits
             },
             reportRecovery = { event -> reportRecoveryEvent(event) },
             recordException = { e -> exceptionList.value += e },
@@ -306,9 +307,11 @@ class DistributedSemaphore
     }
   }
 
-  // Create-revision rank of the entry within one consistent prefix snapshot;
-  // null once the entry no longer exists (its lease died).
-  private fun rankOf(entryKey: String): Int? {
+  // Create-revision rank of the entry within one consistent prefix snapshot,
+  // plus the revision at which that snapshot observed the blockers present (so
+  // the wait can anchor its DELETE-watch there); null once the entry no longer
+  // exists (its lease died).
+  private fun rankOf(entryKey: String): RankSnapshot? {
     val snapshot =
       client.getResponse(
         "$holdersPath/",
@@ -320,8 +323,13 @@ class DistributedSemaphore
         resilience.rpc,
       )
     val idx = snapshot.kvs.indexOfFirst { it.key.asString == entryKey }
-    return if (idx < 0) null else idx
+    return if (idx < 0) null else RankSnapshot(idx, snapshot.header.revision)
   }
+
+  private data class RankSnapshot(
+    val rank: Int,
+    val observedRevision: Long,
+  )
 
   // Runs on jetcd's lease callback thread — no blocking RPCs here. The phase
   // machine guarantees exactly one of {waiter-abort, permitLost} runs.

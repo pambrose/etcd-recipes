@@ -12,6 +12,17 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Fixed (locks: read-write lock / semaphore wait)
+
+- `DistributedReadWriteLock` and `DistributedSemaphore` could park a caller
+  indefinitely under contention. A waiter's DELETE-watch was created without a
+  start revision, so it began at whatever revision etcd assigned when it processed
+  the create — racing the pre-live recheck GET. A predecessor's release landing in
+  that watch-establishment window was missed by both the watch and the recheck, and
+  an unbounded `lock()` then parked forever. Each wait now anchors its watch at the
+  revision where its ranged read observed the blocker present, so the release is
+  always (re)delivered; the pre-live recheck is now only a fast path.
+
 ### Added (discovery: load-balancing ServiceProvider)
 
 - `ServiceProvider` now extends `EtcdConnector` and owns an internal `ServiceCache`:
