@@ -22,7 +22,7 @@ what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zook
 | `io.etcd.recipes.cache` | `PathChildrenCache` (key-prefix cache with PUT/UPDATE/DELETE listeners) |
 | `io.etcd.recipes.counter` | `DistributedAtomicLong` |
 | `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider` |
-| `io.etcd.recipes.election` | `LeaderSelector`, `LeaderSelectorListener`, `Participant` |
+| `io.etcd.recipes.election` | `LeaderSelector`, `LeaderLatch`, `LeaderObserver`, `LeaderSelectorListener`, `Participant` |
 | `io.etcd.recipes.keyvalue` | `TransientKeyValue` (lease-backed key/value) |
 | `io.etcd.recipes.lock` | `DistributedMutex`, `DistributedReadWriteLock`, `DistributedSemaphore` |
 | `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue`, `DistributedWorkQueue` (at-least-once) |
@@ -68,6 +68,28 @@ connectToEtcd(urls) { client ->
     }
 }
 ```
+
+`LeaderSelector` is callback-scoped — leadership lives inside `takeLeadershipBlock`.
+For the "acquire leadership and **hold it until shutdown**" shape, use `LeaderLatch`:
+
+```kotlin
+import io.etcd.recipes.election.LeaderLatch
+
+connectToEtcd(urls) { client ->
+    LeaderLatch(client, "/election/my-service", clientId = "node-1").use { latch ->
+        latch.start()
+        latch.await()               // block until this node holds leadership
+        // hold leadership and do leader-only work; hasLeadership stays true…
+    }                               // …until close() releases candidacy
+}
+```
+
+`LeaderLatch` composes `LeaderSelector`, so latches and selectors interoperate in
+one election; query `hasLeadership`, block on `await()` / `await(timeout)`, or
+register a `LeaderLatchListener` (`isLeader`/`notLeader`). If the leadership lease is
+lost it fires `notLeader` and re-contests. To *observe* an election without being a
+candidate, use `LeaderObserver` (blocking, with a `currentLeader` snapshot and a
+`LeaderListener`) or the coroutine `Client.leadershipAsFlow(path)`.
 
 See the `etcd-recipes-examples/` module for runnable
 [Java](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/java/io/etcd/recipes/examples)

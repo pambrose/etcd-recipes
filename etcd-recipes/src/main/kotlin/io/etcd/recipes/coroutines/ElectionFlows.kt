@@ -26,24 +26,16 @@ import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.WatchResilience
-import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.watcher
+import io.etcd.recipes.election.ElectionPaths
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
-
-// The election LEADER key holds "<clientId>:<randomId(7)>"; drop the unique suffix to
-// recover the client id. Mirrors LeaderSelector's private withLeaderSuffix /
-// stripUniqueSuffix (that file is source-frozen, so the logic is duplicated here).
-private const val LEADER_KEY = "LEADER"
-private const val UNIQUE_SUFFIX_LENGTH = 8 // ':' + EtcdConnector.TOKEN_LENGTH (7)
-
-private fun String.stripLeaderSuffix() = dropLast(UNIQUE_SUFFIX_LENGTH)
 
 /** A change in who holds leadership at an election path, from an observer's view. */
 sealed interface LeadershipEvent {
@@ -77,10 +69,10 @@ fun Client.leadershipAsFlow(
   capacity: Int = Channel.UNLIMITED,
 ): Flow<LeadershipEvent> =
   callbackFlow {
-    val leaderKey = electionPath.appendToPath(LEADER_KEY)
+    val leaderKey = ElectionPaths.leaderKey(electionPath)
 
     fun emitCurrentLeader() {
-      val leader = getValue(leaderKey)?.asString?.stripLeaderSuffix()
+      val leader = getValue(leaderKey)?.asString?.let { ElectionPaths.stripLeaderClientId(it) }
       trySendBlocking(if (leader != null) LeadershipEvent.Elected(leader) else LeadershipEvent.Vacated)
     }
 
@@ -113,9 +105,19 @@ fun Client.leadershipAsFlow(
       watcher(leaderKey, WatchOption.DEFAULT, resilience, recoveryListener, resyncWith = null) { response ->
         response.events.forEach { event ->
           when (event.eventType) {
-            PUT -> trySendBlocking(LeadershipEvent.Elected(event.keyValue.value.asString.stripLeaderSuffix()))
-            DELETE -> trySendBlocking(LeadershipEvent.Vacated)
-            else -> Unit
+            PUT -> {
+              trySendBlocking(
+                LeadershipEvent.Elected(ElectionPaths.stripLeaderClientId(event.keyValue.value.asString)),
+              )
+            }
+
+            DELETE -> {
+              trySendBlocking(LeadershipEvent.Vacated)
+            }
+
+            else -> {
+              Unit
+            }
           }
         }
       }
