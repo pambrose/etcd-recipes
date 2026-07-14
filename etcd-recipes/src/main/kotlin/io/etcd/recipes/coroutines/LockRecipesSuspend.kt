@@ -59,7 +59,7 @@ private fun confinedLockDispatcher(): ExecutorCoroutineDispatcher =
 suspend fun <T> EtcdLock.withLock(action: suspend () -> T): T {
   val confined = confinedLockDispatcher()
   try {
-    runInterruptible(confined) { lock() }
+    interruptibleOn(confined) { lock() }
     try {
       return action()
     } finally {
@@ -82,7 +82,7 @@ suspend fun <T> EtcdLock.withLock(
 ): T? {
   val confined = confinedLockDispatcher()
   try {
-    if (!runInterruptible(confined) { tryLock(timeout) }) return null
+    if (!interruptibleOn(confined) { tryLock(timeout) }) return null
     try {
       return action()
     } finally {

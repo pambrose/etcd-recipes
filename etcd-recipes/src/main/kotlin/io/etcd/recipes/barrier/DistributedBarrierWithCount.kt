@@ -280,16 +280,7 @@ constructor(
               // Check one more time in case watch missed the delete just after last check
               checkWaiterCount()
 
-              val signalled =
-                try {
-                  keepAliveClosed.waitUntilTrueWithInterruption(timeout)
-                } catch (e: InterruptedException) {
-                  // Interrupted mid-wait (e.g. a coroutine bridge was cancelled):
-                  // stop counting toward the barrier — closeKeepAlive() halts the
-                  // healer and deletes our waiting key — before propagating.
-                  closeKeepAlive()
-                  throw e
-                }
+              val signalled = keepAliveClosed.waitUntilTrueWithInterruption(timeout)
               // Cleanup if a time-out occurred
               if (!signalled) {
                 closeKeepAlive()
@@ -307,6 +298,13 @@ constructor(
           }
     } finally {
       activeWaiter.compareAndSet(active, null)
+      // Stop counting toward the barrier on ANY exit path — normal trip, timeout,
+      // or an exception (e.g. a coroutine bridge cancelled the wait, interrupting a
+      // blocking RPC). closeKeepAlive() is idempotent and halts the healer, so the
+      // waiting key is removed (or expires at its TTL) rather than lingering as a
+      // phantom participant. The deleteKey inside it is best-effort under a set
+      // interrupt flag.
+      closeKeepAlive()
     }
   }
 
