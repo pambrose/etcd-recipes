@@ -24,13 +24,17 @@ import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.asByteSequence
+import io.etcd.recipes.common.pollUntil
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.every
 import io.mockk.mockk
 import java.util.concurrent.CompletableFuture
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class ServiceProviderTests : StringSpec() {
     private fun clientReturning(kvs: List<KeyValue>): Client {
@@ -41,6 +45,17 @@ class ServiceProviderTests : StringSpec() {
         every { kv.get(any(), any()) } returns CompletableFuture.completedFuture(getResp)
         return mockk { every { kvClient } returns kv }
     }
+
+    // Build a mocked client whose ranged GET returns these instances (unstarted read path).
+    private fun clientReturningInstances(instances: List<ServiceInstance>): Client =
+        clientReturning(
+            instances.mapIndexed { i, instance ->
+                mockk<KeyValue> {
+                    every { key } returns "/services/names/my-service/id$i".asByteSequence
+                    every { value } returns instance.toJson().asByteSequence
+                }
+            },
+        )
 
     init {
         // Regression test for #10: an empty result is an ordinary discovery condition,
@@ -63,6 +78,42 @@ class ServiceProviderTests : StringSpec() {
             val provider = ServiceProvider(clientReturning(listOf(kv)), "/services/names", "my-service")
 
             provider.getInstance().name shouldBe "my-service"
+        }
+
+        "round-robin distributes getInstance across all instances" {
+            val instances = (1..3).map { serviceInstance("my-service", "payload-$it") }
+            val provider =
+                ServiceProvider(
+                    clientReturningInstances(instances),
+                    "/services/names",
+                    "my-service",
+                    strategy = RoundRobinStrategy(),
+                )
+
+            val picks = (1..3).map { provider.getInstance() }
+            picks shouldContainExactlyInAnyOrder instances
+        }
+
+        "noteError ejects an instance until its down window elapses, then it recovers" {
+            val alive = serviceInstance("my-service", "alive")
+            val failing = serviceInstance("my-service", "failing")
+            val provider =
+                ServiceProvider(
+                    clientReturningInstances(listOf(alive, failing)),
+                    "/services/names",
+                    "my-service",
+                    strategy = RoundRobinStrategy(),
+                    errorThreshold = 1,
+                    downPeriod = 500.milliseconds,
+                )
+
+            provider.noteError(failing) // threshold 1 -> ejected immediately
+
+            // Within the window only the healthy instance is ever selected.
+            repeat(10) { provider.getInstance() shouldBe alive }
+
+            // After the window the ejected instance becomes eligible again.
+            pollUntil(5.seconds) { (1..4).map { provider.getInstance() }.contains(failing) } shouldBe true
         }
     }
 }
