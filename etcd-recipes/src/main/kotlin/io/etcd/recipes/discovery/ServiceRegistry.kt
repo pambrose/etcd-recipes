@@ -65,6 +65,10 @@ constructor(
     leaseListeners += listener
   }
 
+  fun removeLeaseListener(listener: LeaseListener) {
+    leaseListeners -= listener
+  }
+
   init {
     require(servicePath.isNotEmpty()) { "Service base path cannot be empty" }
   }

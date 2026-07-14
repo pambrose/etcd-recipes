@@ -132,6 +132,26 @@ acquisition and release are confined to one thread per call while the body runs
 in your coroutine. The instance-held `DistributedSemaphore` also offers the
 split `awaitAcquire()` / `awaitRelease()`.
 
+Recipe event streams — previously callback listeners — are also exposed as
+`Flow`s. Collecting a flow registers the underlying listener; cancelling the
+collector unregisters it, and collection never starts or closes the recipe:
+
+| Surface | Flow |
+|---|---|
+| `Client` watches | `watchAsFlow(...)` / `watchEventsAsFlow(...)` |
+| `PathChildrenCache` child events | `eventsAsFlow()` / `recoveryEventsAsFlow()` |
+| `ServiceCache` changes | `eventsAsFlow()` / `recoveryEventsAsFlow()` |
+| Any recipe's connection state | `connectionStateAsFlow()` |
+| Lease events (`TransientKeyValue`, `DistributedWorkQueue`, `ServiceRegistry`) | `leaseEventsAsFlow()` |
+| Leadership at an election path | `Client.leadershipAsFlow(path)` |
+| Lock / permit loss | `EtcdLock.lockLostAsFlow()` / `DistributedSemaphore.permitLostAsFlow()` |
+
+`connectionStateAsFlow()` emits the current state first (conflated); the others
+are unbuffered by default, so the recipe's dispatcher is never stalled by a slow
+collector. `leadershipAsFlow` is an observer of who holds leadership — to run for
+election, use `LeaderSelector` with the suspending `awaitStart()` /
+`awaitLeadershipComplete()`.
+
 ## Distributed locks
 
 `DistributedMutex` is a reentrant distributed lock on etcd's **native lock
