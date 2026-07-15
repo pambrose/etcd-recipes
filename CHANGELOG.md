@@ -36,6 +36,15 @@ non-blocking consumption on the existing queues.
   RPC latency / attempts / outcome (`recordRpc`), resilient-watcher recovery transitions
   (`incrementWatchRecovery`), and self-healing-lease events (`incrementKeepAlive`).
 
+### Added (observability: lock + election metrics)
+
+- Recipe-level metric seams via the `EtcdMetrics` SPI: `DistributedMutex`,
+  `DistributedReadWriteLock`, and `DistributedSemaphore` record acquisition wait time
+  (`recordLockWait`, with the acquired/timed-out outcome) and hold time (`recordLockHold`);
+  `LeaderSelector` (and so `LeaderLatch`, which composes it) records leadership take/relinquish
+  transitions (`incrementLeadershipTransition`). The Micrometer binding maps these to
+  `etcd.lock.wait` / `etcd.lock.hold` timers and an `etcd.election.transitions` counter.
+
 ### Added (observability: Micrometer binding)
 
 - New **`etcd-recipes-micrometer`** module: `MicrometerEtcdMetrics(registry)` is a

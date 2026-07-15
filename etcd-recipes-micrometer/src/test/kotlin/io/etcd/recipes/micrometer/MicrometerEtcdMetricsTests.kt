@@ -69,6 +69,22 @@ class MicrometerEtcdMetricsTests : StringSpec() {
       registry.find("etcd.keepalive").tag("kind", "renewal").counter()!!.count() shouldBe 1.0
     }
 
+    "lock wait/hold register timers and leadership transitions a counter" {
+      val registry = SimpleMeterRegistry()
+      val metrics = MicrometerEtcdMetrics(registry)
+      metrics.recordLockWait("/lock/a", 3.milliseconds, acquired = true)
+      metrics.recordLockWait("/lock/a", 20.milliseconds, acquired = false)
+      metrics.recordLockHold("/lock/a", 100.milliseconds)
+      metrics.incrementLeadershipTransition("/election/x", becameLeader = true)
+      metrics.incrementLeadershipTransition("/election/x", becameLeader = false)
+
+      registry.find("etcd.lock.wait").tag("outcome", "acquired").timer()!!.count() shouldBe 1L
+      registry.find("etcd.lock.wait").tag("outcome", "timeout").timer()!!.count() shouldBe 1L
+      registry.find("etcd.lock.hold").timer()!!.count() shouldBe 1L
+      registry.find("etcd.election.transitions").tag("transition", "acquired").counter()!!.count() shouldBe 1.0
+      registry.find("etcd.election.transitions").tag("transition", "relinquished").counter()!!.count() shouldBe 1.0
+    }
+
     "installed via ResilienceConfig.withMetrics it records real RPC activity" {
       val registry = SimpleMeterRegistry()
       val client: Client =

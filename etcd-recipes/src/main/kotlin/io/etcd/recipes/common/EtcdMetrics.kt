@@ -55,6 +55,25 @@ interface EtcdMetrics {
     leaseId: Long,
   ) {}
 
+  /** Time a caller spent trying to acquire a lock/permit at [path], and whether it ultimately [acquired] it. */
+  fun recordLockWait(
+    path: String,
+    duration: Duration,
+    acquired: Boolean,
+  ) {}
+
+  /** How long a lock/permit at [path] was held, from grant to release. */
+  fun recordLockHold(
+    path: String,
+    duration: Duration,
+  ) {}
+
+  /** A leadership transition for the election [path]: [becameLeader] true on take, false on relinquish. */
+  fun incrementLeadershipTransition(
+    path: String,
+    becameLeader: Boolean,
+  ) {}
+
   companion object {
     /** The default: records nothing. Selected unless a backend is installed via [ResilienceConfig.withMetrics]. */
     val NoOp: EtcdMetrics = object : EtcdMetrics {}

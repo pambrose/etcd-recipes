@@ -85,6 +85,7 @@ class DistributedReadWriteLock
     val entryKey: String,
   ) {
     var holdCount = 1 // owner-thread confined
+    val acquiredAt: ComparableTimeMark = TimeSource.Monotonic.markNow()
   }
 
   // One in-flight acquisition; the phase machine arbitrates fatal-vs-win exactly
@@ -125,12 +126,19 @@ class DistributedReadWriteLock
     private val side: Side,
   ) : EtcdLock {
     override fun lock() {
+      val timed = !isHeldByCurrentThread // don't time reentrant re-locks
+      val start = TimeSource.Monotonic.markNow()
       check(acquire(side, null)) { "unbounded acquisition returned without the lock" }
+      if (timed) resilience.metrics.recordLockWait(lockPath, start.elapsedNow(), acquired = true)
     }
 
     override fun tryLock(timeout: Duration): Boolean {
       require(timeout > Duration.ZERO) { "Timeout must be positive: $timeout" }
-      return acquire(side, TimeSource.Monotonic.markNow() + timeout)
+      val timed = !isHeldByCurrentThread
+      val start = TimeSource.Monotonic.markNow()
+      val acquired = acquire(side, TimeSource.Monotonic.markNow() + timeout)
+      if (timed) resilience.metrics.recordLockWait(lockPath, start.elapsedNow(), acquired)
+      return acquired
     }
 
     override fun tryLock(
@@ -171,6 +179,7 @@ class DistributedReadWriteLock
         return true
       }
       holds.remove(me)
+      resilience.metrics.recordLockHold(lockPath, data.acquiredAt.elapsedNow())
       data.lease.close() // revoke deletes the entry, waking successors
       return true
     }

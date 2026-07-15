@@ -101,7 +101,9 @@ class DistributedSemaphore
     val lease: AcquisitionLease,
     val entryKey: String,
     val owner: Thread,
-  )
+  ) {
+    val acquiredAt: ComparableTimeMark = TimeSource.Monotonic.markNow()
+  }
 
   // One in-flight acquisition; the phase machine arbitrates fatal-vs-win exactly
   // like DistributedMutex's.
@@ -134,12 +136,17 @@ class DistributedSemaphore
   override val exceptionContext get() = "DistributedSemaphore[$semaphorePath]"
 
   fun acquire() {
+    val start = TimeSource.Monotonic.markNow()
     check(acquireInternal(null)) { "unbounded acquisition returned without a permit" }
+    resilience.metrics.recordLockWait(semaphorePath, start.elapsedNow(), acquired = true)
   }
 
   fun tryAcquire(timeout: Duration): Boolean {
     require(timeout > Duration.ZERO) { "Timeout must be positive: $timeout" }
-    return acquireInternal(TimeSource.Monotonic.markNow() + timeout)
+    val start = TimeSource.Monotonic.markNow()
+    val acquired = acquireInternal(TimeSource.Monotonic.markNow() + timeout)
+    resilience.metrics.recordLockWait(semaphorePath, start.elapsedNow(), acquired)
+    return acquired
   }
 
   fun tryAcquire(
@@ -155,6 +162,7 @@ class DistributedSemaphore
   fun release(): Boolean {
     val data = holds.pollFirst()
     if (data != null) {
+      resilience.metrics.recordLockHold(semaphorePath, data.acquiredAt.elapsedNow())
       data.lease.close() // revoke deletes the entry, waking waiters
       return true
     }
