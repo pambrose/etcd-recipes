@@ -42,7 +42,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -114,12 +113,14 @@ class QueueWatchRecoveryTests : StringSpec() {
 
   init {
     "waitForFirstChild anchors its PUT-watch at the observed empty-queue revision" {
-      // The head-poll saw the queue empty at OBSERVED_REV; a PUT landing before the
-      // watch goes live would be lost by an un-anchored watch. The watch must start
-      // at OBSERVED_REV + 1 so any later PUT is (re)delivered.
-      val mocks = QueueMocks(emptyGets = Int.MAX_VALUE)
+      // The head read (GET #1) sees the queue empty at OBSERVED_REV and drops into
+      // waitForFirstChild, which subscribes; the pre-live poll (GET #2) then returns an item
+      // so poll() completes promptly — with no reliance on a wait timeout that a slow CI
+      // could exhaust before the watch ever subscribes. A PUT landing before the watch goes
+      // live would be lost by an un-anchored watch, so it must start at OBSERVED_REV + 1.
+      val mocks = QueueMocks(emptyGets = 1)
       DistributedQueue(mocks.client, "/queue/recovery").use { queue ->
-        queue.poll(500.milliseconds) // empty → subscribes, parks briefly, returns null
+        queue.poll(30.seconds) // GET #1 empty → subscribe; GET #2 returns the item → returns
         mocks.options.size shouldBe 1
         mocks.options.first().revision shouldBe QueueMocks.OBSERVED_REV + 1
         mocks.options.first().isPrefix shouldBe true
