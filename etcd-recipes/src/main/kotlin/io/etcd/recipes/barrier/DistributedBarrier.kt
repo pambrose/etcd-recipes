@@ -77,6 +77,8 @@ constructor(
     require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
   }
 
+  override val exceptionContext get() = "DistributedBarrier[$barrierPath]"
+
   fun isBarrierSet(): Boolean {
     checkCloseNotCalled()
     return client.isKeyPresent(barrierPath, resilience.rpc)
@@ -129,14 +131,14 @@ constructor(
   private fun onBarrierLeaseEvent(event: LeaseEvent) {
     reportLeaseEvent(event)
     when (event) {
-      is LeaseEvent.Suspended -> exceptionList.value += event.cause
+      is LeaseEvent.Suspended -> recordException(event.cause)
 
-      is LeaseEvent.Expired -> exceptionList.value += (
-        event.cause ?: EtcdRecipeRuntimeException("Barrier lease for $barrierPath expired; healing")
+      is LeaseEvent.Expired -> recordException(
+        event.cause ?: EtcdRecipeRuntimeException("Barrier lease for $barrierPath expired; healing"),
       )
 
-      is LeaseEvent.Failed -> exceptionList.value += (
-        event.cause ?: EtcdRecipeRuntimeException("Barrier lease healing for $barrierPath abandoned")
+      is LeaseEvent.Failed -> recordException(
+        event.cause ?: EtcdRecipeRuntimeException("Barrier lease healing for $barrierPath abandoned"),
       )
 
       is LeaseEvent.Restored -> logger.info {
@@ -246,7 +248,7 @@ constructor(
           val cause = event.cause
             ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
           watchFailure.set(cause)
-          exceptionList.value += cause
+          recordException(cause)
           waitLatch.countDown()
         }
 

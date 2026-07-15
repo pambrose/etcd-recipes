@@ -59,6 +59,8 @@ class ServiceCache
     require(serviceName.isNotEmpty()) { "ServiceCache service name cannot be empty" }
   }
 
+  override val exceptionContext get() = "ServiceCache[$serviceName]"
+
   @Synchronized
   @Suppress("TooGenericExceptionCaught", "LongMethod")
   fun start(): ServiceCache {
@@ -100,7 +102,7 @@ class ServiceCache
                   listener.cacheChanged(event.eventType, isAdd, stripped, ServiceInstance.toObject(v))
                 } catch (e: Throwable) {
                   logger.error(e) { "Exception in cacheChanged()" }
-                  exceptionList.value += e
+                  recordException(e)
                 }
               }
             }
@@ -112,7 +114,7 @@ class ServiceCache
                   listener.cacheChanged(event.eventType, false, stripped, prevValue)
                 } catch (e: Throwable) {
                   logger.error(e) { "Exception in cacheChanged()" }
-                  exceptionList.value += e
+                  recordException(e)
                 }
               }
             }
@@ -157,15 +159,17 @@ class ServiceCache
   private fun onRecoveryEvent(event: WatchRecoveryEvent) {
     reportRecoveryEvent(event)
     if (event is WatchRecoveryEvent.Failed) {
-      exceptionList.value += event.cause
-        ?: EtcdRecipeRuntimeException("Watch on $servicePath abandoned; service cache is no longer updating")
+      recordException(
+        event.cause
+          ?: EtcdRecipeRuntimeException("Watch on $servicePath abandoned; service cache is no longer updating"),
+      )
     }
     recoveryListeners.forEach { listener ->
       try {
         listener.onRecoveryEvent(event)
       } catch (e: Throwable) {
         logger.error(e) { "Exception in recovery listener" }
-        exceptionList.value += e
+        recordException(e)
       }
     }
   }

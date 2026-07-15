@@ -131,6 +131,8 @@ class DistributedSemaphore
     require(leaseTtlSecs > 0) { "Lease TTL must be > 0" }
   }
 
+  override val exceptionContext get() = "DistributedSemaphore[$semaphorePath]"
+
   fun acquire() {
     check(acquireInternal(null)) { "unbounded acquisition returned without a permit" }
   }
@@ -227,7 +229,7 @@ class DistributedSemaphore
           leaseTtlSecs,
           resilience.rpc,
           onTransient = { e ->
-            exceptionList.value += e
+            recordException(e)
             reportLeaseEvent(LeaseEvent.Suspended(-1L, e))
           },
           onFatal = { cause -> onEntryFatal(attempt, cause) },
@@ -290,7 +292,7 @@ class DistributedSemaphore
               now == null || now.rank < permits
             },
             reportRecovery = { event -> reportRecoveryEvent(event) },
-            recordException = { e -> exceptionList.value += e },
+            recordException = { e -> recordException(e) },
           )
           attempt.wake.set(null)
           // Loop: re-evaluate the rank (it only shrinks while the entry lives)
@@ -338,8 +340,8 @@ class DistributedSemaphore
     cause: Throwable?,
   ) {
     if (attempt.phase.compareAndSet(Phase.WAITING, Phase.DEAD)) {
-      exceptionList.value += (
-        cause ?: EtcdRecipeRuntimeException("Semaphore entry lease expired while waiting on $semaphorePath")
+      recordException(
+        cause ?: EtcdRecipeRuntimeException("Semaphore entry lease expired while waiting on $semaphorePath"),
       )
       attempt.wake.get()?.countDown()
     } else if (attempt.phase.load() == Phase.HOLDING) {
@@ -356,14 +358,14 @@ class DistributedSemaphore
     if (!holds.remove(data)) return // already released, or close() took it
     dispossessedCount.incrementAndGet()
     logger.warn(cause) { "Permit on $semaphorePath lost by $clientId (lease expired)" }
-    exceptionList.value += (cause ?: EtcdRecipeRuntimeException("Permit lease for $semaphorePath expired; permit lost"))
+    recordException(cause ?: EtcdRecipeRuntimeException("Permit lease for $semaphorePath expired; permit lost"))
     reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
     lostListeners.forEach { listener ->
       try {
         listener.onPermitLost(cause)
       } catch (e: Throwable) {
         logger.error(e) { "Exception in permit-lost listener" }
-        exceptionList.value += e
+        recordException(e)
       }
     }
     if (interruptOnPermitLoss) attempt.owner.interrupt()

@@ -175,6 +175,8 @@ constructor(
     require(leaseTtlSecs > 0) { "Lease TTL must be > 0" }
   }
 
+  override val exceptionContext get() = "LeaderSelector[$electionPath]"
+
   val isLeader get() = electedLeader.load()
 
   val isFinished get() = leadershipComplete.get()
@@ -231,7 +233,7 @@ constructor(
                     val cause = event.cause
                       ?: EtcdRecipeRuntimeException("Watch on $leaderPath abandoned; no further re-election attempts")
                     logger.error(cause) { "Leader watch on $leaderPath abandoned" }
-                    exceptionList.value += cause
+                    recordException(cause)
                   }
 
                   is WatchRecoveryEvent.Suspended -> {
@@ -260,7 +262,7 @@ constructor(
             }
           } catch (e: Throwable) {
             logger.error(e) { "In withWatchClient()" }
-            exceptionList.value += e
+            recordException(e)
           } finally {
             watchComplete.set(true)
           }
@@ -271,7 +273,7 @@ constructor(
             advertiseParticipation()
           } catch (e: Throwable) {
             logger.error(e) { "In advertiseParticipation()" }
-            exceptionList.value += e
+            recordException(e)
           } finally {
             advertiseComplete.set(true)
           }
@@ -290,7 +292,7 @@ constructor(
         advertiseComplete.waitUntilTrue()
       } catch (e: Throwable) {
         logger.error(e) { "In start()" }
-        exceptionList.value += e
+        recordException(e)
       } finally {
         startThreadComplete.set(true)
       }
@@ -407,14 +409,14 @@ constructor(
   private fun onParticipationLeaseEvent(event: LeaseEvent) {
     reportLeaseEvent(event)
     when (event) {
-      is LeaseEvent.Suspended -> exceptionList.value += event.cause
+      is LeaseEvent.Suspended -> recordException(event.cause)
 
-      is LeaseEvent.Expired -> exceptionList.value += (
-        event.cause ?: EtcdRecipeRuntimeException("Participation lease for $clientId expired; healing")
+      is LeaseEvent.Expired -> recordException(
+        event.cause ?: EtcdRecipeRuntimeException("Participation lease for $clientId expired; healing"),
       )
 
-      is LeaseEvent.Failed -> exceptionList.value += (
-        event.cause ?: EtcdRecipeRuntimeException("Participation lease healing for $clientId abandoned")
+      is LeaseEvent.Failed -> recordException(
+        event.cause ?: EtcdRecipeRuntimeException("Participation lease healing for $clientId abandoned"),
       )
 
       is LeaseEvent.Restored -> logger.info {
@@ -497,14 +499,14 @@ constructor(
         listener.relinquishLeadership(this)
       } catch (e: Throwable) {
         logger.error(e) { "In relinquishLeadership()" }
-        exceptionList.value += e
+        recordException(e)
       }
 
       takeLeadershipError?.let { throw it }
       return !leaseLostDuringLeadership.load()
     } catch (e: Throwable) {
       logger.error(e) { "In attemptToBecomeLeader()" }
-      exceptionList.value += e
+      recordException(e)
       return false
     } finally {
       registration.close()
@@ -533,7 +535,7 @@ constructor(
         if (e.isLeaseNotFound()) {
           stepDownFromLeadership(e)
         } else {
-          exceptionList.value += e
+          recordException(e)
           reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
         }
       }
@@ -551,7 +553,7 @@ constructor(
     if (!leaseLostDuringLeadership.compareAndSet(false, true)) return
 
     logger.warn(cause) { "Leadership lease lost for $clientId; stepping down" }
-    exceptionList.value += (cause ?: EtcdRecipeRuntimeException("Leadership lease expired; stepping down"))
+    recordException(cause ?: EtcdRecipeRuntimeException("Leadership lease expired; stepping down"))
     electedLeader.store(false)
     reportLeaseEvent(LeaseEvent.Expired(leadershipLeaseId.load(), cause))
 

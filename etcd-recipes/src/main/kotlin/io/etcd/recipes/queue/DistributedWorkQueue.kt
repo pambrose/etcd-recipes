@@ -124,6 +124,8 @@ class DistributedWorkQueue
     require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
   }
 
+  override val exceptionContext get() = "DistributedWorkQueue[$queuePath]"
+
   // The consumer lease all claim markers hang off. Self-healing for FUTURE claims
   // only: markers made under a dead lease are deliberately lost (that IS the
   // visibility contract — their items become reclaimable), and the trivial
@@ -448,7 +450,7 @@ class DistributedWorkQueue
             val cause = event.cause
               ?: EtcdRecipeRuntimeException("Watch on $itemsPath abandoned while waiting for work")
             watchFailure.set(cause)
-            exceptionList.value += cause
+            recordException(cause)
             latch.countDown()
           }
 
@@ -494,14 +496,14 @@ class DistributedWorkQueue
   private fun onLeaseEvent(event: LeaseEvent) {
     reportLeaseEvent(event)
     when (event) {
-      is LeaseEvent.Suspended -> exceptionList.value += event.cause
+      is LeaseEvent.Suspended -> recordException(event.cause)
 
-      is LeaseEvent.Expired -> exceptionList.value += (
-        event.cause ?: EtcdRecipeRuntimeException("Consumer lease expired; outstanding claims are reclaimable")
+      is LeaseEvent.Expired -> recordException(
+        event.cause ?: EtcdRecipeRuntimeException("Consumer lease expired; outstanding claims are reclaimable"),
       )
 
-      is LeaseEvent.Failed -> exceptionList.value += (
-        event.cause ?: EtcdRecipeRuntimeException("Consumer lease healing abandoned; claims will not renew")
+      is LeaseEvent.Failed -> recordException(
+        event.cause ?: EtcdRecipeRuntimeException("Consumer lease healing abandoned; claims will not renew"),
       )
 
       is LeaseEvent.Restored -> logger.info {
@@ -513,7 +515,7 @@ class DistributedWorkQueue
         listener.onLeaseEvent(event)
       } catch (e: Throwable) {
         logger.error(e) { "Exception in lease listener" }
-        exceptionList.value += e
+        recordException(e)
       }
     }
   }

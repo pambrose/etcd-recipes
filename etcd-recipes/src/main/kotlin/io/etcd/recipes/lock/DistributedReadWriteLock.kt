@@ -110,6 +110,8 @@ class DistributedReadWriteLock
     require(leaseTtlSecs > 0) { "Lease TTL must be > 0" }
   }
 
+  override val exceptionContext get() = "DistributedReadWriteLock[$lockPath]"
+
   val readLock: EtcdLock = LockView(Side.READ)
   val writeLock: EtcdLock = LockView(Side.WRITE)
 
@@ -219,7 +221,7 @@ class DistributedReadWriteLock
           leaseTtlSecs,
           resilience.rpc,
           onTransient = { e ->
-            exceptionList.value += e
+            recordException(e)
             reportLeaseEvent(LeaseEvent.Suspended(-1L, e))
           },
           onFatal = { cause -> onEntryFatal(side, attempt, cause) },
@@ -279,7 +281,7 @@ class DistributedReadWriteLock
             deadline,
             observedRevision = conflict.observedRevision,
             reportRecovery = { event -> reportRecoveryEvent(event) },
-            recordException = { e -> exceptionList.value += e },
+            recordException = { e -> recordException(e) },
           )
           attempt.wake.set(null)
           // Loop: re-evaluate the conflict set (it only shrinks)
@@ -352,8 +354,8 @@ class DistributedReadWriteLock
     cause: Throwable?,
   ) {
     if (attempt.phase.compareAndSet(Phase.WAITING, Phase.DEAD)) {
-      exceptionList.value += (
-        cause ?: EtcdRecipeRuntimeException("Lock entry lease expired while waiting on $lockPath")
+      recordException(
+        cause ?: EtcdRecipeRuntimeException("Lock entry lease expired while waiting on $lockPath"),
       )
       attempt.wake.get()?.countDown()
     } else if (attempt.phase.load() == Phase.HOLDING) {
@@ -370,14 +372,14 @@ class DistributedReadWriteLock
     val data = holdsFor(side).remove(thread) ?: return
     dispossessedFor(side)[thread] = data.holdCount
     logger.warn(cause) { "${side.entryPrefix} lock on $lockPath lost by $clientId (lease expired)" }
-    exceptionList.value += (cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
+    recordException(cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
     reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
     listenersFor(side).forEach { listener ->
       try {
         listener.onLockLost(cause)
       } catch (e: Throwable) {
         logger.error(e) { "Exception in lock-lost listener" }
-        exceptionList.value += e
+        recordException(e)
       }
     }
     if (interruptOnLockLoss) thread.interrupt()

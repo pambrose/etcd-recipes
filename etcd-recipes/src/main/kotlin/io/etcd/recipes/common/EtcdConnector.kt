@@ -21,6 +21,7 @@ package io.etcd.recipes.common
 import com.pambrose.common.concurrent.BooleanMonitor
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CopyOnWriteArrayList
@@ -56,6 +57,48 @@ open class EtcdConnector(
 
   fun clearExceptions() {
     if (exceptionList.isInitialized()) exceptionList.value.clear()
+  }
+
+  private val backgroundExceptionListeners = CopyOnWriteArrayList<BackgroundExceptionListener>()
+
+  fun addBackgroundExceptionListener(listener: BackgroundExceptionListener) {
+    backgroundExceptionListeners += listener
+  }
+
+  fun removeBackgroundExceptionListener(listener: BackgroundExceptionListener) {
+    backgroundExceptionListeners -= listener
+  }
+
+  /**
+   * Short source hint attached to background exceptions from this connector so a shared
+   * handler can attribute which recipe failed. Subclasses override it with their path /
+   * clientId; the default is the recipe type name.
+   */
+  protected open val exceptionContext: String
+    get() = this::class.simpleName ?: "EtcdConnector"
+
+  /** Records [throwable] under this connector's [exceptionContext]. */
+  protected fun recordException(throwable: Throwable) = recordException(exceptionContext, throwable)
+
+  /**
+   * The single sink for background failures: records [throwable] in [exceptions] and pushes
+   * it to every [BackgroundExceptionListener] with a short source [context]. Recipes call
+   * this instead of appending to the exception list directly. A listener that throws is
+   * logged and dropped — never re-recorded — so notification cannot recurse.
+   */
+  @Suppress("TooGenericExceptionCaught")
+  protected fun recordException(
+    context: String,
+    throwable: Throwable,
+  ) {
+    exceptionList.value += throwable
+    backgroundExceptionListeners.forEach { listener ->
+      try {
+        listener.onException(context, throwable)
+      } catch (e: Throwable) {
+        logger.error(e) { "Background-exception listener threw while handling [$context]" }
+      }
+    }
   }
 
   protected fun checkStartCalled() {
@@ -111,10 +154,25 @@ open class EtcdConnector(
       try {
         listener.stateChanged(newState, previous)
       } catch (e: Throwable) {
-        exceptionList.value += e
+        recordException("connection-state-listener", e)
       }
     }
   }
+
+  /**
+   * Passive health: healthy unless a lease expired or a watcher was abandoned
+   * ([connectionState] == [ConnectionState.LOST]), or this connector is closed. Derived from
+   * events the recipes already observe — no RPC. For an active check use [ping].
+   */
+  fun isHealthy(): Boolean = connectionState != ConnectionState.LOST && !closeCalled.load()
+
+  /**
+   * Active reachability probe: a bounded, non-mutating count-only GET against etcd, through
+   * the same retry/timeout funnel as every other RPC. Returns false instead of throwing when
+   * etcd cannot be reached within the RPC timeout.
+   */
+  fun ping(): Boolean =
+    runCatching { client.getResponse(PING_PROBE_KEY, getOption { withCountOnly(true) }, resilience.rpc) }.isSuccess
 
   // Template-method close: idempotency is enforced here so subclasses cannot
   // forget to guard against double-close. Subclasses override doClose() for
@@ -129,8 +187,10 @@ open class EtcdConnector(
   protected open fun doClose() {}
 
   companion object {
+    private val logger = KotlinLogging.logger {}
     internal const val TOKEN_LENGTH = 7
     internal const val DEFAULT_TTL_SECS = 2L
+    private const val PING_PROBE_KEY = "health-check-probe"
 
     internal fun defaultClientId(prefix: String) = "$prefix:${randomId(TOKEN_LENGTH)}"
   }

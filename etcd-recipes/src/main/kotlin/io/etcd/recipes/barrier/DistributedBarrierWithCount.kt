@@ -105,6 +105,8 @@ constructor(
     require(memberCount > 0) { "Member count must be > 0" }
   }
 
+  override val exceptionContext get() = "DistributedBarrierWithCount[$barrierPath]"
+
   private val isReadySet: Boolean
     get() {
       checkCloseNotCalled()
@@ -265,7 +267,7 @@ constructor(
                     val cause = event.cause
                       ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
                     watchFailure.set(cause)
-                    exceptionList.value += cause
+                    recordException(cause)
                     closeKeepAlive()
                   }
 
@@ -332,14 +334,14 @@ constructor(
   private fun onWaiterLeaseEvent(event: LeaseEvent) {
     reportLeaseEvent(event)
     when (event) {
-      is LeaseEvent.Suspended -> exceptionList.value += event.cause
+      is LeaseEvent.Suspended -> recordException(event.cause)
 
-      is LeaseEvent.Expired -> exceptionList.value += (
-        event.cause ?: EtcdRecipeRuntimeException("Waiter lease for $barrierPath expired; healing")
+      is LeaseEvent.Expired -> recordException(
+        event.cause ?: EtcdRecipeRuntimeException("Waiter lease for $barrierPath expired; healing"),
       )
 
-      is LeaseEvent.Failed -> exceptionList.value += (
-        event.cause ?: EtcdRecipeRuntimeException("Waiter lease healing for $barrierPath abandoned")
+      is LeaseEvent.Failed -> recordException(
+        event.cause ?: EtcdRecipeRuntimeException("Waiter lease healing for $barrierPath abandoned"),
       )
 
       is LeaseEvent.Restored -> logger.info {
