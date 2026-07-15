@@ -438,24 +438,26 @@ class DistributedWorkQueue
     val watchFailure = AtomicReference<Throwable?>()
     val recoveryListener =
       WatchRecoveryListener { event ->
-        reportRecoveryEvent(event)
-        when (event) {
-          is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-            if (client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc).kvs.isNotEmpty()) {
+        withRecipeLoggingContext {
+          reportRecoveryEvent(event)
+          when (event) {
+            is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+              if (client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc).kvs.isNotEmpty()) {
+                latch.countDown()
+              }
+            }
+
+            is WatchRecoveryEvent.Failed -> {
+              val cause = event.cause
+                ?: EtcdRecipeRuntimeException("Watch on $itemsPath abandoned while waiting for work")
+              watchFailure.set(cause)
+              recordException(cause)
               latch.countDown()
             }
-          }
 
-          is WatchRecoveryEvent.Failed -> {
-            val cause = event.cause
-              ?: EtcdRecipeRuntimeException("Watch on $itemsPath abandoned while waiting for work")
-            watchFailure.set(cause)
-            recordException(cause)
-            latch.countDown()
-          }
-
-          is WatchRecoveryEvent.Suspended -> {
-            // jetcd (transient) or the recovery loop (fatal) is already on it
+            is WatchRecoveryEvent.Suspended -> {
+              // jetcd (transient) or the recovery loop (fatal) is already on it
+            }
           }
         }
       }
@@ -494,28 +496,30 @@ class DistributedWorkQueue
 
   @Suppress("TooGenericExceptionCaught")
   private fun onLeaseEvent(event: LeaseEvent) {
-    reportLeaseEvent(event)
-    when (event) {
-      is LeaseEvent.Suspended -> recordException(event.cause)
+    withRecipeLoggingContext {
+      reportLeaseEvent(event)
+      when (event) {
+        is LeaseEvent.Suspended -> recordException(event.cause)
 
-      is LeaseEvent.Expired -> recordException(
-        event.cause ?: EtcdRecipeRuntimeException("Consumer lease expired; outstanding claims are reclaimable"),
-      )
+        is LeaseEvent.Expired -> recordException(
+          event.cause ?: EtcdRecipeRuntimeException("Consumer lease expired; outstanding claims are reclaimable"),
+        )
 
-      is LeaseEvent.Failed -> recordException(
-        event.cause ?: EtcdRecipeRuntimeException("Consumer lease healing abandoned; claims will not renew"),
-      )
+        is LeaseEvent.Failed -> recordException(
+          event.cause ?: EtcdRecipeRuntimeException("Consumer lease healing abandoned; claims will not renew"),
+        )
 
-      is LeaseEvent.Restored -> logger.info {
-        "Consumer lease healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+        is LeaseEvent.Restored -> logger.info {
+          "Consumer lease healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+        }
       }
-    }
-    leaseListeners.forEach { listener ->
-      try {
-        listener.onLeaseEvent(event)
-      } catch (e: Throwable) {
-        logger.error(e) { "Exception in lease listener" }
-        recordException(e)
+      leaseListeners.forEach { listener ->
+        try {
+          listener.onLeaseEvent(event)
+        } catch (e: Throwable) {
+          logger.error(e) { "Exception in lease listener" }
+          recordException(e)
+        }
       }
     }
   }

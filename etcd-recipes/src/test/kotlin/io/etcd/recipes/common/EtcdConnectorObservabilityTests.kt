@@ -27,6 +27,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
+import org.slf4j.MDC
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -40,6 +41,8 @@ class EtcdConnectorObservabilityTests : StringSpec() {
   private class TestConnector(
     client: Client,
   ) : EtcdConnector(client) {
+    override val exceptionContext get() = "test-recipe"
+
     fun record(
       context: String,
       t: Throwable,
@@ -48,6 +51,8 @@ class EtcdConnectorObservabilityTests : StringSpec() {
     fun reportRecovery(event: WatchRecoveryEvent) = reportRecoveryEvent(event)
 
     fun reportLease(event: LeaseEvent) = reportLeaseEvent(event)
+
+    fun <T> wrap(body: () -> T): T = withRecipeLoggingContext(body)
   }
 
   /** A mock client whose probe GET either completes or fails, for [EtcdConnector.ping]. */
@@ -128,6 +133,14 @@ class EtcdConnectorObservabilityTests : StringSpec() {
 
     "ping returns false when the probe GET fails" {
       TestConnector(clientWithProbe(succeeds = false)).ping() shouldBe false
+    }
+
+    "withRecipeLoggingContext stamps the recipe MDC key inside the block and restores it after" {
+      val connector = TestConnector(mockk())
+      MDC.remove(EtcdConnector.RECIPE_MDC_KEY) // ensure a clean baseline
+      val inside = connector.wrap { MDC.get(EtcdConnector.RECIPE_MDC_KEY) }
+      inside shouldBe "test-recipe"
+      MDC.get(EtcdConnector.RECIPE_MDC_KEY) shouldBe null
     }
   }
 }

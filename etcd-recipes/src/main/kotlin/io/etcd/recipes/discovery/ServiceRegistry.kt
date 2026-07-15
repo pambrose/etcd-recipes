@@ -152,36 +152,38 @@ constructor(
     instancePath: String,
     event: LeaseEvent,
   ) {
-    reportLeaseEvent(event)
-    when (event) {
-      is LeaseEvent.Suspended -> {
-        recordException(event.cause)
-      }
+    withRecipeLoggingContext {
+      reportLeaseEvent(event)
+      when (event) {
+        is LeaseEvent.Suspended -> {
+          recordException(event.cause)
+        }
 
-      is LeaseEvent.Expired -> {
-        event.cause?.let { recordException(it) }
-        ?: run { recordException(EtcdRecipeRuntimeException("Lease for $instancePath expired; healing")) }
-      }
+        is LeaseEvent.Expired -> {
+          event.cause?.let { recordException(it) }
+          ?: run { recordException(EtcdRecipeRuntimeException("Lease for $instancePath expired; healing")) }
+        }
 
-      is LeaseEvent.Failed -> {
-        recordException(
-          event.cause
-            ?: EtcdRecipeRuntimeException("Lease healing for $instancePath abandoned; instance is unregistered"),
-        )
-      }
+        is LeaseEvent.Failed -> {
+          recordException(
+            event.cause
+              ?: EtcdRecipeRuntimeException("Lease healing for $instancePath abandoned; instance is unregistered"),
+          )
+        }
 
-      is LeaseEvent.Restored -> {
-        logger.info {
-        "Lease for $instancePath healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+        is LeaseEvent.Restored -> {
+          logger.info {
+          "Lease for $instancePath healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+        }
+        }
       }
-      }
-    }
-    leaseListeners.forEach { listener ->
-      try {
-        listener.onLeaseEvent(event)
-      } catch (e: Throwable) {
-        logger.error(e) { "Exception in lease listener" }
-        recordException(e)
+      leaseListeners.forEach { listener ->
+        try {
+          listener.onLeaseEvent(event)
+        } catch (e: Throwable) {
+          logger.error(e) { "Exception in lease listener" }
+          recordException(e)
+        }
       }
     }
   }

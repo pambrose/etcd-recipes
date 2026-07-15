@@ -114,7 +114,9 @@ class LeaderLatch
       if (!startCalled.compareAndSet(false, true))
         throw EtcdRecipeRuntimeException("start() already called")
       worker =
-        thread(start = true, isDaemon = true, name = "leader-latch-$clientId") { runTermLoop() }
+        thread(start = true, isDaemon = true, name = "leader-latch-$clientId") {
+          withRecipeLoggingContext { runTermLoop() }
+        }
       // Block until the first candidacy is registered (or the worker exited early).
       firstTermStarted.waitUntilTrue()
       return this
@@ -207,12 +209,14 @@ class LeaderLatch
       val snapshot = listeners.toList()
       try {
         notifyExecutor.execute {
-          snapshot.forEach { listener ->
-            try {
-              listener.call()
-            } catch (e: Throwable) {
-              logger.error(e) { "Exception in LeaderLatch listener" }
-              recordException(e)
+          withRecipeLoggingContext {
+            snapshot.forEach { listener ->
+              try {
+                listener.call()
+              } catch (e: Throwable) {
+                logger.error(e) { "Exception in LeaderLatch listener" }
+                recordException(e)
+              }
             }
           }
         }

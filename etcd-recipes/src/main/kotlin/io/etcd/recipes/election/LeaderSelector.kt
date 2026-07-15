@@ -206,95 +206,105 @@ constructor(
     }
 
     executor.execute {
-      try {
-        val watchStarted = BooleanMonitor(false)
-        val watchComplete = BooleanMonitor(false)
-        val advertiseComplete = BooleanMonitor(false)
+      withRecipeLoggingContext {
+        try {
+          val watchStarted = BooleanMonitor(false)
+          val watchComplete = BooleanMonitor(false)
+          val advertiseComplete = BooleanMonitor(false)
 
-        executor.execute {
-          try {
-            val watchOption = watchOption { withNoPut(true) }
+          executor.execute {
+            withRecipeLoggingContext {
+              try {
+                val watchOption = watchOption { withNoPut(true) }
 
-            // The leader-key DELETE is this node's only re-election trigger. If it
-            // is lost while the watch stream is fatally dead (compaction resync, or
-            // a death before any event), the node would never run for leader again —
-            // so after each recovery, re-probe the leader key and run if it is gone.
-            // attemptToBecomeLeader CAS-guards against a concurrent winner.
-            val recoveryListener =
-              WatchRecoveryListener { event ->
-                reportRecoveryEvent(event)
-                when (event) {
-                  is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-                    if (client.isKeyNotPresent(leaderPath, resilience.rpc))
-                      attemptToBecomeLeader(client)
+                // The leader-key DELETE is this node's only re-election trigger. If it
+                // is lost while the watch stream is fatally dead (compaction resync, or
+                // a death before any event), the node would never run for leader again —
+                // so after each recovery, re-probe the leader key and run if it is gone.
+                // attemptToBecomeLeader CAS-guards against a concurrent winner.
+                val recoveryListener =
+                  WatchRecoveryListener { event ->
+                    withRecipeLoggingContext {
+                      reportRecoveryEvent(event)
+                      when (event) {
+                        is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+                          if (client.isKeyNotPresent(leaderPath, resilience.rpc))
+                            attemptToBecomeLeader(client)
+                        }
+
+                        is WatchRecoveryEvent.Failed -> {
+                          val cause = event.cause
+                            ?: EtcdRecipeRuntimeException(
+                              "Watch on $leaderPath abandoned; no further re-election attempts",
+                            )
+                          logger.error(cause) { "Leader watch on $leaderPath abandoned" }
+                          recordException(cause)
+                        }
+
+                        is WatchRecoveryEvent.Suspended -> {
+                          // jetcd (transient) or the recovery loop (fatal) is already on it
+                        }
+                      }
+                    }
                   }
 
-                  is WatchRecoveryEvent.Failed -> {
-                    val cause = event.cause
-                      ?: EtcdRecipeRuntimeException("Watch on $leaderPath abandoned; no further re-election attempts")
-                    logger.error(cause) { "Leader watch on $leaderPath abandoned" }
-                    recordException(cause)
-                  }
-
-                  is WatchRecoveryEvent.Suspended -> {
-                    // jetcd (transient) or the recovery loop (fatal) is already on it
-                  }
+                client.withWatcher(
+                  leaderPath,
+                  watchOption,
+                  resilience.watch,
+                  recoveryListener,
+                  resyncWith = null,
+                  { watchResponse ->
+                    for (event in watchResponse.events) {
+                      if (event.eventType == DELETE) {
+                        // Run for leader whenever leader key is deleted
+                        attemptToBecomeLeader(client)
+                      }
+                    }
+                  },
+                ) {
+                  watchStarted.set(true)
+                  terminateWatch.waitUntilTrue()
                 }
+              } catch (e: Throwable) {
+                logger.error(e) { "In withWatchClient()" }
+                recordException(e)
+              } finally {
+                watchComplete.set(true)
               }
-
-            client.withWatcher(
-              leaderPath,
-              watchOption,
-              resilience.watch,
-              recoveryListener,
-              resyncWith = null,
-              { watchResponse ->
-                for (event in watchResponse.events) {
-                  if (event.eventType == DELETE) {
-                    // Run for leader whenever leader key is deleted
-                    attemptToBecomeLeader(client)
-                  }
-                }
-              },
-            ) {
-              watchStarted.set(true)
-              terminateWatch.waitUntilTrue()
             }
-          } catch (e: Throwable) {
-            logger.error(e) { "In withWatchClient()" }
-            recordException(e)
-          } finally {
-            watchComplete.set(true)
           }
-        }
 
-        executor.execute {
-          try {
-            advertiseParticipation()
-          } catch (e: Throwable) {
-            logger.error(e) { "In advertiseParticipation()" }
-            recordException(e)
-          } finally {
-            advertiseComplete.set(true)
+          executor.execute {
+            withRecipeLoggingContext {
+              try {
+                advertiseParticipation()
+              } catch (e: Throwable) {
+                logger.error(e) { "In advertiseParticipation()" }
+                recordException(e)
+              } finally {
+                advertiseComplete.set(true)
+              }
+            }
           }
+
+          // Wait for the watcher to start
+          watchStarted.waitUntilTrue()
+
+          electionSetup.set(true)
+
+          // Clients should run for leader in case they are the first to run
+          attemptToBecomeLeader(client)
+
+          leadershipComplete.waitUntilTrue()
+          watchComplete.waitUntilTrue()
+          advertiseComplete.waitUntilTrue()
+        } catch (e: Throwable) {
+          logger.error(e) { "In start()" }
+          recordException(e)
+        } finally {
+          startThreadComplete.set(true)
         }
-
-        // Wait for the watcher to start
-        watchStarted.waitUntilTrue()
-
-        electionSetup.set(true)
-
-        // Clients should run for leader in case they are the first to run
-        attemptToBecomeLeader(client)
-
-        leadershipComplete.waitUntilTrue()
-        watchComplete.waitUntilTrue()
-        advertiseComplete.waitUntilTrue()
-      } catch (e: Throwable) {
-        logger.error(e) { "In start()" }
-        recordException(e)
-      } finally {
-        startThreadComplete.set(true)
       }
     }
 
@@ -407,20 +417,22 @@ constructor(
   }
 
   private fun onParticipationLeaseEvent(event: LeaseEvent) {
-    reportLeaseEvent(event)
-    when (event) {
-      is LeaseEvent.Suspended -> recordException(event.cause)
+    withRecipeLoggingContext {
+      reportLeaseEvent(event)
+      when (event) {
+        is LeaseEvent.Suspended -> recordException(event.cause)
 
-      is LeaseEvent.Expired -> recordException(
-        event.cause ?: EtcdRecipeRuntimeException("Participation lease for $clientId expired; healing"),
-      )
+        is LeaseEvent.Expired -> recordException(
+          event.cause ?: EtcdRecipeRuntimeException("Participation lease for $clientId expired; healing"),
+        )
 
-      is LeaseEvent.Failed -> recordException(
-        event.cause ?: EtcdRecipeRuntimeException("Participation lease healing for $clientId abandoned"),
-      )
+        is LeaseEvent.Failed -> recordException(
+          event.cause ?: EtcdRecipeRuntimeException("Participation lease healing for $clientId abandoned"),
+        )
 
-      is LeaseEvent.Restored -> logger.info {
-        "Participation lease for $clientId healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+        is LeaseEvent.Restored -> logger.info {
+          "Participation lease for $clientId healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+        }
       }
     }
   }

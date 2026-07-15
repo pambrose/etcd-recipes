@@ -257,22 +257,24 @@ constructor(
             // the failure recorded so the caller errors out instead of parking.
             val recoveryListener =
               WatchRecoveryListener { event ->
-                reportRecoveryEvent(event)
-                when (event) {
-                  is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-                    checkWaiterCount()
-                  }
+                withRecipeLoggingContext {
+                  reportRecoveryEvent(event)
+                  when (event) {
+                    is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+                      checkWaiterCount()
+                    }
 
-                  is WatchRecoveryEvent.Failed -> {
-                    val cause = event.cause
-                      ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
-                    watchFailure.set(cause)
-                    recordException(cause)
-                    closeKeepAlive()
-                  }
+                    is WatchRecoveryEvent.Failed -> {
+                      val cause = event.cause
+                        ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
+                      watchFailure.set(cause)
+                      recordException(cause)
+                      closeKeepAlive()
+                    }
 
-                  is WatchRecoveryEvent.Suspended -> {
-                    // jetcd (transient) or the recovery loop (fatal) is already on it
+                    is WatchRecoveryEvent.Suspended -> {
+                      // jetcd (transient) or the recovery loop (fatal) is already on it
+                    }
                   }
                 }
               }
@@ -332,20 +334,22 @@ constructor(
   // Record lease trouble on the exceptions list, drive connection state, and log
   // healing outcomes.
   private fun onWaiterLeaseEvent(event: LeaseEvent) {
-    reportLeaseEvent(event)
-    when (event) {
-      is LeaseEvent.Suspended -> recordException(event.cause)
+    withRecipeLoggingContext {
+      reportLeaseEvent(event)
+      when (event) {
+        is LeaseEvent.Suspended -> recordException(event.cause)
 
-      is LeaseEvent.Expired -> recordException(
-        event.cause ?: EtcdRecipeRuntimeException("Waiter lease for $barrierPath expired; healing"),
-      )
+        is LeaseEvent.Expired -> recordException(
+          event.cause ?: EtcdRecipeRuntimeException("Waiter lease for $barrierPath expired; healing"),
+        )
 
-      is LeaseEvent.Failed -> recordException(
-        event.cause ?: EtcdRecipeRuntimeException("Waiter lease healing for $barrierPath abandoned"),
-      )
+        is LeaseEvent.Failed -> recordException(
+          event.cause ?: EtcdRecipeRuntimeException("Waiter lease healing for $barrierPath abandoned"),
+        )
 
-      is LeaseEvent.Restored -> logger.info {
-        "Waiter lease for $barrierPath healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+        is LeaseEvent.Restored -> logger.info {
+          "Waiter lease for $barrierPath healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+        }
       }
     }
   }

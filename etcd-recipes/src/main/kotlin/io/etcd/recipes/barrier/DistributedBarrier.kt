@@ -237,23 +237,25 @@ constructor(
     watchFailure: AtomicReference<Throwable?>,
   ): WatchRecoveryListener =
     WatchRecoveryListener { event ->
-      reportRecoveryEvent(event)
-      when (event) {
-        is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-          if (!isBarrierSet() && (barrierPresentAtStart || !waitOnMissingBarriers))
+      withRecipeLoggingContext {
+        reportRecoveryEvent(event)
+        when (event) {
+          is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+            if (!isBarrierSet() && (barrierPresentAtStart || !waitOnMissingBarriers))
+              waitLatch.countDown()
+          }
+
+          is WatchRecoveryEvent.Failed -> {
+            val cause = event.cause
+              ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
+            watchFailure.set(cause)
+            recordException(cause)
             waitLatch.countDown()
-        }
+          }
 
-        is WatchRecoveryEvent.Failed -> {
-          val cause = event.cause
-            ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
-          watchFailure.set(cause)
-          recordException(cause)
-          waitLatch.countDown()
-        }
-
-        is WatchRecoveryEvent.Suspended -> {
-          // jetcd (transient) or the recovery loop (fatal) is already on it
+          is WatchRecoveryEvent.Suspended -> {
+            // jetcd (transient) or the recovery loop (fatal) is already on it
+          }
         }
       }
     }

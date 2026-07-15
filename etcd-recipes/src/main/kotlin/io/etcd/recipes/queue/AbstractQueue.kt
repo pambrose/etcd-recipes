@@ -213,30 +213,32 @@ abstract class AbstractQueue(
     watchFailure: AtomicReference<Throwable?>,
   ): WatchRecoveryListener =
     WatchRecoveryListener { event ->
-      reportRecoveryEvent(event)
-      when (event) {
-        is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-          val children = client.getFirstChild(queuePath, target, resilience.rpc).kvs
-          if (children.isNotEmpty()) {
+      withRecipeLoggingContext {
+        reportRecoveryEvent(event)
+        when (event) {
+          is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+            val children = client.getFirstChild(queuePath, target, resilience.rpc).kvs
+            if (children.isNotEmpty()) {
+              synchronized(watchLatch) {
+                keyFound.compareAndSet(null, children.first())
+                if (watchLatch.count > 0) watchLatch.countDown()
+              }
+            }
+          }
+
+          is WatchRecoveryEvent.Failed -> {
+            val cause = event.cause
+              ?: EtcdRecipeRuntimeException("Watch on $queuePath abandoned while waiting for an item")
+            watchFailure.set(cause)
+            recordException(cause)
             synchronized(watchLatch) {
-              keyFound.compareAndSet(null, children.first())
               if (watchLatch.count > 0) watchLatch.countDown()
             }
           }
-        }
 
-        is WatchRecoveryEvent.Failed -> {
-          val cause = event.cause
-            ?: EtcdRecipeRuntimeException("Watch on $queuePath abandoned while waiting for an item")
-          watchFailure.set(cause)
-          recordException(cause)
-          synchronized(watchLatch) {
-            if (watchLatch.count > 0) watchLatch.countDown()
+          is WatchRecoveryEvent.Suspended -> {
+            // jetcd (transient) or the recovery loop (fatal) is already on it
           }
-        }
-
-        is WatchRecoveryEvent.Suspended -> {
-          // jetcd (transient) or the recovery loop (fatal) is already on it
         }
       }
     }
