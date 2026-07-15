@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 val libraryName = "etcd-recipes"
 val libraryModule = ":$libraryName"
 val examplesModule = ":$libraryName-examples"
+val micrometerModule = ":$libraryName-micrometer"
 val repoUrl = "https://github.com/pambrose/$libraryName"
 
 val envDockerHost = "DOCKER_HOST"
@@ -58,6 +59,7 @@ subprojects {
 dependencies {
     dokka(project(libraryModule))
     dokka(project(examplesModule))
+    dokka(project(micrometerModule))
 
     kover(project(libraryModule))
 }
@@ -96,8 +98,8 @@ subprojects {
         }
     }
 
-    // Examples module isn't published; only the library is.
-    if (name == libraryName) configurePublishing()
+    // The library and its Micrometer binding are published; the examples and test-runners aren't.
+    if (name == libraryName || name == "$libraryName-micrometer") configurePublishing()
 
     configure<KotlinJvmProjectExtension> {
         jvmToolchain(rootProject.libs.versions.jvm.get().toInt())
