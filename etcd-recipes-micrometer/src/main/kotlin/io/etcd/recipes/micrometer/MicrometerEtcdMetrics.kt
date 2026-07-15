@@ -17,6 +17,7 @@
 package io.etcd.recipes.micrometer
 
 import io.etcd.recipes.common.EtcdMetrics
+import io.micrometer.core.instrument.DistributionSummary
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import kotlin.time.Duration
@@ -36,7 +37,10 @@ import kotlin.time.toJavaDuration
  *   (`acquired`/`timeout`);
  * - `etcd.lock.hold` — a [Timer] of lock/permit hold durations;
  * - `etcd.election.transitions` — a counter of leadership changes, tagged `transition`
- *   (`acquired`/`relinquished`).
+ *   (`acquired`/`relinquished`);
+ * - `etcd.queue` — a [Timer] of queue operations, tagged `op` (`enqueue`/`dequeue`);
+ * - `etcd.cache.sync` — a [Timer] of cache snapshot loads, and `etcd.cache.size` a
+ *   [DistributionSummary] of the resulting entry counts.
  *
  * Tag cardinality is kept low on purpose: the etcd key, lock path, and lease id are used only
  * for the (low-cardinality) `operation`/`kind`/`outcome` dimensions, never as tags themselves.
@@ -101,5 +105,25 @@ class MicrometerEtcdMetrics(
   ) {
     registry.counter("etcd.election.transitions", "transition", if (becameLeader) "acquired" else "relinquished")
       .increment()
+  }
+
+  override fun recordQueue(
+    op: String,
+    path: String,
+    duration: Duration,
+  ) {
+    Timer.builder("etcd.queue")
+      .tag("op", op)
+      .register(registry)
+      .record(duration.toJavaDuration())
+  }
+
+  override fun recordCacheSync(
+    path: String,
+    duration: Duration,
+    size: Int,
+  ) {
+    Timer.builder("etcd.cache.sync").register(registry).record(duration.toJavaDuration())
+    DistributionSummary.builder("etcd.cache.size").register(registry).record(size.toDouble())
   }
 }

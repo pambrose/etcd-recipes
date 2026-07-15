@@ -39,6 +39,7 @@ import io.etcd.recipes.common.watcher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.TimeSource
 
 class ServiceCache
   @JvmOverloads
@@ -141,6 +142,7 @@ class ServiceCache
   // revision + 1). Runs during start() and, on the watch dispatcher thread, during
   // compaction resync — deliberately not synchronized (see PathChildrenCache.reconcile).
   private fun reconcile(): Long {
+    val start = TimeSource.Monotonic.markNow()
     val trailingServicePath = servicePath.ensureSuffix("/")
     val trailingNamesPath = namesPath.ensureSuffix("/")
     val getOption = getOption {
@@ -152,6 +154,7 @@ class ServiceCache
       resp.kvs.associate { kv -> kv.key.asString.substring(trailingNamesPath.length) to kv.value.asString }
     serviceMap.keys.retainAll(fresh.keys)
     serviceMap.putAll(fresh)
+    resilience.metrics.recordCacheSync(servicePath, start.elapsedNow(), serviceMap.size)
     return resp.header.revision + 1
   }
 

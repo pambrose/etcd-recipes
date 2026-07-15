@@ -74,6 +74,20 @@ interface EtcdMetrics {
     becameLeader: Boolean,
   ) {}
 
+  /** A queue operation ([op] is enqueue / dequeue) at [path] and how long it took. */
+  fun recordQueue(
+    op: String,
+    path: String,
+    duration: Duration,
+  ) {}
+
+  /** A cache (re)sync of [path]: how long the snapshot load took and the resulting entry [size]. */
+  fun recordCacheSync(
+    path: String,
+    duration: Duration,
+    size: Int,
+  ) {}
+
   companion object {
     /** The default: records nothing. Selected unless a backend is installed via [ResilienceConfig.withMetrics]. */
     val NoOp: EtcdMetrics = object : EtcdMetrics {}
