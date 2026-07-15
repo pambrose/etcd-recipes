@@ -98,6 +98,8 @@ class DistributedMutex
     require(leaseTtlSecs > 0) { "Lease TTL must be > 0" }
   }
 
+  override val exceptionContext get() = "DistributedMutex[$lockPath]"
+
   override fun lock() {
     check(acquire(null)) { "unbounded acquisition returned without the lock" }
   }
@@ -181,7 +183,7 @@ class DistributedMutex
           leaseTtlSecs,
           resilience.rpc,
           onTransient = { e ->
-            exceptionList.value += e
+            recordException(e)
             reportLeaseEvent(LeaseEvent.Suspended(-1L, e))
           },
           onFatal = { cause -> onAttemptFatal(attempt, cause) },
@@ -207,7 +209,7 @@ class DistributedMutex
           } catch (e: Exception) {
             // Lease death mid-wait, "no leader", or a close() abort. Retry with a
             // fresh lease (paced); tryLock stays bounded by the loop's deadline check.
-            exceptionList.value += e
+            recordException(e)
             if (closeCalled.load()) {
               throw EtcdRecipeRuntimeException("Lock attempt on $lockPath aborted by close()", e)
             }
@@ -277,14 +279,14 @@ class DistributedMutex
     val data = threadData.remove(thread) ?: return
     dispossessed[thread] = data.holdCount
     logger.warn(cause) { "Lock on $lockPath lost by $clientId (lease expired)" }
-    exceptionList.value += (cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
+    recordException(cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
     reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
     lockLostListeners.forEach { listener ->
       try {
         listener.onLockLost(cause)
       } catch (e: Throwable) {
         logger.error(e) { "Exception in lock-lost listener" }
-        exceptionList.value += e
+        recordException(e)
       }
     }
     if (interruptOnLockLoss) thread.interrupt()

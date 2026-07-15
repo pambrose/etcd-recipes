@@ -91,6 +91,8 @@ constructor(
       start()
   }
 
+  override val exceptionContext get() = "TransientKeyValue[$keyPath]"
+
   @Suppress("TooGenericExceptionCaught")
   @Synchronized
   fun start(): TransientKeyValue {
@@ -119,7 +121,7 @@ constructor(
         logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
       } catch (e: Throwable) {
         logger.error(e) { "In start()" }
-        exceptionList.value += e
+        recordException(e)
       } finally {
         runCatching { healer?.close() }
         // Always release the start() caller, even on failure. The previous
@@ -167,17 +169,19 @@ constructor(
     reportLeaseEvent(event)
     when (event) {
       is LeaseEvent.Suspended -> {
-        exceptionList.value += event.cause
+        recordException(event.cause)
       }
 
       is LeaseEvent.Expired -> {
-        event.cause?.let { exceptionList.value += it }
-        ?: run { exceptionList.value += EtcdRecipeRuntimeException("Lease for $keyPath expired; healing") }
+        event.cause?.let { recordException(it) }
+        ?: run { recordException(EtcdRecipeRuntimeException("Lease for $keyPath expired; healing")) }
       }
 
       is LeaseEvent.Failed -> {
-        exceptionList.value += event.cause
-        ?: EtcdRecipeRuntimeException("Lease healing for $keyPath abandoned; key is gone")
+        recordException(
+          event.cause
+            ?: EtcdRecipeRuntimeException("Lease healing for $keyPath abandoned; key is gone"),
+        )
       }
 
       is LeaseEvent.Restored -> {
@@ -189,7 +193,7 @@ constructor(
         listener.onLeaseEvent(event)
       } catch (e: Throwable) {
         logger.error(e) { "Exception in lease listener" }
-        exceptionList.value += e
+        recordException(e)
       }
     }
   }

@@ -12,6 +12,21 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (observability: push errors + health)
+
+- **Push-based background-exception callback** on `EtcdConnector`: register a
+  `BackgroundExceptionListener` (`addBackgroundExceptionListener` /
+  `removeBackgroundExceptionListener`) to be notified — with a short source context
+  (the recipe's path/clientId) — the moment a background failure occurs (keep-alive
+  death, abandoned watcher, lost lock/leadership, a throwing user callback), instead
+  of polling the `exceptions` list. Every recipe now routes its failures through a
+  single `recordException` sink; the pull-only `exceptions` API is unchanged.
+- **Health** on `EtcdConnector`: `isHealthy()` (passive — healthy unless a lease
+  expired / watcher was abandoned, or the connector is closed) and `ping()` (an
+  active, bounded, non-mutating reachability probe).
+- Coroutines: `EtcdConnector.backgroundExceptionsAsFlow()` surfaces the same
+  notifications as a `Flow<BackgroundException>`.
+
 ### Fixed (locks: read-write lock / semaphore wait)
 
 - `DistributedReadWriteLock` and `DistributedSemaphore` could park a caller

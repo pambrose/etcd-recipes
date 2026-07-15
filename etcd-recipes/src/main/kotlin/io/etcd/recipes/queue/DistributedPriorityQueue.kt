@@ -52,6 +52,8 @@ class DistributedPriorityQueue
     val minimumWaitTime: Duration,
     resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
   ) : AbstractQueue(client, queuePath, SortTarget.KEY, resilience) {
+  override val exceptionContext get() = "DistributedPriorityQueue[$queuePath]"
+
   private var lastWriteTime = TimeSource.Monotonic.markNow()
 
   fun enqueue(

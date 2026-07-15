@@ -73,6 +73,8 @@ constructor(
     require(servicePath.isNotEmpty()) { "Service base path cannot be empty" }
   }
 
+  override val exceptionContext get() = "ServiceRegistry[$servicePath]"
+
   internal class ServiceInstanceContext(
     val service: ServiceInstance,
     val client: Client,
@@ -153,17 +155,19 @@ constructor(
     reportLeaseEvent(event)
     when (event) {
       is LeaseEvent.Suspended -> {
-        exceptionList.value += event.cause
+        recordException(event.cause)
       }
 
       is LeaseEvent.Expired -> {
-        event.cause?.let { exceptionList.value += it }
-        ?: run { exceptionList.value += EtcdRecipeRuntimeException("Lease for $instancePath expired; healing") }
+        event.cause?.let { recordException(it) }
+        ?: run { recordException(EtcdRecipeRuntimeException("Lease for $instancePath expired; healing")) }
       }
 
       is LeaseEvent.Failed -> {
-        exceptionList.value += event.cause
-        ?: EtcdRecipeRuntimeException("Lease healing for $instancePath abandoned; instance is unregistered")
+        recordException(
+          event.cause
+            ?: EtcdRecipeRuntimeException("Lease healing for $instancePath abandoned; instance is unregistered"),
+        )
       }
 
       is LeaseEvent.Restored -> {
@@ -177,7 +181,7 @@ constructor(
         listener.onLeaseEvent(event)
       } catch (e: Throwable) {
         logger.error(e) { "Exception in lease listener" }
-        exceptionList.value += e
+        recordException(e)
       }
     }
   }

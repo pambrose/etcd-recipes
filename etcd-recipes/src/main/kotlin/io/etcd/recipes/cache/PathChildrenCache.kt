@@ -84,6 +84,8 @@ class PathChildrenCache
   // Use a single-threaded executor to maintain order
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
 
+  override val exceptionContext get() = "PathChildrenCache[$cachePath]"
+
   enum class StartMode {
     /**
      * cache will _not_ be primed. i.e. it will start empty and you will receive
@@ -142,7 +144,7 @@ class PathChildrenCache
                 listener.childEvent(cacheEvent)
               } catch (e: Throwable) {
                 logger.error(e) { "Exception in cacheChanged()" }
-                exceptionList.value += e
+                recordException(e)
               }
             }
           startThreadComplete.set(true)
@@ -203,7 +205,7 @@ class PathChildrenCache
       setupWatcher(anchorRevision)
     } catch (e: Throwable) {
       logger.error(e) { "Exception in loadDataAndStartWatcher()" }
-      exceptionList.value += e
+      recordException(e)
     }
   }
 
@@ -237,7 +239,7 @@ class PathChildrenCache
                   listener.childEvent(cacheEvent)
                 } catch (e: Throwable) {
                   logger.error(e) { "Exception in cacheChanged()" }
-                  exceptionList.value += e
+                  recordException(e)
                 }
               }
             }
@@ -251,7 +253,7 @@ class PathChildrenCache
                   listener.childEvent(cacheEvent)
                 } catch (e: Throwable) {
                   logger.error(e) { "Exception in cacheChanged()" }
-                  exceptionList.value += e
+                  recordException(e)
                 }
               }
             }
@@ -318,15 +320,17 @@ class PathChildrenCache
   private fun onRecoveryEvent(event: WatchRecoveryEvent) {
     reportRecoveryEvent(event)
     if (event is WatchRecoveryEvent.Failed) {
-      exceptionList.value += event.cause
-        ?: EtcdRecipeRuntimeException("Watch on $cachePath abandoned; cache is no longer updating")
+      recordException(
+        event.cause
+          ?: EtcdRecipeRuntimeException("Watch on $cachePath abandoned; cache is no longer updating"),
+      )
     }
     recoveryListeners.forEach { listener ->
       try {
         listener.onRecoveryEvent(event)
       } catch (e: Throwable) {
         logger.error(e) { "Exception in recovery listener" }
-        exceptionList.value += e
+        recordException(e)
       }
     }
   }

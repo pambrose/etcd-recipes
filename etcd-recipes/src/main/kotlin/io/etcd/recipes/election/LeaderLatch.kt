@@ -77,6 +77,8 @@ class LeaderLatch
       require(leaseTtlSecs > 0) { "Lease TTL must be > 0" }
     }
 
+    override val exceptionContext get() = "LeaderLatch[$electionPath]"
+
     private val closing = AtomicBoolean(false)
 
     // Serializes inner-selector lifecycle (construct/start) against close(): the worker
@@ -174,15 +176,15 @@ class LeaderLatch
             logger.debug(e) { "Latch worker interrupted while awaiting term end" }
           }
 
-          if (sel.hasExceptions) exceptionList.value += sel.exceptions
-          runCatching { sel.close() }.onFailure { exceptionList.value += it }
+          if (sel.hasExceptions) sel.exceptions.forEach { recordException(it) }
+          runCatching { sel.close() }.onFailure { recordException(it) }
 
           if (closing.get()) return
           // Otherwise the term ended via step-down: loop back and re-contest with a
           // fresh selector (one selector per full term, so no tight spin).
         }
       } catch (e: Throwable) {
-        exceptionList.value += e
+        recordException(e)
       } finally {
         leadershipMonitor.set(false)
         firstTermStarted.set(true) // never leave start() blocked if the worker died early
@@ -210,7 +212,7 @@ class LeaderLatch
               listener.call()
             } catch (e: Throwable) {
               logger.error(e) { "Exception in LeaderLatch listener" }
-              exceptionList.value += e
+              recordException(e)
             }
           }
         }
@@ -231,7 +233,7 @@ class LeaderLatch
           w.interrupt() // backstop
           w.join(TimeUnit.SECONDS.toMillis(5))
           if (w.isAlive)
-            exceptionList.value += EtcdRecipeRuntimeException("LeaderLatch worker did not terminate")
+            recordException(EtcdRecipeRuntimeException("LeaderLatch worker did not terminate"))
         }
       }
       leadershipMonitor.set(false)

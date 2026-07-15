@@ -42,6 +42,8 @@ class DistributedQueue
     queuePath: String,
     resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
   ) : AbstractQueue(client, queuePath, SortTarget.MOD, resilience) {
+  override val exceptionContext get() = "DistributedQueue[$queuePath]"
+
   fun enqueue(value: String) = enqueue(value.asByteSequence)
 
   fun enqueue(value: Int) = enqueue(value.asByteSequence)

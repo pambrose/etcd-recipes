@@ -54,6 +54,8 @@ abstract class AbstractQueue(
     require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
   }
 
+  override val exceptionContext get() = "AbstractQueue[$queuePath]"
+
   fun dequeue(): ByteSequence = checkNotNull(takeWithDeadline(null)) { "unbounded take returned empty" }
 
   /** Non-blocking take: the head item, or null when the queue is empty. */
@@ -215,7 +217,7 @@ abstract class AbstractQueue(
           val cause = event.cause
             ?: EtcdRecipeRuntimeException("Watch on $queuePath abandoned while waiting for an item")
           watchFailure.set(cause)
-          exceptionList.value += cause
+          recordException(cause)
           synchronized(watchLatch) {
             if (watchLatch.count > 0) watchLatch.countDown()
           }

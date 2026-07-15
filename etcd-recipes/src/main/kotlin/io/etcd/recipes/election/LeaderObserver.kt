@@ -64,6 +64,8 @@ class LeaderObserver
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
     }
 
+    override val exceptionContext get() = "LeaderObserver[$electionPath]"
+
     private val leaderKey = ElectionPaths.leaderKey(electionPath)
     private val listeners = CopyOnWriteArrayList<LeaderListener>()
     private val currentLeaderRef = AtomicReference<String?>(null)
@@ -122,7 +124,7 @@ class LeaderObserver
         } catch (e: Throwable) {
           logger.error(e) { "Exception in LeaderObserver takeLeadership" }
           runCatching { listener.onError(e) }
-          exceptionList.value += e
+          recordException(e)
         }
       }
     }
@@ -136,7 +138,7 @@ class LeaderObserver
         } catch (e: Throwable) {
           logger.error(e) { "Exception in LeaderObserver relinquishLeadership" }
           runCatching { listener.onError(e) }
-          exceptionList.value += e
+          recordException(e)
         }
       }
     }
