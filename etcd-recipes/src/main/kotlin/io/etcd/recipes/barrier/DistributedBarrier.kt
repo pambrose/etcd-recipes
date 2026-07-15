@@ -31,6 +31,7 @@ import io.etcd.recipes.common.SelfHealingKeepAlive
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.putOption
@@ -180,10 +181,19 @@ constructor(
     } else {
       // Presence at wait start bounds the recovery recheck below: with
       // waitOnMissingBarriers=true a waiter on a never-set barrier must keep
-      // waiting across recoveries, not release spuriously.
-      val barrierPresentAtStart = isBarrierSet()
+      // waiting across recoveries, not release spuriously. The probe's revision
+      // anchors the watch at observedRevision + 1 so a DELETE landing in the
+      // watch-establishment window (between this probe and the watch going live)
+      // is still delivered; the pre-live recheck below is then only a fast path.
+      val startProbe = client.transaction(resilience.rpc) { If(barrierPath.doesExist) }
+      val barrierPresentAtStart = startProbe.isSucceeded
+      val observedRevision = startProbe.header.revision
       val waitLatch = CountDownLatch(1)
-      val watchOption = watchOption { withNoPut(true) }
+      val watchOption =
+        watchOption {
+          if (observedRevision > 0L) withRevision(observedRevision + 1)
+          withNoPut(true)
+        }
       val watchFailure = AtomicReference<Throwable?>()
       val recoveryListener = waiterRecoveryListener(barrierPresentAtStart, waitLatch, watchFailure)
 

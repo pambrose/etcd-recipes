@@ -23,6 +23,16 @@ non-blocking consumption on the existing queues.
   revision where its ranged read observed the blocker present, so the release is
   always (re)delivered; the pre-live recheck is now only a fast path.
 
+### Fixed (barriers / queue: waiter watch)
+
+- `DistributedBarrier`, `DistributedBarrierWithCount`, and the queues
+  (`DistributedQueue` / `DistributedPriorityQueue`) shared the same un-anchored-watch
+  race as the locks: a waiter's watch was subscribed without a start revision, so a
+  barrier DELETE / ready DELETE / queue PUT landing in the watch-establishment window
+  could be lost by both the watch and the pre-live recheck. Each now anchors its watch
+  at the revision its pre-subscribe read observed, so the awaited event is always
+  (re)delivered.
+
 ### Added (discovery: load-balancing ServiceProvider)
 
 - `ServiceProvider` now extends `EtcdConnector` and owns an internal `ServiceCache`:
