@@ -284,21 +284,23 @@ class DistributedMutex
     thread: Thread,
     cause: Throwable?,
   ) {
-    val data = threadData.remove(thread) ?: return
-    dispossessed[thread] = data.holdCount
-    logger.warn(cause) { "Lock on $lockPath lost by $clientId (lease expired)" }
-    recordException(cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
-    reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
-    lockLostListeners.forEach { listener ->
-      try {
-        listener.onLockLost(cause)
-      } catch (e: Throwable) {
-        logger.error(e) { "Exception in lock-lost listener" }
-        recordException(e)
+    withRecipeLoggingContext {
+      val data = threadData.remove(thread) ?: return
+      dispossessed[thread] = data.holdCount
+      logger.warn(cause) { "Lock on $lockPath lost by $clientId (lease expired)" }
+      recordException(cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
+      reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
+      lockLostListeners.forEach { listener ->
+        try {
+          listener.onLockLost(cause)
+        } catch (e: Throwable) {
+          logger.error(e) { "Exception in lock-lost listener" }
+          recordException(e)
+        }
       }
+      if (interruptOnLockLoss) thread.interrupt()
+      data.acquisitionLease.closeWithoutRevoke() // lease already gone; no RPC on this thread
     }
-    if (interruptOnLockLoss) thread.interrupt()
-    data.acquisitionLease.closeWithoutRevoke() // lease already gone; no RPC on this thread
   }
 
   private fun releaseHold(data: LockData) {

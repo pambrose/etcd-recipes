@@ -22,6 +22,7 @@ import com.pambrose.common.concurrent.BooleanMonitor
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.slf4j.MDC
 import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CopyOnWriteArrayList
@@ -79,6 +80,21 @@ open class EtcdConnector(
 
   /** Records [throwable] under this connector's [exceptionContext]. */
   protected fun recordException(throwable: Throwable) = recordException(exceptionContext, throwable)
+
+  /**
+   * Runs [body] with this recipe's identity ([exceptionContext]) in the SLF4J MDC under
+   * [RECIPE_MDC_KEY], restoring any prior value afterward. Recipes wrap their background-thread
+   * runnables with this so logs emitted far from the calling code still carry recipe context.
+   */
+  protected inline fun <T> withRecipeLoggingContext(body: () -> T): T {
+    val prior = MDC.get(RECIPE_MDC_KEY)
+    MDC.put(RECIPE_MDC_KEY, exceptionContext)
+    return try {
+      body()
+    } finally {
+      if (prior == null) MDC.remove(RECIPE_MDC_KEY) else MDC.put(RECIPE_MDC_KEY, prior)
+    }
+  }
 
   /**
    * The single sink for background failures: records [throwable] in [exceptions] and pushes
@@ -191,6 +207,9 @@ open class EtcdConnector(
     internal const val TOKEN_LENGTH = 7
     internal const val DEFAULT_TTL_SECS = 2L
     private const val PING_PROBE_KEY = "health-check-probe"
+
+    /** SLF4J MDC key under which [withRecipeLoggingContext] publishes the recipe's identity. */
+    const val RECIPE_MDC_KEY = "etcd.recipe"
 
     internal fun defaultClientId(prefix: String) = "$prefix:${randomId(TOKEN_LENGTH)}"
   }

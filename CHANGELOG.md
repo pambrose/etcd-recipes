@@ -36,6 +36,15 @@ non-blocking consumption on the existing queues.
   RPC latency / attempts / outcome (`recordRpc`), resilient-watcher recovery transitions
   (`incrementWatchRecovery`), and self-healing-lease events (`incrementKeepAlive`).
 
+### Added (observability: structured logging)
+
+- Recipe background-thread logging now carries an `etcd.recipe` MDC key (the recipe's identity,
+  e.g. `DistributedMutex[/lock/x]`), so logs emitted on healer / watch-dispatcher /
+  election-worker threads can be correlated to the recipe that produced them. Applied across
+  the recipes' async runnables and their lease / lock-loss / watch-recovery handlers via a new
+  protected `EtcdConnector.withRecipeLoggingContext { }`; `EtcdConnector.RECIPE_MDC_KEY` exposes
+  the key name.
+
 ### Added (observability: live-state gauges)
 
 - Micrometer gauges bound to a specific recipe instance (via the new

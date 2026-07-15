@@ -101,35 +101,37 @@ constructor(
     checkCloseNotCalled()
 
     executor.execute {
-      var healer: SelfHealingKeepAlive? = null
-      try {
-        val leaseTtl = leaseTtlSecs.seconds
-        logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
-        // Self-healing: if the lease expires (partition longer than the TTL), the
-        // healer re-grants it and re-puts the key, instead of the key silently
-        // vanishing while this recipe still looks healthy.
-        healer = client.selfHealingKeepAlive(
-          leaseTtl,
-          resilience.lease,
-          leaseListener = { event -> onLeaseEvent(event) },
-        ) { lease ->
-          client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) }, resilience.rpc)
-          true
+      withRecipeLoggingContext {
+        var healer: SelfHealingKeepAlive? = null
+        try {
+          val leaseTtl = leaseTtlSecs.seconds
+          logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
+          // Self-healing: if the lease expires (partition longer than the TTL), the
+          // healer re-grants it and re-puts the key, instead of the key silently
+          // vanishing while this recipe still looks healthy.
+          healer = client.selfHealingKeepAlive(
+            leaseTtl,
+            resilience.lease,
+            leaseListener = { event -> onLeaseEvent(event) },
+          ) { lease ->
+            client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) }, resilience.rpc)
+            true
+          }
+          keepAliveStartedLatch.countDown()
+          keepAliveWaitLatch.await()
+          logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
+        } catch (e: Throwable) {
+          logger.error(e) { "In start()" }
+          recordException(e)
+        } finally {
+          runCatching { healer?.close() }
+          // Always release the start() caller, even on failure. The previous
+          // version only counted down inside the keepAlive callback, so if the
+          // initial put / lease grant threw, start() would block on
+          // keepAliveStartedLatch forever.
+          keepAliveStartedLatch.countDown()
+          startThreadComplete.set(true)
         }
-        keepAliveStartedLatch.countDown()
-        keepAliveWaitLatch.await()
-        logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
-      } catch (e: Throwable) {
-        logger.error(e) { "In start()" }
-        recordException(e)
-      } finally {
-        runCatching { healer?.close() }
-        // Always release the start() caller, even on failure. The previous
-        // version only counted down inside the keepAlive callback, so if the
-        // initial put / lease grant threw, start() would block on
-        // keepAliveStartedLatch forever.
-        keepAliveStartedLatch.countDown()
-        startThreadComplete.set(true)
       }
     }
 
@@ -166,34 +168,36 @@ constructor(
   // trouble), drive connection state, and forward to user listeners.
   @Suppress("TooGenericExceptionCaught")
   private fun onLeaseEvent(event: LeaseEvent) {
-    reportLeaseEvent(event)
-    when (event) {
-      is LeaseEvent.Suspended -> {
-        recordException(event.cause)
-      }
+    withRecipeLoggingContext {
+      reportLeaseEvent(event)
+      when (event) {
+        is LeaseEvent.Suspended -> {
+          recordException(event.cause)
+        }
 
-      is LeaseEvent.Expired -> {
-        event.cause?.let { recordException(it) }
-        ?: run { recordException(EtcdRecipeRuntimeException("Lease for $keyPath expired; healing")) }
-      }
+        is LeaseEvent.Expired -> {
+          event.cause?.let { recordException(it) }
+          ?: run { recordException(EtcdRecipeRuntimeException("Lease for $keyPath expired; healing")) }
+        }
 
-      is LeaseEvent.Failed -> {
-        recordException(
-          event.cause
-            ?: EtcdRecipeRuntimeException("Lease healing for $keyPath abandoned; key is gone"),
-        )
-      }
+        is LeaseEvent.Failed -> {
+          recordException(
+            event.cause
+              ?: EtcdRecipeRuntimeException("Lease healing for $keyPath abandoned; key is gone"),
+          )
+        }
 
-      is LeaseEvent.Restored -> {
-        logger.info { "Lease for $keyPath healed: ${event.oldLeaseId} -> ${event.newLeaseId}" }
+        is LeaseEvent.Restored -> {
+          logger.info { "Lease for $keyPath healed: ${event.oldLeaseId} -> ${event.newLeaseId}" }
+        }
       }
-    }
-    leaseListeners.forEach { listener ->
-      try {
-        listener.onLeaseEvent(event)
-      } catch (e: Throwable) {
-        logger.error(e) { "Exception in lease listener" }
-        recordException(e)
+      leaseListeners.forEach { listener ->
+        try {
+          listener.onLeaseEvent(event)
+        } catch (e: Throwable) {
+          logger.error(e) { "Exception in lease listener" }
+          recordException(e)
+        }
       }
     }
   }

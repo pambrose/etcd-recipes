@@ -127,28 +127,30 @@ class PathChildrenCache
 
     if (mode == StartMode.BUILD_INITIAL_CACHE || mode == StartMode.POST_INITIALIZED_EVENT) {
       executor.execute {
-        try {
-          // Snapshot then watch with the snapshot's revision as the watch
-          // anchor: the watcher receives every event that occurred after the
-          // snapshot revision, with no overlap and no gap. Without anchoring
-          // a PUT could land between watch-registration and snapshot-load,
-          // and the snapshot would silently overwrite the newer value.
-          loadDataAndStartWatcher()
-        } finally {
-          if (mode == StartMode.POST_INITIALIZED_EVENT)
-            listeners.forEach { listener ->
-              try {
-                val cacheEvent =
-                  PathChildrenCacheEvent("", PathChildrenCacheEvent.Type.INITIALIZED, null).apply {
-                    initialDataVal = currentData
-                  }
-                listener.childEvent(cacheEvent)
-              } catch (e: Throwable) {
-                logger.error(e) { "Exception in cacheChanged()" }
-                recordException(e)
+        withRecipeLoggingContext {
+          try {
+            // Snapshot then watch with the snapshot's revision as the watch
+            // anchor: the watcher receives every event that occurred after the
+            // snapshot revision, with no overlap and no gap. Without anchoring
+            // a PUT could land between watch-registration and snapshot-load,
+            // and the snapshot would silently overwrite the newer value.
+            loadDataAndStartWatcher()
+          } finally {
+            if (mode == StartMode.POST_INITIALIZED_EVENT)
+              listeners.forEach { listener ->
+                try {
+                  val cacheEvent =
+                    PathChildrenCacheEvent("", PathChildrenCacheEvent.Type.INITIALIZED, null).apply {
+                      initialDataVal = currentData
+                    }
+                  listener.childEvent(cacheEvent)
+                } catch (e: Throwable) {
+                  logger.error(e) { "Exception in cacheChanged()" }
+                  recordException(e)
+                }
               }
-            }
-          startThreadComplete.set(true)
+            startThreadComplete.set(true)
+          }
         }
       }
     } else {

@@ -378,21 +378,23 @@ class DistributedReadWriteLock
     thread: Thread,
     cause: Throwable?,
   ) {
-    val data = holdsFor(side).remove(thread) ?: return
-    dispossessedFor(side)[thread] = data.holdCount
-    logger.warn(cause) { "${side.entryPrefix} lock on $lockPath lost by $clientId (lease expired)" }
-    recordException(cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
-    reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
-    listenersFor(side).forEach { listener ->
-      try {
-        listener.onLockLost(cause)
-      } catch (e: Throwable) {
-        logger.error(e) { "Exception in lock-lost listener" }
-        recordException(e)
+    withRecipeLoggingContext {
+      val data = holdsFor(side).remove(thread) ?: return
+      dispossessedFor(side)[thread] = data.holdCount
+      logger.warn(cause) { "${side.entryPrefix} lock on $lockPath lost by $clientId (lease expired)" }
+      recordException(cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
+      reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
+      listenersFor(side).forEach { listener ->
+        try {
+          listener.onLockLost(cause)
+        } catch (e: Throwable) {
+          logger.error(e) { "Exception in lock-lost listener" }
+          recordException(e)
+        }
       }
+      if (interruptOnLockLoss) thread.interrupt()
+      data.lease.closeWithoutRevoke() // lease already gone; no RPC on this thread
     }
-    if (interruptOnLockLoss) thread.interrupt()
-    data.lease.closeWithoutRevoke() // lease already gone; no RPC on this thread
   }
 
   override fun doClose() {

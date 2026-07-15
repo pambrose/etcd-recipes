@@ -47,7 +47,12 @@ class LeaderLatchTests : StringSpec() {
         try {
           latch.await(20.seconds) shouldBe true
           latch.hasLeadership shouldBe true
-          LeaderSelector.getParticipants(client, "$path/lone").single { it.isLeader }.clientId shouldBe "solo"
+          // Participant advertisement is async, so poll rather than reading it point-in-time.
+          pollUntil(10.seconds) {
+            runCatching {
+              LeaderSelector.getParticipants(client, "$path/lone").single { it.isLeader }.clientId == "solo"
+            }.getOrDefault(false)
+          } shouldBe true
         } finally {
           latch.close()
         }

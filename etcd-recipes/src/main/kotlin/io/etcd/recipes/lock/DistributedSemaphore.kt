@@ -362,22 +362,24 @@ class DistributedSemaphore
     attempt: Attempt,
     cause: Throwable?,
   ) {
-    val data = attempt.holdData ?: return
-    if (!holds.remove(data)) return // already released, or close() took it
-    dispossessedCount.incrementAndGet()
-    logger.warn(cause) { "Permit on $semaphorePath lost by $clientId (lease expired)" }
-    recordException(cause ?: EtcdRecipeRuntimeException("Permit lease for $semaphorePath expired; permit lost"))
-    reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
-    lostListeners.forEach { listener ->
-      try {
-        listener.onPermitLost(cause)
-      } catch (e: Throwable) {
-        logger.error(e) { "Exception in permit-lost listener" }
-        recordException(e)
+    withRecipeLoggingContext {
+      val data = attempt.holdData ?: return
+      if (!holds.remove(data)) return // already released, or close() took it
+      dispossessedCount.incrementAndGet()
+      logger.warn(cause) { "Permit on $semaphorePath lost by $clientId (lease expired)" }
+      recordException(cause ?: EtcdRecipeRuntimeException("Permit lease for $semaphorePath expired; permit lost"))
+      reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
+      lostListeners.forEach { listener ->
+        try {
+          listener.onPermitLost(cause)
+        } catch (e: Throwable) {
+          logger.error(e) { "Exception in permit-lost listener" }
+          recordException(e)
+        }
       }
+      if (interruptOnPermitLoss) attempt.owner.interrupt()
+      data.lease.closeWithoutRevoke() // lease already gone; no RPC on this thread
     }
-    if (interruptOnPermitLoss) attempt.owner.interrupt()
-    data.lease.closeWithoutRevoke() // lease already gone; no RPC on this thread
   }
 
   override fun doClose() {
