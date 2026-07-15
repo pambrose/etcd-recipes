@@ -86,6 +86,7 @@ abstract class AbstractQueue(
   @Suppress("LoopWithTooManyJumpStatements", "ReturnCount")
   private fun takeWithDeadline(deadline: ComparableTimeMark?): ByteSequence? {
     checkCloseNotCalled()
+    val start = TimeSource.Monotonic.markNow() // dequeue latency = call → item in hand
 
     // Loop instead of recursing on CAS-conflict retries: a recursive frame per
     // retry could allocate a new watcher (with its own dispatcher executor).
@@ -96,6 +97,7 @@ abstract class AbstractQueue(
       if (childList.isNotEmpty()) {
         val child = childList.first()
         if (deleteRevKey(child)) {
+          resilience.metrics.recordQueue("dequeue", queuePath, start.elapsedNow())
           return child.value
         }
         logger.debug { "Lost CAS to concurrent consumer, retrying without watcher" }
@@ -111,7 +113,10 @@ abstract class AbstractQueue(
       // in the watch-establishment window is still delivered (the pre-live poll
       // then only shortcuts the already-arrived case).
       val winner = waitForFirstChild(deadline, firstChild.header.revision) ?: continue
-      if (deleteRevKey(winner)) return winner.value
+      if (deleteRevKey(winner)) {
+        resilience.metrics.recordQueue("dequeue", queuePath, start.elapsedNow())
+        return winner.value
+      }
     }
   }
 

@@ -36,6 +36,14 @@ non-blocking consumption on the existing queues.
   RPC latency / attempts / outcome (`recordRpc`), resilient-watcher recovery transitions
   (`incrementWatchRecovery`), and self-healing-lease events (`incrementKeepAlive`).
 
+### Added (observability: queue + cache metrics)
+
+- More recipe metric seams via the `EtcdMetrics` SPI: the queues record dequeue latency
+  (`recordQueue`, measured call→item-in-hand), and `PathChildrenCache` / `ServiceCache` record
+  each snapshot (re)sync (`recordCacheSync`, with the resulting entry count). The Micrometer
+  binding maps these to an `etcd.queue` timer and an `etcd.cache.sync` timer plus an
+  `etcd.cache.size` distribution.
+
 ### Added (observability: lock + election metrics)
 
 - Recipe-level metric seams via the `EtcdMetrics` SPI: `DistributedMutex`,

@@ -51,6 +51,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+import kotlin.time.TimeSource
 
 @JvmOverloads
 fun <T> withPathChildrenCache(
@@ -189,6 +190,7 @@ class PathChildrenCache
   @Suppress("TooGenericExceptionCaught")
   private fun loadDataAndStartWatcher() {
     try {
+      val start = TimeSource.Monotonic.markNow()
       val getOption = getOption {
         isPrefix(true)
         withSortField(GetOption.SortTarget.KEY)
@@ -202,6 +204,7 @@ class PathChildrenCache
         cacheMap[s] = kv.value
       }
 
+      resilience.metrics.recordCacheSync(cachePath, start.elapsedNow(), cacheMap.size)
       setupWatcher(anchorRevision)
     } catch (e: Throwable) {
       logger.error(e) { "Exception in loadDataAndStartWatcher()" }
@@ -305,6 +308,7 @@ class PathChildrenCache
   // reconciliation is safe on the ConcurrentMap, and watch events are serialized on
   // the same dispatcher thread anyway.
   private fun reconcile(): Long {
+    val start = TimeSource.Monotonic.markNow()
     val getOption = getOption {
       isPrefix(true)
       withSortField(GetOption.SortTarget.KEY)
@@ -313,6 +317,7 @@ class PathChildrenCache
     val fresh = resp.kvs.associate { kv -> kv.key.asString.substring(trailingPath.length) to kv.value }
     cacheMap.keys.retainAll(fresh.keys)
     cacheMap.putAll(fresh)
+    resilience.metrics.recordCacheSync(cachePath, start.elapsedNow(), cacheMap.size)
     return resp.header.revision + 1
   }
 

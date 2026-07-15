@@ -85,6 +85,19 @@ class MicrometerEtcdMetricsTests : StringSpec() {
       registry.find("etcd.election.transitions").tag("transition", "relinquished").counter()!!.count() shouldBe 1.0
     }
 
+    "queue ops register a timer tagged by op, and cache sync a timer plus a size summary" {
+      val registry = SimpleMeterRegistry()
+      val metrics = MicrometerEtcdMetrics(registry)
+      metrics.recordQueue("dequeue", "/q", 5.milliseconds)
+      metrics.recordCacheSync("/c", 10.milliseconds, size = 3)
+
+      registry.find("etcd.queue").tag("op", "dequeue").timer()!!.count() shouldBe 1L
+      registry.find("etcd.cache.sync").timer()!!.count() shouldBe 1L
+      val size = registry.find("etcd.cache.size").summary()!!
+      size.count() shouldBe 1L
+      size.max() shouldBe 3.0
+    }
+
     "installed via ResilienceConfig.withMetrics it records real RPC activity" {
       val registry = SimpleMeterRegistry()
       val client: Client =

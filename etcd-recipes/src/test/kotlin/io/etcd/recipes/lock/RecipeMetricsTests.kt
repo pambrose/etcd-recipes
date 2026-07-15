@@ -18,17 +18,22 @@
 
 package io.etcd.recipes.lock
 
+import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.common.EtcdMetrics
 import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.pollUntil
+import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.urls
 import io.etcd.recipes.election.LeaderSelector
+import io.etcd.recipes.queue.DistributedQueue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * End-to-end proof that the recipes actually drive the [EtcdMetrics] seams: a mutex,
@@ -42,6 +47,8 @@ class RecipeMetricsTests : StringSpec() {
     val lockWaits = CopyOnWriteArrayList<Boolean>()
     val lockHolds = AtomicInteger(0)
     val leadership = CopyOnWriteArrayList<Boolean>()
+    val queueOps = CopyOnWriteArrayList<String>()
+    val cacheSyncs = CopyOnWriteArrayList<Int>()
 
     override fun recordLockWait(
       path: String,
@@ -63,6 +70,22 @@ class RecipeMetricsTests : StringSpec() {
       becameLeader: Boolean,
     ) {
       leadership += becameLeader
+    }
+
+    override fun recordQueue(
+      op: String,
+      path: String,
+      duration: Duration,
+    ) {
+      queueOps += op
+    }
+
+    override fun recordCacheSync(
+      path: String,
+      duration: Duration,
+      size: Int,
+    ) {
+      cacheSyncs += size
     }
   }
 
@@ -109,6 +132,35 @@ class RecipeMetricsTests : StringSpec() {
           selector.waitOnLeadershipComplete()
         }
         metrics.leadership shouldBe listOf(true, false)
+      }
+    }
+
+    "a queue dequeue records a dequeue op" {
+      connectToEtcd(urls) { client ->
+        client.deleteChildren(base)
+        val metrics = RecordingMetrics()
+        DistributedQueue(client, "$base/queue", resilience = ResilienceConfig.DEFAULT.withMetrics(metrics))
+          .use { queue ->
+            queue.enqueue("hello")
+            queue.dequeue()
+          }
+        metrics.queueOps shouldBe listOf("dequeue")
+      }
+    }
+
+    "a path-children cache records an initial sync with the entry count" {
+      connectToEtcd(urls) { client ->
+        client.deleteChildren(base)
+        val cachePath = "$base/cache"
+        client.putValue("$cachePath/a", "1")
+        client.putValue("$cachePath/b", "2")
+        val metrics = RecordingMetrics()
+        PathChildrenCache(client, cachePath, resilience = ResilienceConfig.DEFAULT.withMetrics(metrics))
+          .use { cache ->
+            cache.start(buildInitial = true)
+            pollUntil(10.seconds) { metrics.cacheSyncs.isNotEmpty() } shouldBe true
+          }
+        metrics.cacheSyncs.first() shouldBe 2
       }
     }
   }
