@@ -32,6 +32,7 @@ import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.equalTo
+import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getFirstChild
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
@@ -80,6 +81,12 @@ abstract class AbstractQueue(
     timeout: Long,
     timeUnit: TimeUnit,
   ): ByteSequence? = poll(timeUnitToDuration(timeout, timeUnit))
+
+  /**
+   * Current number of items in the queue. etcd cannot push a count, so this issues a
+   * range-count RPC on each call — a metrics gauge bound to it polls etcd on every scrape.
+   */
+  val size: Int get() = client.getChildCount(queuePath, resilience.rpc).toInt()
 
   // The single consumption loop: a null [deadline] never expires (the unbounded
   // take), otherwise the wait is bounded and an expired deadline yields null.

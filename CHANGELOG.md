@@ -36,6 +36,16 @@ non-blocking consumption on the existing queues.
   RPC latency / attempts / outcome (`recordRpc`), resilient-watcher recovery transitions
   (`incrementWatchRecovery`), and self-healing-lease events (`incrementKeepAlive`).
 
+### Added (observability: live-state gauges)
+
+- Micrometer gauges bound to a specific recipe instance (via the new
+  `etcd-recipes-micrometer` binders): `MeterRegistry.bindQueueDepth`, `bindCacheSize` /
+  `bindServiceCacheSize`, `bindAvailablePermits`, and `bindLeadership` register
+  `etcd.queue.depth`, `etcd.cache.entries`, `etcd.semaphore.available`, and
+  `etcd.election.leader`. Cache size and leadership are in-memory reads; queue depth and
+  available permits poll a range-count RPC on **each scrape** (documented on the binders).
+  Adds a public `AbstractQueue.size` accessor for the queue-depth gauge.
+
 ### Added (observability: queue + cache metrics)
 
 - More recipe metric seams via the `EtcdMetrics` SPI: the queues record dequeue latency
