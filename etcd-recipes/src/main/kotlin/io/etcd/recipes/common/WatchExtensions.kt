@@ -288,9 +288,18 @@ private class ResilientWatcher(
       ?.compactedRevision
 
   private fun emit(event: WatchRecoveryEvent) {
+    resilience.metrics.incrementWatchRecovery(recoveryKind(event), keyName)
     runCatching { recoveryListener?.onRecoveryEvent(event) }
       .onFailure { e -> logger.error(e) { "Watch recovery listener for $keyName threw on $event" } }
   }
+
+  private fun recoveryKind(event: WatchRecoveryEvent): String =
+    when (event) {
+      is WatchRecoveryEvent.Suspended -> "suspended"
+      is WatchRecoveryEvent.Resubscribed -> "resubscribed"
+      is WatchRecoveryEvent.Resynced -> "resynced"
+      is WatchRecoveryEvent.Failed -> "failed"
+    }
 }
 
 @JvmOverloads

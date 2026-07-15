@@ -26,6 +26,13 @@ data class ResilienceConfig(
   val lease: LeaseResilience = LeaseResilience.DEFAULT,
   val rpc: RpcResilience = RpcResilience.DEFAULT,
 ) {
+  /** The metrics sink shared by the sub-configs (installed via [withMetrics]); [EtcdMetrics.NoOp] by default. */
+  val metrics: EtcdMetrics get() = rpc.metrics
+
+  /** A copy that routes every recipe seam and RPC/watch/lease funnel to [metrics]. */
+  fun withMetrics(metrics: EtcdMetrics): ResilienceConfig =
+    copy(watch = watch.withMetrics(metrics), lease = lease.withMetrics(metrics), rpc = rpc.withMetrics(metrics))
+
   companion object {
     @JvmField
     val DEFAULT = ResilienceConfig()

@@ -118,7 +118,10 @@ class SelfHealingKeepAlive internal constructor(
     client.leaseClient.keepAlive(
       granted.id,
       Observers.builder<LeaseKeepAliveResponse>()
-        .onNext { next -> logger.debug { "KeepAlive next resp: $next" } }
+        .onNext { next ->
+          logger.debug { "KeepAlive next resp: $next" }
+          resilience.metrics.incrementKeepAlive("renewal", granted.id)
+        }
         .onError { e -> onStreamEvent(granted, e) }
         .onCompleted { onStreamEvent(granted, null) }
         .build(),
@@ -230,9 +233,26 @@ class SelfHealingKeepAlive internal constructor(
   }
 
   private fun emit(event: LeaseEvent) {
+    resilience.metrics.incrementKeepAlive(leaseKind(event), leaseIdOf(event))
     runCatching { leaseListener?.onLeaseEvent(event) }
       .onFailure { e -> logger.error(e) { "Lease listener threw on $event" } }
   }
+
+  private fun leaseKind(event: LeaseEvent): String =
+    when (event) {
+      is LeaseEvent.Suspended -> "suspended"
+      is LeaseEvent.Expired -> "expired"
+      is LeaseEvent.Restored -> "restored"
+      is LeaseEvent.Failed -> "failed"
+    }
+
+  private fun leaseIdOf(event: LeaseEvent): Long =
+    when (event) {
+      is LeaseEvent.Suspended -> event.leaseId
+      is LeaseEvent.Expired -> event.leaseId
+      is LeaseEvent.Restored -> event.newLeaseId
+      is LeaseEvent.Failed -> event.leaseId
+    }
 }
 
 /**

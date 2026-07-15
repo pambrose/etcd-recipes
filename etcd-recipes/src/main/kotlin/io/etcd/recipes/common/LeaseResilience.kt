@@ -38,7 +38,10 @@ class LeaseResilience
      * retry under the policy instead of parking forever on an unreachable server.
      */
     val healOperationTimeout: Duration = 10.seconds,
+    val metrics: EtcdMetrics = EtcdMetrics.NoOp,
   ) {
+    fun withMetrics(metrics: EtcdMetrics): LeaseResilience = LeaseResilience(retryPolicy, healOperationTimeout, metrics)
+
     companion object {
       @JvmField
       val DEFAULT = LeaseResilience()

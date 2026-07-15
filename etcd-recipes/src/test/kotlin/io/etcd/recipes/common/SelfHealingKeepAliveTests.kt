@@ -28,6 +28,7 @@ import io.etcd.jetcd.support.CloseableClient
 import io.grpc.stub.StreamObserver
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -112,6 +113,26 @@ class SelfHealingKeepAliveTests : StringSpec() {
         restored.oldLeaseId shouldBe 100L
         restored.newLeaseId shouldBe 101L
       }
+    }
+
+    "keep-alive lease transitions increment the keep-alive metric" {
+      val mocks = HealMocks()
+      val kinds = CopyOnWriteArrayList<String>()
+      val metrics =
+        object : EtcdMetrics {
+          override fun incrementKeepAlive(
+            kind: String,
+            leaseId: Long,
+          ) {
+            kinds += kind
+          }
+        }
+      mocks.client.selfHealingKeepAlive(2.seconds, quickHeals().withMetrics(metrics), null) { true }
+        .use {
+          mocks.observers.first().onCompleted() // expiry → heal → restore
+          pollUntil(10.seconds) { kinds.contains("restored") } shouldBe true
+          kinds shouldContain "expired"
+        }
     }
 
     "NOT_FOUND stream error heals like an expiry" {

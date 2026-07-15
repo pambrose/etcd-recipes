@@ -40,7 +40,10 @@ class RpcResilience
     val retryPolicy: RetryPolicy = RetryPolicy.bounded(maxAttempts = 4, delay = 250.milliseconds),
     /** Per-attempt deadline; [Duration.INFINITE] restores unbounded waiting. */
     val operationTimeout: Duration = 30.seconds,
+    val metrics: EtcdMetrics = EtcdMetrics.NoOp,
   ) {
+    fun withMetrics(metrics: EtcdMetrics): RpcResilience = RpcResilience(retryPolicy, operationTimeout, metrics)
+
     companion object {
       @JvmField
       val DEFAULT = RpcResilience()

@@ -99,6 +99,26 @@ class ResilientWatcherTests : StringSpec() {
       }
     }
 
+    "recovery transitions increment the watch-recovery metric" {
+      val mocks = WatchMocks()
+      val kinds = CopyOnWriteArrayList<String>()
+      val metrics =
+        object : EtcdMetrics {
+          override fun incrementWatchRecovery(
+            kind: String,
+            key: String,
+          ) {
+            kinds += kind
+          }
+        }
+      mocks.client.watcher("/rw/metrics", WatchOption.DEFAULT, quickRetries().withMetrics(metrics), { }, null) { }
+        .use {
+          mocks.listeners.first().die()
+          pollUntil(5.seconds) { kinds.contains("resubscribed") } shouldBe true
+          kinds shouldContain "suspended"
+        }
+    }
+
     "resubscribe resumes at last-seen event revision + 1" {
       val mocks = WatchMocks()
       val events = CopyOnWriteArrayList<WatchRecoveryEvent>()
