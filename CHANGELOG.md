@@ -36,6 +36,15 @@ non-blocking consumption on the existing queues.
   RPC latency / attempts / outcome (`recordRpc`), resilient-watcher recovery transitions
   (`incrementWatchRecovery`), and self-healing-lease events (`incrementKeepAlive`).
 
+### Added (observability: Micrometer binding)
+
+- New **`etcd-recipes-micrometer`** module: `MicrometerEtcdMetrics(registry)` is a
+  Micrometer backend for the `EtcdMetrics` SPI. Install it with
+  `ResilienceConfig.withMetrics(MicrometerEtcdMetrics(registry))` to record `etcd.rpc`
+  (a timer plus a retry counter, tagged by operation and outcome), `etcd.watch.recovery`,
+  and `etcd.keepalive` (counters tagged by kind), with tag cardinality kept low. Micrometer
+  is an `api` dependency of this module only — the core library stays dependency-free.
+
 ### Fixed (locks: read-write lock / semaphore wait)
 
 - `DistributedReadWriteLock` and `DistributedSemaphore` could park a caller
