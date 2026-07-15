@@ -45,33 +45,47 @@ internal fun <T> retryRpc(
 ): T {
   val start = TimeSource.Monotonic.markNow()
   var attempt = 0
-  var lastFailure: Throwable
-  while (true) {
-    attempt += 1
-    try {
-      val future = op()
-      return if (rpc.operationTimeout.isFinite()) {
-        try {
-          future.get(rpc.operationTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-        } catch (e: TimeoutException) {
-          future.cancel(true)
-          throw e
-        }
-      } else {
-        future.get()
+  var failed = true
+  try {
+    var lastFailure: Throwable
+    while (true) {
+      attempt += 1
+      try {
+        val result = op().awaitBounded(rpc) { throw it } // a timeout is a retriable failure
+        failed = false
+        return result
+      } catch (e: InterruptedException) {
+        Thread.currentThread().interrupt()
+        throw EtcdRecipeRuntimeException("$opName interrupted", e)
+      } catch (e: Throwable) {
+        if (!e.isRetriableRpcFailure()) throw e
+        lastFailure = e
       }
-    } catch (e: InterruptedException) {
-      Thread.currentThread().interrupt()
-      throw EtcdRecipeRuntimeException("$opName interrupted", e)
-    } catch (e: Throwable) {
-      if (!e.isRetriableRpcFailure()) throw e
-      lastFailure = e
+      val delay = rpc.retryPolicy.nextDelay(attempt, start.elapsedNow())
+        ?: throw EtcdRecipeRuntimeException("$opName failed after $attempt attempts", lastFailure)
+      if (delay > Duration.ZERO) Thread.sleep(delay.inWholeMilliseconds)
     }
-    val delay = rpc.retryPolicy.nextDelay(attempt, start.elapsedNow())
-      ?: throw EtcdRecipeRuntimeException("$opName failed after $attempt attempts", lastFailure)
-    if (delay > Duration.ZERO) Thread.sleep(delay.inWholeMilliseconds)
+  } finally {
+    rpc.metrics.recordRpc(opName, start.elapsedNow(), attempt, failed)
   }
 }
+
+// Blocks on the future with the operation timeout applied; on timeout it cancels the
+// future and runs [onTimeout] (which must not return). No retry or metrics — pure await.
+private fun <T> CompletableFuture<T>.awaitBounded(
+  rpc: RpcResilience,
+  onTimeout: (TimeoutException) -> Nothing,
+): T =
+  if (rpc.operationTimeout.isFinite()) {
+    try {
+      get(rpc.operationTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+    } catch (e: TimeoutException) {
+      cancel(true)
+      onTimeout(e)
+    }
+  } else {
+    get()
+  }
 
 // internal: the suspend RPC engine in io.etcd.recipes.coroutines shares this predicate
 internal fun Throwable.isRetriableRpcFailure(): Boolean =
@@ -87,14 +101,17 @@ internal fun <T> awaitRpc(
   rpc: RpcResilience,
   opName: String,
   future: CompletableFuture<T>,
-): T =
-  if (rpc.operationTimeout.isFinite()) {
-    try {
-      future.get(rpc.operationTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-    } catch (e: TimeoutException) {
-      future.cancel(true)
-      throw EtcdRecipeRuntimeException("$opName timed out after ${rpc.operationTimeout}", e)
-    }
-  } else {
-    future.get()
+): T {
+  val start = TimeSource.Monotonic.markNow()
+  var failed = true
+  try {
+    val result =
+      future.awaitBounded(rpc) { e ->
+        throw EtcdRecipeRuntimeException("$opName timed out after ${rpc.operationTimeout}", e)
+      }
+    failed = false
+    return result
+  } finally {
+    rpc.metrics.recordRpc(opName, start.elapsedNow(), attempts = 1, failed = failed)
   }
+}

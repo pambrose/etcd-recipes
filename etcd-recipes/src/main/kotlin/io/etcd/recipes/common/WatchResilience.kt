@@ -36,7 +36,10 @@ class WatchResilience
      * [io.etcd.jetcd.watch.WatchResponse]s with an empty event list.
      */
     val progressNotify: Boolean = true,
+    val metrics: EtcdMetrics = EtcdMetrics.NoOp,
   ) {
+    fun withMetrics(metrics: EtcdMetrics): WatchResilience = WatchResilience(retryPolicy, progressNotify, metrics)
+
     companion object {
       @JvmField
       val DEFAULT = WatchResilience()

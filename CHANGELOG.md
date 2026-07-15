@@ -27,6 +27,15 @@ non-blocking consumption on the existing queues.
 - Coroutines: `EtcdConnector.backgroundExceptionsAsFlow()` surfaces the same
   notifications as a `Flow<BackgroundException>`.
 
+### Added (observability: metrics SPI)
+
+- `EtcdMetrics` — a dependency-free instrumentation SPI. Install a backend with
+  `ResilienceConfig.withMetrics(metrics)` (bring your own, or a Micrometer binding in a
+  later release); the default (`EtcdMetrics.NoOp`) records nothing, so off means zero
+  overhead. The three connection funnels every recipe shares are instrumented: blocking
+  RPC latency / attempts / outcome (`recordRpc`), resilient-watcher recovery transitions
+  (`incrementWatchRecovery`), and self-healing-lease events (`incrementKeepAlive`).
+
 ### Fixed (locks: read-write lock / semaphore wait)
 
 - `DistributedReadWriteLock` and `DistributedSemaphore` could park a caller
