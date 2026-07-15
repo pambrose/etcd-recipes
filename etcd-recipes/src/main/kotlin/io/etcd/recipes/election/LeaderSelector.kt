@@ -465,6 +465,7 @@ constructor(
 
         // Mark elected inside the lock so a concurrent candidate sees isLeader and bails.
         electedLeader.store(true)
+        resilience.metrics.incrementLeadershipTransition(electionPath, becameLeader = true)
         granted
       }
 
@@ -495,6 +496,7 @@ constructor(
       // Leadership is over (relinquished or stepped down): always notify, even when
       // takeLeadership threw, so the listener can release its resources. (Pre-0.12
       // a throw skipped relinquishLeadership.)
+      resilience.metrics.incrementLeadershipTransition(electionPath, becameLeader = false)
       try {
         listener.relinquishLeadership(this)
       } catch (e: Throwable) {

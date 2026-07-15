@@ -72,6 +72,7 @@ class DistributedMutex
     val ownershipKey: ByteSequence,
   ) {
     var holdCount = 1 // guarded by owner-thread confinement
+    val acquiredAt: ComparableTimeMark = TimeSource.Monotonic.markNow()
   }
 
   private enum class Phase { WAITING, HOLDING, DEAD }
@@ -101,12 +102,19 @@ class DistributedMutex
   override val exceptionContext get() = "DistributedMutex[$lockPath]"
 
   override fun lock() {
+    val timed = !isHeldByCurrentThread // don't time reentrant re-locks
+    val start = TimeSource.Monotonic.markNow()
     check(acquire(null)) { "unbounded acquisition returned without the lock" }
+    if (timed) resilience.metrics.recordLockWait(lockPath, start.elapsedNow(), acquired = true)
   }
 
   override fun tryLock(timeout: Duration): Boolean {
     require(timeout > Duration.ZERO) { "Timeout must be positive: $timeout" }
-    return acquire(TimeSource.Monotonic.markNow() + timeout)
+    val timed = !isHeldByCurrentThread
+    val start = TimeSource.Monotonic.markNow()
+    val acquired = acquire(TimeSource.Monotonic.markNow() + timeout)
+    if (timed) resilience.metrics.recordLockWait(lockPath, start.elapsedNow(), acquired)
+    return acquired
   }
 
   override fun tryLock(
@@ -294,6 +302,7 @@ class DistributedMutex
   }
 
   private fun releaseHold(data: LockData) {
+    resilience.metrics.recordLockHold(lockPath, data.acquiredAt.elapsedNow())
     // Prompt FIFO handoff via the unlock RPC; the revoke below is belt-and-braces
     // (it deletes the ownership key even if the unlock RPC failed).
     runCatching { client.unlock(data.ownershipKey.asString, resilience.rpc) }

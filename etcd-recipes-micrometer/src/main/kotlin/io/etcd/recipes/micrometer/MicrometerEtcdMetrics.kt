@@ -31,10 +31,15 @@ import kotlin.time.toJavaDuration
  *   argument) and `outcome` (`success`/`failure`);
  * - `etcd.rpc.retries` — a counter of extra attempts beyond the first, tagged `operation`;
  * - `etcd.watch.recovery` — a counter of resilient-watcher transitions, tagged `kind`;
- * - `etcd.keepalive` — a counter of self-healing-lease events, tagged `kind`.
+ * - `etcd.keepalive` — a counter of self-healing-lease events, tagged `kind`;
+ * - `etcd.lock.wait` — a [Timer] of lock/permit acquisition waits, tagged `outcome`
+ *   (`acquired`/`timeout`);
+ * - `etcd.lock.hold` — a [Timer] of lock/permit hold durations;
+ * - `etcd.election.transitions` — a counter of leadership changes, tagged `transition`
+ *   (`acquired`/`relinquished`).
  *
- * Tag cardinality is kept low on purpose: the etcd key and lease id are used only for the
- * (low-cardinality) `operation`/`kind` dimensions, never as tags themselves.
+ * Tag cardinality is kept low on purpose: the etcd key, lock path, and lease id are used only
+ * for the (low-cardinality) `operation`/`kind`/`outcome` dimensions, never as tags themselves.
  */
 class MicrometerEtcdMetrics(
   private val registry: MeterRegistry,
@@ -68,5 +73,33 @@ class MicrometerEtcdMetrics(
     leaseId: Long,
   ) {
     registry.counter("etcd.keepalive", "kind", kind).increment()
+  }
+
+  override fun recordLockWait(
+    path: String,
+    duration: Duration,
+    acquired: Boolean,
+  ) {
+    Timer.builder("etcd.lock.wait")
+      .tag("outcome", if (acquired) "acquired" else "timeout")
+      .register(registry)
+      .record(duration.toJavaDuration())
+  }
+
+  override fun recordLockHold(
+    path: String,
+    duration: Duration,
+  ) {
+    Timer.builder("etcd.lock.hold")
+      .register(registry)
+      .record(duration.toJavaDuration())
+  }
+
+  override fun incrementLeadershipTransition(
+    path: String,
+    becameLeader: Boolean,
+  ) {
+    registry.counter("etcd.election.transitions", "transition", if (becameLeader) "acquired" else "relinquished")
+      .increment()
   }
 }
