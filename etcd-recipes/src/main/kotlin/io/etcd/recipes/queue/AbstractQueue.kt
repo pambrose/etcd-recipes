@@ -89,7 +89,8 @@ abstract class AbstractQueue(
     // retry could allocate a new watcher (with its own dispatcher executor).
     // Under high contention the resulting churn was unbounded.
     while (true) {
-      val childList = client.getFirstChild(queuePath, target, resilience.rpc).kvs
+      val firstChild = client.getFirstChild(queuePath, target, resilience.rpc)
+      val childList = firstChild.kvs
       if (childList.isNotEmpty()) {
         val child = childList.first()
         if (deleteRevKey(child)) {
@@ -103,16 +104,23 @@ abstract class AbstractQueue(
 
       // Queue is empty; wait under a single watcher. If the CAS delete fails
       // after waking up, loop and retry — withWatcher closes its dispatcher
-      // before we retry, so no executor or watcher resources accumulate.
-      val winner = waitForFirstChild(deadline) ?: continue
+      // before we retry, so no executor or watcher resources accumulate. Anchor
+      // the watch at the revision we observed the queue empty, so a PUT landing
+      // in the watch-establishment window is still delivered (the pre-live poll
+      // then only shortcuts the already-arrived case).
+      val winner = waitForFirstChild(deadline, firstChild.header.revision) ?: continue
       if (deleteRevKey(winner)) return winner.value
     }
   }
 
-  private fun waitForFirstChild(deadline: ComparableTimeMark? = null): KeyValue? {
+  private fun waitForFirstChild(
+    deadline: ComparableTimeMark?,
+    observedRevision: Long,
+  ): KeyValue? {
     val watchLatch = CountDownLatch(1)
     val watchOption =
       watchOption {
+        if (observedRevision > 0L) withRevision(observedRevision + 1)
         isPrefix(true)
         withNoDelete(true)
       }

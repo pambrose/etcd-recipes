@@ -38,6 +38,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -56,6 +57,7 @@ class BarrierWatchRecoveryTests : StringSpec() {
     private val presentProbes: Int,
   ) {
     val listeners = CopyOnWriteArrayList<Watch.Listener>()
+    val options = CopyOnWriteArrayList<WatchOption>()
     private val probeCount = AtomicInteger(0)
 
     val client: Client =
@@ -68,18 +70,29 @@ class BarrierWatchRecoveryTests : StringSpec() {
                 every { If(*anyVararg()) } returns this
                 every { Then(*anyVararg()) } returns this
                 every { commit() } returns
-                  CompletableFuture.completedFuture(mockk<TxnResponse> { every { isSucceeded } returns present })
+                  CompletableFuture.completedFuture(
+                    mockk<TxnResponse> {
+                      every { isSucceeded } returns present
+                      every { header } returns mockk { every { revision } returns OBSERVED_REV }
+                    },
+                  )
               }
             }
           }
         every { watchClient } returns
           mockk<Watch> {
             every { watch(any<ByteSequence>(), any<WatchOption>(), any<Watch.Listener>()) } answers {
+              options += secondArg<WatchOption>()
               listeners += thirdArg<Watch.Listener>()
               mockk<Watch.Watcher>(relaxed = true)
             }
           }
       }
+
+    companion object {
+      /** Revision the presence probe observes the barrier at; the watch must anchor at +1. */
+      const val OBSERVED_REV = 100L
+    }
   }
 
   private fun Watch.Listener.die() {
@@ -88,6 +101,19 @@ class BarrierWatchRecoveryTests : StringSpec() {
   }
 
   init {
+    "waitOnBarrier anchors its DELETE-watch at the observed-present revision" {
+      // The presence probe saw the barrier set at OBSERVED_REV; a DELETE landing before
+      // the watch goes live would be lost by an un-anchored watch. The watch must start
+      // at OBSERVED_REV + 1 so the release is (re)delivered.
+      val mocks = BarrierMocks(presentProbes = Int.MAX_VALUE) // stays present → parks until timeout
+      DistributedBarrier(mocks.client, "/barrier/recovery").use { barrier ->
+        barrier.waitOnBarrier(500.milliseconds)
+        mocks.options.size shouldBe 1
+        mocks.options.first().revision shouldBe BarrierMocks.OBSERVED_REV + 1
+        mocks.options.first().isNoPut shouldBe true
+      }
+    }
+
     "waiter releases after recovery when the barrier DELETE happened during the outage" {
       // Probe #1 (presence at wait start): present. Later probes (recovery recheck): absent.
       val mocks = BarrierMocks(presentProbes = 1)

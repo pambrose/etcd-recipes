@@ -41,6 +41,8 @@ import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildCount
+import io.etcd.recipes.common.getOption
+import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.selfHealingKeepAlive
@@ -230,7 +232,20 @@ constructor(
           } else {
             // Watch for DELETE of /ready and PUTS on /waiters/*
             val trailingKey = barrierPath.ensureSuffix("/")
-            val watchOption = watchOption { isPrefix(true) }
+            // Anchor the prefix watch at observedRevision + 1 so a /ready DELETE or
+            // waiter PUT landing in the watch-establishment window is still delivered;
+            // checkWaiterCount below is then only a fast-path recheck.
+            val observedRevision =
+              client.getResponse(
+                trailingKey,
+                getOption { isPrefix(true).withCountOnly(true) },
+                resilience.rpc,
+              ).header.revision
+            val watchOption =
+              watchOption {
+                if (observedRevision > 0L) withRevision(observedRevision + 1)
+                isPrefix(true)
+              }
             val watchFailure = java.util.concurrent.atomic.AtomicReference<Throwable?>()
 
             // A ready-key DELETE or waiter PUT can be lost while the watch stream is

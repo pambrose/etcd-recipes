@@ -42,6 +42,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -56,6 +57,7 @@ class QueueWatchRecoveryTests : StringSpec() {
     private val emptyGets: Int,
   ) {
     val listeners = CopyOnWriteArrayList<Watch.Listener>()
+    val options = CopyOnWriteArrayList<WatchOption>()
     val getCount = AtomicInteger(0)
 
     private val item: KeyValue =
@@ -70,6 +72,7 @@ class QueueWatchRecoveryTests : StringSpec() {
       return mockk {
         every { kvs } returns if (empty) emptyList() else listOf(item)
         every { isMore } returns false
+        every { header } returns mockk { every { revision } returns OBSERVED_REV }
       }
     }
 
@@ -91,11 +94,17 @@ class QueueWatchRecoveryTests : StringSpec() {
         every { watchClient } returns
           mockk<Watch> {
             every { watch(any<ByteSequence>(), any<WatchOption>(), any<Watch.Listener>()) } answers {
+              options += secondArg<WatchOption>()
               listeners += thirdArg<Watch.Listener>()
               mockk<Watch.Watcher>(relaxed = true)
             }
           }
       }
+
+    companion object {
+      /** Revision the head-poll observes the (empty) queue at; the watch must anchor at +1. */
+      const val OBSERVED_REV = 100L
+    }
   }
 
   private fun Watch.Listener.die() {
@@ -104,6 +113,20 @@ class QueueWatchRecoveryTests : StringSpec() {
   }
 
   init {
+    "waitForFirstChild anchors its PUT-watch at the observed empty-queue revision" {
+      // The head-poll saw the queue empty at OBSERVED_REV; a PUT landing before the
+      // watch goes live would be lost by an un-anchored watch. The watch must start
+      // at OBSERVED_REV + 1 so any later PUT is (re)delivered.
+      val mocks = QueueMocks(emptyGets = Int.MAX_VALUE)
+      DistributedQueue(mocks.client, "/queue/recovery").use { queue ->
+        queue.poll(500.milliseconds) // empty → subscribes, parks briefly, returns null
+        mocks.options.size shouldBe 1
+        mocks.options.first().revision shouldBe QueueMocks.OBSERVED_REV + 1
+        mocks.options.first().isPrefix shouldBe true
+        mocks.options.first().isNoDelete shouldBe true
+      }
+    }
+
     "parked dequeue delivers an item that arrived while the watch stream was dead" {
       // GET #1 (fast path) and #2 (pre-live gap poll) see an empty queue; the
       // recovery re-poll and everything after see the item.
