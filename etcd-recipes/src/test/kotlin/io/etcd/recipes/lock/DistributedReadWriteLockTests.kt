@@ -19,6 +19,7 @@
 package io.etcd.recipes.lock
 
 import com.pambrose.common.concurrent.BooleanMonitor
+import io.etcd.recipes.common.accumulateMax
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -30,7 +31,9 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
@@ -47,22 +50,22 @@ class DistributedReadWriteLockTests : StringSpec() {
       connectToEtcd(urls) { client ->
         client.deleteChildren(base)
         val path = "$base/shared-readers"
-        val concurrent = AtomicInteger(0)
-        val maxConcurrent = AtomicInteger(0)
+        val concurrent = AtomicInt(0)
+        val maxConcurrent = AtomicInt(0)
 
         blockingThreads(4) {
           connectToEtcd(urls) { c ->
             DistributedReadWriteLock(c, path).use { rw ->
               rw.readLock.withLock {
-                val now = concurrent.incrementAndGet()
-                maxConcurrent.accumulateAndGet(now) { a, b -> maxOf(a, b) }
+                val now = concurrent.incrementAndFetch()
+                maxConcurrent.accumulateMax(now)
                 Thread.sleep(500)
-                concurrent.decrementAndGet()
+                concurrent.decrementAndFetch()
               }
             }
           }
         }
-        maxConcurrent.get() shouldBe 4
+        maxConcurrent.load() shouldBe 4
       }
     }
 
@@ -70,8 +73,8 @@ class DistributedReadWriteLockTests : StringSpec() {
       connectToEtcd(urls) { client ->
         client.deleteChildren(base)
         val path = "$base/writer-excludes"
-        val inCritical = AtomicInteger(0)
-        val maxInCritical = AtomicInteger(0)
+        val inCritical = AtomicInt(0)
+        val maxInCritical = AtomicInt(0)
         var unguarded = 0
 
         blockingThreads(4) { i ->
@@ -81,19 +84,19 @@ class DistributedReadWriteLockTests : StringSpec() {
               repeat(5) {
                 lock.withLock {
                   if (i % 2 == 0) {
-                    val now = inCritical.incrementAndGet()
-                    maxInCritical.accumulateAndGet(now) { a, b -> maxOf(a, b) }
+                    val now = inCritical.incrementAndFetch()
+                    maxInCritical.accumulateMax(now)
                     unguarded += 1
-                    inCritical.decrementAndGet()
+                    inCritical.decrementAndFetch()
                   } else {
-                    inCritical.get() shouldBe 0 // no writer while a reader holds
+                    inCritical.load() shouldBe 0 // no writer while a reader holds
                   }
                 }
               }
             }
           }
         }
-        maxInCritical.get() shouldBeLessThanOrEqual 1
+        maxInCritical.load() shouldBeLessThanOrEqual 1
         unguarded shouldBe 10
       }
     }

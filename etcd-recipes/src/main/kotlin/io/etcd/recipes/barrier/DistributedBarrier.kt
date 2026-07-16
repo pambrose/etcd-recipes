@@ -43,8 +43,8 @@ import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
@@ -196,7 +196,7 @@ constructor(
           if (observedRevision > 0L) withRevision(observedRevision + 1)
           withNoPut(true)
         }
-      val watchFailure = AtomicReference<Throwable?>()
+      val watchFailure = AtomicReference<Throwable?>(null)
       val recoveryListener = waiterRecoveryListener(barrierPresentAtStart, waitLatch, watchFailure)
 
       client.withWatcher(
@@ -218,7 +218,7 @@ constructor(
           waitLatch.countDown()
 
         val released = waitLatch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-        watchFailure.get()?.let { cause ->
+        watchFailure.load()?.let { cause ->
           throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
         }
         released
@@ -248,7 +248,7 @@ constructor(
           is WatchRecoveryEvent.Failed -> {
             val cause = event.cause
               ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
-            watchFailure.set(cause)
+            watchFailure.store(cause)
             recordException(cause)
             waitLatch.countDown()
           }

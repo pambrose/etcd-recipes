@@ -32,7 +32,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -50,48 +51,48 @@ class SuspendRpcRetryTests : StringSpec() {
   init {
     "retries retriable failures until success" {
       runTest {
-        val calls = AtomicInteger(0)
+        val calls = AtomicInt(0)
         val result =
           suspendRetryRpc(quick(), "test-op") {
-            if (calls.incrementAndGet() <= 2) {
+            if (calls.incrementAndFetch() <= 2) {
               CompletableFuture.failedFuture(unavailable())
             } else {
               CompletableFuture.completedFuture("ok")
             }
           }
         result shouldBe "ok"
-        calls.get() shouldBe 3
+        calls.load() shouldBe 3
       }
     }
 
     "retriable causes are found through the exception chain" {
       runTest {
-        val calls = AtomicInteger(0)
+        val calls = AtomicInt(0)
         val result =
           suspendRetryRpc(quick(), "wrapped-op") {
-            if (calls.incrementAndGet() <= 1) {
+            if (calls.incrementAndFetch() <= 1) {
               CompletableFuture.failedFuture(RuntimeException("wrapper", unavailable()))
             } else {
               CompletableFuture.completedFuture("ok")
             }
           }
         result shouldBe "ok"
-        calls.get() shouldBe 2
+        calls.load() shouldBe 2
       }
     }
 
     "gives up after policy exhaustion and wraps the cause with attempt context" {
       runTest {
-        val calls = AtomicInteger(0)
+        val calls = AtomicInt(0)
         val rpc = RpcResilience(RetryPolicy.bounded(maxAttempts = 2, delay = 10.milliseconds), 5.seconds)
         val thrown =
           shouldThrow<EtcdRecipeRuntimeException> {
             suspendRetryRpc<String>(rpc, "doomed-op") {
-              calls.incrementAndGet()
+              calls.incrementAndFetch()
               CompletableFuture.failedFuture(unavailable())
             }
           }
-        calls.get() shouldBe 3 // initial + 2 retries
+        calls.load() shouldBe 3 // initial + 2 retries
         thrown.message!! shouldContain "doomed-op"
         thrown.message!! shouldContain "3"
         generateSequence(thrown as Throwable) { it.cause.takeIf { c -> c !== it } }
@@ -115,43 +116,43 @@ class SuspendRpcRetryTests : StringSpec() {
 
     "an attempt timeout is retriable under the policy" {
       runTest {
-        val calls = AtomicInteger(0)
+        val calls = AtomicInt(0)
         val rpc = RpcResilience(RetryPolicy.bounded(maxAttempts = 3, delay = 10.milliseconds), 100.milliseconds)
         val result =
           suspendRetryRpc(rpc, "slow-then-ok") {
-            if (calls.incrementAndGet() <= 1) {
+            if (calls.incrementAndFetch() <= 1) {
               CompletableFuture() // hangs; times out at 100ms virtual
             } else {
               CompletableFuture.completedFuture("ok")
             }
           }
         result shouldBe "ok"
-        calls.get() shouldBe 2
+        calls.load() shouldBe 2
       }
     }
 
     "non-retriable failures propagate without retry" {
       runTest {
-        val calls = AtomicInteger(0)
+        val calls = AtomicInt(0)
         shouldThrow<IllegalArgumentException> {
           suspendRetryRpc<String>(quick(), "bad-request") {
-            calls.incrementAndGet()
+            calls.incrementAndFetch()
             CompletableFuture.failedFuture(IllegalArgumentException("bad key"))
           }
         }
-        calls.get() shouldBe 1
+        calls.load() shouldBe 1
       }
     }
 
     "external cancellation during the await propagates promptly without retry" {
       runTest {
-        val calls = AtomicInteger(0)
+        val calls = AtomicInt(0)
         val futures = mutableListOf<CompletableFuture<String>>()
         val rpc = RpcResilience(RetryPolicy.bounded(maxAttempts = 5, delay = 10.milliseconds), Duration.INFINITE)
         val job =
           launch {
             suspendRetryRpc<String>(rpc, "cancelled-op") {
-              calls.incrementAndGet()
+              calls.incrementAndFetch()
               CompletableFuture<String>().also { futures += it } // hangs; no timeout configured
             }
           }
@@ -159,28 +160,28 @@ class SuspendRpcRetryTests : StringSpec() {
         job.cancel()
         job.join()
         job.isCancelled shouldBe true
-        calls.get() shouldBe 1
+        calls.load() shouldBe 1
         futures.single().isCancelled shouldBe true
       }
     }
 
     "external cancellation during backoff is prompt: no further attempt" {
       runTest {
-        val calls = AtomicInteger(0)
+        val calls = AtomicInt(0)
         val rpc = RpcResilience(RetryPolicy.bounded(maxAttempts = 5, delay = 60.seconds), 5.seconds)
         val job =
           launch {
             suspendRetryRpc<String>(rpc, "backoff-op") {
-              calls.incrementAndGet()
+              calls.incrementAndFetch()
               CompletableFuture.failedFuture(unavailable())
             }
           }
         testScheduler.runCurrent() // first attempt fails; coroutine parks in the 60s backoff delay
-        calls.get() shouldBe 1
+        calls.load() shouldBe 1
         job.cancel()
         job.join()
         job.isCancelled shouldBe true
-        calls.get() shouldBe 1
+        calls.load() shouldBe 1
       }
     }
 
@@ -226,14 +227,14 @@ class SuspendRpcRetryTests : StringSpec() {
 
     "cancellation exceptions are never swallowed as retriable" {
       runTest {
-        val calls = AtomicInteger(0)
+        val calls = AtomicInt(0)
         shouldThrow<CancellationException> {
           suspendRetryRpc<String>(quick(), "cancel-inside") {
-            calls.incrementAndGet()
+            calls.incrementAndFetch()
             CompletableFuture.failedFuture(CancellationException("externally cancelled future"))
           }
         }
-        calls.get() shouldBe 1
+        calls.load() shouldBe 1
       }
     }
   }

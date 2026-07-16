@@ -27,7 +27,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.seconds
 
 @Suppress("MaxLineLength")
@@ -39,8 +40,8 @@ class ReportLeaderTests : StringSpec() {
         // jetcd lease grant. Same code passed under JUnit — root cause not yet diagnosed.
         "reportLeaderTest" {
             val count = 2
-            val takeLeadershipCounter = AtomicInteger(0)
-            val relinquishLeadershipCounter = AtomicInteger(0)
+            val takeLeadershipCounter = AtomicInt(0)
+            val relinquishLeadershipCounter = AtomicInt(0)
 
             val executor = Executors.newSingleThreadExecutor()
             LeaderSelector.reportLeader(
@@ -49,11 +50,11 @@ class ReportLeaderTests : StringSpec() {
                 object : LeaderListener {
                     override fun takeLeadership(leaderName: String) {
                         logger.debug { "$leaderName elected leader" }
-                        takeLeadershipCounter.incrementAndGet()
+                        takeLeadershipCounter.incrementAndFetch()
                     }
 
                     override fun relinquishLeadership() {
-                        relinquishLeadershipCounter.incrementAndGet()
+                        relinquishLeadershipCounter.incrementAndFetch()
                     }
                 },
                 executor,
@@ -84,8 +85,8 @@ class ReportLeaderTests : StringSpec() {
             // This requires a pause because reportLeader() needs to get notified (via a watcher) of the change in leadership
             sleep(10.seconds)
 
-            takeLeadershipCounter.get() shouldBe count
-            relinquishLeadershipCounter.get() shouldBe count
+            takeLeadershipCounter.load() shouldBe count
+            relinquishLeadershipCounter.load() shouldBe count
 
             executor.shutdown()
         }

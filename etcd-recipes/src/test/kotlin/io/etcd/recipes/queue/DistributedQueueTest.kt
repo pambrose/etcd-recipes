@@ -30,7 +30,8 @@ import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 
 class DistributedQueueTest : StringSpec() {
     // Namespace etcd paths by class name so concurrent test forks (and the
@@ -218,7 +219,7 @@ class DistributedQueueTest : StringSpec() {
         // Same code passed under JUnit — root cause not yet diagnosed.
         "pingPongTest" {
             val queuePath = "$basePath/pingPongTest"
-            val counter = AtomicInteger(0)
+            val counter = AtomicInt(0)
             val token = "Pong"
             val latch = CountDownLatch(threadCount)
             val iterCount = 100
@@ -234,7 +235,7 @@ class DistributedQueueTest : StringSpec() {
                                 val v = dequeue().asString
                                 v shouldBe token
                                 enqueue(v)
-                                counter.incrementAndGet()
+                                counter.incrementAndFetch()
                             }
                         }
                     }
@@ -248,7 +249,7 @@ class DistributedQueueTest : StringSpec() {
                 }
             }
 
-            counter.get() shouldBe threadCount * iterCount
+            counter.load() shouldBe threadCount * iterCount
         }
     }
 

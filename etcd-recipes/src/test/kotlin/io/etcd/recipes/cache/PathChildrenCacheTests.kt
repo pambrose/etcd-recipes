@@ -35,7 +35,8 @@ import io.etcd.recipes.common.putValuesWithKeepAlive
 import io.etcd.recipes.common.urls
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
@@ -69,10 +70,10 @@ class PathChildrenCacheTests : StringSpec() {
         "listenerTestNoInitialData" {
             val count = 25
             val path = "/cache/listenerTestNoInitialData"
-            val addCount = AtomicInteger(0)
-            val updateCount = AtomicInteger(0)
-            val deleteCount = AtomicInteger(0)
-            val initCount = AtomicInteger(0)
+            val addCount = AtomicInt(0)
+            val updateCount = AtomicInt(0)
+            val deleteCount = AtomicInt(0)
+            val initCount = AtomicInt(0)
 
             connectToEtcd(urls) { client ->
 
@@ -83,10 +84,10 @@ class PathChildrenCacheTests : StringSpec() {
                 withPathChildrenCache(client, path) {
                     addListener { event: PathChildrenCacheEvent ->
                         when (event.type) {
-                            CHILD_ADDED -> addCount.incrementAndGet()
-                            CHILD_UPDATED -> updateCount.incrementAndGet()
-                            CHILD_REMOVED -> deleteCount.incrementAndGet()
-                            INITIALIZED -> initCount.incrementAndGet()
+                            CHILD_ADDED -> addCount.incrementAndFetch()
+                            CHILD_UPDATED -> updateCount.incrementAndFetch()
+                            CHILD_REMOVED -> deleteCount.incrementAndFetch()
+                            INITIALIZED -> initCount.incrementAndFetch()
                         }
                     }
 
@@ -94,10 +95,10 @@ class PathChildrenCacheTests : StringSpec() {
                     waitOnStartComplete()
                     currentData shouldBe emptyList()
 
-                    addCount.get() shouldBe 0
-                    updateCount.get() shouldBe 0
-                    deleteCount.get() shouldBe 0
-                    initCount.get() shouldBe 0
+                    addCount.load() shouldBe 0
+                    updateCount.load() shouldBe 0
+                    deleteCount.load() shouldBe 0
+                    initCount.load() shouldBe 0
 
                     val kvs = generateTestData(count)
 
@@ -106,29 +107,29 @@ class PathChildrenCacheTests : StringSpec() {
                         client.putValue("$path/${kv.first}", kv.second + suffix)
                     }
 
-                    pollUntil(settle) { addCount.get() == count && updateCount.get() == count } shouldBe true
+                    pollUntil(settle) { addCount.load() == count && updateCount.load() == count } shouldBe true
                     compareData(count, currentData, kvs, suffix)
 
                     client.deleteChildren(path)
 
-                    pollUntil(settle) { deleteCount.get() == count && currentData.isEmpty() } shouldBe true
+                    pollUntil(settle) { deleteCount.load() == count && currentData.isEmpty() } shouldBe true
                     currentData shouldBe emptyList()
                 }
             }
 
-            addCount.get() shouldBe count
-            updateCount.get() shouldBe count
-            deleteCount.get() shouldBe count
-            initCount.get() shouldBe 0
+            addCount.load() shouldBe count
+            updateCount.load() shouldBe count
+            deleteCount.load() shouldBe count
+            initCount.load() shouldBe 0
         }
 
         "listenerTestWithInitialData" {
             val count = 25
             val path = "/cache/listenerTestWithInitialData"
-            val addCount = AtomicInteger(0)
-            val updateCount = AtomicInteger(0)
-            val deleteCount = AtomicInteger(0)
-            val initCount = AtomicInteger(0)
+            val addCount = AtomicInt(0)
+            val updateCount = AtomicInt(0)
+            val deleteCount = AtomicInt(0)
+            val initCount = AtomicInt(0)
 
             connectToEtcd(urls) { client ->
 
@@ -146,10 +147,10 @@ class PathChildrenCacheTests : StringSpec() {
                 withPathChildrenCache(client, path) {
                     addListener { event: PathChildrenCacheEvent ->
                         when (event.type) {
-                            CHILD_ADDED -> addCount.incrementAndGet()
-                            CHILD_UPDATED -> updateCount.incrementAndGet()
-                            CHILD_REMOVED -> deleteCount.incrementAndGet()
-                            INITIALIZED -> initCount.incrementAndGet()
+                            CHILD_ADDED -> addCount.incrementAndFetch()
+                            CHILD_UPDATED -> updateCount.incrementAndFetch()
+                            CHILD_REMOVED -> deleteCount.incrementAndFetch()
+                            INITIALIZED -> initCount.incrementAndFetch()
                         }
                     }
 
@@ -159,31 +160,31 @@ class PathChildrenCacheTests : StringSpec() {
                     pollUntil(settle) { currentData.size == count } shouldBe true
                     compareData(count, currentData, testKvs, suffix)
 
-                    addCount.get() shouldBe 0
-                    updateCount.get() shouldBe 0
-                    deleteCount.get() shouldBe 0
-                    initCount.get() shouldBe 0
+                    addCount.load() shouldBe 0
+                    updateCount.load() shouldBe 0
+                    deleteCount.load() shouldBe 0
+                    initCount.load() shouldBe 0
 
                     client.deleteChildren(path)
 
-                    pollUntil(settle) { deleteCount.get() == count && currentData.isEmpty() } shouldBe true
+                    pollUntil(settle) { deleteCount.load() == count && currentData.isEmpty() } shouldBe true
                     currentData shouldBe emptyList()
                 }
             }
 
-            addCount.get() shouldBe 0
-            updateCount.get() shouldBe 0
-            deleteCount.get() shouldBe count
-            initCount.get() shouldBe 0
+            addCount.load() shouldBe 0
+            updateCount.load() shouldBe 0
+            deleteCount.load() shouldBe count
+            initCount.load() shouldBe 0
         }
 
         "withInitialEventTest" {
             val count = 25
             val path = "/cache/noInitialDataTest"
-            val addCount = AtomicInteger(0)
-            val updateCount = AtomicInteger(0)
-            val deleteCount = AtomicInteger(0)
-            val initCount = AtomicInteger(0)
+            val addCount = AtomicInt(0)
+            val updateCount = AtomicInt(0)
+            val deleteCount = AtomicInt(0)
+            val initCount = AtomicInt(0)
 
             connectToEtcd(urls) { client ->
 
@@ -204,19 +205,19 @@ class PathChildrenCacheTests : StringSpec() {
                     addListener { event: PathChildrenCacheEvent ->
                         when (event.type) {
                             CHILD_ADDED -> {
-                              addCount.incrementAndGet()
+                              addCount.incrementAndFetch()
                             }
 
                             CHILD_UPDATED -> {
-                              updateCount.incrementAndGet()
+                              updateCount.incrementAndFetch()
                             }
 
                             CHILD_REMOVED -> {
-                              deleteCount.incrementAndGet()
+                              deleteCount.incrementAndFetch()
                             }
 
                             INITIALIZED -> {
-                                initCount.incrementAndGet()
+                                initCount.incrementAndFetch()
                                 initData = event.initialData
                             }
                         }
@@ -225,22 +226,22 @@ class PathChildrenCacheTests : StringSpec() {
                     start(POST_INITIALIZED_EVENT)
                     waitOnStartComplete()
 
-                    pollUntil(settle) { currentData.size == count && initCount.get() == 1 } shouldBe true
+                    pollUntil(settle) { currentData.size == count && initCount.load() == 1 } shouldBe true
                     compareData(count, currentData, kvs, suffix)
 
                     client.deleteChildren(path)
 
-                    pollUntil(settle) { deleteCount.get() == count && currentData.isEmpty() } shouldBe true
+                    pollUntil(settle) { deleteCount.load() == count && currentData.isEmpty() } shouldBe true
                     currentData shouldBe emptyList()
                 }
 
                 compareData(count, initData!!, kvs, suffix)
             }
 
-            addCount.get() shouldBe 0
-            updateCount.get() shouldBe 0
-            deleteCount.get() shouldBe count
-            initCount.get() shouldBe 1
+            addCount.load() shouldBe 0
+            updateCount.load() shouldBe 0
+            deleteCount.load() shouldBe count
+            initCount.load() shouldBe 1
         }
 
         "leasedValuesTest" {

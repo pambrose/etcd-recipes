@@ -25,7 +25,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.Collections.synchronizedList
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 
 class ThreadedLeaderSelectorTests : StringSpec() {
     val path = "/election/${javaClass.simpleName}"
@@ -33,20 +34,20 @@ class ThreadedLeaderSelectorTests : StringSpec() {
 
     init {
         "threadedElection1Test" {
-            val takeLeadershiptCounter = AtomicInteger(0)
-            val relinquishLeadershiptCounter = AtomicInteger(0)
+            val takeLeadershiptCounter = AtomicInt(0)
+            val relinquishLeadershiptCounter = AtomicInt(0)
 
             blockingThreads(count) {
                 val takeAction =
                     { selector: LeaderSelector ->
                         logger.info { "${selector.clientId} elected leader" }
-                        takeLeadershiptCounter.incrementAndGet()
+                        takeLeadershiptCounter.incrementAndFetch()
                         Unit
                     }
 
                 val relinquishAction =
                     { selector: LeaderSelector ->
-                        relinquishLeadershiptCounter.incrementAndGet()
+                        relinquishLeadershiptCounter.incrementAndFetch()
                         logger.info { "${selector.clientId} relinquished leadership" }
                     }
 
@@ -58,25 +59,25 @@ class ThreadedLeaderSelectorTests : StringSpec() {
                 }
             }
 
-            takeLeadershiptCounter.get() shouldBe count
-            relinquishLeadershiptCounter.get() shouldBe count
+            takeLeadershiptCounter.load() shouldBe count
+            relinquishLeadershiptCounter.load() shouldBe count
         }
 
         "threadedElection2Test" {
-            val takeLeadershiptCounter = AtomicInteger(0)
-            val relinquishLeadershiptCounter = AtomicInteger(0)
+            val takeLeadershiptCounter = AtomicInt(0)
+            val relinquishLeadershiptCounter = AtomicInt(0)
             val electionList: MutableList<LeaderSelector> = synchronizedList(mutableListOf())
 
             val takeAction =
                 { selector: LeaderSelector ->
                     logger.info { "${selector.clientId} elected leader" }
-                    takeLeadershiptCounter.incrementAndGet()
+                    takeLeadershiptCounter.incrementAndFetch()
                     Unit
                 }
 
             val relinquishAction =
                 { selector: LeaderSelector ->
-                    relinquishLeadershiptCounter.incrementAndGet()
+                    relinquishLeadershiptCounter.incrementAndFetch()
                     logger.info { "${selector.clientId} relinquished leadership" }
                 }
 
@@ -96,8 +97,8 @@ class ThreadedLeaderSelectorTests : StringSpec() {
                     .forEach { it.close() }
             }
 
-            takeLeadershiptCounter.get() shouldBe count
-            relinquishLeadershiptCounter.get() shouldBe count
+            takeLeadershiptCounter.load() shouldBe count
+            relinquishLeadershiptCounter.load() shouldBe count
         }
     }
 

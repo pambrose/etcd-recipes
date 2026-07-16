@@ -31,7 +31,8 @@ import io.etcd.recipes.queue.DistributedQueue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -45,7 +46,7 @@ class RecipeMetricsTests : StringSpec() {
 
   private class RecordingMetrics : EtcdMetrics {
     val lockWaits = CopyOnWriteArrayList<Boolean>()
-    val lockHolds = AtomicInteger(0)
+    val lockHolds = AtomicInt(0)
     val leadership = CopyOnWriteArrayList<Boolean>()
     val queueOps = CopyOnWriteArrayList<String>()
     val cacheSyncs = CopyOnWriteArrayList<Int>()
@@ -62,7 +63,7 @@ class RecipeMetricsTests : StringSpec() {
       path: String,
       duration: Duration,
     ) {
-      lockHolds.incrementAndGet()
+      lockHolds.incrementAndFetch()
     }
 
     override fun incrementLeadershipTransition(
@@ -100,7 +101,7 @@ class RecipeMetricsTests : StringSpec() {
             mutex.unlock()
           }
         metrics.lockWaits shouldBe listOf(true)
-        metrics.lockHolds.get() shouldBe 1
+        metrics.lockHolds.load() shouldBe 1
       }
     }
 
@@ -114,7 +115,7 @@ class RecipeMetricsTests : StringSpec() {
             semaphore.release()
           }
         metrics.lockWaits shouldBe listOf(true)
-        metrics.lockHolds.get() shouldBe 1
+        metrics.lockHolds.load() shouldBe 1
       }
     }
 

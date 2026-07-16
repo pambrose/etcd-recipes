@@ -22,7 +22,9 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.lock.DistributedSemaphore
 import io.etcd.recipes.lock.withPermit
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.thread
 
 /**
@@ -34,7 +36,7 @@ fun main() {
   val logger = KotlinLogging.logger {}
   val urls = listOf("http://localhost:2379")
   val semaphorePath = "/semaphores/example"
-  val inFlight = AtomicInteger(0)
+  val inFlight = AtomicInt(0)
 
   val workers =
     (1..6).map { worker ->
@@ -42,10 +44,10 @@ fun main() {
         connectToEtcd(urls) { client ->
           DistributedSemaphore(client, semaphorePath, permits = 2).use { semaphore ->
             semaphore.withPermit {
-              val now = inFlight.incrementAndGet()
+              val now = inFlight.incrementAndFetch()
               logger.info { "Worker $worker holds a permit ($now of 2 in flight)" }
               Thread.sleep(500)
-              inFlight.decrementAndGet()
+              inFlight.decrementAndFetch()
             }
           }
         }

@@ -29,7 +29,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
 
 /**
  * Coroutine-scoped mutual exclusion and concurrency limiting: [withLock] holds a
@@ -43,12 +45,12 @@ fun main() {
   runBlocking {
     connectToEtcd(urls).use { client ->
       DistributedMutex(client, "/examples/coroutines/mutex").use { mutex ->
-        val counter = AtomicInteger(0)
+        val counter = AtomicInt(0)
         coroutineScope {
           repeat(5) { id ->
             launch(Dispatchers.Default) {
               mutex.withLock {
-                val n = counter.incrementAndGet()
+                val n = counter.incrementAndFetch()
                 logger.info { "Worker $id holds the mutex (count=$n)" }
                 delay(100)
               }
@@ -58,15 +60,15 @@ fun main() {
       }
 
       DistributedSemaphore(client, "/examples/coroutines/semaphore", permits = 2).use { semaphore ->
-        val inFlight = AtomicInteger(0)
+        val inFlight = AtomicInt(0)
         coroutineScope {
           repeat(6) { id ->
             launch(Dispatchers.Default) {
               semaphore.withPermit {
-                val now = inFlight.incrementAndGet()
+                val now = inFlight.incrementAndFetch()
                 logger.info { "Worker $id holds a permit ($now of 2 in flight)" }
                 delay(150)
-                inFlight.decrementAndGet()
+                inFlight.decrementAndFetch()
               }
             }
           }

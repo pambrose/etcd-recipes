@@ -24,7 +24,8 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 
 // Regression test for: LeaderSelector with the default internal executor
 // could not be re-used after close() because close() shut down the
@@ -33,7 +34,7 @@ class LeaderSelectorReuseTests : StringSpec() {
   init {
     "startWorksAfterCloseWithInternalExecutor" {
       val path = "/election/LeaderSelectorReuseTests"
-      val tookLeadership = AtomicInteger(0)
+      val tookLeadership = AtomicInt(0)
 
       connectToEtcd(urls) { client ->
         // No userExecutor — the LeaderSelector creates its own ExecutorService.
@@ -41,7 +42,7 @@ class LeaderSelectorReuseTests : StringSpec() {
           LeaderSelector(
             client,
             path,
-            takeLeadershipBlock = { tookLeadership.incrementAndGet() },
+            takeLeadershipBlock = { tookLeadership.incrementAndFetch() },
           )
 
         // First cycle.
@@ -55,7 +56,7 @@ class LeaderSelectorReuseTests : StringSpec() {
         selector.waitOnLeadershipComplete()
         selector.close()
 
-        tookLeadership.get() shouldBe 2
+        tookLeadership.load() shouldBe 2
         selector.hasExceptions shouldBe false
       }
     }
@@ -65,7 +66,7 @@ class LeaderSelectorReuseTests : StringSpec() {
     // NOT shut down the user's executor (it didn't create it).
     "startWorksAfterCloseWithUserExecutor" {
       val path = "/election/LeaderSelectorReuseTests-userExecutor"
-      val tookLeadership = AtomicInteger(0)
+      val tookLeadership = AtomicInt(0)
       val userExecutor = Executors.newFixedThreadPool(3)
 
       try {
@@ -74,7 +75,7 @@ class LeaderSelectorReuseTests : StringSpec() {
             LeaderSelector(
               client,
               path,
-              takeLeadershipBlock = { tookLeadership.incrementAndGet() },
+              takeLeadershipBlock = { tookLeadership.incrementAndFetch() },
               executorService = userExecutor,
             )
 
@@ -89,7 +90,7 @@ class LeaderSelectorReuseTests : StringSpec() {
           selector.waitOnLeadershipComplete()
           selector.close()
 
-          tookLeadership.get() shouldBe 2
+          tookLeadership.load() shouldBe 2
           selector.hasExceptions shouldBe false
           userExecutor.isShutdown shouldBe false
         }

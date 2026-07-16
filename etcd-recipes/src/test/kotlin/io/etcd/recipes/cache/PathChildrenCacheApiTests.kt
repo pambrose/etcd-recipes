@@ -26,7 +26,8 @@ import io.etcd.recipes.common.urls
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 
 /**
  * Covers the snapshot-accessor side of [PathChildrenCache] — currentData,
@@ -80,15 +81,15 @@ class PathChildrenCacheApiTests : StringSpec() {
                 client.deleteChildren(path)
 
                 PathChildrenCache(client, path).use { cache ->
-                    val events = AtomicInteger(0)
-                    cache.addListener { events.incrementAndGet() }
+                    val events = AtomicInt(0)
+                    cache.addListener { events.incrementAndFetch() }
                     cache.clearListeners()
                     cache.start(buildInitial = true)
 
                     client.putValue("$path/x", "v")
                     // Give any incorrectly-retained listener a chance to fire.
                     Thread.sleep(1000)
-                    events.get() shouldBe 0
+                    events.load() shouldBe 0
                 }
 
                 client.deleteChildren(path)

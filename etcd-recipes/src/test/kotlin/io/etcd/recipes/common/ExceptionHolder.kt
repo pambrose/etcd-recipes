@@ -18,14 +18,14 @@
 
 package io.etcd.recipes.common
 
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 
 class ExceptionHolder {
-  private val holder = lazy { AtomicReference<Throwable>() }
+  private val holder = lazy { AtomicReference<Throwable?>(null) }
 
   var exception: Throwable?
-    get() = if (holder.isInitialized()) holder.value.get() else null
+    get() = if (holder.isInitialized()) holder.value.load() else null
     set(e) {
-      e?.let { holder.value.set(it) }
+      e?.let { holder.value.store(it) }
     }
 }

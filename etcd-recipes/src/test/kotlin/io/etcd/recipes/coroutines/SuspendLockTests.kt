@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.coroutines
 
+import io.etcd.recipes.common.accumulateMax
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getChildCount
@@ -39,7 +40,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -74,8 +77,8 @@ class SuspendLockTests : StringSpec() {
     "withLock serializes concurrent coroutines" {
       connectToEtcd(urls).use { client ->
         client.deleteChildren(base)
-        val inCritical = AtomicInteger(0)
-        val maxInCritical = AtomicInteger(0)
+        val inCritical = AtomicInt(0)
+        val maxInCritical = AtomicInt(0)
         var unguarded = 0
 
         DistributedMutex(client, "$base/serialize").use { mutex ->
@@ -84,18 +87,18 @@ class SuspendLockTests : StringSpec() {
               launch(Dispatchers.Default) {
                 repeat(3) {
                   mutex.withLock {
-                    val now = inCritical.incrementAndGet()
-                    maxInCritical.accumulateAndGet(now) { a, b -> maxOf(a, b) }
+                    val now = inCritical.incrementAndFetch()
+                    maxInCritical.accumulateMax(now)
                     unguarded += 1
                     delay(50)
-                    inCritical.decrementAndGet()
+                    inCritical.decrementAndFetch()
                   }
                 }
               }
             }
           }
         }
-        maxInCritical.get() shouldBeLessThanOrEqual 1
+        maxInCritical.load() shouldBeLessThanOrEqual 1
         unguarded shouldBe 12
       }
     }
@@ -191,21 +194,21 @@ class SuspendLockTests : StringSpec() {
         client.deleteChildren(base)
         val path = "$base/rw"
         DistributedReadWriteLock(client, path).use { rw ->
-          val concurrent = AtomicInteger(0)
-          val maxConcurrent = AtomicInteger(0)
+          val concurrent = AtomicInt(0)
+          val maxConcurrent = AtomicInt(0)
           coroutineScope {
             repeat(2) {
               launch(Dispatchers.Default) {
                 rw.readLock.withLock {
-                  val now = concurrent.incrementAndGet()
-                  maxConcurrent.accumulateAndGet(now) { a, b -> maxOf(a, b) }
+                  val now = concurrent.incrementAndFetch()
+                  maxConcurrent.accumulateMax(now)
                   delay(500)
-                  concurrent.decrementAndGet()
+                  concurrent.decrementAndFetch()
                 }
               }
             }
           }
-          maxConcurrent.get() shouldBe 2
+          maxConcurrent.load() shouldBe 2
 
           coroutineScope {
             val held = CompletableDeferred<Unit>()
@@ -243,23 +246,23 @@ class SuspendLockTests : StringSpec() {
       connectToEtcd(urls).use { client ->
         client.deleteChildren(base)
         val path = "$base/permits"
-        val inFlight = AtomicInteger(0)
-        val maxInFlight = AtomicInteger(0)
+        val inFlight = AtomicInt(0)
+        val maxInFlight = AtomicInt(0)
 
         DistributedSemaphore(client, path, 2).use { sem ->
           coroutineScope {
             repeat(5) {
               launch(Dispatchers.Default) {
                 sem.withPermit {
-                  val now = inFlight.incrementAndGet()
-                  maxInFlight.accumulateAndGet(now) { a, b -> maxOf(a, b) }
+                  val now = inFlight.incrementAndFetch()
+                  maxInFlight.accumulateMax(now)
                   delay(200)
-                  inFlight.decrementAndGet()
+                  inFlight.decrementAndFetch()
                 }
               }
             }
           }
-          maxInFlight.get() shouldBeLessThanOrEqual 2
+          maxInFlight.load() shouldBeLessThanOrEqual 2
         }
 
         DistributedSemaphore(client, "$base/permit-cancel", 1).use { sem ->

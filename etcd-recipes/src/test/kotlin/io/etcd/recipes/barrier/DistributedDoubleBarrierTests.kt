@@ -31,7 +31,8 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -52,10 +53,10 @@ class DistributedDoubleBarrierTests : StringSpec() {
             val leaveLatch = CountDownLatch(count - 1)
             val doneLatch = CountDownLatch(count)
 
-            val enterRetryCounter = AtomicInteger(0)
-            val leaveRetryCounter = AtomicInteger(0)
-            val enterCounter = AtomicInteger(0)
-            val leaveCounter = AtomicInteger(0)
+            val enterRetryCounter = AtomicInt(0)
+            val leaveRetryCounter = AtomicInt(0)
+            val enterCounter = AtomicInt(0)
+            val leaveCounter = AtomicInt(0)
 
             fun enterBarrier(
               id: Int,
@@ -68,14 +69,14 @@ class DistributedDoubleBarrierTests : StringSpec() {
                         barrier.enter(1000.random().milliseconds)
                     else
                         barrier.enter(1000, TimeUnit.MILLISECONDS)
-                    enterRetryCounter.incrementAndGet()
+                    enterRetryCounter.incrementAndFetch()
                     logger.debug { "#$id Timed out entering barrier" }
                 }
 
                 enterLatch.countDown()
                 logger.debug { "#$id Waiting to enter barrier" }
                 barrier.enter()
-                enterCounter.incrementAndGet()
+                enterCounter.incrementAndFetch()
 
                 logger.debug { "#$id Entered barrier" }
             }
@@ -91,14 +92,14 @@ class DistributedDoubleBarrierTests : StringSpec() {
                         barrier.leave(1000.random().milliseconds)
                     else
                         barrier.leave(1000, TimeUnit.MILLISECONDS)
-                    leaveRetryCounter.incrementAndGet()
+                    leaveRetryCounter.incrementAndFetch()
                     logger.debug { "#$id Timed out leaving barrier" }
                 }
 
                 leaveLatch.countDown()
                 logger.debug { "#$id Waiting to leave barrier" }
                 barrier.leave()
-                leaveCounter.incrementAndGet()
+                leaveCounter.incrementAndFetch()
                 logger.debug { "#$id Left barrier" }
                 doneLatch.countDown()
             }
@@ -134,11 +135,11 @@ class DistributedDoubleBarrierTests : StringSpec() {
                 holder.checkForException()
             }
 
-            enterRetryCounter.get() shouldBe retryAttempts * (count - 1)
-            enterCounter.get() shouldBe count
+            enterRetryCounter.load() shouldBe retryAttempts * (count - 1)
+            enterCounter.load() shouldBe count
 
-            leaveRetryCounter.get() shouldBe retryAttempts * (count - 1)
-            leaveCounter.get() shouldBe count
+            leaveRetryCounter.load() shouldBe retryAttempts * (count - 1)
+            leaveCounter.load() shouldBe count
 
             logger.debug { "Done" }
         }

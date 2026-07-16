@@ -37,7 +37,8 @@ import io.mockk.every
 import io.mockk.mockk
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicLong
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.fetchAndIncrement
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -60,14 +61,14 @@ class TransientKeyValueHealTests : StringSpec() {
             every { grant(any()) } answers {
               CompletableFuture.completedFuture(
                 mockk<LeaseGrantResponse> {
-                  every { id } returns nextId.getAndIncrement()
+                  every { id } returns nextId.fetchAndIncrement()
                 },
               )
             }
             every { grant(any(), any(), any()) } answers {
               CompletableFuture.completedFuture(
                 mockk<LeaseGrantResponse> {
-                  every { id } returns nextId.getAndIncrement()
+                  every { id } returns nextId.fetchAndIncrement()
                 },
               )
             }

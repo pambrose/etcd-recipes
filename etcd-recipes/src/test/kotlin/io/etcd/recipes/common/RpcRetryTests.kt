@@ -33,7 +33,8 @@ import io.kotest.matchers.string.shouldContain
 import io.mockk.every
 import io.mockk.mockk
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -51,30 +52,30 @@ class RpcRetryTests : StringSpec() {
 
   init {
     "retries retriable failures until success" {
-      val calls = AtomicInteger(0)
+      val calls = AtomicInt(0)
       val result =
         retryRpc(quick(), "test-op") {
-          if (calls.incrementAndGet() <= 2) {
+          if (calls.incrementAndFetch() <= 2) {
             CompletableFuture.failedFuture(unavailable())
           } else {
             CompletableFuture.completedFuture("ok")
           }
         }
       result shouldBe "ok"
-      calls.get() shouldBe 3
+      calls.load() shouldBe 3
     }
 
     "gives up after policy exhaustion and wraps the cause with attempt context" {
-      val calls = AtomicInteger(0)
+      val calls = AtomicInt(0)
       val rpc = RpcResilience(RetryPolicy.bounded(maxAttempts = 2, delay = 10.milliseconds), 5.seconds)
       val thrown =
         shouldThrow<EtcdRecipeRuntimeException> {
           retryRpc<String>(rpc, "doomed-op") {
-            calls.incrementAndGet()
+            calls.incrementAndFetch()
             CompletableFuture.failedFuture(unavailable())
           }
         }
-      calls.get() shouldBe 3 // initial + 2 retries
+      calls.load() shouldBe 3 // initial + 2 retries
       thrown.message!! shouldContain "doomed-op"
       thrown.message!! shouldContain "3"
       generateSequence(thrown as Throwable) { it.cause.takeIf { c -> c !== it } }
@@ -91,35 +92,35 @@ class RpcRetryTests : StringSpec() {
     }
 
     "non-retriable failures propagate without retry" {
-      val calls = AtomicInteger(0)
+      val calls = AtomicInt(0)
       shouldThrowAny {
         retryRpc<String>(quick(), "bad-request") {
-          calls.incrementAndGet()
+          calls.incrementAndFetch()
           CompletableFuture.failedFuture(IllegalArgumentException("bad key"))
         }
       }
-      calls.get() shouldBe 1
+      calls.load() shouldBe 1
     }
 
     "DISABLED reproduces one-shot semantics" {
-      val calls = AtomicInteger(0)
+      val calls = AtomicInt(0)
       shouldThrowAny {
         retryRpc<String>(RpcResilience.DISABLED, "one-shot") {
-          calls.incrementAndGet()
+          calls.incrementAndFetch()
           CompletableFuture.failedFuture(unavailable())
         }
       }
-      calls.get() shouldBe 1
+      calls.load() shouldBe 1
     }
 
     "transaction is never retried even on retriable failures" {
-      val commits = AtomicInteger(0)
+      val commits = AtomicInt(0)
       val txn =
         mockk<Txn> {
           every { If(*anyVararg()) } returns this
           every { Then(*anyVararg()) } returns this
           every { commit() } answers {
-            commits.incrementAndGet()
+            commits.incrementAndFetch()
             CompletableFuture.failedFuture<TxnResponse>(unavailable())
           }
         }
@@ -131,17 +132,17 @@ class RpcRetryTests : StringSpec() {
       shouldThrowAny {
         client.transaction { If("x".doesExist) }
       }
-      commits.get() shouldBe 1
+      commits.load() shouldBe 1
     }
 
     "reads route through the retry engine" {
-      val calls = AtomicInteger(0)
+      val calls = AtomicInt(0)
       val client =
         mockk<Client> {
           every { kvClient } returns
             mockk<KV> {
               every { get(any<ByteSequence>(), any()) } answers {
-                if (calls.incrementAndGet() <= 1) {
+                if (calls.incrementAndFetch() <= 1) {
                   CompletableFuture.failedFuture(unavailable())
                 } else {
                   CompletableFuture.completedFuture(
@@ -156,7 +157,7 @@ class RpcRetryTests : StringSpec() {
         }
 
       client.getResponse("/rpc/read").kvs.isEmpty() shouldBe true
-      calls.get() shouldBe 2
+      calls.load() shouldBe 2
     }
   }
 }

@@ -26,7 +26,8 @@ import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.urls
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -54,8 +55,8 @@ class LeaderStepDownTests : StringSpec() {
     "leader steps down when its leadership lease is lost" {
       connectToEtcd(urls) { client ->
         val electionPath = "$path/stepdown"
-        val relinquishCount = AtomicInteger(0)
-        val bLeaderships = AtomicInteger(0)
+        val relinquishCount = AtomicInt(0)
+        val bLeaderships = AtomicInt(0)
         val aElected = BooleanMonitor(false)
 
         val selectorA =
@@ -67,13 +68,13 @@ class LeaderStepDownTests : StringSpec() {
               // Parks on the finished monitor: step-down must release it.
               selector.waitUntilFinished()
             },
-            relinquishLeadershipBlock = { relinquishCount.incrementAndGet() },
+            relinquishLeadershipBlock = { relinquishCount.incrementAndFetch() },
           )
         val selectorB =
           LeaderSelector(
             client,
             electionPath,
-            takeLeadershipBlock = { bLeaderships.incrementAndGet() },
+            takeLeadershipBlock = { bLeaderships.incrementAndFetch() },
           )
 
         selectorA.use { a ->
@@ -87,10 +88,10 @@ class LeaderStepDownTests : StringSpec() {
 
             pollUntil(20.seconds) { !a.isLeader } shouldBe true
             a.waitOnLeadershipComplete(20.seconds) shouldBe true
-            pollUntil(10.seconds) { relinquishCount.get() == 1 } shouldBe true
+            pollUntil(10.seconds) { relinquishCount.load() == 1 } shouldBe true
 
             // The other candidate takes over (no split brain: A already stepped down)
-            pollUntil(20.seconds) { bLeaderships.get() == 1 } shouldBe true
+            pollUntil(20.seconds) { bLeaderships.load() == 1 } shouldBe true
             b.waitOnLeadershipComplete(20.seconds) shouldBe true
           }
         }

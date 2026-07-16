@@ -40,8 +40,9 @@ import io.mockk.every
 import io.mockk.mockk
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -64,14 +65,14 @@ class BarrierWithCountWatchRecoveryTests : StringSpec() {
   ) {
     val listeners = CopyOnWriteArrayList<Watch.Listener>()
     val options = CopyOnWriteArrayList<WatchOption>()
-    private val txnCount = AtomicInteger(0)
+    private val txnCount = AtomicInt(0)
 
     val client: Client =
       mockk {
         every { kvClient } returns
           mockk<KV> {
             every { txn() } answers {
-              val n = txnCount.incrementAndGet()
+              val n = txnCount.incrementAndFetch()
               val succeeded = if (n <= 2) true else (n - 2) <= readyPresentProbes
               mockk<Txn> {
                 every { If(*anyVararg()) } returns this
@@ -138,25 +139,25 @@ class BarrierWithCountWatchRecoveryTests : StringSpec() {
       // Ready-key probes: 2 present (initial checkWaiterCount + pre-park recheck),
       // then absent (deleted during the dead-stream window).
       val mocks = CountBarrierMocks(readyPresentProbes = 2)
-      val released = AtomicReference<Boolean?>()
-      val error = AtomicReference<Throwable?>()
+      val released = AtomicReference<Boolean?>(null)
+      val error = AtomicReference<Throwable?>(null)
 
       DistributedBarrierWithCount(mocks.client, "/barrier/count", memberCount = 2).use { barrier ->
         val waiter =
           thread(name = "count-barrier-waiter") {
             try {
-              released.set(barrier.waitOnBarrier(1.minutes))
+              released.store(barrier.waitOnBarrier(1.minutes))
             } catch (e: Throwable) {
-              error.set(e)
+              error.store(e)
             }
           }
 
         pollUntil(5.seconds) { mocks.listeners.size == 1 } shouldBe true
         mocks.listeners.first().die()
 
-        pollUntil(10.seconds) { released.get() != null || error.get() != null } shouldBe true
-        error.get() shouldBe null
-        released.get() shouldBe true
+        pollUntil(10.seconds) { released.load() != null || error.load() != null } shouldBe true
+        error.load() shouldBe null
+        released.load() shouldBe true
         waiter.join(5_000)
       }
     }
@@ -164,8 +165,8 @@ class BarrierWithCountWatchRecoveryTests : StringSpec() {
     "counted waiter fails fast when watch recovery is abandoned" {
       // Ready key stays present; recovery disabled: the wait must error, not park.
       val mocks = CountBarrierMocks(readyPresentProbes = Int.MAX_VALUE)
-      val released = AtomicReference<Boolean?>()
-      val error = AtomicReference<Throwable?>()
+      val released = AtomicReference<Boolean?>(null)
+      val error = AtomicReference<Throwable?>(null)
 
       DistributedBarrierWithCount(
         mocks.client,
@@ -176,18 +177,18 @@ class BarrierWithCountWatchRecoveryTests : StringSpec() {
         val waiter =
           thread(name = "count-barrier-waiter") {
             try {
-              released.set(barrier.waitOnBarrier(1.minutes))
+              released.store(barrier.waitOnBarrier(1.minutes))
             } catch (e: Throwable) {
-              error.set(e)
+              error.store(e)
             }
           }
 
         pollUntil(5.seconds) { mocks.listeners.size == 1 } shouldBe true
         mocks.listeners.first().die()
 
-        pollUntil(10.seconds) { error.get() != null } shouldBe true
-        error.get().shouldBeInstanceOf<EtcdRecipeRuntimeException>()
-        released.get() shouldBe null
+        pollUntil(10.seconds) { error.load() != null } shouldBe true
+        error.load().shouldBeInstanceOf<EtcdRecipeRuntimeException>()
+        released.load() shouldBe null
         waiter.join(5_000)
       }
     }

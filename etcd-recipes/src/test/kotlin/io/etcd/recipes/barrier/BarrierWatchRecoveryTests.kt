@@ -35,8 +35,9 @@ import io.mockk.every
 import io.mockk.mockk
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -58,14 +59,14 @@ class BarrierWatchRecoveryTests : StringSpec() {
   ) {
     val listeners = CopyOnWriteArrayList<Watch.Listener>()
     val options = CopyOnWriteArrayList<WatchOption>()
-    private val probeCount = AtomicInteger(0)
+    private val probeCount = AtomicInt(0)
 
     val client: Client =
       mockk {
         every { kvClient } returns
           mockk<KV> {
             every { txn() } answers {
-              val present = probeCount.incrementAndGet() <= presentProbes
+              val present = probeCount.incrementAndFetch() <= presentProbes
               mockk<Txn> {
                 every { If(*anyVararg()) } returns this
                 every { Then(*anyVararg()) } returns this
@@ -117,25 +118,25 @@ class BarrierWatchRecoveryTests : StringSpec() {
     "waiter releases after recovery when the barrier DELETE happened during the outage" {
       // Probe #1 (presence at wait start): present. Later probes (recovery recheck): absent.
       val mocks = BarrierMocks(presentProbes = 1)
-      val released = AtomicReference<Boolean?>()
-      val error = AtomicReference<Throwable?>()
+      val released = AtomicReference<Boolean?>(null)
+      val error = AtomicReference<Throwable?>(null)
 
       DistributedBarrier(mocks.client, "/barrier/recovery").use { barrier ->
         val waiter =
           thread(name = "barrier-waiter") {
             try {
-              released.set(barrier.waitOnBarrier(1.minutes))
+              released.store(barrier.waitOnBarrier(1.minutes))
             } catch (e: Throwable) {
-              error.set(e)
+              error.store(e)
             }
           }
 
         pollUntil(5.seconds) { mocks.listeners.size == 1 } shouldBe true
         mocks.listeners.first().die()
 
-        pollUntil(10.seconds) { released.get() != null || error.get() != null } shouldBe true
-        error.get() shouldBe null
-        released.get() shouldBe true
+        pollUntil(10.seconds) { released.load() != null || error.load() != null } shouldBe true
+        error.load() shouldBe null
+        released.load() shouldBe true
         waiter.join(5_000)
       }
     }
@@ -143,8 +144,8 @@ class BarrierWatchRecoveryTests : StringSpec() {
     "waiter fails fast when watch recovery is abandoned" {
       // Barrier stays present; recovery disabled: the wait must error, not park.
       val mocks = BarrierMocks(presentProbes = Int.MAX_VALUE)
-      val released = AtomicReference<Boolean?>()
-      val error = AtomicReference<Throwable?>()
+      val released = AtomicReference<Boolean?>(null)
+      val error = AtomicReference<Throwable?>(null)
 
       DistributedBarrier(
         mocks.client,
@@ -154,18 +155,18 @@ class BarrierWatchRecoveryTests : StringSpec() {
         val waiter =
           thread(name = "barrier-waiter") {
             try {
-              released.set(barrier.waitOnBarrier(1.minutes))
+              released.store(barrier.waitOnBarrier(1.minutes))
             } catch (e: Throwable) {
-              error.set(e)
+              error.store(e)
             }
           }
 
         pollUntil(5.seconds) { mocks.listeners.size == 1 } shouldBe true
         mocks.listeners.first().die()
 
-        pollUntil(10.seconds) { error.get() != null } shouldBe true
-        error.get().shouldBeInstanceOf<EtcdRecipeRuntimeException>()
-        released.get() shouldBe null
+        pollUntil(10.seconds) { error.load() != null } shouldBe true
+        error.load().shouldBeInstanceOf<EtcdRecipeRuntimeException>()
+        released.load() shouldBe null
         waiter.join(5_000)
       }
     }

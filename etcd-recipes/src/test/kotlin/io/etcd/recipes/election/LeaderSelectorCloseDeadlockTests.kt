@@ -24,7 +24,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
@@ -38,7 +38,7 @@ class LeaderSelectorCloseDeadlockTests : StringSpec() {
         client,
         path,
         takeLeadershipBlock = { selector ->
-            latchRef.get().countDown()
+            latchRef.load().countDown()
             // Block until close() signals completion. Pre-fix attemptToBecomeLeader
             // held the instance monitor across this call, so close() (also
             // @Synchronized on the instance) could never run doClose() to flip the
@@ -62,7 +62,7 @@ class LeaderSelectorCloseDeadlockTests : StringSpec() {
                 val selector = blockingLeaderSelector(client, latchRef)
 
                 selector.start()
-                latchRef.get().await(20, TimeUnit.SECONDS) shouldBe true
+                latchRef.load().await(20, TimeUnit.SECONDS) shouldBe true
 
                 val closer = thread { selector.close() }
                 closer.join(20_000)
@@ -81,9 +81,9 @@ class LeaderSelectorCloseDeadlockTests : StringSpec() {
                 val selector = blockingLeaderSelector(client, latchRef)
 
                 repeat(3) {
-                    latchRef.set(CountDownLatch(1))
+                    latchRef.store(CountDownLatch(1))
                     selector.start()
-                    latchRef.get().await(20, TimeUnit.SECONDS) shouldBe true
+                    latchRef.load().await(20, TimeUnit.SECONDS) shouldBe true
 
                     val closer = thread { selector.close() }
                     closer.join(20_000)

@@ -28,8 +28,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -146,7 +146,7 @@ class LeaderLatch
         while (true) {
           val sel =
             synchronized(stateLock) {
-              if (closing.get()) return
+              if (closing.load()) return
               LeaderSelector(
                 client,
                 electionPath,
@@ -164,7 +164,7 @@ class LeaderLatch
                 resilience = resilience,
                 interruptOnLeaseLoss = interruptOnLeaseLoss,
               ).also {
-                currentSelector.set(it)
+                currentSelector.store(it)
                 it.start()
               }
             }
@@ -181,7 +181,7 @@ class LeaderLatch
           if (sel.hasExceptions) sel.exceptions.forEach { recordException(it) }
           runCatching { sel.close() }.onFailure { recordException(it) }
 
-          if (closing.get()) return
+          if (closing.load()) return
           // Otherwise the term ended via step-down: loop back and re-contest with a
           // fresh selector (one selector per full term, so no tight spin).
         }
@@ -228,8 +228,8 @@ class LeaderLatch
 
     override fun doClose() {
       synchronized(stateLock) {
-        closing.set(true)
-        currentSelector.get()?.let { runCatching { it.close() } } // unblocks the worker's park
+        closing.store(true)
+        currentSelector.load()?.let { runCatching { it.close() } } // unblocks the worker's park
       }
       worker?.let { w ->
         w.join(closeJoinTimeout.inWholeMilliseconds)

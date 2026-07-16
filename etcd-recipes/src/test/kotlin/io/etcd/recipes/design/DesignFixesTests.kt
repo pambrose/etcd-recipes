@@ -45,7 +45,8 @@ import io.kotest.matchers.string.shouldStartWith
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.reflect.KVisibility
 import kotlin.reflect.full.declaredMemberProperties
 import kotlin.time.Duration.Companion.seconds
@@ -64,16 +65,16 @@ class DesignFixesTests : StringSpec() {
     // ============================================================
     "fix #1: EtcdConnector close() runs doClose() exactly once across multiple calls" {
       connectToEtcd(urls) { client ->
-        val callCount = AtomicInteger(0)
+        val callCount = AtomicInt(0)
         val connector = object : EtcdConnector(client) {
           override fun doClose() {
-            callCount.incrementAndGet()
+            callCount.incrementAndFetch()
           }
         }
         connector.close()
         connector.close()
         connector.close()
-        callCount.get() shouldBe 1
+        callCount.load() shouldBe 1
       }
     }
 
@@ -277,7 +278,7 @@ class DesignFixesTests : StringSpec() {
           val perProducer = 25
           val producers = Executors.newFixedThreadPool(producerCount)
           val consumers = Executors.newFixedThreadPool(producerCount)
-          val received = AtomicInteger(0)
+          val received = AtomicInt(0)
           val total = producerCount * perProducer
           val finishLatch = CountDownLatch(total)
 
@@ -288,15 +289,15 @@ class DesignFixesTests : StringSpec() {
           }
           repeat(producerCount) {
             consumers.execute {
-              while (received.get() < total) {
+              while (received.load() < total) {
                 queue.dequeue() // blocks until a value appears
-                received.incrementAndGet()
+                received.incrementAndFetch()
                 finishLatch.countDown()
               }
             }
           }
           finishLatch.await(60, TimeUnit.SECONDS) shouldBe true
-          received.get() shouldBe total
+          received.load() shouldBe total
           producers.shutdownNow()
           consumers.shutdownNow()
         }
