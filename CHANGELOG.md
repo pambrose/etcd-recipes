@@ -37,6 +37,21 @@ non-blocking consumption on the existing queues.
   Kotlin) for projects that prefer Jackson to kotlinx-serialization. Published as its own Maven
   Central artifact.
 
+### Added (adoption packaging: Spring Boot starter, Ktor plugin, connection config)
+
+- **`EtcdConnectionConfig`** + `connectToEtcd(config)` — declarative auth (user/password), key
+  `namespace`, TLS (CA / client certs), and timeouts mapped onto the jetcd builder, so the common
+  options no longer require the `initReceiver` escape hatch. Plus `Client.ping()` (a bare-client
+  reachability probe) and an `EtcdRecipes` factory (path-scoped recipes over a shared client).
+- **`etcd-recipes-spring-boot-starter`** — auto-configures a `Client` bean (graceful shutdown via
+  `destroyMethod = "close"`) and an `EtcdRecipes` bean from `etcd.recipes.*` properties, plus an
+  optional Actuator `HealthIndicator`. `@ConditionalOnMissingBean` lets an app override any bean.
+  Spring Boot 3.5.x.
+- **`etcd-recipes-ktor`** — a Ktor `Application` plugin that connects from config (or an injected
+  client) and closes a plugin-owned client on `ApplicationStopping`; exposes `Application.etcdClient`
+  / `Application.etcdRecipes`. Ktor 3.5.x.
+- Both new modules are published as their own Maven Central artifacts.
+
 ### Added (typed recipe variants)
 
 - Typed wrappers for the remaining raw-payload recipes, each marshalling through an `EtcdCodec<T>`
