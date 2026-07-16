@@ -37,6 +37,23 @@ non-blocking consumption on the existing queues.
   Kotlin) for projects that prefer Jackson to kotlinx-serialization. Published as its own Maven
   Central artifact.
 
+### Added (typed recipe variants)
+
+- Typed wrappers for the remaining raw-payload recipes, each marshalling through an `EtcdCodec<T>`
+  so callers stop hand-encoding `ByteSequence`/`String`:
+  - **`TypedDistributedQueue<T>`** / **`TypedDistributedPriorityQueue<T>`** — `enqueue(T)` /
+    `dequeue(): T` / typed `poll`, over the existing queues.
+  - **`TypedPathChildrenCache<T>`** — typed `currentData` / `getCurrentData` (`TypedChildData<T>`)
+    and decoded `TypedPathChildrenCacheEvent`s via `TypedPathChildrenCacheListener` (plus a
+    coroutine `eventsAsFlow()`).
+  - **`TypedTransientKeyValue<T>`** — publishes a value encoded once through a codec.
+  - **`ServiceInstance`** typed payload — additive `payload<T>(codec)` / `setPayload` extensions and
+    a typed `serviceInstance(name, payload, codec)` builder, keeping the `jsonPayload` JSON string as
+    the unchanged wire format.
+- Each typed recipe is a composition wrapper exposing the underlying recipe as `untyped`, so the full
+  `EtcdConnector` API stays reachable; no existing class changed. Codecs for the `String`-valued
+  surfaces (`ServiceInstance`, `TransientKeyValue`) must emit UTF-8 text.
+
 ### Added (observability: push errors + health)
 
 - **Push-based background-exception callback** on `EtcdConnector`: register a
