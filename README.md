@@ -26,7 +26,7 @@ what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zook
 | `io.etcd.recipes.keyvalue` | `TransientKeyValue` (lease-backed key/value) |
 | `io.etcd.recipes.lock` | `DistributedMutex`, `DistributedReadWriteLock`, `DistributedSemaphore` |
 | `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue`, `DistributedWorkQueue` (at-least-once) |
-| `io.etcd.recipes.common` | Kotlin extensions over jetcd `Client`, `KV`, `Lease`, `Watch`, `Txn` |
+| `io.etcd.recipes.common` | Kotlin extensions over jetcd `Client`, `KV`, `Lease`, `Watch`, `Txn`; `EtcdCodec<T>` typed values |
 | `io.etcd.recipes.coroutines` | Suspending twins of the `common` extensions, `Flow`-based watches |
 
 ## Usage
@@ -47,6 +47,28 @@ connectToEtcd(urls) { client ->
     client.delete("test_key")
 }
 ```
+
+Read and write typed values through an `EtcdCodec<T>` instead of hand-marshalling bytes:
+
+```kotlin
+import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.jsonCodec
+import io.etcd.recipes.common.putValue
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class Config(val name: String, val count: Int)
+
+connectToEtcd(urls) { client ->
+    val codec = jsonCodec<Config>()
+    client.putValue("/config/app", Config("svc", 3), codec)
+    val config: Config? = client.getValue("/config/app", codec)
+}
+```
+
+Built-in codecs are `StringCodec`, `ByteSequenceCodec`, and `jsonCodec<T>()`
+(kotlinx-serialization). Java projects can add the optional `etcd-recipes-jackson`
+module for a `JacksonCodec<T>`. The same codecs type `NodeCache<T>`.
 
 Run a single-leader election across a cluster of processes:
 
