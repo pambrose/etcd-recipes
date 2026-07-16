@@ -1,4 +1,4 @@
-.PHONY: default help clean clean-all stop build tests tests-tc tests-container all-tests coverage kdocs \
+.PHONY: default help clean clean-all stop etcd etcd-stop build tests tests-tc tests-container all-tests coverage kdocs \
         lint detekt detekt-baseline refresh versions publish-local publish-local-snapshot \
         publish-snapshot publish-maven-central upgrade-wrapper \
         _check-gpg-env _require-version _require-gradle-version
@@ -34,6 +34,12 @@ stop: ## Stop running Gradle daemons
 
 build: clean ## Clean and run a full build, skipping tests
 	./gradlew build -x test
+
+etcd: ## Start a local etcd at localhost:2379 (foreground; Ctrl-C to stop)
+	./etcd.sh
+
+etcd-stop: ## Gracefully stop the local etcd started by `make etcd`
+	./etcd-stop.sh
 
 tests: ## Run the full test suite against a local etcd at localhost:2379
 	./gradlew check --rerun-tasks --no-build-cache
