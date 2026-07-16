@@ -23,12 +23,14 @@ import io.etcd.recipes.cache.NodeCache
 import io.etcd.recipes.cache.NodeCacheEvent
 import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.cache.PathChildrenCacheEvent
+import io.etcd.recipes.cache.TypedPathChildrenCache
 import io.etcd.recipes.common.StringCodec
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.getResponse
+import io.etcd.recipes.common.jsonCodec
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.urls
 import io.etcd.recipes.discovery.ServiceCache
@@ -45,6 +47,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Duration.Companion.seconds
 
@@ -55,6 +58,11 @@ import kotlin.time.Duration.Companion.seconds
  */
 class EventFlowTests : StringSpec() {
   private val base = "/coroutines/${javaClass.simpleName}"
+
+  @Serializable
+  data class Payload(
+    val v: String,
+  )
 
   private suspend fun <T> withScope(body: suspend (CoroutineScope) -> T): T {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -122,6 +130,39 @@ class EventFlowTests : StringSpec() {
                 NodeCacheEvent.Type.UPDATED,
                 NodeCacheEvent.Type.DELETED,
               )
+          }
+        }
+      }
+    }
+
+    "typed cache eventsAsFlow delivers decoded child add, update, and remove in order" {
+      connectToEtcd(urls).use { client ->
+        client.deleteChildren(base)
+        val path = "$base/typed-cache"
+        val codec = jsonCodec<Payload>()
+        val seen = CopyOnWriteArrayList<Pair<PathChildrenCacheEvent.Type, Payload?>>()
+
+        TypedPathChildrenCache(client, path, codec).use { cache ->
+          cache.start(buildInitial = true)
+          cache.waitOnStartComplete(10.seconds) shouldBe true
+
+          withScope { scope ->
+            scope.launch { cache.eventsAsFlow().collect { e -> seen += e.type to e.data } }
+            delay(1_000) // let the collector subscribe
+
+            client.putValue("$path/k", Payload("v1"), codec)
+            client.putValue("$path/k", Payload("v2"), codec)
+            client.deleteChildren(path)
+
+            untilTrue(15.seconds) { seen.size == 3 } shouldBe true
+            seen.map { it.first } shouldContainExactly
+              listOf(
+                PathChildrenCacheEvent.Type.CHILD_ADDED,
+                PathChildrenCacheEvent.Type.CHILD_UPDATED,
+                PathChildrenCacheEvent.Type.CHILD_REMOVED,
+              )
+            seen[0].second shouldBe Payload("v1")
+            seen[1].second shouldBe Payload("v2")
           }
         }
       }

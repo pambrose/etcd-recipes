@@ -22,6 +22,9 @@ import io.etcd.recipes.cache.NodeCacheListener
 import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.cache.PathChildrenCacheListener
+import io.etcd.recipes.cache.TypedPathChildrenCache
+import io.etcd.recipes.cache.TypedPathChildrenCacheEvent
+import io.etcd.recipes.cache.TypedPathChildrenCacheListener
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import kotlinx.coroutines.channels.Channel
@@ -71,6 +74,27 @@ fun <T> NodeCache<T>.eventsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<NodeC
 
 /** The single-key cache's watch-recovery transitions as a [Flow]; see [eventsAsFlow] for lifecycle. */
 fun NodeCache<*>.recoveryEventsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<WatchRecoveryEvent> =
+  callbackFlow {
+    val listener = WatchRecoveryListener { event -> trySendBlocking(event) }
+    addRecoveryListener(listener)
+    awaitClose { removeRecoveryListener(listener) }
+  }.buffer(capacity)
+
+/**
+ * The typed prefix cache's decoded child events ([TypedPathChildrenCacheEvent]) as a [Flow]. The
+ * typed peer of [PathChildrenCache.eventsAsFlow]; see it for lifecycle.
+ */
+fun <T> TypedPathChildrenCache<T>.eventsAsFlow(
+  capacity: Int = Channel.UNLIMITED,
+): Flow<TypedPathChildrenCacheEvent<T>> =
+  callbackFlow {
+    val listener = TypedPathChildrenCacheListener<T> { event -> trySendBlocking(event) }
+    addListener(listener)
+    awaitClose { removeListener(listener) }
+  }.buffer(capacity)
+
+/** The typed prefix cache's watch-recovery transitions as a [Flow]; see [eventsAsFlow] for lifecycle. */
+fun TypedPathChildrenCache<*>.recoveryEventsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<WatchRecoveryEvent> =
   callbackFlow {
     val listener = WatchRecoveryListener { event -> trySendBlocking(event) }
     addRecoveryListener(listener)

@@ -19,13 +19,13 @@ what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zook
 | Package | Recipes |
 |---|---|
 | `io.etcd.recipes.barrier` | `DistributedBarrier`, `DistributedBarrierWithCount`, `DistributedDoubleBarrier` |
-| `io.etcd.recipes.cache` | `PathChildrenCache` (key-prefix cache), `NodeCache<T>` (typed single-key cache) |
+| `io.etcd.recipes.cache` | `PathChildrenCache` (key-prefix cache), `TypedPathChildrenCache<T>`, `NodeCache<T>` (typed single-key cache) |
 | `io.etcd.recipes.counter` | `DistributedAtomicLong` |
-| `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider`, `ProviderStrategy` |
+| `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance` (typed `payload<T>()`), `ServiceProvider`, `ProviderStrategy` |
 | `io.etcd.recipes.election` | `LeaderSelector`, `LeaderLatch`, `LeaderObserver`, `LeaderSelectorListener`, `Participant` |
-| `io.etcd.recipes.keyvalue` | `TransientKeyValue` (lease-backed key/value) |
+| `io.etcd.recipes.keyvalue` | `TransientKeyValue` (lease-backed key/value), `TypedTransientKeyValue<T>` |
 | `io.etcd.recipes.lock` | `DistributedMutex`, `DistributedReadWriteLock`, `DistributedSemaphore` |
-| `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue`, `DistributedWorkQueue` (at-least-once) |
+| `io.etcd.recipes.queue` | `DistributedQueue`, `DistributedPriorityQueue`, `DistributedWorkQueue` (at-least-once), `TypedDistributedQueue<T>` / `TypedDistributedPriorityQueue<T>` |
 | `io.etcd.recipes.common` | Kotlin extensions over jetcd `Client`, `KV`, `Lease`, `Watch`, `Txn`; `EtcdCodec<T>` typed values |
 | `io.etcd.recipes.coroutines` | Suspending twins of the `common` extensions, `Flow`-based watches |
 
@@ -68,7 +68,10 @@ connectToEtcd(urls) { client ->
 
 Built-in codecs are `StringCodec`, `ByteSequenceCodec`, and `jsonCodec<T>()`
 (kotlinx-serialization). Java projects can add the optional `etcd-recipes-jackson`
-module for a `JacksonCodec<T>`. The same codecs type `NodeCache<T>`.
+module for a `JacksonCodec<T>`. The same codecs type the recipes: `NodeCache<T>`,
+`TypedPathChildrenCache<T>`, `TypedDistributedQueue<T>` /
+`TypedDistributedPriorityQueue<T>`, `TypedTransientKeyValue<T>`, and `ServiceInstance`'s
+`payload<T>(codec)` / typed `serviceInstance(name, payload, codec)` builder.
 
 Run a single-leader election across a cluster of processes:
 
