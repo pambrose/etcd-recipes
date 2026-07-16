@@ -12,6 +12,20 @@ leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
 gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
 non-blocking consumption on the existing queues.
 
+### Added (cache: typed NodeCache + codec layer)
+
+- **`NodeCache<T>`** — a watch-backed cache of a **single** etcd key, the counterpart to
+  `PathChildrenCache` (which caches a prefix) for the "keep one config value hot, notify on
+  change" case. `start()` snapshots the key and anchors the watch at the snapshot revision + 1
+  (no establishment-race gap); `current` / `currentBytes` read the live value; a
+  `NodeCacheListener` is notified of CREATED / UPDATED / DELETED; compaction of the watched
+  revision re-syncs transparently. Plus a `withNodeCache { }` DSL and coroutine
+  `eventsAsFlow()` / `recoveryEventsAsFlow()`.
+- **`EtcdCodec<T>`** — a small pluggable-serialization SPI (`encode`/`decode`) with built-ins
+  `ByteSequenceCodec`, `StringCodec`, and `KotlinxJsonCodec` (reified `jsonCodec<T>()`).
+  `NodeCache<T>` decodes its payload through it; the other recipes gain typed variants in a
+  later pass.
+
 ### Added (observability: push errors + health)
 
 - **Push-based background-exception callback** on `EtcdConnector`: register a

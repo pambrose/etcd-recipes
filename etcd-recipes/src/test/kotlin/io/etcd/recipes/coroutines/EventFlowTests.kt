@@ -19,11 +19,15 @@
 package io.etcd.recipes.coroutines
 
 import com.pambrose.common.concurrent.BooleanMonitor
+import io.etcd.recipes.cache.NodeCache
+import io.etcd.recipes.cache.NodeCacheEvent
 import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.cache.PathChildrenCacheEvent
+import io.etcd.recipes.common.StringCodec
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.urls
@@ -88,6 +92,35 @@ class EventFlowTests : StringSpec() {
                 PathChildrenCacheEvent.Type.CHILD_ADDED,
                 PathChildrenCacheEvent.Type.CHILD_UPDATED,
                 PathChildrenCacheEvent.Type.CHILD_REMOVED,
+              )
+          }
+        }
+      }
+    }
+
+    "nodeCache eventsAsFlow delivers CREATED, UPDATED, and DELETED in order" {
+      connectToEtcd(urls).use { client ->
+        client.deleteChildren(base)
+        val key = "$base/node"
+        val seen = CopyOnWriteArrayList<NodeCacheEvent.Type>()
+
+        NodeCache(client, key, StringCodec).use { cache ->
+          cache.start()
+
+          withScope { scope ->
+            scope.launch { cache.eventsAsFlow().collect { e -> seen += e.type } }
+            delay(1_000) // let the collector subscribe
+
+            client.putValue(key, "v1")
+            client.putValue(key, "v2")
+            client.deleteKey(key)
+
+            untilTrue(15.seconds) { seen.size == 3 } shouldBe true
+            seen shouldContainExactly
+              listOf(
+                NodeCacheEvent.Type.CREATED,
+                NodeCacheEvent.Type.UPDATED,
+                NodeCacheEvent.Type.DELETED,
               )
           }
         }

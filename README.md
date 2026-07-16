@@ -19,7 +19,7 @@ what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zook
 | Package | Recipes |
 |---|---|
 | `io.etcd.recipes.barrier` | `DistributedBarrier`, `DistributedBarrierWithCount`, `DistributedDoubleBarrier` |
-| `io.etcd.recipes.cache` | `PathChildrenCache` (key-prefix cache with PUT/UPDATE/DELETE listeners) |
+| `io.etcd.recipes.cache` | `PathChildrenCache` (key-prefix cache), `NodeCache<T>` (typed single-key cache) |
 | `io.etcd.recipes.counter` | `DistributedAtomicLong` |
 | `io.etcd.recipes.discovery` | `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider`, `ProviderStrategy` |
 | `io.etcd.recipes.election` | `LeaderSelector`, `LeaderLatch`, `LeaderObserver`, `LeaderSelectorListener`, `Participant` |
@@ -162,6 +162,7 @@ collector unregisters it, and collection never starts or closes the recipe:
 |---|---|
 | `Client` watches | `watchAsFlow(...)` / `watchEventsAsFlow(...)` |
 | `PathChildrenCache` child events | `eventsAsFlow()` / `recoveryEventsAsFlow()` |
+| `NodeCache` key changes | `eventsAsFlow()` / `recoveryEventsAsFlow()` |
 | `ServiceCache` changes | `eventsAsFlow()` / `recoveryEventsAsFlow()` |
 | Any recipe's connection state | `connectionStateAsFlow()` |
 | Lease events (`TransientKeyValue`, `DistributedWorkQueue`, `ServiceRegistry`) | `leaseEventsAsFlow()` |
