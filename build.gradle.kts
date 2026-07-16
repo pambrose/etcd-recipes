@@ -12,6 +12,8 @@ val libraryModule = ":$libraryName"
 val examplesModule = ":$libraryName-examples"
 val micrometerModule = ":$libraryName-micrometer"
 val jacksonModule = ":$libraryName-jackson"
+val springBootStarterModule = ":$libraryName-spring-boot-starter"
+val ktorModule = ":$libraryName-ktor"
 val repoUrl = "https://github.com/pambrose/$libraryName"
 
 val envDockerHost = "DOCKER_HOST"
@@ -62,6 +64,8 @@ dependencies {
     dokka(project(examplesModule))
     dokka(project(micrometerModule))
     dokka(project(jacksonModule))
+    dokka(project(springBootStarterModule))
+    dokka(project(ktorModule))
 
     kover(project(libraryModule))
 }
@@ -100,10 +104,12 @@ subprojects {
         }
     }
 
-    // The library and its Micrometer/Jackson bindings are published; the examples and test-runners aren't.
+    // The library and its optional bindings are published; the examples and test-runners aren't.
     if (name == libraryName ||
         name == "$libraryName-micrometer" ||
-        name == "$libraryName-jackson"
+        name == "$libraryName-jackson" ||
+        name == "$libraryName-spring-boot-starter" ||
+        name == "$libraryName-ktor"
     ) {
         configurePublishing()
     }

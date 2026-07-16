@@ -121,6 +121,38 @@ See the `etcd-recipes-examples/` module for runnable
 and [Kotlin](https://github.com/pambrose/etcd-recipes/tree/master/etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples)
 demos of every recipe.
 
+## Framework integration
+
+`connectToEtcd` also takes a declarative `EtcdConnectionConfig` (endpoints, auth, key `namespace`,
+TLS, timeouts) instead of the `initReceiver` lambda:
+
+```kotlin
+connectToEtcd(EtcdConnectionConfig(endpoints = urls, namespace = "/myapp/", user = "root", password = "…"))
+```
+
+Two optional modules wire that into the common server stacks.
+
+**Spring Boot** (`etcd-recipes-spring-boot-starter`) — configure `application.yml` and the client is
+auto-configured (and closed gracefully on shutdown), alongside an `EtcdRecipes` factory bean and an
+optional Actuator `etcd` health indicator:
+
+```yaml
+etcd:
+  recipes:
+    endpoints: [ "http://localhost:2379" ]
+    namespace: /myapp/
+```
+
+**Ktor** (`etcd-recipes-ktor`) — install the plugin; `application.etcdClient` and
+`application.etcdRecipes` become available, and a plugin-owned client closes on `ApplicationStopping`:
+
+```kotlin
+install(EtcdPlugin) {
+    endpoints = listOf("http://localhost:2379")
+    namespace = "/myapp/"
+}
+```
+
 ## Coroutines API
 
 Every blocking operation stays as-is (Java parity); a Kotlin-first async surface
