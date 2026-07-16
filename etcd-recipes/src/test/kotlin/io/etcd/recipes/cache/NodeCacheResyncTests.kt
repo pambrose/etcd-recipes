@@ -36,7 +36,8 @@ import io.mockk.every
 import io.mockk.mockk
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -51,7 +52,7 @@ class NodeCacheResyncTests : StringSpec() {
   ) {
     val listeners = CopyOnWriteArrayList<Watch.Listener>()
     val options = CopyOnWriteArrayList<WatchOption>()
-    private val getCount = AtomicInteger(0)
+    private val getCount = AtomicInt(0)
 
     private fun kv(value: String): KeyValue =
       mockk {
@@ -60,7 +61,7 @@ class NodeCacheResyncTests : StringSpec() {
 
     // GET #1 (initial snapshot): value "1" at revision 10. Every later GET (resync): "2" at 20.
     private fun getResponse(): GetResponse {
-      val first = getCount.incrementAndGet() == 1
+      val first = getCount.incrementAndFetch() == 1
       return mockk {
         every { kvs } returns listOf(kv(if (first) "1" else "2"))
         every { isMore } returns false

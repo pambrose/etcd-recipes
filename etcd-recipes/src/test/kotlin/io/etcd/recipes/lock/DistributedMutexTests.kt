@@ -24,7 +24,7 @@ import io.etcd.recipes.common.urls
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
@@ -61,15 +61,15 @@ class DistributedMutexTests : StringSpec() {
         client.deleteChildren(base)
         DistributedMutex(client, "$base/non-owner").use { mutex ->
           mutex.lock()
-          val thrown = AtomicReference<Throwable?>()
+          val thrown = AtomicReference<Throwable?>(null)
           thread {
             try {
               mutex.unlock()
             } catch (e: Throwable) {
-              thrown.set(e)
+              thrown.store(e)
             }
           }.join(10_000)
-          (thrown.get() is IllegalMonitorStateException) shouldBe true
+          (thrown.load() is IllegalMonitorStateException) shouldBe true
           mutex.unlock() shouldBe true
         }
       }

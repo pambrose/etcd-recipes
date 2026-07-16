@@ -34,8 +34,9 @@ import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.seconds
 
 class DistributedBarrierTests : StringSpec() {
@@ -52,8 +53,8 @@ class DistributedBarrierTests : StringSpec() {
             val setBarrierLatch = CountDownLatch(1)
             val completeLatch = CountDownLatch(1)
             val removeBarrierTime = AtomicLong(0L)
-            val timeoutCount = AtomicInteger(0)
-            val advancedCount = AtomicInteger(0)
+            val timeoutCount = AtomicInt(0)
+            val advancedCount = AtomicInt(0)
 
             connectToEtcd(urls) { client ->
 
@@ -75,7 +76,7 @@ class DistributedBarrierTests : StringSpec() {
                         sleep(6.seconds)
 
                         logger.info { "Removing Barrier" }
-                        removeBarrierTime.set(System.currentTimeMillis())
+                        removeBarrierTime.store(System.currentTimeMillis())
                         val isRemoved = removeBarrier()
                         isRemoved.shouldBeTrue()
 
@@ -93,14 +94,14 @@ class DistributedBarrierTests : StringSpec() {
                         logger.info { "$i Waiting on Barrier" }
                         waitOnBarrier(1.seconds)
 
-                        timeoutCount.incrementAndGet()
+                        timeoutCount.incrementAndFetch()
 
                         logger.info { "$i Timed out waiting on barrier, waiting again" }
                         waitOnBarrier()
 
                         // Make sure the waiter advanced quickly
-                        System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500L
-                        advancedCount.incrementAndGet()
+                        System.currentTimeMillis() - removeBarrierTime.load() shouldBeLessThan 500L
+                        advancedCount.incrementAndFetch()
 
                         logger.debug { "$i Done Waiting on Barrier" }
                     }
@@ -109,8 +110,8 @@ class DistributedBarrierTests : StringSpec() {
 
             completeLatch.await()
 
-            timeoutCount.get() shouldBe count
-            advancedCount.get() shouldBe count
+            timeoutCount.load() shouldBe count
+            advancedCount.load() shouldBe count
 
             logger.debug { "Done" }
         }
@@ -119,8 +120,8 @@ class DistributedBarrierTests : StringSpec() {
             val path = "/barriers/earlyDistributedBarrierTests"
             val count = 10
             val removeBarrierTime = AtomicLong(0L)
-            val timeoutCount = AtomicInteger(0)
-            val advancedCount = AtomicInteger(0)
+            val timeoutCount = AtomicInt(0)
+            val advancedCount = AtomicInt(0)
 
             connectToEtcd(urls) { client ->
 
@@ -130,14 +131,14 @@ class DistributedBarrierTests : StringSpec() {
                             logger.debug { "$i Waiting on Barrier" }
                             waitOnBarrier(1, TimeUnit.SECONDS)
 
-                            timeoutCount.incrementAndGet()
+                            timeoutCount.incrementAndFetch()
 
                             logger.debug { "$i Timed out waiting on barrier, waiting again" }
                             waitOnBarrier()
 
                             // Make sure the waiter advanced quickly
-                            System.currentTimeMillis() - removeBarrierTime.get() shouldBeLessThan 500L
-                            advancedCount.incrementAndGet()
+                            System.currentTimeMillis() - removeBarrierTime.load() shouldBeLessThan 500L
+                            advancedCount.incrementAndFetch()
 
                             logger.debug { "$i Done Waiting on Barrier" }
                         }
@@ -161,7 +162,7 @@ class DistributedBarrierTests : StringSpec() {
                     sleep(6.seconds)
 
                     logger.debug { "Removing Barrier" }
-                    removeBarrierTime.set(System.currentTimeMillis())
+                    removeBarrierTime.store(System.currentTimeMillis())
                     removeBarrier()
 
                     sleep(3.seconds)
@@ -172,8 +173,8 @@ class DistributedBarrierTests : StringSpec() {
                 holder.checkForException()
             }
 
-            timeoutCount.get() shouldBe count
-            advancedCount.get() shouldBe count
+            timeoutCount.load() shouldBe count
+            advancedCount.load() shouldBe count
 
             logger.debug { "Done" }
         }

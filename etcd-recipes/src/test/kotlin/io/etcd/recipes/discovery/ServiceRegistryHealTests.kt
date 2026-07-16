@@ -36,8 +36,10 @@ import io.mockk.every
 import io.mockk.mockk
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.fetchAndIncrement
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -49,7 +51,7 @@ import kotlin.time.Duration.Companion.seconds
 class ServiceRegistryHealTests : StringSpec() {
   private class RegistryHealMocks {
     val observers = CopyOnWriteArrayList<StreamObserver<LeaseKeepAliveResponse>>()
-    val txnCount = AtomicInteger(0)
+    val txnCount = AtomicInt(0)
     private val nextId = AtomicLong(100)
 
     val client: Client =
@@ -58,12 +60,12 @@ class ServiceRegistryHealTests : StringSpec() {
           mockk<Lease> {
             every { grant(any()) } answers {
               CompletableFuture.completedFuture(
-                mockk<LeaseGrantResponse> { every { id } returns nextId.getAndIncrement() },
+                mockk<LeaseGrantResponse> { every { id } returns nextId.fetchAndIncrement() },
               )
             }
             every { grant(any(), any(), any()) } answers {
               CompletableFuture.completedFuture(
-                mockk<LeaseGrantResponse> { every { id } returns nextId.getAndIncrement() },
+                mockk<LeaseGrantResponse> { every { id } returns nextId.fetchAndIncrement() },
               )
             }
             every { keepAlive(any(), any()) } answers {
@@ -75,7 +77,7 @@ class ServiceRegistryHealTests : StringSpec() {
         every { kvClient } returns
           mockk<KV> {
             every { txn() } answers {
-              txnCount.incrementAndGet()
+              txnCount.incrementAndFetch()
               mockk<Txn> {
                 every { If(*anyVararg()) } returns this
                 every { Then(*anyVararg()) } returns this
@@ -97,13 +99,13 @@ class ServiceRegistryHealTests : StringSpec() {
       ServiceRegistry(mocks.client, "/registry/heal").use { registry ->
         registry.addLeaseListener { events += it }
         registry.registerService(service)
-        mocks.txnCount.get() shouldBe 1 // initial CAS registration
+        mocks.txnCount.load() shouldBe 1 // initial CAS registration
 
         // jetcd's DeadLine service fires onCompleted when the lease expires unrenewed
         mocks.observers.first().onCompleted()
 
         pollUntil(10.seconds) { events.any { it is LeaseEvent.Restored } } shouldBe true
-        mocks.txnCount.get() shouldBe 2 // re-registration CAS under the healed lease
+        mocks.txnCount.load() shouldBe 2 // re-registration CAS under the healed lease
       }
     }
   }

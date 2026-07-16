@@ -30,7 +30,7 @@ import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 
@@ -123,7 +123,7 @@ internal object WaiterSupport {
     reportRecovery: (WatchRecoveryEvent) -> Unit,
     recordException: (Throwable) -> Unit,
   ) {
-    val failure = AtomicReference<Throwable?>()
+    val failure = AtomicReference<Throwable?>(null)
     val recoveryListener =
       WatchRecoveryListener { event ->
         reportRecovery(event)
@@ -135,7 +135,7 @@ internal object WaiterSupport {
 
           is WatchRecoveryEvent.Failed -> {
             val cause = event.cause ?: EtcdRecipeRuntimeException("Watch on $watchKey abandoned while waiting")
-            failure.set(cause)
+            failure.store(cause)
             recordException(cause)
             latch.countDown()
           }
@@ -166,7 +166,7 @@ internal object WaiterSupport {
           latch.await(remaining.inWholeMilliseconds, TimeUnit.MILLISECONDS)
         }
       }
-      failure.get()?.let { cause ->
+      failure.load()?.let { cause ->
         throw EtcdRecipeRuntimeException("Lock watch on $watchKey failed while waiting", cause)
       }
     }

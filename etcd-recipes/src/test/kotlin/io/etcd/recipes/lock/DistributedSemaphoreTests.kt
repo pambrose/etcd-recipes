@@ -19,6 +19,7 @@
 package io.etcd.recipes.lock
 
 import com.pambrose.common.concurrent.BooleanMonitor
+import io.etcd.recipes.common.accumulateMax
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -32,7 +33,9 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
@@ -49,25 +52,25 @@ class DistributedSemaphoreTests : StringSpec() {
       connectToEtcd(urls) { client ->
         client.deleteChildren(base)
         val path = "$base/capacity"
-        val inFlight = AtomicInteger(0)
-        val maxInFlight = AtomicInteger(0)
-        val completions = AtomicInteger(0)
+        val inFlight = AtomicInt(0)
+        val maxInFlight = AtomicInt(0)
+        val completions = AtomicInt(0)
 
         blockingThreads(8) {
           connectToEtcd(urls) { c ->
             DistributedSemaphore(c, path, 3).use { sem ->
               sem.withPermit {
-                val now = inFlight.incrementAndGet()
-                maxInFlight.accumulateAndGet(now) { a, b -> maxOf(a, b) }
+                val now = inFlight.incrementAndFetch()
+                maxInFlight.accumulateMax(now)
                 Thread.sleep(300)
-                inFlight.decrementAndGet()
-                completions.incrementAndGet()
+                inFlight.decrementAndFetch()
+                completions.incrementAndFetch()
               }
             }
           }
         }
-        maxInFlight.get() shouldBeLessThanOrEqual 3
-        completions.get() shouldBe 8
+        maxInFlight.load() shouldBeLessThanOrEqual 3
+        completions.load() shouldBe 8
       }
     }
 

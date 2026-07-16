@@ -30,7 +30,8 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.seconds
 
 class DistributedBarrierWithCountTests : StringSpec() {
@@ -47,8 +48,8 @@ class DistributedBarrierWithCountTests : StringSpec() {
             val count = 30
             val retryAttempts = 5
             val retryLatch = CountDownLatch(count - 1)
-            val retryCounter = AtomicInteger(0)
-            val advancedCounter = AtomicInteger(0)
+            val retryCounter = AtomicInt(0)
+            val advancedCounter = AtomicInt(0)
 
             fun waiter(
               id: Int,
@@ -61,7 +62,7 @@ class DistributedBarrierWithCountTests : StringSpec() {
                 repeat(retryCount) {
                     barrier.waitOnBarrier(1.seconds)
                     logger.debug { "#$id Timed out waiting on barrier, waiting again" }
-                    retryCounter.incrementAndGet()
+                    retryCounter.incrementAndFetch()
                 }
 
                 retryLatch.countDown()
@@ -69,7 +70,7 @@ class DistributedBarrierWithCountTests : StringSpec() {
                 logger.debug { "#$id Waiter count = ${barrier.waiterCount}" }
                 barrier.waitOnBarrier()
 
-                advancedCounter.incrementAndGet()
+                advancedCounter.incrementAndFetch()
 
                 logger.debug { "#$id Done waiting on barrier" }
             }
@@ -99,8 +100,8 @@ class DistributedBarrierWithCountTests : StringSpec() {
                 holder.checkForException()
             }
 
-            retryCounter.get() shouldBe retryAttempts * (count - 1)
-            advancedCounter.get() shouldBe count
+            retryCounter.load() shouldBe retryAttempts * (count - 1)
+            advancedCounter.load() shouldBe count
 
             logger.debug { "Done" }
         }

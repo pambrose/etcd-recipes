@@ -59,7 +59,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.random.Random
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
@@ -435,7 +435,7 @@ class DistributedWorkQueue
   // reclaiming even when nothing is enqueued.
   private fun awaitItem(deadline: ComparableTimeMark?) {
     val latch = CountDownLatch(1)
-    val watchFailure = AtomicReference<Throwable?>()
+    val watchFailure = AtomicReference<Throwable?>(null)
     val recoveryListener =
       WatchRecoveryListener { event ->
         withRecipeLoggingContext {
@@ -450,7 +450,7 @@ class DistributedWorkQueue
             is WatchRecoveryEvent.Failed -> {
               val cause = event.cause
                 ?: EtcdRecipeRuntimeException("Watch on $itemsPath abandoned while waiting for work")
-              watchFailure.set(cause)
+              watchFailure.store(cause)
               recordException(cause)
               latch.countDown()
             }
@@ -488,7 +488,7 @@ class DistributedWorkQueue
       if (wait > Duration.ZERO) {
         latch.await(wait.inWholeMilliseconds, TimeUnit.MILLISECONDS)
       }
-      watchFailure.get()?.let { cause ->
+      watchFailure.load()?.let { cause ->
         throw EtcdRecipeRuntimeException("Work-queue watch on $itemsPath failed while waiting", cause)
       }
     }

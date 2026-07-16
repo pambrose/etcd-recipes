@@ -35,8 +35,11 @@ import io.mockk.mockk
 import io.mockk.verify
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.fetchAndDecrement
+import kotlin.concurrent.atomics.fetchAndIncrement
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -54,10 +57,10 @@ class SelfHealingKeepAliveTests : StringSpec() {
     private val nextId = AtomicLong(100)
 
     /** Heal-path grant calls that should fail before one succeeds. */
-    val grantFailures = AtomicInteger(0)
+    val grantFailures = AtomicInt(0)
 
     private fun granted(): CompletableFuture<LeaseGrantResponse> {
-      val id = nextId.getAndIncrement()
+      val id = nextId.fetchAndIncrement()
       return CompletableFuture.completedFuture(mockk<LeaseGrantResponse> { every { this@mockk.id } returns id })
     }
 
@@ -65,7 +68,7 @@ class SelfHealingKeepAliveTests : StringSpec() {
       mockk {
         every { grant(any()) } answers { granted() }
         every { grant(any(), any(), any()) } answers {
-          if (grantFailures.getAndDecrement() > 0) {
+          if (grantFailures.fetchAndDecrement() > 0) {
             CompletableFuture.failedFuture(IllegalStateException("grant refused"))
           } else {
             granted()
@@ -165,10 +168,10 @@ class SelfHealingKeepAliveTests : StringSpec() {
     "establish returning false on heal emits Failed and stops" {
       val mocks = HealMocks()
       val events = CopyOnWriteArrayList<LeaseEvent>()
-      val calls = AtomicInteger(0)
+      val calls = AtomicInt(0)
 
       mocks.client.selfHealingKeepAlive(2.seconds, quickHeals(), { events += it }) {
-        calls.incrementAndGet() == 1 // initial establish succeeds; heals decline
+        calls.incrementAndFetch() == 1 // initial establish succeeds; heals decline
       }.use { healer ->
         mocks.observers.first().onCompleted()
         pollUntil(10.seconds) { events.any { it is LeaseEvent.Failed } } shouldBe true
@@ -181,7 +184,7 @@ class SelfHealingKeepAliveTests : StringSpec() {
     "heal attempts retry grant failures under the policy" {
       val mocks = HealMocks()
       val events = CopyOnWriteArrayList<LeaseEvent>()
-      mocks.grantFailures.set(2)
+      mocks.grantFailures.store(2)
 
       mocks.client.selfHealingKeepAlive(2.seconds, quickHeals(), { events += it }) { true }
         .use { healer ->
@@ -194,7 +197,7 @@ class SelfHealingKeepAliveTests : StringSpec() {
     "policy exhaustion emits Failed" {
       val mocks = HealMocks()
       val events = CopyOnWriteArrayList<LeaseEvent>()
-      mocks.grantFailures.set(Int.MAX_VALUE)
+      mocks.grantFailures.store(Int.MAX_VALUE)
       val resilience = LeaseResilience(RetryPolicy.bounded(maxAttempts = 2, delay = 10.milliseconds))
 
       mocks.client.selfHealingKeepAlive(2.seconds, resilience, { events += it }) { true }
@@ -208,7 +211,7 @@ class SelfHealingKeepAliveTests : StringSpec() {
     "close during healing cancels further attempts" {
       val mocks = HealMocks()
       val events = CopyOnWriteArrayList<LeaseEvent>()
-      mocks.grantFailures.set(Int.MAX_VALUE)
+      mocks.grantFailures.store(Int.MAX_VALUE)
       val resilience = LeaseResilience(RetryPolicy.bounded(maxAttempts = 1000, delay = 20.milliseconds))
 
       val healer = mocks.client.selfHealingKeepAlive(2.seconds, resilience, { events += it }) { true }
@@ -217,10 +220,10 @@ class SelfHealingKeepAliveTests : StringSpec() {
       healer.close()
 
       Thread.sleep(200)
-      val grantsAtClose = mocks.grantFailures.get()
+      val grantsAtClose = mocks.grantFailures.load()
       Thread.sleep(300)
       // grantFailures decrements once per heal-grant attempt; no movement = no attempts
-      (mocks.grantFailures.get() >= grantsAtClose - 1) shouldBe true
+      (mocks.grantFailures.load() >= grantsAtClose - 1) shouldBe true
       events.none { it is LeaseEvent.Restored } shouldBe true
     }
 

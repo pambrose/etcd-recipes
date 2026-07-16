@@ -39,8 +39,9 @@ import io.mockk.every
 import io.mockk.mockk
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
@@ -57,7 +58,7 @@ class QueueWatchRecoveryTests : StringSpec() {
   ) {
     val listeners = CopyOnWriteArrayList<Watch.Listener>()
     val options = CopyOnWriteArrayList<WatchOption>()
-    val getCount = AtomicInteger(0)
+    val getCount = AtomicInt(0)
 
     private val item: KeyValue =
       mockk {
@@ -67,7 +68,7 @@ class QueueWatchRecoveryTests : StringSpec() {
       }
 
     private fun getResponse(): GetResponse {
-      val empty = getCount.incrementAndGet() <= emptyGets
+      val empty = getCount.incrementAndFetch() <= emptyGets
       return mockk {
         every { kvs } returns if (empty) emptyList() else listOf(item)
         every { isMore } returns false
@@ -132,25 +133,25 @@ class QueueWatchRecoveryTests : StringSpec() {
       // GET #1 (fast path) and #2 (pre-live gap poll) see an empty queue; the
       // recovery re-poll and everything after see the item.
       val mocks = QueueMocks(emptyGets = 2)
-      val result = AtomicReference<ByteSequence?>()
-      val error = AtomicReference<Throwable?>()
+      val result = AtomicReference<ByteSequence?>(null)
+      val error = AtomicReference<Throwable?>(null)
 
       DistributedQueue(mocks.client, "/queue/recovery").use { queue ->
         val worker =
           thread(name = "dequeue-under-test") {
             try {
-              result.set(queue.dequeue())
+              result.store(queue.dequeue())
             } catch (e: Throwable) {
-              error.set(e)
+              error.store(e)
             }
           }
 
         pollUntil(5.seconds) { mocks.listeners.size == 1 } shouldBe true
         mocks.listeners.first().die()
 
-        pollUntil(10.seconds) { result.get() != null || error.get() != null } shouldBe true
-        error.get() shouldBe null
-        result.get()!!.asString shouldBe "hello"
+        pollUntil(10.seconds) { result.load() != null || error.load() != null } shouldBe true
+        error.load() shouldBe null
+        result.load()!!.asString shouldBe "hello"
         worker.join(5_000)
       }
     }
@@ -159,25 +160,25 @@ class QueueWatchRecoveryTests : StringSpec() {
       // Queue stays empty forever and recovery is disabled: the dequeue must
       // surface an error instead of parking forever.
       val mocks = QueueMocks(emptyGets = Int.MAX_VALUE)
-      val error = AtomicReference<Throwable?>()
-      val result = AtomicReference<ByteSequence?>()
+      val error = AtomicReference<Throwable?>(null)
+      val result = AtomicReference<ByteSequence?>(null)
 
       DistributedQueue(mocks.client, "/queue/recovery", ResilienceConfig.DISABLED).use { queue ->
         val worker =
           thread(name = "dequeue-under-test") {
             try {
-              result.set(queue.dequeue())
+              result.store(queue.dequeue())
             } catch (e: Throwable) {
-              error.set(e)
+              error.store(e)
             }
           }
 
         pollUntil(5.seconds) { mocks.listeners.size == 1 } shouldBe true
         mocks.listeners.first().die()
 
-        pollUntil(10.seconds) { error.get() != null } shouldBe true
-        error.get().shouldBeInstanceOf<EtcdRecipeRuntimeException>()
-        result.get() shouldBe null
+        pollUntil(10.seconds) { error.load() != null } shouldBe true
+        error.load().shouldBeInstanceOf<EtcdRecipeRuntimeException>()
+        result.load() shouldBe null
         worker.join(5_000)
       }
     }

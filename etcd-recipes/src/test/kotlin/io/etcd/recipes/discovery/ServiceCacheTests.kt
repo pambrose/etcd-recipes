@@ -30,7 +30,8 @@ import io.etcd.recipes.discovery.withServiceDiscovery
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.seconds
 
 class ServiceCacheTests : StringSpec() {
@@ -41,10 +42,10 @@ class ServiceCacheTests : StringSpec() {
       val serviceCount = 10
       val name = "ServiceCacheTest"
       val holder = ExceptionHolder()
-      val registerCounter = AtomicInteger(0)
-      val updateCounter = AtomicInteger(0)
-      val unregisterCounter = AtomicInteger(0)
-      val totalCounter = AtomicInteger(0)
+      val registerCounter = AtomicInt(0)
+      val updateCounter = AtomicInt(0)
+      val unregisterCounter = AtomicInt(0)
+      val totalCounter = AtomicInt(0)
 
       val expectedTotal = (threadCount * serviceCount) * 3
 
@@ -68,20 +69,20 @@ class ServiceCacheTests : StringSpec() {
                   serviceName.split("/").first() shouldBe name
 
                   if (eventType == EventType.PUT) {
-                    if (isAdd) registerCounter.incrementAndGet() else updateCounter.incrementAndGet()
+                    if (isAdd) registerCounter.incrementAndFetch() else updateCounter.incrementAndFetch()
 
                     serviceInstance?.name shouldBe name
                   }
 
                   if (eventType == EventType.DELETE) {
-                    unregisterCounter.incrementAndGet()
+                    unregisterCounter.incrementAndFetch()
                     serviceInstance?.name shouldBe name
                   }
                 }
               }
             })
 
-            addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndGet() }
+            addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndFetch() }
 
             val (finishedLatch, holder2) =
               nonblockingThreads(threadCount) {
@@ -110,16 +111,16 @@ class ServiceCacheTests : StringSpec() {
             // events. On slow runners the producer threads finish ahead of
             // the watch delivery, so polling outside this block races the
             // close path and can lose tail events.
-            pollUntil(30.seconds) { totalCounter.get() == expectedTotal } shouldBe true
+            pollUntil(30.seconds) { totalCounter.load() == expectedTotal } shouldBe true
           }
         }
       }
 
       holder.checkForException()
-      registerCounter.get() shouldBe threadCount * serviceCount
-      updateCounter.get() shouldBe threadCount * serviceCount
-      unregisterCounter.get() shouldBe threadCount * serviceCount
-      totalCounter.get() shouldBe expectedTotal
+      registerCounter.load() shouldBe threadCount * serviceCount
+      updateCounter.load() shouldBe threadCount * serviceCount
+      unregisterCounter.load() shouldBe threadCount * serviceCount
+      totalCounter.load() shouldBe expectedTotal
     }
   }
 

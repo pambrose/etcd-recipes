@@ -24,7 +24,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 
 class SerialLeaderSelectorTests : StringSpec() {
     val path = "/election/${javaClass.simpleName}"
@@ -38,18 +39,18 @@ class SerialLeaderSelectorTests : StringSpec() {
 
         "serialElectionTest" {
             val count = 5
-            val takeLeadershiptCounter = AtomicInteger(0)
-            val relinquishLeadershiptCounter = AtomicInteger(0)
+            val takeLeadershiptCounter = AtomicInt(0)
+            val relinquishLeadershiptCounter = AtomicInt(0)
 
             val leadershipAction = { selector: LeaderSelector ->
                 logger.info { "${selector.clientId} elected leader" }
-                takeLeadershiptCounter.incrementAndGet()
+                takeLeadershiptCounter.incrementAndFetch()
                 Unit
             }
 
             val relinquishAction = { selector: LeaderSelector ->
                 logger.info { "${selector.clientId} relinquished" }
-                relinquishLeadershiptCounter.incrementAndGet()
+                relinquishLeadershiptCounter.incrementAndFetch()
                 Unit
             }
 
@@ -63,12 +64,12 @@ class SerialLeaderSelectorTests : StringSpec() {
                 }
             }
 
-            takeLeadershiptCounter.get() shouldBe count
-            relinquishLeadershiptCounter.get() shouldBe count
+            takeLeadershiptCounter.load() shouldBe count
+            relinquishLeadershiptCounter.load() shouldBe count
 
             // Reset counters
-            takeLeadershiptCounter.set(0)
-            relinquishLeadershiptCounter.set(0)
+            takeLeadershiptCounter.store(0)
+            relinquishLeadershiptCounter.store(0)
 
             connectToEtcd(urls) { client ->
                 repeat(count) {
@@ -80,8 +81,8 @@ class SerialLeaderSelectorTests : StringSpec() {
                 }
             }
 
-            takeLeadershiptCounter.get() shouldBe count
-            relinquishLeadershiptCounter.get() shouldBe count
+            takeLeadershiptCounter.load() shouldBe count
+            relinquishLeadershiptCounter.load() shouldBe count
         }
     }
 

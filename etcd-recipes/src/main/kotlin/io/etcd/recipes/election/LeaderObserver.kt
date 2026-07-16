@@ -31,7 +31,7 @@ import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.watcher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 
 /**
  * Runs [receiver] with a started [LeaderObserver], closing it on exit.
@@ -74,7 +74,7 @@ class LeaderObserver
     private var watcher: Watch.Watcher? = null
 
     /** The current leader's clientId, or null when the election is vacant. */
-    val currentLeader: String? get() = currentLeaderRef.get()
+    val currentLeader: String? get() = currentLeaderRef.load()
 
     fun addListener(listener: LeaderListener) {
       listeners += listener
@@ -91,7 +91,7 @@ class LeaderObserver
         throw EtcdRecipeRuntimeException("start() already called")
       // Seed the snapshot: a listener registered before start() reads currentLeader; only
       // CHANGES (PUT/DELETE) fire callbacks, so no synthetic take/relinquish is emitted.
-      currentLeaderRef.set(readLeader())
+      currentLeaderRef.store(readLeader())
       watcher =
         client.watcher(
           leaderKey,
@@ -117,7 +117,7 @@ class LeaderObserver
 
     @Suppress("TooGenericExceptionCaught")
     private fun setLeader(name: String) {
-      currentLeaderRef.set(name)
+      currentLeaderRef.store(name)
       listeners.forEach { listener ->
         try {
           listener.takeLeadership(name)
@@ -131,7 +131,7 @@ class LeaderObserver
 
     @Suppress("TooGenericExceptionCaught")
     private fun clearLeader() {
-      currentLeaderRef.set(null)
+      currentLeaderRef.store(null)
       listeners.forEach { listener ->
         try {
           listener.relinquishLeadership()

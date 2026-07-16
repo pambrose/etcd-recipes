@@ -32,8 +32,9 @@ import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.queue.DistributedQueue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
@@ -91,8 +92,8 @@ class RecipeFaultTests : StringSpec() {
       assumeFaultInjection()
       val electionPath = "$path/election"
       val releaseLeader = BooleanMonitor(false)
-      val aLeaderships = AtomicInteger(0)
-      val bLeaderships = AtomicInteger(0)
+      val aLeaderships = AtomicInt(0)
+      val bLeaderships = AtomicInt(0)
 
       connectToEtcd(urls) { clientA ->
         connectToEtcd(urls) { clientB ->
@@ -101,7 +102,7 @@ class RecipeFaultTests : StringSpec() {
               clientA,
               electionPath,
               takeLeadershipBlock = { _ ->
-                aLeaderships.incrementAndGet()
+                aLeaderships.incrementAndFetch()
                 releaseLeader.waitUntilTrue()
               },
             )
@@ -109,13 +110,13 @@ class RecipeFaultTests : StringSpec() {
             LeaderSelector(
               clientB,
               electionPath,
-              takeLeadershipBlock = { _ -> bLeaderships.incrementAndGet() },
+              takeLeadershipBlock = { _ -> bLeaderships.incrementAndFetch() },
             )
 
           selectorA.use { a ->
             selectorB.use { b ->
               a.start()
-              pollUntil(15.seconds) { aLeaderships.get() == 1 } shouldBe true
+              pollUntil(15.seconds) { aLeaderships.load() == 1 } shouldBe true
               b.start()
 
               // The candidate's leader-key watch must survive the restart to ever
@@ -123,7 +124,7 @@ class RecipeFaultTests : StringSpec() {
               EtcdTestContainer.restart()
 
               releaseLeader.set(true)
-              pollUntil(60.seconds) { bLeaderships.get() == 1 } shouldBe true
+              pollUntil(60.seconds) { bLeaderships.load() == 1 } shouldBe true
               a.waitOnLeadershipComplete(30.seconds) shouldBe true
               b.waitOnLeadershipComplete(30.seconds) shouldBe true
             }
@@ -137,14 +138,14 @@ class RecipeFaultTests : StringSpec() {
       connectToEtcd(urls) { client ->
         val queuePath = "$path/queue"
         DistributedQueue(client, queuePath).use { queue ->
-          val result = AtomicReference<String?>()
-          val error = AtomicReference<Throwable?>()
+          val result = AtomicReference<String?>(null)
+          val error = AtomicReference<Throwable?>(null)
           val consumer =
             thread(name = "fault-dequeue") {
               try {
-                result.set(queue.dequeue().asString)
+                result.store(queue.dequeue().asString)
               } catch (e: Throwable) {
-                error.set(e)
+                error.store(e)
               }
             }
 
@@ -154,9 +155,9 @@ class RecipeFaultTests : StringSpec() {
 
           connectToEtcd(urls) { producer -> DistributedQueue(producer, queuePath).use { it.enqueue("recovered") } }
 
-          pollUntil(60.seconds) { result.get() != null || error.get() != null } shouldBe true
-          error.get() shouldBe null
-          result.get() shouldBe "recovered"
+          pollUntil(60.seconds) { result.load() != null || error.load() != null } shouldBe true
+          error.load() shouldBe null
+          result.load() shouldBe "recovered"
           consumer.join(5_000)
         }
       }

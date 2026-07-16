@@ -27,7 +27,8 @@ import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.getChildrenValues
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -113,9 +114,9 @@ class ServiceProvider
      */
     fun noteError(instance: ServiceInstance) {
       val entry = down.computeIfAbsent(instance) { DownEntry() }
-      if (entry.errors.incrementAndGet() >= errorThreshold) {
+      if (entry.errors.incrementAndFetch() >= errorThreshold) {
         entry.downUntil = TimeSource.Monotonic.markNow() + downPeriod
-        entry.errors.set(0)
+        entry.errors.store(0)
       }
     }
 
@@ -139,7 +140,7 @@ class ServiceProvider
     }
 
     private class DownEntry {
-      val errors = AtomicInteger(0)
+      val errors = AtomicInt(0)
 
       @Volatile
       var downUntil: TimeSource.Monotonic.ValueTimeMark? = null

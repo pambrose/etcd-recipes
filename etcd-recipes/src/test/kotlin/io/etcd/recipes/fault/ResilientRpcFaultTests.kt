@@ -28,7 +28,7 @@ import io.etcd.recipes.common.urls
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -76,9 +76,9 @@ class ResilientRpcFaultTests : StringSpec() {
             try {
               // Per-attempt timeout of 3s; retries ride out the pause window.
               val patient = RpcResilience(RetryPolicy.bounded(maxAttempts = 20, delay = 500.milliseconds), 3.seconds)
-              result.set(client.getValue("$path/patient", "default", patient))
+              result.store(client.getValue("$path/patient", "default", patient))
             } catch (e: Throwable) {
-              error.set(e)
+              error.store(e)
             }
           }
         try {
@@ -89,8 +89,8 @@ class ResilientRpcFaultTests : StringSpec() {
         EtcdTestContainer.awaitReady()
 
         reader.join(60_000)
-        error.get() shouldBe null
-        result.get() shouldBe "survives"
+        error.load() shouldBe null
+        result.load() shouldBe "survives"
       }
     }
   }

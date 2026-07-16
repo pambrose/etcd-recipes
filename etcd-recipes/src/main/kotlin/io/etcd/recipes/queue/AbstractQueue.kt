@@ -40,7 +40,7 @@ import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -138,8 +138,8 @@ abstract class AbstractQueue(
         isPrefix(true)
         withNoDelete(true)
       }
-    val keyFound = AtomicReference<KeyValue?>()
-    val watchFailure = AtomicReference<Throwable?>()
+    val keyFound = AtomicReference<KeyValue?>(null)
+    val watchFailure = AtomicReference<Throwable?>(null)
     val recoveryListener = waiterRecoveryListener(watchLatch, keyFound, watchFailure)
 
     return client.withWatcher(
@@ -170,7 +170,7 @@ abstract class AbstractQueue(
         val waitingChildList = client.getFirstChild(queuePath, target, resilience.rpc).kvs
         if (waitingChildList.isNotEmpty()) {
           synchronized(watchLatch) {
-            keyFound.set(waitingChildList.first())
+            keyFound.store(waitingChildList.first())
             if (watchLatch.count > 0) watchLatch.countDown()
           }
         }
@@ -192,9 +192,9 @@ abstract class AbstractQueue(
       // highest-priority (KEY) / oldest (MOD) item. Fall back to the watcher's event only if the re-query is
       // empty (a concurrent consumer already took the head) — the deleteRevKey CAS and
       // the outer retry loop then still guarantee no loss or duplication.
-      val head = client.getFirstChild(queuePath, target, resilience.rpc).kvs.firstOrNull() ?: keyFound.get()
+      val head = client.getFirstChild(queuePath, target, resilience.rpc).kvs.firstOrNull() ?: keyFound.load()
       if (head == null) {
-        watchFailure.get()?.let { cause ->
+        watchFailure.load()?.let { cause ->
           throw EtcdRecipeRuntimeException("Queue watch on $queuePath failed while waiting for an item", cause)
         }
       }
@@ -229,7 +229,7 @@ abstract class AbstractQueue(
           is WatchRecoveryEvent.Failed -> {
             val cause = event.cause
               ?: EtcdRecipeRuntimeException("Watch on $queuePath abandoned while waiting for an item")
-            watchFailure.set(cause)
+            watchFailure.store(cause)
             recordException(cause)
             synchronized(watchLatch) {
               if (watchLatch.count > 0) watchLatch.countDown()

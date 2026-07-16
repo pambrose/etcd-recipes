@@ -18,8 +18,9 @@
 
 package io.etcd.recipes.discovery
 
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.fetchAndIncrement
 
 /**
  * Picks one instance from the currently-available set (a [ServiceProvider]'s live
@@ -40,17 +41,17 @@ object RandomStrategy : ProviderStrategy {
 
 /**
  * Even round-robin via a monotonic cursor. `Math.floorMod` keeps the index non-negative
- * across `AtomicInteger` overflow and adapts automatically to list-size changes.
+ * across `AtomicInt` overflow and adapts automatically to list-size changes.
  *
  * STATEFUL — use a fresh instance per [ServiceProvider]; sharing one across providers
  * interleaves their cursors.
  */
 class RoundRobinStrategy : ProviderStrategy {
-  private val cursor = AtomicInteger(0)
+  private val cursor = AtomicInt(0)
 
   override fun select(instances: List<ServiceInstance>): ServiceInstance? {
     if (instances.isEmpty()) return null
-    return instances[Math.floorMod(cursor.getAndIncrement(), instances.size)]
+    return instances[Math.floorMod(cursor.fetchAndIncrement(), instances.size)]
   }
 }
 
@@ -69,13 +70,13 @@ class StickyStrategy(
   @Suppress("ReturnCount")
   override fun select(instances: List<ServiceInstance>): ServiceInstance? {
     if (instances.isEmpty()) {
-      last.set(null)
+      last.store(null)
       return null
     }
-    val current = last.get()
+    val current = last.load()
     if (current != null && current in instances) return current
     val picked = delegate.select(instances)
-    last.set(picked)
+    last.store(picked)
     return picked
   }
 }

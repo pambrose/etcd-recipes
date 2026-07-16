@@ -39,7 +39,7 @@ import io.kotest.matchers.shouldBe
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -158,16 +158,16 @@ class BugFixesTests : StringSpec() {
           // autoStart=true triggers start() inside the constructor; the
           // pre-fix code blocked on keepAliveStartedLatch indefinitely here.
           TransientKeyValue(client, path, "v", autoStart = true)
-          outcome.set(IllegalStateException("expected start() to throw"))
+          outcome.store(IllegalStateException("expected start() to throw"))
         } catch (e: Throwable) {
-          outcome.set(e)
+          outcome.store(e)
         } finally {
           done.countDown()
         }
       }
 
       done.await(15, TimeUnit.SECONDS) shouldBe true
-      val thrown = outcome.get()
+      val thrown = outcome.load()
       // Any exception (EtcdRecipeRuntimeException wrapping a jetcd failure,
       // or the underlying gRPC error itself) is acceptable — the test is
       // that we did not hang.
@@ -252,7 +252,7 @@ class BugFixesTests : StringSpec() {
               // Sleep briefly so a buggy close() that doesn't await would
               // race past this point.
               Thread.sleep(200)
-              callbackExited.set(true)
+              callbackExited.store(true)
             }
           }
 
@@ -271,7 +271,7 @@ class BugFixesTests : StringSpec() {
 
         watcher.close()
         // Post-close, the callback must have finished.
-        callbackExited.get() shouldBe true
+        callbackExited.load() shouldBe true
 
         helper.shutdownNow()
         client.deleteKey(path)

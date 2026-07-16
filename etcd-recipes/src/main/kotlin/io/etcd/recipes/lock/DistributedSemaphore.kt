@@ -40,9 +40,10 @@ import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -112,14 +113,14 @@ class DistributedSemaphore
     val entryKey: String,
   ) {
     val phase = AtomicReference(Phase.WAITING)
-    val wake = java.util.concurrent.atomic.AtomicReference<CountDownLatch?>(null)
+    val wake = AtomicReference<CountDownLatch?>(null)
 
     @Volatile
     var holdData: PermitData? = null
   }
 
   private val holds = ConcurrentLinkedDeque<PermitData>()
-  private val dispossessedCount = AtomicInteger(0)
+  private val dispossessedCount = AtomicInt(0)
   private val lostListeners = CopyOnWriteArrayList<PermitLostListener>()
   private val attempts = CopyOnWriteArrayList<Attempt>()
   private val permitsValidated = AtomicBoolean(false)
@@ -167,7 +168,7 @@ class DistributedSemaphore
       return true
     }
     while (true) {
-      val slots = dispossessedCount.get()
+      val slots = dispossessedCount.load()
       if (slots <= 0) break
       if (dispossessedCount.compareAndSet(slots, slots - 1)) {
         logger.debug { "release() on $semaphorePath after the permit was lost or released by close()" }
@@ -286,7 +287,7 @@ class DistributedSemaphore
           }
 
           val latch = CountDownLatch(1)
-          attempt.wake.set(latch)
+          attempt.wake.store(latch)
           if (attempt.phase.load() == Phase.DEAD) latch.countDown() // fatal raced the install
           WaiterSupport.awaitPrefixDeletion(
             client,
@@ -302,7 +303,7 @@ class DistributedSemaphore
             reportRecovery = { event -> reportRecoveryEvent(event) },
             recordException = { e -> recordException(e) },
           )
-          attempt.wake.set(null)
+          attempt.wake.store(null)
           // Loop: re-evaluate the rank (it only shrinks while the entry lives)
         }
       } finally {
@@ -351,7 +352,7 @@ class DistributedSemaphore
       recordException(
         cause ?: EtcdRecipeRuntimeException("Semaphore entry lease expired while waiting on $semaphorePath"),
       )
-      attempt.wake.get()?.countDown()
+      attempt.wake.load()?.countDown()
     } else if (attempt.phase.load() == Phase.HOLDING) {
       permitLost(attempt, cause)
     }
@@ -365,7 +366,7 @@ class DistributedSemaphore
     withRecipeLoggingContext {
       val data = attempt.holdData ?: return
       if (!holds.remove(data)) return // already released, or close() took it
-      dispossessedCount.incrementAndGet()
+      dispossessedCount.incrementAndFetch()
       logger.warn(cause) { "Permit on $semaphorePath lost by $clientId (lease expired)" }
       recordException(cause ?: EtcdRecipeRuntimeException("Permit lease for $semaphorePath expired; permit lost"))
       reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
@@ -385,12 +386,12 @@ class DistributedSemaphore
   override fun doClose() {
     while (true) {
       val data = holds.pollFirst() ?: break
-      dispossessedCount.incrementAndGet()
+      dispossessedCount.incrementAndFetch()
       data.lease.close()
     }
     attempts.toList().forEach { attempt ->
       if (attempt.phase.compareAndSet(Phase.WAITING, Phase.DEAD)) {
-        attempt.wake.get()?.countDown()
+        attempt.wake.load()?.countDown()
       }
     }
     lostListeners.clear()

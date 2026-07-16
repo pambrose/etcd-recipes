@@ -26,7 +26,7 @@ import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.urls
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -75,8 +75,8 @@ class BarrierLeaseHealTests : StringSpec() {
         val barrierPath = "$path/counted"
         val waitingPath = "$barrierPath/waiting"
         DistributedBarrierWithCount(client, barrierPath, memberCount = 2).use { barrier ->
-          val released = AtomicReference<Boolean?>()
-          val waiter = thread { released.set(barrier.waitOnBarrier(1.minutes)) }
+          val released = AtomicReference<Boolean?>(null)
+          val waiter = thread { released.store(barrier.waitOnBarrier(1.minutes)) }
 
           pollUntil(20.seconds) { client.getChildrenKeys(waitingPath).size == 1 } shouldBe true
           val waiterKey = client.getChildrenKeys(waitingPath).first()
@@ -91,7 +91,7 @@ class BarrierLeaseHealTests : StringSpec() {
           DistributedBarrierWithCount(client, barrierPath, memberCount = 2).use { second ->
             second.waitOnBarrier(1.minutes) shouldBe true
           }
-          pollUntil(20.seconds) { released.get() == true } shouldBe true
+          pollUntil(20.seconds) { released.load() == true } shouldBe true
           waiter.join(5_000)
         }
       }

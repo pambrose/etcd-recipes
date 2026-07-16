@@ -30,7 +30,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
@@ -134,14 +134,14 @@ class MutexLockLostTests : StringSpec() {
               try {
                 Thread.sleep(4_000)
               } catch (e: InterruptedException) {
-                interrupted.set(true)
+                interrupted.store(true)
               }
               finished.set(true)
             }
           heldOff.waitUntilTrue(15.seconds) shouldBe true
           revokeHolderLease(client, cooperativePath)
           finished.waitUntilTrue(20.seconds) shouldBe true
-          interrupted.get() shouldBe false
+          interrupted.load() shouldBe false
           pollUntil(10.seconds) { !mutex.isHeldByCurrentThread } shouldBe true
           holder.join(10_000)
         }

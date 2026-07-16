@@ -25,6 +25,7 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -153,5 +154,16 @@ fun captureException(
     block()
   } catch (e: Throwable) {
     holder.exception = e
+  }
+}
+
+/**
+ * Atomically raise this counter to [candidate] when it is larger (a running max). The Kotlin
+ * atomics API has no `accumulateAndGet`, so tests tracking a high-water mark use this CAS loop.
+ */
+fun AtomicInt.accumulateMax(candidate: Int) {
+  while (true) {
+    val current = load()
+    if (candidate <= current || compareAndSet(current, candidate)) break
   }
 }

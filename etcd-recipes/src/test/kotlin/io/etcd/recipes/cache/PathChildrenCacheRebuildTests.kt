@@ -24,7 +24,7 @@ import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.urls
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
@@ -56,17 +56,17 @@ class PathChildrenCacheRebuildTests : StringSpec() {
                     val stop = AtomicBoolean(false)
                     val reader =
                         thread {
-                            while (!stop.get()) {
-                                if (cache.currentDataAsMap.isEmpty()) sawEmpty.set(true)
+                            while (!stop.load()) {
+                                if (cache.currentDataAsMap.isEmpty()) sawEmpty.store(true)
                             }
                         }
 
                     repeat(100) { cache.rebuild() }
 
-                    stop.set(true)
+                    stop.store(true)
                     reader.join(5_000)
 
-                    sawEmpty.get() shouldBe false
+                    sawEmpty.load() shouldBe false
                     cache.currentDataAsMap.size shouldBe childCount
                 }
 
