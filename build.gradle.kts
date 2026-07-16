@@ -11,6 +11,7 @@ val libraryName = "etcd-recipes"
 val libraryModule = ":$libraryName"
 val examplesModule = ":$libraryName-examples"
 val micrometerModule = ":$libraryName-micrometer"
+val jacksonModule = ":$libraryName-jackson"
 val repoUrl = "https://github.com/pambrose/$libraryName"
 
 val envDockerHost = "DOCKER_HOST"
@@ -60,6 +61,7 @@ dependencies {
     dokka(project(libraryModule))
     dokka(project(examplesModule))
     dokka(project(micrometerModule))
+    dokka(project(jacksonModule))
 
     kover(project(libraryModule))
 }
@@ -98,8 +100,13 @@ subprojects {
         }
     }
 
-    // The library and its Micrometer binding are published; the examples and test-runners aren't.
-    if (name == libraryName || name == "$libraryName-micrometer") configurePublishing()
+    // The library and its Micrometer/Jackson bindings are published; the examples and test-runners aren't.
+    if (name == libraryName ||
+        name == "$libraryName-micrometer" ||
+        name == "$libraryName-jackson"
+    ) {
+        configurePublishing()
+    }
 
     configure<KotlinJvmProjectExtension> {
         jvmToolchain(rootProject.libs.versions.jvm.get().toInt())

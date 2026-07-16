@@ -21,4 +21,5 @@ rootProject.name = "etcd-recipes"
 include("etcd-recipes")
 include("etcd-recipes-examples")
 include("etcd-recipes-micrometer")
+include("etcd-recipes-jackson")
 include("etcd-recipes-test-runners")

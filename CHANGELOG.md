@@ -26,6 +26,17 @@ non-blocking consumption on the existing queues.
   `NodeCache<T>` decodes its payload through it; the other recipes gain typed variants in a
   later pass.
 
+### Added (typed KV extensions + Jackson codec)
+
+- **Typed KV extensions** — `Client.putValue(key, value, codec)` and `Client.getValue(key, codec)`
+  encode / decode through any `EtcdCodec<T>`, removing the hand-marshalling that the raw
+  `ByteSequence` overloads leave to the caller. Purely additive — the existing overloads are
+  unchanged.
+- **`etcd-recipes-jackson`** — a new optional module providing a Jackson-backed `JacksonCodec<T>`
+  (`Class` / `TypeReference` constructors for Java callers, plus a reified `jacksonCodec<T>()` for
+  Kotlin) for projects that prefer Jackson to kotlinx-serialization. Published as its own Maven
+  Central artifact.
+
 ### Added (observability: push errors + health)
 
 - **Push-based background-exception callback** on `EtcdConnector`: register a
