@@ -60,7 +60,7 @@ tests-tc: ## Run the full test suite under Testcontainers (no local etcd require
 	DOCKER_HOST="$(DOCKER_HOST)" ./gradlew check --rerun-tasks --no-build-cache -PuseTestcontainers
 
 tests-container: ## Run only the multi-container tests (each participant in its own container)
-	DOCKER_HOST="$(DOCKER_HOST)" ./gradlew :etcd-recipes:cleanTest :etcd-recipes:test --tests "io.etcd.recipes.container.*" --no-build-cache -PuseTestcontainers
+	DOCKER_HOST="$(DOCKER_HOST)" ./gradlew :etcd-recipes-core:cleanTest :etcd-recipes-core:test --tests "io.etcd.recipes.container.*" --no-build-cache -PuseTestcontainers
 
 all-tests: tests tests-tc tests-container ## Run all tests (local etcd, Testcontainers, and multi-container)
 

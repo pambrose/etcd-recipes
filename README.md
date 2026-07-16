@@ -1,6 +1,6 @@
 # etcd Recipes
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.pambrose/etcd-recipes.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.pambrose/etcd-recipes)
+[![Maven Central](https://img.shields.io/maven-central/v/com.pambrose/etcd-recipes-core.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.pambrose/etcd-recipes-core)
 [![CI](https://github.com/pambrose/etcd-recipes/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/pambrose/etcd-recipes/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e185b9c637b040bab55bdecf38b0de76)](https://www.codacy.com/manual/pambrose/etcd-recipes?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pambrose/etcd-recipes&amp;utm_campaign=Badge_Grade)
@@ -280,7 +280,7 @@ expires is lost cooperatively — a `PermitLostListener` fires and the matching
 ## Load-balancing service provider
 
 `ServiceProvider` hands out instances of a registered service with a pluggable
-[`ProviderStrategy`](etcd-recipes/src/main/kotlin/io/etcd/recipes/discovery/ProviderStrategy.kt)
+[`ProviderStrategy`](etcd-recipes-core/src/main/kotlin/io/etcd/recipes/discovery/ProviderStrategy.kt)
 — `RandomStrategy` (the default), `RoundRobinStrategy`, or `StickyStrategy` (session
 affinity) — the basis for client-side load balancing. Call `start()` to back reads
 with a watch-updated `ServiceCache` (in-memory, current); without `start()` each read
@@ -364,7 +364,7 @@ their maps during a compaction resync instead of going silently stale; parked wa
 after every recovery, and an abandoned recovery unparks them with an error rather
 than hanging forever.
 
-Recovery pacing is a [`RetryPolicy`](etcd-recipes/src/main/kotlin/io/etcd/recipes/common/RetryPolicy.kt)
+Recovery pacing is a [`RetryPolicy`](etcd-recipes-core/src/main/kotlin/io/etcd/recipes/common/RetryPolicy.kt)
 (default: exponential backoff, 250&nbsp;ms → 15&nbsp;s, unbounded). Every recipe takes an
 optional trailing `ResilienceConfig`:
 
@@ -466,7 +466,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.pambrose:etcd-recipes:0.11.0")
+    implementation("com.pambrose:etcd-recipes-core:0.12.0")
 }
 ```
 
@@ -474,10 +474,10 @@ If you use a version catalog (`gradle/libs.versions.toml`):
 
 ```toml
 [versions]
-etcd-recipes = "0.11.0"
+etcd-recipes-core = "0.12.0"
 
 [libraries]
-etcd-recipes = { module = "com.pambrose:etcd-recipes", version.ref = "etcd-recipes" }
+etcd-recipes-core = { module = "com.pambrose:etcd-recipes-core", version.ref = "etcd-recipes-core" }
 ```
 
 ### Gradle (Groovy DSL)
@@ -488,7 +488,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.pambrose:etcd-recipes:0.11.0'
+    implementation 'com.pambrose:etcd-recipes-core:0.12.0'
 }
 ```
 
@@ -498,8 +498,8 @@ dependencies {
 <dependencies>
     <dependency>
         <groupId>com.pambrose</groupId>
-        <artifactId>etcd-recipes</artifactId>
-        <version>0.11.0</version>
+        <artifactId>etcd-recipes-core</artifactId>
+        <version>0.12.0</version>
     </dependency>
 </dependencies>
 ```
@@ -510,7 +510,7 @@ JDK 17 is required (the build is configured with a Kotlin JVM toolchain of 17). 
 is checked in, so no local Gradle install is needed.
 
 ```
-./gradlew clean build -xtest      # build without running tests
+./gradlew clean build -x test     # build without running tests
 ./gradlew check                   # run all tests + Kover coverage
 ./gradlew lintKotlin              # kotlinter + detekt
 ```
@@ -557,7 +557,7 @@ Two complementary variants of the distributed-coordination tests live in the rep
 
 Issues and pull requests are welcome on [GitHub](https://github.com/pambrose/etcd-recipes). When
 adding a new recipe, please include a runnable example under `etcd-recipes-examples/` and Kotest
-tests under `etcd-recipes/src/test/kotlin/`.
+tests under `etcd-recipes-core/src/test/kotlin/`.
 
 ## License
 

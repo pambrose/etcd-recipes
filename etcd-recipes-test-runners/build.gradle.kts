@@ -5,7 +5,7 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":etcd-recipes"))
+    implementation(project(":etcd-recipes-core"))
 }
 
 tasks.shadowJar {

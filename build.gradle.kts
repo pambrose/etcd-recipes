@@ -7,8 +7,12 @@ import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+// The shared prefix (repo name + satellite-module prefix). The core library module itself is
+// "$libraryName-core"; the -examples/-micrometer/-jackson/-spring-boot-starter/-ktor/-test-runners
+// siblings keep the bare prefix.
 val libraryName = "etcd-recipes"
-val libraryModule = ":$libraryName"
+val coreName = "$libraryName-core"
+val libraryModule = ":$coreName"
 val examplesModule = ":$libraryName-examples"
 val micrometerModule = ":$libraryName-micrometer"
 val jacksonModule = ":$libraryName-jackson"
@@ -98,14 +102,14 @@ subprojects {
     // The library's tests include a container-based variant that reads result keys
     // written by the runners module. The runners module already depends on the library,
     // so this is a test-only one-way dependency, not a cycle.
-    if (name == libraryName) {
+    if (name == coreName) {
         dependencies {
             "testImplementation"(project(":$libraryName-test-runners"))
         }
     }
 
     // The library and its optional bindings are published; the examples and test-runners aren't.
-    if (name == libraryName ||
+    if (name == coreName ||
         name == "$libraryName-micrometer" ||
         name == "$libraryName-jackson" ||
         name == "$libraryName-spring-boot-starter" ||
@@ -120,6 +124,7 @@ subprojects {
 
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions {
+            freeCompilerArgs.add("-Xcollection-literals")
             listOf(
                 "kotlin.time.ExperimentalTime",
                 "kotlin.ExperimentalUnsignedTypes",
@@ -185,11 +190,11 @@ subprojects {
                 environment("TESTCONTAINERS_RYUK_DISABLED", "false")
             }
 
-            // The container-based tests (etcd-recipes/src/test/.../container) need
+            // The container-based tests (etcd-recipes-core/src/test/.../container) need
             // the test-runners fat JAR to mount into each participant container.
             // Wire it only for the library module's test task — the test-runners
             // module's own test task (if any) has no need for it.
-            if (project.name == libraryName) {
+            if (project.name == coreName) {
                 // String-form dependsOn defers task-graph wiring until after all projects are
                 // configured. The path itself is captured in a doFirst so that we look up the
                 // (now-registered) shadowJar task at execution time — a configure-time lookup
