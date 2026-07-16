@@ -16,6 +16,9 @@
 
 package io.etcd.recipes.coroutines
 
+import io.etcd.recipes.cache.NodeCache
+import io.etcd.recipes.cache.NodeCacheEvent
+import io.etcd.recipes.cache.NodeCacheListener
 import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.cache.PathChildrenCacheListener
@@ -48,6 +51,26 @@ fun PathChildrenCache.eventsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<Path
 
 /** The cache's watch-recovery transitions as a [Flow]; see [eventsAsFlow] for lifecycle. */
 fun PathChildrenCache.recoveryEventsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<WatchRecoveryEvent> =
+  callbackFlow {
+    val listener = WatchRecoveryListener { event -> trySendBlocking(event) }
+    addRecoveryListener(listener)
+    awaitClose { removeRecoveryListener(listener) }
+  }.buffer(capacity)
+
+/**
+ * The single-key cache's changes ([NodeCacheEvent], CREATED / UPDATED / DELETED) as a [Flow].
+ * Collection registers a listener and cancellation removes it; it never starts or closes the
+ * cache. The default unlimited [capacity] keeps a slow collector from stalling the watch dispatcher.
+ */
+fun <T> NodeCache<T>.eventsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<NodeCacheEvent<T>> =
+  callbackFlow {
+    val listener = NodeCacheListener<T> { event -> trySendBlocking(event) }
+    addListener(listener)
+    awaitClose { removeListener(listener) }
+  }.buffer(capacity)
+
+/** The single-key cache's watch-recovery transitions as a [Flow]; see [eventsAsFlow] for lifecycle. */
+fun NodeCache<*>.recoveryEventsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<WatchRecoveryEvent> =
   callbackFlow {
     val listener = WatchRecoveryListener { event -> trySendBlocking(event) }
     addRecoveryListener(listener)
