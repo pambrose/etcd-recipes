@@ -8,3 +8,9 @@ out
 default.etcd
 .DS_Store
 .claude/*.lock
+
+# Documentation site (website/). The virtualenv and the generated site are local
+# build artifacts; website/uv.lock is committed so CI pins the same zensical.
+.venv
+website/etcd-recipes/site
+website/etcd-recipes/.cache

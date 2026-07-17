@@ -1,0 +1,219 @@
+# ============================================================================
+#
+# Configuration for the etcd-recipes documentation site.
+#
+# Build it with `make docs` from the repo root, or:
+#
+#     cd website/etcd-recipes && zensical serve
+#
+# IMPORTANT: zensical must run with this directory as the working directory.
+# pymdownx.snippets resolves `base_path` against the process CWD (not against
+# this file's location), so `zensical build -f website/etcd-recipes/zensical.toml`
+# from the repo root will fail to find any snippet. Always cd here first.
+#
+# ============================================================================
+
+[project]
+
+site_name = "etcd-recipes"
+site_description = """
+Distributed coordination recipes for etcd v3 on the JVM: barriers, locks, leader \
+election, service discovery, queues, counters and caches, for Kotlin and Java.
+"""
+site_author = "Paul Ambrose"
+site_url = "https://pambrose.github.io/etcd-recipes/"
+
+repo_url = "https://github.com/pambrose/etcd-recipes"
+repo_name = "pambrose/etcd-recipes"
+
+# The docs_dir lives at website/etcd-recipes/docs, not at the repo root, so the
+# edit_uri that Zensical would otherwise derive from the repo host is wrong.
+edit_uri = "edit/master/website/etcd-recipes/docs/"
+
+copyright = """
+Copyright &copy; 2026 Paul Ambrose &ndash; Licensed under the Apache License 2.0
+"""
+
+# NOTE: there is deliberately no `watch` entry for the snippet source dirs.
+# It would be useful (editing a snippet would live-reload the page that embeds
+# it), but Zensical 0.0.50 panics on startup when `watch` names a path outside
+# the project directory: "panicked at crates/zensical/src/watcher.rs:299:12:
+# invariant". The panic fires on `build` too, not just `serve`. Re-test before
+# re-adding this on a Zensical upgrade.
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = [
+    { "Getting started" = "getting-started/index.md" },
+    { "Connecting" = "getting-started/connecting.md" },
+    { "Core concepts" = "getting-started/concepts.md" },
+  ] },
+  { "etcd basics" = [
+    { "etcd basics" = "basics/index.md" },
+    { "Key/value" = "basics/kv.md" },
+    { "Watches" = "basics/watch.md" },
+    { "Transactions" = "basics/txn.md" },
+    { "Leases" = "basics/lease.md" },
+  ] },
+  { "Recipes" = [
+    { "Recipes" = "recipes/index.md" },
+    { "Locks" = "recipes/locks.md" },
+    { "Leader election" = "recipes/election.md" },
+    { "Barriers" = "recipes/barriers.md" },
+    { "Queues" = "recipes/queues.md" },
+    { "Caches" = "recipes/caches.md" },
+    { "Counters" = "recipes/counter.md" },
+    { "Service discovery" = "recipes/discovery.md" },
+    { "Transient key/values" = "recipes/keyvalue.md" },
+  ] },
+  { "Typed values" = "typed-values.md" },
+  { "Coroutines" = [
+    { "Coroutines" = "coroutines/index.md" },
+    { "Flows" = "coroutines/flows.md" },
+  ] },
+  { "Resilience" = [
+    { "Resilience" = "resilience/index.md" },
+    { "Leases and loss" = "resilience/leases.md" },
+    { "Connection state" = "resilience/connection-state.md" },
+  ] },
+  { "Observability" = "observability.md" },
+  { "Integrations" = [
+    { "Integrations" = "integrations/index.md" },
+    { "Spring Boot" = "integrations/spring-boot.md" },
+    { "Ktor" = "integrations/ktor.md" },
+    { "Jackson" = "integrations/jackson.md" },
+  ] },
+  { "Java guide" = "java.md" },
+  { "Contributing" = "contributing.md" },
+]
+
+# ----------------------------------------------------------------------------
+# Theme
+# ----------------------------------------------------------------------------
+[project.theme]
+
+language = "en"
+
+features = [
+  "announce.dismiss",
+  "content.action.edit",
+  "content.action.view",
+  "content.code.annotate",
+  "content.code.copy",
+  "content.code.select",
+  "content.footnote.tooltips",
+  # Keeps the Kotlin/Java tabs in sync across the whole site: pick Java once and
+  # every page follows. This is what makes the dual-language docs bearable.
+  "content.tabs.link",
+  "content.tooltips",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.instant.prefetch",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "toc.follow",
+]
+
+# ----------------------------------------------------------------------------
+# Palette
+#
+# Dark mode is the default: Zensical uses the FIRST palette entry as the initial
+# scheme, so "slate" must lead. The second entry is what the toggle switches to.
+# ----------------------------------------------------------------------------
+[[project.theme.palette]]
+scheme = "slate"
+primary = "teal"
+accent = "teal"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+scheme = "default"
+primary = "teal"
+accent = "teal"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[project.theme.font]
+text = "Inter"
+code = "JetBrains Mono"
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/pambrose/etcd-recipes"
+
+# ----------------------------------------------------------------------------
+# Markdown extensions
+# ----------------------------------------------------------------------------
+[project.markdown_extensions.abbr]
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.def_list]
+[project.markdown_extensions.footnotes]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.tables]
+[project.markdown_extensions.toc]
+permalink = true
+
+[project.markdown_extensions.pymdownx.betterem]
+[project.markdown_extensions.pymdownx.caret]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.emoji]
+emoji_generator = "zensical.extensions.emoji.to_svg"
+emoji_index = "zensical.extensions.emoji.twemoji"
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.keys]
+[project.markdown_extensions.pymdownx.magiclink]
+[project.markdown_extensions.pymdownx.mark]
+[project.markdown_extensions.pymdownx.smartsymbols]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }
+]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+combine_header_slug = true
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true
+[project.markdown_extensions.pymdownx.tilde]
+
+# ----------------------------------------------------------------------------
+# Snippets
+#
+# Every code example on this site is a real, compiled source file living in a
+# Gradle test source set — never a hand-written fence. `./gradlew compileTestKotlin
+# compileTestJava` type-checks them against the actual API on every CI run, so an
+# example cannot silently rot when the library changes.
+#
+# base_path points at each module's src/test (not src/test/kotlin), which makes
+# both `kotlin/website/...` and `java/website/...` reachable under one entry.
+# The satellite modules need their own entries because etcd-recipes-core's test
+# source set cannot see them: they depend on core, not the other way round.
+#
+# Paths are tried in order and the first hit wins, so each satellite namespaces
+# its snippets under website/<module>/ to make shadowing impossible.
+# ----------------------------------------------------------------------------
+[project.markdown_extensions.pymdownx.snippets]
+base_path = [
+  "../../etcd-recipes-core/src/test",
+  "../../etcd-recipes-jackson/src/test",
+  "../../etcd-recipes-micrometer/src/test",
+  "../../etcd-recipes-spring-boot-starter/src/test",
+  "../../etcd-recipes-ktor/src/test",
+]
+# Fail the build on a missing snippet. Without this a bad path renders as an
+# empty code block, which is the one failure mode this whole design must not have.
+check_paths = true
+# Snippet bodies live inside functions; without this they render indented.
+dedent_subsections = true

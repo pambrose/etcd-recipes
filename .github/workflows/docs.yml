@@ -1,0 +1,75 @@
+name: Documentation
+
+on:
+  push:
+    branches:
+      - master
+  # Build (but don't deploy) on PRs. The docs embed code snippets from the Gradle
+  # test source sets via pymdownx.snippets with check_paths = true, so this job
+  # catches a doc that points at a snippet section someone renamed or deleted.
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege by default: the build job only reads the repo. The Pages
+# permissions are granted to the deploy job alone, so a PR build — which may run
+# code from a fork — never holds a token that can publish.
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        # zensical MUST run with the config directory as the working directory:
+        # pymdownx.snippets resolves base_path against the process CWD, not against
+        # the location of zensical.toml. Building from the repo root with
+        # `-f website/etcd-recipes/zensical.toml` silently finds no snippets.
+        working-directory: website/etcd-recipes
+    steps:
+      - uses: actions/checkout@v7
+
+      # NOTE: deliberately no actions/configure-pages here. It exists to enable
+      # Pages and to expose base_url/origin outputs for generators that need
+      # them; zensical.toml sets site_url explicitly, so we use neither. Having
+      # it in this job made every PR call the Pages API — which fails outright
+      # for fork PRs, whose token is read-only. Only the deploy job touches Pages.
+
+      # uv resolves zensical from website/uv.lock, so CI builds the docs with the
+      # same pinned version as a local `make site`.
+      # Pinned to an exact tag on purpose: astral-sh/setup-uv publishes a floating
+      # major only up to v7 — the 8.x line has patch tags only, so `@v8` does not
+      # resolve. Bump this deliberately.
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          enable-cache: true
+
+      - name: Build site
+        # --strict promotes warnings (a nav entry with no page, a broken internal
+        # link) into build failures.
+        run: uv run zensical build --clean --strict
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: website/etcd-recipes/site
+
+  deploy:
+    # Only master deploys; PRs stop after the build job above.
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/deploy-pages@v5
+        id: deployment
