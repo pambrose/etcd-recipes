@@ -17,6 +17,12 @@ guava = "33.6.0-jre"
 kotlin-logging = "8.0.4"
 logback = "1.5.38"
 
+# Optional integration bindings (each used by a single satellite module)
+jackson = "2.22.1"
+ktor = "3.5.1"
+micrometer = "1.17.0"
+spring-boot = "3.5.16"
+
 # Testing
 junit = "6.1.2"
 kotest = "6.2.2"
@@ -30,7 +36,7 @@ dokka = "2.2.0"
 kotlinter = "5.6.0"
 kover = "0.9.8"
 maven-publish = "0.37.0"
-shadow = "9.5.1"
+shadow = "9.6.0"
 
 [libraries]
 # Main library
@@ -44,6 +50,15 @@ kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = 
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+
+# Optional integration bindings
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
+spring-boot-actuator = { module = "org.springframework.boot:spring-boot-actuator", version.ref = "spring-boot" }
+spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure", version.ref = "spring-boot" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "spring-boot" }
 
 # Testing
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
