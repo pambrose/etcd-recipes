@@ -10,10 +10,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege by default: the build job only reads the repo. The Pages
+# permissions are granted to the deploy job alone, so a PR build — which may run
+# code from a fork — never holds a token that can publish.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: docs-${{ github.ref }}
@@ -33,7 +34,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/configure-pages@v6
+      # NOTE: deliberately no actions/configure-pages here. It exists to enable
+      # Pages and to expose base_url/origin outputs for generators that need
+      # them; zensical.toml sets site_url explicitly, so we use neither. Having
+      # it in this job made every PR call the Pages API — which fails outright
+      # for fork PRs, whose token is read-only. Only the deploy job touches Pages.
 
       # uv resolves zensical from website/uv.lock, so CI builds the docs with the
       # same pinned version as a local `make site`.
@@ -57,6 +62,9 @@ jobs:
     # Only master deploys; PRs stop after the build job above.
     if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
