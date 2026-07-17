@@ -82,14 +82,18 @@ public class PathChildrenCacheSnippets {
     // --8<-- [start:listener]
     try (PathChildrenCache cache = new PathChildrenCache(client, "/cache/workers")) {
       cache.addListener(event -> {
-        switch (event.getType()) {
-          case CHILD_ADDED -> System.out.println("Added " + event.getChildName());
-          case CHILD_UPDATED -> System.out.println("Updated " + event.getChildName());
+        // A switch expression rather than a statement: the compiler enforces that
+        // every Type is handled, so a new event type becomes a compile error here
+        // instead of an event this listener silently drops.
+        String message = switch (event.getType()) {
+          case CHILD_ADDED -> "Added " + event.getChildName();
+          case CHILD_UPDATED -> "Updated " + event.getChildName();
           // getData() carries the value the child held immediately before removal.
-          case CHILD_REMOVED -> System.out.println("Removed " + event.getChildName());
+          case CHILD_REMOVED -> "Removed " + event.getChildName();
           // Only INITIALIZED events populate getInitialData().
-          case INITIALIZED -> System.out.println("Primed: " + event.getInitialData().size());
-        }
+          case INITIALIZED -> "Primed: " + event.getInitialData().size();
+        };
+        System.out.println(message);
       });
       cache.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT);
     }
