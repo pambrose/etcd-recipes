@@ -13,7 +13,12 @@ jobs:
   test:
     name: build & test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The Testcontainers suite has been running 23-26 min on a 2-core runner for
+    # a while, so 30 left only a few minutes of headroom and any small addition
+    # tipped it over: the job would be killed after every test had already passed.
+    # This is a slow suite by nature (forkEvery=1, a container per fault-injection
+    # class), so give it real headroom rather than shaving the margin again.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
