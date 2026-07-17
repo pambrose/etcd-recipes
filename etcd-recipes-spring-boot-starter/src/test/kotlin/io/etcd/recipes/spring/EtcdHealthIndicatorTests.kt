@@ -25,7 +25,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
-import org.springframework.boot.actuate.health.Status
+import org.springframework.boot.health.contributor.Status
 import java.util.concurrent.CompletableFuture
 
 /** The health indicator maps the client's reachability probe to Actuator UP / DOWN. */

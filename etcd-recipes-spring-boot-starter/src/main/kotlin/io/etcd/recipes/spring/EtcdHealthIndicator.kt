@@ -20,8 +20,8 @@ package io.etcd.recipes.spring
 
 import io.etcd.jetcd.Client
 import io.etcd.recipes.common.ping
-import org.springframework.boot.actuate.health.Health
-import org.springframework.boot.actuate.health.HealthIndicator
+import org.springframework.boot.health.contributor.Health
+import org.springframework.boot.health.contributor.HealthIndicator
 
 /**
  * Spring Boot Actuator health for etcd: an active [Client.ping] (bounded count-only GET) maps to

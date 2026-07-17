@@ -24,8 +24,8 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
-import org.springframework.boot.actuate.health.HealthIndicator
 import org.springframework.boot.autoconfigure.AutoConfigurations
+import org.springframework.boot.health.contributor.HealthIndicator
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import java.util.function.Supplier
 
