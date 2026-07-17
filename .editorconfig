@@ -11,7 +11,7 @@ trim_trailing_whitespace = true
 [*.kts]
 indent_size = 4
 
-[{Makefile, makefile}]
+[{Makefile,makefile}]
 indent_style = tab
 indent_size = 4
 
