@@ -36,8 +36,11 @@ jobs:
       - uses: actions/configure-pages@v6
 
       # uv resolves zensical from website/uv.lock, so CI builds the docs with the
-      # same pinned version as a local `make docs`.
-      - uses: astral-sh/setup-uv@v8
+      # same pinned version as a local `make site`.
+      # Pinned to an exact tag on purpose: astral-sh/setup-uv publishes a floating
+      # major only up to v7 — the 8.x line has patch tags only, so `@v8` does not
+      # resolve. Bump this deliberately.
+      - uses: astral-sh/setup-uv@v8.3.2
         with:
           enable-cache: true
 
