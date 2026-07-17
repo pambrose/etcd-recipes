@@ -14,6 +14,8 @@ for [etcd](https://etcd.io) v3, a distributed, reliable key-value store. It prov
 distributed coordination primitives layered on top of the raw key/value API — similar in spirit to
 what [Curator](https://curator.apache.org) provides for [ZooKeeper](https://zookeeper.apache.org).
 
+📖 **Full documentation: [pambrose.github.io/etcd-recipes](https://pambrose.github.io/etcd-recipes/)**
+
 ## Recipes
 
 | Package | Recipes |
@@ -526,6 +528,9 @@ make lint               # kotlinter + detekt
 make coverage           # Kover HTML + XML reports
 make kdocs              # Dokka HTML / Javadoc
 make versions           # gradle dependencyUpdates
+
+make site               # serve the documentation site locally
+make docs-check         # compile the doc snippets + build the site strictly
 ```
 
 `make tests` and the examples expect a local etcd at `http://localhost:2379`. Start one with:
@@ -536,10 +541,16 @@ make versions           # gradle dependencyUpdates
 
 `make tests-tc` and `make tests-container` stand up etcd via Testcontainers and require Docker.
 
+The documentation site lives under `website/` and is built with [Zensical](https://zensical.org);
+see [website/README.md](website/README.md). Its code examples are not written into the Markdown —
+each one is a real source file under a `src/test/.../website/` source set, embedded at build time,
+so `./gradlew compileTestKotlin compileTestJava` type-checks every example on the site. `make
+docs-check` runs that compile and then builds the site in strict mode, which is what CI does.
+
 To run a single test class:
 
 ```
-./gradlew :etcd-recipes:test --tests "io.etcd.recipes.barrier.DistributedBarrierTests"
+./gradlew :etcd-recipes-core:test --tests "io.etcd.recipes.barrier.DistributedBarrierTests"
 ```
 
 ### Test variants

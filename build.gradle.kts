@@ -35,7 +35,8 @@ plugins {
     alias(libs.plugins.maven.publish) apply false
 }
 
-// Version and group are defined in gradle.properties; also update version refs in README.md and website/srcref/docs/{api,getting-started}.md
+// Version and group are defined in gradle.properties; also update the version refs in README.md
+// and website/etcd-recipes/docs/{getting-started/index.md,integrations/index.md}
 allprojects {
     providers.gradleProperty("overrideVersion").orNull?.let { version = it }
 }

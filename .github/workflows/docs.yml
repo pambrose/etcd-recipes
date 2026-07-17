@@ -1,0 +1,64 @@
+name: Documentation
+
+on:
+  push:
+    branches:
+      - master
+  # Build (but don't deploy) on PRs. The docs embed code snippets from the Gradle
+  # test source sets via pymdownx.snippets with check_paths = true, so this job
+  # catches a doc that points at a snippet section someone renamed or deleted.
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        # zensical MUST run with the config directory as the working directory:
+        # pymdownx.snippets resolves base_path against the process CWD, not against
+        # the location of zensical.toml. Building from the repo root with
+        # `-f website/etcd-recipes/zensical.toml` silently finds no snippets.
+        working-directory: website/etcd-recipes
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/configure-pages@v6
+
+      # uv resolves zensical from website/uv.lock, so CI builds the docs with the
+      # same pinned version as a local `make docs`.
+      - uses: astral-sh/setup-uv@v8
+        with:
+          enable-cache: true
+
+      - name: Build site
+        # --strict promotes warnings (a nav entry with no page, a broken internal
+        # link) into build failures.
+        run: uv run zensical build --clean --strict
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: website/etcd-recipes/site
+
+  deploy:
+    # Only master deploys; PRs stop after the build job above.
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/deploy-pages@v5
+        id: deployment

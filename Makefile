@@ -1,10 +1,22 @@
 .PHONY: default help clean clean-all stop etcd etcd-stop build tests tests-tc tests-container all-tests coverage kdocs \
+        site clean-site check-site upgrade-site docs-check \
         lint detekt detekt-baseline refresh versions publish-local publish-local-snapshot \
         publish-snapshot publish-maven-central upgrade-wrapper \
         _check-gpg-env _require-version _require-gradle-version
 
 VERSION := $(shell sed -n 's/^version=\(.*\)/\1/p' gradle.properties)
 GRADLE_VERSION := $(shell sed -n 's/^gradle-wrapper = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+
+# The uv project root: where pyproject.toml and uv.lock live. The check-site /
+# upgrade-site targets cd here so `uv lock` finds the project.
+WEBSITE_DIR := website
+
+# The zensical config dir, holding zensical.toml and docs/. zensical MUST run
+# with this as its working directory: pymdownx.snippets resolves base_path
+# against the process CWD rather than against zensical.toml's location, so
+# `zensical -f website/etcd-recipes/...` from the repo root silently finds no
+# snippets. Hence the cd in the site / docs-check targets.
+SITE_DIR := $(WEBSITE_DIR)/etcd-recipes
 
 GPG_ENV = \
 	ORG_GRADLE_PROJECT_signingInMemoryKey="$$(gpg --armor --export-secret-keys $$GPG_SIGNING_KEY_ID)" \
@@ -69,6 +81,26 @@ coverage: ## Generate Kover HTML + XML coverage reports and print the summary
 
 kdocs: ## Generate Dokka HTML and Javadoc documentation
 	./gradlew dokkaGenerate
+
+# The site embeds code examples straight out of the Gradle test source sets, so a
+# renamed snippet section breaks the docs build. This compiles the examples and
+# then builds the site in strict mode, which is what CI does.
+docs-check: ## Compile the doc snippets, then build the site in strict mode
+	./gradlew compileTestKotlin compileTestJava
+	cd $(SITE_DIR) && uv run zensical build --clean --strict
+
+check-site:  ## Check for outdated website dependencies
+	cd $(WEBSITE_DIR) && env -u VIRTUAL_ENV uv lock --upgrade --dry-run
+
+upgrade-site:  ## Upgrade the website dependencies
+	cd $(WEBSITE_DIR) && env -u VIRTUAL_ENV uv lock --upgrade
+
+clean-site:  ## Remove generated zensical site and cache
+	rm -rf $(SITE_DIR)/site
+	rm -rf $(SITE_DIR)/.cache
+
+site: clean-site  ## Serve the docs site locally with zensical
+	cd $(SITE_DIR) && uv run zensical serve
 
 lint: ## Run kotlinter and detekt (style + static analysis)
 	./gradlew lintKotlin detekt
