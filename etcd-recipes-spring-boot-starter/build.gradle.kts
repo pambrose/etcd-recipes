@@ -1,5 +1,5 @@
 dependencies {
-  api(project(":etcd-recipes"))
+  api(project(":etcd-recipes-core"))
   // Declared inline rather than in the version catalog: these Spring deps are unique to this
   // module, and the catalog is otherwise reserved for shared dependencies.
   api("org.springframework.boot:spring-boot-autoconfigure:3.5.16")

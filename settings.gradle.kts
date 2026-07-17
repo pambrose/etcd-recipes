@@ -18,7 +18,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "etcd-recipes"
 
-include("etcd-recipes")
+include("etcd-recipes-core")
 include("etcd-recipes-examples")
 include("etcd-recipes-micrometer")
 include("etcd-recipes-jackson")

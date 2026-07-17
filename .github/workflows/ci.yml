@@ -45,7 +45,7 @@ jobs:
           # at build/reports/kover/report.xml is empty because the root
           # project has no Kotlin source for Kover 0.9's aggregation to
           # attach to; the per-subproject report has the real data.
-          files: ./etcd-recipes/build/reports/kover/report.xml
+          files: ./etcd-recipes-core/build/reports/kover/report.xml
           # Do NOT let the action auto-discover reports. Search picks up the
           # empty root aggregate plus the examples/test-runners reports (no
           # main source / no tests), which report 0% and, when the named file
