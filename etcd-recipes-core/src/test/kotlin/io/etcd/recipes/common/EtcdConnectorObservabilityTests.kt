@@ -65,7 +65,7 @@ class EtcdConnectorObservabilityTests : StringSpec() {
               // count-only probe: empty kvs, not paginated
               CompletableFuture.completedFuture(
                 mockk<GetResponse> {
-                  every { kvs } returns emptyList()
+                  every { kvs } returns []
                   every { isMore } returns false
                 },
               )
@@ -86,8 +86,8 @@ class EtcdConnectorObservabilityTests : StringSpec() {
       val boom = RuntimeException("boom")
       connector.record("alpha keep-alive", boom)
 
-      connector.exceptions shouldBe listOf(boom)
-      seen shouldBe listOf("alpha keep-alive" to boom)
+      connector.exceptions shouldBe [boom]
+      seen shouldBe ["alpha keep-alive" to boom]
     }
 
     "a throwing background-exception listener is caught and does not recurse or re-record" {

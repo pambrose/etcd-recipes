@@ -36,10 +36,10 @@ private const val LOCAL_ETCD_PORT = 2379
 
 val urls: List<String> by lazy {
   if (System.getProperty("etcd.recipes.testcontainers") == "true") {
-    listOf(EtcdTestContainer.endpoint())
+    [EtcdTestContainer.endpoint()]
   } else {
     assertLocalEtcdReachable(LOCAL_ETCD_HOST, LOCAL_ETCD_PORT)
-    listOf("http://$LOCAL_ETCD_HOST:$LOCAL_ETCD_PORT")
+    ["http://$LOCAL_ETCD_HOST:$LOCAL_ETCD_PORT"]
   }
 }
 

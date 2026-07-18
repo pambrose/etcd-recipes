@@ -53,7 +53,7 @@ class JacksonCodecTests : StringSpec() {
 
     "JacksonCodec round-trips a generic type via TypeReference" {
       val codec = JacksonCodec(object : TypeReference<List<Point>>() {})
-      val value = listOf(Point(1, 1), Point(2, 2))
+      val value = [Point(1, 1), Point(2, 2)]
       codec.decode(codec.encode(value)) shouldBe value
     }
 

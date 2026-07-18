@@ -131,7 +131,7 @@ internal object EtcdTestContainer {
     var lastFailure: Exception? = null
     while (start.elapsedNow() < timeout) {
       try {
-        connectToEtcd(listOf(endpoint())) { client ->
+        connectToEtcd([endpoint()]) { client ->
           client.kvClient.get("/fault/ready-probe".asByteSequence).get(2, TimeUnit.SECONDS)
         }
         return

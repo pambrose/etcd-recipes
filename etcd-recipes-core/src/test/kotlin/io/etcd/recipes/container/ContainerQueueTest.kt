@@ -39,7 +39,7 @@ class ContainerQueueTest :
       val total = consumerCount * itemsPerConsumer
       val testId = newTestId("queue")
       val queuePath = "/queues/$testId"
-      val hostUrls = listOf(EtcdContainerNetwork.hostEndpoint())
+      val hostUrls = [EtcdContainerNetwork.hostEndpoint()]
       val produced = (1..total).map { "item-%04d".format(it) }
 
       connectToEtcd(hostUrls) { client ->

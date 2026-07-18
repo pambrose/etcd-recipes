@@ -34,7 +34,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
   val electionPath = "/election/latch-example"
   val count = 5
   val done = CountDownLatch(count)

@@ -121,7 +121,7 @@ class DistributedSemaphoreTests : StringSpec() {
           gateThread.join(10_000)
           w1.join(15_000)
           w2.join(15_000)
-          grants.toList() shouldBe listOf("w1", "w2")
+          grants.toList() shouldBe ["w1", "w2"]
         }
       }
     }

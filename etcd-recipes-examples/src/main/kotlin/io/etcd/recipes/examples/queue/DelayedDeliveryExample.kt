@@ -31,7 +31,7 @@ import kotlin.time.TimeSource
  */
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
 
   connectToEtcd(urls) { client ->
     DistributedWorkQueue(client, "/examples/delayed").use { queue ->

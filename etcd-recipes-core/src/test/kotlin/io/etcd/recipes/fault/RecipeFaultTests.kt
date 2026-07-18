@@ -82,7 +82,7 @@ class RecipeFaultTests : StringSpec() {
 
           client.putValue("$namesPath/$serviceName/${after.id}", after.toJson())
           pollUntil(60.seconds) {
-            cache.instances.map { it.jsonPayload }.sorted() == listOf("after", "before")
+            cache.instances.map { it.jsonPayload }.sorted() == ["after", "before"]
           } shouldBe true
         }
       }

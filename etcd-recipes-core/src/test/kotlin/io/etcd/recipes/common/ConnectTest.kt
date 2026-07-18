@@ -24,7 +24,7 @@ import io.kotest.core.spec.style.StringSpec
 class ConnectTest : StringSpec() {
     init {
         "badArgsTest" {
-            shouldThrow<IllegalArgumentException> { connectToEtcd(emptyList()) { this } }
+            shouldThrow<IllegalArgumentException> { connectToEtcd([]) { this } }
         }
     }
 }

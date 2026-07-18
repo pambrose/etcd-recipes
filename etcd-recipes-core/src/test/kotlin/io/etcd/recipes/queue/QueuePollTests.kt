@@ -115,7 +115,7 @@ class QueuePollTests : StringSpec() {
       connectToEtcd(urls) { client ->
         client.deleteChildren("$base/batch")
         DistributedQueue(client, "$base/batch").use { queue ->
-          queue.enqueueAll(listOf("a", "b", "c").map { it.asByteSequence })
+          queue.enqueueAll(["a", "b", "c"].map { it.asByteSequence })
 
           // one transaction => every entry shares the same mod revision
           val option: GetOption = getOption { isPrefix(true) }

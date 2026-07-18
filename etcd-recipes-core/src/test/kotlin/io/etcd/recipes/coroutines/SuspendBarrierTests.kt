@@ -98,7 +98,7 @@ class SuspendBarrierTests : StringSpec() {
                 }
               }
             }
-          results.awaitAll() shouldBe listOf(true, true, true)
+          results.awaitAll() shouldBe [true, true, true]
         }
       }
     }

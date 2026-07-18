@@ -33,7 +33,7 @@ private val logger = KotlinLogging.logger {}
 fun Application.installPlugin() {
   // --8<-- [start:install]
   install(EtcdPlugin) {
-    endpoints = listOf("http://localhost:2379")
+    endpoints = ["http://localhost:2379"]
     namespace = "/myapp/"
   }
   // --8<-- [end:install]
@@ -42,7 +42,7 @@ fun Application.installPlugin() {
 fun Application.installWithAuth() {
   // --8<-- [start:auth]
   install(EtcdPlugin) {
-    endpoints = listOf("http://etcd-1:2379", "http://etcd-2:2379")
+    endpoints = ["http://etcd-1:2379", "http://etcd-2:2379"]
     user = "orders-svc"
     password = System.getenv("ETCD_PASSWORD")
     namespace = "/myapp/"
@@ -54,7 +54,7 @@ fun Application.installOwnClient() {
   // --8<-- [start:own-client]
   // Injecting a client makes the plugin a pure consumer: it will NOT close this client on
   // ApplicationStopping, because it did not create it. Closing it stays your job.
-  val myClient = connectToEtcd(listOf("http://localhost:2379"))
+  val myClient = connectToEtcd(["http://localhost:2379"])
 
   install(EtcdPlugin) {
     client = myClient

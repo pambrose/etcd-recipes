@@ -36,14 +36,14 @@ class ProviderStrategyTests : StringSpec() {
     }
 
     "RandomStrategy returns null on an empty list" {
-      RandomStrategy.select(emptyList()) shouldBe null
+      RandomStrategy.select([]) shouldBe null
     }
 
     "RoundRobinStrategy cycles through every instance in order and wraps" {
       val list = instances(3)
       val strategy = RoundRobinStrategy()
       val picks = (1..6).map { strategy.select(list) }
-      picks shouldBe listOf(list[0], list[1], list[2], list[0], list[1], list[2])
+      picks shouldBe [list[0], list[1], list[2], list[0], list[1], list[2]]
     }
 
     "RoundRobinStrategy stays valid when the list shrinks" {
@@ -52,12 +52,12 @@ class ProviderStrategyTests : StringSpec() {
       strategy.select(three) // advance the cursor
       strategy.select(three)
       // List drops to 1: index must stay in range, never throw.
-      val one = listOf(three[0])
+      val one = [three[0]]
       repeat(5) { strategy.select(one) shouldBe three[0] }
     }
 
     "RoundRobinStrategy returns null on an empty list" {
-      RoundRobinStrategy().select(emptyList()) shouldBe null
+      RoundRobinStrategy().select([]) shouldBe null
     }
 
     "StickyStrategy returns the same instance until it leaves, then re-picks" {
@@ -77,7 +77,7 @@ class ProviderStrategyTests : StringSpec() {
       val list = instances(2)
       val strategy = StickyStrategy()
       strategy.select(list)
-      strategy.select(emptyList()) shouldBe null
+      strategy.select([]) shouldBe null
       strategy.select(list) shouldBeIn list
     }
   }

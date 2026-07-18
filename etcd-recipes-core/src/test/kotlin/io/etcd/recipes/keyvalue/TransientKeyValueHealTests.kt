@@ -97,13 +97,13 @@ class TransientKeyValueHealTests : StringSpec() {
         tkv.addLeaseListener { events += it }
         tkv.start()
 
-        mocks.putLeaseIds shouldBe listOf(100L)
+        mocks.putLeaseIds shouldBe [100L]
 
         // jetcd's DeadLine service fires onCompleted when the lease expires unrenewed
         mocks.observers.first().onCompleted()
 
         pollUntil(10.seconds) { events.any { it is LeaseEvent.Restored } } shouldBe true
-        mocks.putLeaseIds shouldBe listOf(100L, 101L)
+        mocks.putLeaseIds shouldBe [100L, 101L]
         tkv.connectionState shouldBe ConnectionState.RECONNECTED
         tkv.hasExceptions shouldBe true // the expiry itself is still recorded
       }

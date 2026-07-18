@@ -58,7 +58,7 @@ class TypedDistributedQueueTests : StringSpec() {
         client.deleteChildren(path)
         TypedDistributedQueue(client, path, jsonCodec<Msg>()).use { queue ->
           queue.enqueue(Msg(1, "a"))
-          queue.enqueueAll(listOf(Msg(2, "b"), Msg(3, "c")))
+          queue.enqueueAll([Msg(2, "b"), Msg(3, "c")])
           queue.dequeue() shouldBe Msg(1, "a")
           queue.dequeue() shouldBe Msg(2, "b")
           queue.dequeue() shouldBe Msg(3, "c")

@@ -56,10 +56,10 @@ class ConnectionStateTests : StringSpec() {
       connector.watchEvent(WatchRecoveryEvent.Resubscribed("/k", 42))
       connector.connectionState shouldBe ConnectionState.RECONNECTED
 
-      transitions shouldBe listOf(
+      transitions shouldBe [
         ConnectionState.SUSPENDED to ConnectionState.CONNECTED,
         ConnectionState.RECONNECTED to ConnectionState.SUSPENDED,
-      )
+      ]
     }
 
     "lease expiry drives LOST and restoration drives RECONNECTED" {
@@ -86,7 +86,7 @@ class ConnectionStateTests : StringSpec() {
       connector.leaseEvent(LeaseEvent.Suspended(7L, boom))
       connector.watchEvent(WatchRecoveryEvent.Suspended("/k2", boom))
 
-      transitions shouldBe listOf(ConnectionState.SUSPENDED)
+      transitions shouldBe [ConnectionState.SUSPENDED]
     }
 
     "listener exceptions are recorded and do not block other listeners" {
@@ -97,7 +97,7 @@ class ConnectionStateTests : StringSpec() {
 
       connector.watchEvent(WatchRecoveryEvent.Suspended("/k", boom))
 
-      seen shouldBe listOf(ConnectionState.SUSPENDED)
+      seen shouldBe [ConnectionState.SUSPENDED]
       connector.hasExceptions shouldBe true
       connector.exceptions.first().shouldBeInstanceOf<IllegalStateException>()
     }
@@ -111,7 +111,7 @@ class ConnectionStateTests : StringSpec() {
       connector.removeConnectionStateListener(listener)
       connector.watchEvent(WatchRecoveryEvent.Resubscribed("/k", 1))
 
-      seen shouldBe listOf(ConnectionState.SUSPENDED)
+      seen shouldBe [ConnectionState.SUSPENDED]
     }
   }
 }

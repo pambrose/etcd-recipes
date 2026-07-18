@@ -31,7 +31,7 @@ import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
   val barrierPath = "/barriers/barrierwithcountdemo"
   val count = 30
   val waitLatch = CountDownLatch(count)

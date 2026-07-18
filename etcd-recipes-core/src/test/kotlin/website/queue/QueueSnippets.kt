@@ -72,11 +72,11 @@ fun batchEnqueue(client: Client) {
     // One transaction: either every value lands or none does. The keys embed the
     // argument index, so within the batch consumers see them in argument order.
     queue.enqueueAll(
-      listOf(
+      [
         "order-1".asByteSequence,
         "order-2".asByteSequence,
         "order-3".asByteSequence,
-      ),
+      ],
     )
 
     // size costs a range-count RPC on every read — it is not a cached counter.
@@ -100,7 +100,7 @@ fun typedQueue(client: Client) {
   // --8<-- [start:typed]
   TypedDistributedQueue(client, "/queues/orders", jsonCodec<Order>()).use { queue ->
     queue.enqueue(Order(1, "widget"))
-    queue.enqueueAll(listOf(Order(2, "gadget"), Order(3, "gizmo")))
+    queue.enqueueAll([Order(2, "gadget"), Order(3, "gizmo")])
 
     val order: Order = queue.dequeue()
     logger.info { "Dequeued $order" }

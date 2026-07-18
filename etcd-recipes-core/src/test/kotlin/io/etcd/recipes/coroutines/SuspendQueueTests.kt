@@ -86,7 +86,7 @@ class SuspendQueueTests : StringSpec() {
       connectToEtcd(urls).use { client ->
         client.deleteChildren(base)
         DistributedQueue(client, "$base/batch").use { queue ->
-          queue.awaitEnqueueAll(listOf("x".asByteSequence, "y".asByteSequence, "z".asByteSequence))
+          queue.awaitEnqueueAll(["x".asByteSequence, "y".asByteSequence, "z".asByteSequence])
           queue.receive().asString shouldBe "x"
           queue.receive().asString shouldBe "y"
           queue.receive().asString shouldBe "z"

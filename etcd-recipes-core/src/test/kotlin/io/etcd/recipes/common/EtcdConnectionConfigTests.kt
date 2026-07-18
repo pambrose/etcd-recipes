@@ -33,7 +33,7 @@ class EtcdConnectionConfigTests : StringSpec() {
     "config maps auth, namespace, and timeouts onto the jetcd builder" {
       val config =
         EtcdConnectionConfig(
-          endpoints = listOf("http://localhost:2379"),
+          endpoints = ["http://localhost:2379"],
           user = "root",
           password = "secret",
           namespace = "/tenant/",

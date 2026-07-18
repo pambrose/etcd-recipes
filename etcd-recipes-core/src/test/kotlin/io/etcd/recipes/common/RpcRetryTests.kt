@@ -147,7 +147,7 @@ class RpcRetryTests : StringSpec() {
                 } else {
                   CompletableFuture.completedFuture(
                     mockk {
-                      every { kvs } returns emptyList()
+                      every { kvs } returns []
                       every { isMore } returns false
                     },
                   )

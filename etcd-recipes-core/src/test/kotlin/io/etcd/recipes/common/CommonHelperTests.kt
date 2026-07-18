@@ -60,13 +60,13 @@ class CommonHelperTests : StringSpec() {
         }
 
         "List<Pair<String, ByteSequence>> converts and exposes keys/values" {
-            val list = listOf("a" to 1.asByteSequence, "b" to 2.asByteSequence)
-            list.asInt shouldBe listOf("a" to 1, "b" to 2)
-            list.asInt.keys shouldBe listOf("a", "b")
-            list.asInt.values shouldBe listOf(1, 2)
+            val list = ["a" to 1.asByteSequence, "b" to 2.asByteSequence]
+            list.asInt shouldBe ["a" to 1, "b" to 2]
+            list.asInt.keys shouldBe ["a", "b"]
+            list.asInt.values shouldBe [1, 2]
 
-            listOf("a" to 1L.asByteSequence).asLong shouldBe listOf("a" to 1L)
-            listOf("a" to "x".asByteSequence).asString shouldBe listOf("a" to "x")
+            ["a" to 1L.asByteSequence].asLong shouldBe ["a" to 1L]
+            ["a" to "x".asByteSequence].asString shouldBe ["a" to "x"]
         }
 
         // --- BuilderUtils option DSLs ---

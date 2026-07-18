@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.days
 
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
   val servicePath = "/services/test"
 
   connectToEtcd(urls) { client ->

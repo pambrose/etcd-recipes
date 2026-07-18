@@ -78,7 +78,7 @@ class ResilientWatcherTests : StringSpec() {
 
   private fun progressResponse(headerRevision: Long): WatchResponse =
     mockk {
-      every { events } returns emptyList()
+      every { events } returns []
       every { header } returns mockk { every { revision } returns headerRevision }
     }
 
@@ -279,7 +279,7 @@ class ResilientWatcherTests : StringSpec() {
         pollUntil(5.seconds) { mocks.listeners.size == 2 } shouldBe true
         mocks.listeners[1].onNext(eventResponse(50))
         pollUntil(5.seconds) { received.size == 3 } shouldBe true
-        received shouldBe listOf(41L, 42L, 50L)
+        received shouldBe [41L, 42L, 50L]
         received shouldContain 50L
       }
     }

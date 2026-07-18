@@ -56,7 +56,7 @@ class TypedPathChildrenCacheTests : StringSpec() {
         TypedPathChildrenCache(client, path, codec).use { cache ->
           cache.start(buildInitial = true)
           cache.currentData shouldContainExactlyInAnyOrder
-            listOf(TypedChildData("a", Node(1)), TypedChildData("b", Node(2)))
+            [TypedChildData("a", Node(1)), TypedChildData("b", Node(2))]
           cache.getCurrentData("a") shouldBe Node(1)
           cache.currentDataAsMap shouldBe mapOf("a" to Node(1), "b" to Node(2))
         }

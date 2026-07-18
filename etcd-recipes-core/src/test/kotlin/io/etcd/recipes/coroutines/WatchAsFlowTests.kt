@@ -99,8 +99,8 @@ class WatchAsFlowTests : StringSpec() {
           client.deleteChildren("$base/ordered")
           untilTrue(15.seconds) { seen.size == 3 } shouldBe true
           seen.map { it.first } shouldContainExactly
-            listOf(WatchEvent.EventType.PUT, WatchEvent.EventType.PUT, WatchEvent.EventType.DELETE)
-          seen.take(2).map { it.second } shouldContainExactly listOf("v1", "v2")
+            [WatchEvent.EventType.PUT, WatchEvent.EventType.PUT, WatchEvent.EventType.DELETE]
+          seen.take(2).map { it.second } shouldContainExactly ["v1", "v2"]
         }
       }
     }
@@ -124,7 +124,7 @@ class WatchAsFlowTests : StringSpec() {
           client.putValue("$prefix/b", "2")
           client.putValue("$prefix/c", "3")
           untilTrue(15.seconds) { seen.size == 3 } shouldBe true
-          seen.toList() shouldContainExactly listOf("a", "b", "c")
+          seen.toList() shouldContainExactly ["a", "b", "c"]
         }
       }
     }
@@ -149,7 +149,7 @@ class WatchAsFlowTests : StringSpec() {
 
           client.putValue(key, "after")
           delay(2_000) // grace: a live watcher would have delivered by now
-          seen.toList() shouldContainExactly listOf("before")
+          seen.toList() shouldContainExactly ["before"]
         }
       }
     }

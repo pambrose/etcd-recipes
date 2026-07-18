@@ -29,7 +29,7 @@ import java.time.Duration
  */
 @ConfigurationProperties("etcd.recipes")
 data class EtcdProperties(
-  val endpoints: List<String> = emptyList(),
+  val endpoints: List<String> = [],
   val user: String? = null,
   val password: String? = null,
   val namespace: String? = null,

@@ -47,18 +47,18 @@ class PathChildrenCacheTrailingSlashTests : StringSpec() {
                     cache.start(buildInitial = true)
 
                     // Snapshot path (loadDataAndStartWatcher): full name, not "ar".
-                    cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder listOf("bar")
+                    cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder ["bar"]
                     cache.getCurrentData("bar")?.asString shouldBe "v1"
 
                     // Live watcher PUT lands in the same key space — no duplicate/stale key.
                     client.putValue("$base/baz", "v2")
                     pollUntil(5.seconds) { cache.getCurrentData("baz") != null } shouldBe true
                     cache.getCurrentData("baz")?.asString shouldBe "v2"
-                    cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder listOf("bar", "baz")
+                    cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder ["bar", "baz"]
 
                     // rebuild() re-reads via the same prefix and must agree.
                     cache.rebuild()
-                    cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder listOf("bar", "baz")
+                    cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder ["bar", "baz"]
                     cache.getCurrentData("bar")?.asString shouldBe "v1"
                 }
 

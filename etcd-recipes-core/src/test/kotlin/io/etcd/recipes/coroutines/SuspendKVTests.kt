@@ -68,9 +68,9 @@ class SuspendKVTests : StringSpec() {
 
         client.awaitGetChildCount(path) shouldBe 3L
         client.awaitGetChildrenKeys(path).map { it.substringAfterLast('/') } shouldContainExactly
-          listOf("a", "b", "c")
-        client.awaitGetChildrenValues(path).map { it.asString } shouldContainExactly listOf("1", "2", "3")
-        client.awaitGetChildren(path).map { it.second.asString } shouldContainExactly listOf("1", "2", "3")
+          ["a", "b", "c"]
+        client.awaitGetChildrenValues(path).map { it.asString } shouldContainExactly ["1", "2", "3"]
+        client.awaitGetChildren(path).map { it.second.asString } shouldContainExactly ["1", "2", "3"]
 
         client.awaitGetFirstChild(path, GetOption.SortTarget.KEY)
           .kvs.single().key.asString.substringAfterLast('/') shouldBe "a"

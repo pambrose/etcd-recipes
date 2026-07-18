@@ -34,7 +34,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
   val key = "/config/node-example/greeting"
 
   connectToEtcd(urls) { client ->

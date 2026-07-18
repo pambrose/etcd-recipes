@@ -54,7 +54,7 @@ class SerialServiceDiscoveryTests : StringSpec() {
                     queryForInstance(service.name, service.id) shouldBe service
 
                     logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
-                    queryForInstances(service.name) shouldBe listOf(service)
+                    queryForInstances(service.name) shouldBe [service]
 
                     logger.debug { "Retrieved names: ${queryForNames()}" }
                     queryForNames().first() shouldEndWith service.id
@@ -68,7 +68,7 @@ class SerialServiceDiscoveryTests : StringSpec() {
                     queryForInstance(service.name, service.id) shouldBe service
 
                     logger.debug { "Retrieved values: ${queryForInstances(service.name)}" }
-                    queryForInstances(service.name) shouldBe listOf(service)
+                    queryForInstances(service.name) shouldBe [service]
 
                     logger.debug { "Retrieved names: ${queryForNames()}" }
                     queryForNames().first() shouldEndWith service.id

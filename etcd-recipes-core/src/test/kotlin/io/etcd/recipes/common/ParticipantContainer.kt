@@ -59,20 +59,20 @@ internal object Participant {
     extraArgs: Map<String, String> = emptyMap(),
     startupTimeout: Duration = Duration.ofSeconds(60),
   ): GenericContainer<*> {
-    val args =
-      mutableListOf(
+    val args: MutableList<String> =
+      [
         "--recipe=$recipe",
         "--role=$role",
         "--etcd=${EtcdContainerNetwork.inNetworkEndpoint()}",
         "--test-id=$testId",
         "--participant-id=$participantId",
-      )
+      ]
     extraArgs.forEach { (k, v) -> args += "--$k=$v" }
 
     return GenericContainer(DockerImageName.parse(RUNNER_IMAGE))
       .withNetwork(EtcdContainerNetwork.network)
       .withCopyFileToContainer(MountableFile.forHostPath(runnerJarPath), JAR_DEST)
-      .withCommand(*(listOf("java", "-jar", JAR_DEST) + args).toTypedArray())
+      .withCommand(*(["java", "-jar", JAR_DEST] + args).toTypedArray())
       .waitingFor(Wait.forLogMessage(".*Starting runner.*\\n", 1).withStartupTimeout(startupTimeout))
   }
 }

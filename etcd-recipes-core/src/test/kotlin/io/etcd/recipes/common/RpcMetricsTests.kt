@@ -64,7 +64,7 @@ class RpcMetricsTests : StringSpec() {
             every { get(any<ByteSequence>(), any<GetOption>()) } returns
               CompletableFuture.completedFuture(
                 mockk<GetResponse> {
-                  every { kvs } returns emptyList()
+                  every { kvs } returns []
                   every { isMore } returns false
                 },
               )

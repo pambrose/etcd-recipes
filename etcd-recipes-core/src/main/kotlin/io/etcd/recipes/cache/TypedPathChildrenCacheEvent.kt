@@ -27,7 +27,7 @@ class TypedPathChildrenCacheEvent<T>(
   val type: PathChildrenCacheEvent.Type,
   val data: T?,
 ) {
-  internal var initialDataVal: List<TypedChildData<T>> = emptyList()
+  internal var initialDataVal: List<TypedChildData<T>> = []
 
   val initialData: List<TypedChildData<T>> get() = initialDataVal
 

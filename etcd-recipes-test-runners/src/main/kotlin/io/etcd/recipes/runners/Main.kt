@@ -52,13 +52,13 @@ internal inline fun <reified P> RecipeRunner.result(
   )
 
 private val runners: Map<Pair<String, String>, RecipeRunner> =
-  listOf(
+  [
     BarrierWaiterRunner,
     ElectionParticipantRunner,
     QueueConsumerRunner,
     CounterIncrementRunner,
     ServiceRegistrationRunner,
-  ).associateBy { it.recipe to it.role }
+  ].associateBy { it.recipe to it.role }
 
 fun main(rawArgs: Array<String>) {
   val args = Args(rawArgs)
@@ -77,7 +77,7 @@ fun main(rawArgs: Array<String>) {
   @Suppress("TooGenericExceptionCaught")
   val result =
     try {
-      connectToEtcd(listOf(etcd)) { client ->
+      connectToEtcd([etcd]) { client ->
         val outcome = runner.run(client, testId, participantId, args)
         client.recordResult(outcome)
         outcome
@@ -93,7 +93,7 @@ fun main(rawArgs: Array<String>) {
           errorMessage = "${t.javaClass.simpleName}: ${t.message}",
         )
       runCatching {
-        connectToEtcd(listOf(etcd)) { client -> client.recordResult(failure) }
+        connectToEtcd([etcd]) { client -> client.recordResult(failure) }
       }
       failure
     }

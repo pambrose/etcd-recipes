@@ -40,7 +40,7 @@ import kotlin.concurrent.atomics.incrementAndFetch
  */
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
 
   runBlocking {
     connectToEtcd(urls).use { client ->

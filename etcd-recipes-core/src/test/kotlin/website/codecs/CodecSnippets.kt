@@ -91,7 +91,7 @@ fun typedQueue(client: Client) {
   // --8<-- [start:typed-queue]
   TypedDistributedQueue(client, "/queues/orders", jsonCodec<Order>()).use { queue ->
     queue.enqueue(Order("A-1", 3))
-    queue.enqueueAll(listOf(Order("A-2", 1), Order("A-3", 7)))
+    queue.enqueueAll([Order("A-2", 1), Order("A-3", 7)])
 
     // dequeue() hands back an Order, not a ByteSequence.
     val order: Order = queue.dequeue()
