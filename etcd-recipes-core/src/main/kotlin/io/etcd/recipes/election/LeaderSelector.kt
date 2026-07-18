@@ -594,7 +594,7 @@ constructor(
     ): List<Participant> {
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 
-      val participants = mutableListOf<Participant>()
+      val participants: MutableList<Participant> = []
       val leader = client.getValue(electionPath.withLeaderSuffix)?.asString?.stripUniqueSuffix ?: ""
       client.getChildrenValues(electionPath.withParticipationSuffix).map { it.asString }
         .forEach { participants += Participant(it, leader == it) }

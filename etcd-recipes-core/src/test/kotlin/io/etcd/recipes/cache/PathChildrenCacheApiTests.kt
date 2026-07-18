@@ -35,65 +35,65 @@ import kotlin.concurrent.atomics.incrementAndFetch
  * existing event-driven tests do not exercise.
  */
 class PathChildrenCacheApiTests : StringSpec() {
-    private val path = "/caches/${javaClass.simpleName}"
+  private val path = "/caches/${javaClass.simpleName}"
 
-    init {
-        "currentData, currentDataAsMap and getCurrentData reflect seeded children" {
-            connectToEtcd(urls) { client ->
-                client.deleteChildren(path)
-                client.putValue("$path/k1", "v1")
-                client.putValue("$path/k2", "v2")
+  init {
+    "currentData, currentDataAsMap and getCurrentData reflect seeded children" {
+      connectToEtcd(urls) { client ->
+        client.deleteChildren(path)
+        client.putValue("$path/k1", "v1")
+        client.putValue("$path/k2", "v2")
 
-                PathChildrenCache(client, path).use { cache ->
-                    cache.start(buildInitial = true)
+        PathChildrenCache(client, path).use { cache ->
+          cache.start(buildInitial = true)
 
-                    cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder listOf("k1", "k2")
-                    cache.getCurrentData("k1")?.asString shouldBe "v1"
-                    cache.getCurrentData("missing") shouldBe null
-                    cache.currentData.map { it.key to it.value.asString } shouldContainExactlyInAnyOrder
-                        listOf("k1" to "v1", "k2" to "v2")
-                }
-
-                client.deleteChildren(path)
-            }
+          cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder ["k1", "k2"]
+          cache.getCurrentData("k1")?.asString shouldBe "v1"
+          cache.getCurrentData("missing") shouldBe null
+          cache.currentData.map { it.key to it.value.asString } shouldContainExactlyInAnyOrder
+            ["k1" to "v1", "k2" to "v2"]
         }
 
-        "rebuild re-reads children added directly to etcd" {
-            connectToEtcd(urls) { client ->
-                client.deleteChildren(path)
-                client.putValue("$path/a", "1")
-
-                PathChildrenCache(client, path).use { cache ->
-                    cache.start(buildInitial = true)
-                    cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder listOf("a")
-
-                    client.putValue("$path/b", "2")
-                    cache.rebuild()
-                    cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder listOf("a", "b")
-                }
-
-                client.deleteChildren(path)
-            }
-        }
-
-        "clearListeners removes registered listeners before events fire" {
-            connectToEtcd(urls) { client ->
-                client.deleteChildren(path)
-
-                PathChildrenCache(client, path).use { cache ->
-                    val events = AtomicInt(0)
-                    cache.addListener { events.incrementAndFetch() }
-                    cache.clearListeners()
-                    cache.start(buildInitial = true)
-
-                    client.putValue("$path/x", "v")
-                    // Give any incorrectly-retained listener a chance to fire.
-                    Thread.sleep(1000)
-                    events.load() shouldBe 0
-                }
-
-                client.deleteChildren(path)
-            }
-        }
+        client.deleteChildren(path)
+      }
     }
+
+    "rebuild re-reads children added directly to etcd" {
+      connectToEtcd(urls) { client ->
+        client.deleteChildren(path)
+        client.putValue("$path/a", "1")
+
+        PathChildrenCache(client, path).use { cache ->
+          cache.start(buildInitial = true)
+          cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder ["a"]
+
+          client.putValue("$path/b", "2")
+          cache.rebuild()
+          cache.currentDataAsMap.keys shouldContainExactlyInAnyOrder ["a", "b"]
+        }
+
+        client.deleteChildren(path)
+      }
+    }
+
+    "clearListeners removes registered listeners before events fire" {
+      connectToEtcd(urls) { client ->
+        client.deleteChildren(path)
+
+        PathChildrenCache(client, path).use { cache ->
+          val events = AtomicInt(0)
+          cache.addListener { events.incrementAndFetch() }
+          cache.clearListeners()
+          cache.start(buildInitial = true)
+
+          client.putValue("$path/x", "v")
+          // Give any incorrectly-retained listener a chance to fire.
+          Thread.sleep(1000)
+          events.load() shouldBe 0
+        }
+
+        client.deleteChildren(path)
+      }
+    }
+  }
 }

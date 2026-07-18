@@ -63,7 +63,7 @@ class NodeCacheResyncTests : StringSpec() {
     private fun getResponse(): GetResponse {
       val first = getCount.incrementAndFetch() == 1
       return mockk {
-        every { kvs } returns listOf(kv(if (first) "1" else "2"))
+        every { kvs } returns [kv(if (first) "1" else "2")]
         every { isMore } returns false
         every { header } returns mockk { every { revision } returns if (first) 10L else 20L }
       }

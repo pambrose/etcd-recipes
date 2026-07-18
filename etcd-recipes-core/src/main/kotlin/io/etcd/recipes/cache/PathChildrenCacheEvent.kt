@@ -32,7 +32,7 @@ class PathChildrenCacheEvent(
     INITIALIZED,
   }
 
-  internal var initialDataVal: List<ChildData> = mutableListOf()
+  internal var initialDataVal: List<ChildData> = []
 
   /**
    * Special purpose method. When an [Type.INITIALIZED]

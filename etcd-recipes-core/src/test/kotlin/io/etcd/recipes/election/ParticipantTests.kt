@@ -39,8 +39,8 @@ class ParticipantTests : StringSpec() {
             val startedLatch = CountDownLatch(count)
             val finishedLatch = CountDownLatch(count)
             val holdLatch = CountDownLatch(1)
-            val participantCounts: MutableList<Int> = synchronizedList(mutableListOf())
-            val leaderNames: MutableList<String> = synchronizedList(mutableListOf())
+            val participantCounts: MutableList<Int> = synchronizedList([])
+            val leaderNames: MutableList<String> = synchronizedList([])
 
             connectToEtcd(urls) { client ->
                 blockingThreads(count) {

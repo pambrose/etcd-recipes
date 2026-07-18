@@ -47,7 +47,7 @@ class DistributedQueueTest : StringSpec() {
     ) {
         val queuePath = "$basePath/threadedTestNoWait"
         val latch = CountDownLatch(threadCount)
-        val dequeuedData = synchronizedList(mutableListOf<String>())
+        val dequeuedData: MutableList<String> = synchronizedList([])
         val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
@@ -82,7 +82,7 @@ class DistributedQueueTest : StringSpec() {
     ) {
         val queuePath = "$basePath/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)
-        val dequeuedData = synchronizedList(mutableListOf<String>())
+        val dequeuedData: MutableList<String> = synchronizedList([])
         val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
@@ -135,7 +135,7 @@ class DistributedQueueTest : StringSpec() {
     init {
         "serialTestNoWait" {
             val queuePath = "$basePath/serialTestNoWait"
-            val dequeuedData = mutableListOf<String>()
+            val dequeuedData: MutableList<String> = []
 
             connectToEtcd(urls) { client ->
                 client.deleteChildren(queuePath)
@@ -153,7 +153,7 @@ class DistributedQueueTest : StringSpec() {
         // Disabled under Kotest: enqueue+dequeue threads on same client deadlock
         "serialTestWithWait" {
             val queuePath = "$basePath/serialTestWithWait"
-            val dequeuedData = synchronizedList(mutableListOf<String>())
+            val dequeuedData: MutableList<String> = synchronizedList([])
             val latch = CountDownLatch(1)
 
             connectToEtcd(urls) { client ->

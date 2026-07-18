@@ -62,15 +62,15 @@ import kotlin.time.TimeSource
  * (it would self-deadlock).
  */
 class DistributedReadWriteLock
-  @JvmOverloads
-  constructor(
-    client: Client,
-    val lockPath: String,
-    val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
-    resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
-    val clientId: String = defaultClientId(DistributedReadWriteLock::class.simpleName!!),
-    private val interruptOnLockLoss: Boolean = false,
-  ) : EtcdConnector(client, resilience) {
+@JvmOverloads
+constructor(
+  client: Client,
+  val lockPath: String,
+  val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+  val clientId: String = defaultClientId(DistributedReadWriteLock::class.simpleName!!),
+  private val interruptOnLockLoss: Boolean = false,
+) : EtcdConnector(client, resilience) {
   internal enum class Side(
     val entryPrefix: String,
   ) {
@@ -398,7 +398,7 @@ class DistributedReadWriteLock
   }
 
   override fun doClose() {
-    listOf(Side.READ, Side.WRITE).forEach { side ->
+    [Side.READ, Side.WRITE].forEach { side ->
       val holds = holdsFor(side)
       holds.keys.toList().forEach { thread ->
         holds.remove(thread)?.let { data ->

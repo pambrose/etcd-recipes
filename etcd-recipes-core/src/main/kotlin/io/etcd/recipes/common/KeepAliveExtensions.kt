@@ -50,7 +50,7 @@ fun Client.putValueWithKeepAlive(
   keyval: ByteSequence,
   ttlSecs: Long,
   block: () -> Unit,
-) = putValuesWithKeepAlive(listOf(keyName to keyval), ttlSecs, block = block)
+) = putValuesWithKeepAlive([keyName to keyval], ttlSecs, block = block)
 
 @JvmName("putValueWithKeepAliveDur")
 fun Client.putValueWithKeepAlive(
@@ -82,7 +82,7 @@ fun Client.putValueWithKeepAlive(
   keyval: ByteSequence,
   ttl: Duration,
   block: () -> Unit,
-) = putValuesWithKeepAlive(listOf(keyName to keyval), ttl, block = block)
+) = putValuesWithKeepAlive([keyName to keyval], ttl, block = block)
 
 fun Client.putValuesWithKeepAlive(
   kvs: Collection<Pair<String, ByteSequence>>,

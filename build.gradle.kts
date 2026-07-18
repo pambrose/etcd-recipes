@@ -3,7 +3,6 @@ import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.SourcesJar
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -125,12 +124,20 @@ subprojects {
 
     tasks.withType<KotlinCompile>().configureEach {
         compilerOptions {
+            // freeCompilerArgs.add("-Xreturn-value-checker=check")
             freeCompilerArgs.add("-Xcollection-literals")
+
             listOf(
                 "kotlin.time.ExperimentalTime",
                 "kotlin.ExperimentalUnsignedTypes",
                 "kotlin.concurrent.atomics.ExperimentalAtomicApi",
             ).forEach { freeCompilerArgs.add("-opt-in=$it") }
+        }
+    }
+
+    tasks.named<KotlinCompile>("compileTestKotlin") {
+        compilerOptions {
+            freeCompilerArgs.add("-Xcollection-literals")
         }
     }
 
