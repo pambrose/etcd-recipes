@@ -107,7 +107,7 @@ class MicrometerEtcdMetricsTests : StringSpec() {
               every { get(any<ByteSequence>(), any<GetOption>()) } returns
                 CompletableFuture.completedFuture(
                   mockk<GetResponse> {
-                    every { kvs } returns []
+                    every { kvs } returns emptyList()
                     every { isMore } returns false
                   },
                 )

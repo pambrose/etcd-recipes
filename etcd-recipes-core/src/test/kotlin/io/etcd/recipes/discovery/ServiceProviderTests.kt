@@ -62,7 +62,7 @@ class ServiceProviderTests : StringSpec() {
         // so getInstance() must throw the library's typed exception (naming the
         // service) instead of a bare, context-free NoSuchElementException from random().
         "getInstance throws a typed EtcdRecipeException naming the service when none are registered" {
-            val provider = ServiceProvider(clientReturning([]), "/services/names", "my-service")
+            val provider = ServiceProvider(clientReturning(emptyList()), "/services/names", "my-service")
 
             val ex = shouldThrow<EtcdRecipeException> { provider.getInstance() }
             ex.message shouldContain "my-service"

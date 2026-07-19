@@ -65,7 +65,7 @@ class EtcdConnectorObservabilityTests : StringSpec() {
               // count-only probe: empty kvs, not paginated
               CompletableFuture.completedFuture(
                 mockk<GetResponse> {
-                  every { kvs } returns []
+                  every { kvs } returns emptyList()
                   every { isMore } returns false
                 },
               )

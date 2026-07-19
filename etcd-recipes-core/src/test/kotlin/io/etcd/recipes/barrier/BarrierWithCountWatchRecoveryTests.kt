@@ -85,7 +85,7 @@ class BarrierWithCountWatchRecoveryTests : StringSpec() {
               CompletableFuture.completedFuture(
                 mockk<GetResponse> {
                   every { count } returns 1L // waiter count stays below memberCount
-                  every { kvs } returns []
+                  every { kvs } returns emptyList()
                   every { isMore } returns false
                   every { header } returns mockk { every { revision } returns OBSERVED_REV }
                 },

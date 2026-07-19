@@ -70,7 +70,7 @@ class QueueWatchRecoveryTests : StringSpec() {
     private fun getResponse(): GetResponse {
       val empty = getCount.incrementAndFetch() <= emptyGets
       return mockk {
-        every { kvs } returns if (empty) [] else [item]
+        every { kvs } returns if (empty) emptyList() else listOf(item)
         every { isMore } returns false
         every { header } returns mockk { every { revision } returns OBSERVED_REV }
       }

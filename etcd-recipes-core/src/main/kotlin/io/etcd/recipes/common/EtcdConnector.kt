@@ -52,7 +52,7 @@ open class EtcdConnector(
       if (exceptionList.isInitialized())
         synchronized(exceptionList.value) { exceptionList.value.toList() }
       else
-        []
+        emptyList()
 
   val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.isNotEmpty()
 

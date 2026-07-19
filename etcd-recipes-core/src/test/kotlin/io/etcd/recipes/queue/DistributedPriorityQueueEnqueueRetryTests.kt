@@ -46,7 +46,7 @@ class DistributedPriorityQueueEnqueueRetryTests : StringSpec() {
         every { header.revision } returns 0L
 
         val getResp = mockk<GetResponse>()
-        every { getResp.kvs } returns []
+        every { getResp.kvs } returns emptyList()
         every { getResp.isMore } returns false
         every { getResp.header } returns header
 

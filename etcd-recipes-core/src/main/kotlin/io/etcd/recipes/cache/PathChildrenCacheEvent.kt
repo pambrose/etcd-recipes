@@ -32,7 +32,7 @@ class PathChildrenCacheEvent(
     INITIALIZED,
   }
 
-  internal var initialDataVal: List<ChildData> = []
+  internal var initialDataVal: List<ChildData> = emptyList()
 
   /**
    * Special purpose method. When an [Type.INITIALIZED]

@@ -87,7 +87,7 @@ class ServiceProvider
     /** All registered instances: cache-backed once [start]ed, a direct GET otherwise. */
     fun getAllInstances(): List<ServiceInstance> =
       if (startCalled.load())
-        cache?.instances ?: []
+        cache?.instances ?: emptyList()
       else
         client.getChildrenValues(instancesPath).map { ServiceInstance.toObject(it.asString) }
 

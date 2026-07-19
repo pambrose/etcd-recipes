@@ -78,7 +78,7 @@ class ResilientWatcherTests : StringSpec() {
 
   private fun progressResponse(headerRevision: Long): WatchResponse =
     mockk {
-      every { events } returns []
+      every { events } returns emptyList()
       every { header } returns mockk { every { revision } returns headerRevision }
     }
 

@@ -34,7 +34,7 @@ import io.ktor.util.AttributeKey
  * close (you own its lifecycle).
  */
 class EtcdPluginConfig {
-  var endpoints: List<String> = []
+  var endpoints: List<String> = emptyList()
   var user: String? = null
   var password: String? = null
   var namespace: String? = null

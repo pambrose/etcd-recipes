@@ -93,7 +93,7 @@ class PathChildrenCacheTests : StringSpec() {
 
                     start(true)
                     waitOnStartComplete()
-                    currentData shouldBe []
+                    currentData shouldBe emptyList()
 
                     addCount.load() shouldBe 0
                     updateCount.load() shouldBe 0
@@ -113,7 +113,7 @@ class PathChildrenCacheTests : StringSpec() {
                     client.deleteChildren(path)
 
                     pollUntil(settle) { deleteCount.load() == count && currentData.isEmpty() } shouldBe true
-                    currentData shouldBe []
+                    currentData shouldBe emptyList()
                 }
             }
 
@@ -168,7 +168,7 @@ class PathChildrenCacheTests : StringSpec() {
                     client.deleteChildren(path)
 
                     pollUntil(settle) { deleteCount.load() == count && currentData.isEmpty() } shouldBe true
-                    currentData shouldBe []
+                    currentData shouldBe emptyList()
                 }
             }
 
@@ -232,7 +232,7 @@ class PathChildrenCacheTests : StringSpec() {
                     client.deleteChildren(path)
 
                     pollUntil(settle) { deleteCount.load() == count && currentData.isEmpty() } shouldBe true
-                    currentData shouldBe []
+                    currentData shouldBe emptyList()
                 }
 
                 compareData(count, initData!!, kvs, suffix)
@@ -262,7 +262,7 @@ class PathChildrenCacheTests : StringSpec() {
 
                     // After keep-alive returns the leases expire; wait for etcd to evict them.
                     pollUntil(settle) { currentData.isEmpty() } shouldBe true
-                    currentData shouldBe []
+                    currentData shouldBe emptyList()
                 }
             }
         }
