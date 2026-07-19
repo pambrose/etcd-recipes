@@ -39,7 +39,7 @@ class ContainerBarrierTest :
       val count = 5
       val testId = newTestId("barrier")
       val barrierPath = "/barriers/$testId"
-      val hostUrls = listOf(EtcdContainerNetwork.hostEndpoint())
+      val hostUrls = [EtcdContainerNetwork.hostEndpoint()]
 
       val containers =
         (1..count).map { i ->

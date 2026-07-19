@@ -73,7 +73,7 @@ class DistributedPriorityQueueEnqueueRetryTests : StringSpec() {
         // another (cross-instance) producer must retry with a fresh sequence number,
         // not surface the conflict as an exception to the caller.
         "retries the enqueue CAS and succeeds once an attempt wins" {
-            val (client, txn) = scriptedClient(listOf(false, false, true))
+            val (client, txn) = scriptedClient([false, false, true])
             val queue = DistributedPriorityQueue(client, "/pqueue", minimumWaitTime = 0.milliseconds)
 
             shouldNotThrowAny { queue.enqueue("payload", priority = 5) }
@@ -84,7 +84,7 @@ class DistributedPriorityQueueEnqueueRetryTests : StringSpec() {
         // The retry loop must be bounded so a persistently-losing enqueue surfaces a
         // failure instead of spinning forever while holding the instance monitor.
         "throws after a bounded number of attempts when the CAS never wins" {
-            val (client, txn) = scriptedClient(listOf(false))
+            val (client, txn) = scriptedClient([false])
             val queue = DistributedPriorityQueue(client, "/pqueue", minimumWaitTime = 0.milliseconds)
 
             shouldThrow<EtcdRecipeRuntimeException> { queue.enqueue("payload", priority = 5) }

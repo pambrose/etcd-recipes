@@ -102,7 +102,7 @@ class SuspendRpcRetryTests : StringSpec() {
 
     "a hung call fails at operationTimeout and cancels the in-flight future" {
       runTest {
-        val futures = mutableListOf<CompletableFuture<String>>()
+        val futures: MutableList<CompletableFuture<String>> = []
         val rpc = RpcResilience(RetryPolicy.never, operationTimeout = 200.milliseconds)
         shouldThrow<EtcdRecipeRuntimeException> {
           suspendRetryRpc(rpc, "hung-op") {
@@ -147,7 +147,7 @@ class SuspendRpcRetryTests : StringSpec() {
     "external cancellation during the await propagates promptly without retry" {
       runTest {
         val calls = AtomicInt(0)
-        val futures = mutableListOf<CompletableFuture<String>>()
+        val futures: MutableList<CompletableFuture<String>> = []
         val rpc = RpcResilience(RetryPolicy.bounded(maxAttempts = 5, delay = 10.milliseconds), Duration.INFINITE)
         val job =
           launch {

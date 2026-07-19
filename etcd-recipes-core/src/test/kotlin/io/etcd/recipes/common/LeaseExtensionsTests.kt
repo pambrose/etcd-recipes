@@ -55,13 +55,13 @@ class LeaseExtensionsTests : StringSpec() {
             val observerSlot = slot<StreamObserver<LeaseKeepAliveResponse>>()
             val client = capturingClient(leaseId = 5L, observerSlot = observerSlot)
 
-            val recorded = mutableListOf<Throwable>()
+            val recorded: MutableList<Throwable> = []
             client.keepAlive(leaseOf(5L)) { recorded += it }
 
             val boom = RuntimeException("stream broke")
             observerSlot.captured.onError(boom)
 
-            recorded shouldContainExactly listOf(boom)
+            recorded shouldContainExactly [boom]
         }
 
         // onCompleted carries no throwable, so keepAlive synthesizes an
@@ -71,7 +71,7 @@ class LeaseExtensionsTests : StringSpec() {
             val observerSlot = slot<StreamObserver<LeaseKeepAliveResponse>>()
             val client = capturingClient(leaseId = 6L, observerSlot = observerSlot)
 
-            val recorded = mutableListOf<Throwable>()
+            val recorded: MutableList<Throwable> = []
             client.keepAlive(leaseOf(6L)) { recorded += it }
 
             observerSlot.captured.onCompleted()

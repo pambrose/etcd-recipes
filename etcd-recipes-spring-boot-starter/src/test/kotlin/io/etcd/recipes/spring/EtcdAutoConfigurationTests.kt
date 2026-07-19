@@ -54,7 +54,7 @@ class EtcdAutoConfigurationTests : StringSpec() {
       runner
         .withBean("myClient", Client::class.java, Supplier { mockk<Client>(relaxed = true) })
         .run { context ->
-          context.getBeansOfType(Client::class.java).keys.toList() shouldContainExactly listOf("myClient")
+          context.getBeansOfType(Client::class.java).keys.toList() shouldContainExactly ["myClient"]
         }
     }
   }

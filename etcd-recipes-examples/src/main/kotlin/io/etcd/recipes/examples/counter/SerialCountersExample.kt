@@ -25,7 +25,7 @@ import kotlin.time.measureTimedValue
 
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
   val counterPath = "counter2"
 
   connectToEtcd(urls) { client ->

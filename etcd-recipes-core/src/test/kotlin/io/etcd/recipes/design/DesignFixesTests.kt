@@ -336,7 +336,7 @@ class DesignFixesTests : StringSpec() {
 
         val cache = ServiceCache(client, "$basePath/names", "svc").start()
         // Snapshot included the registered instance.
-        cache.instances.map { it.name } shouldBe listOf("svc")
+        cache.instances.map { it.name } shouldBe ["svc"]
         cache.close()
         sd.close()
         client.deleteChildren(basePath)
@@ -377,7 +377,7 @@ class DesignFixesTests : StringSpec() {
           registry.registerService(instance)
           // ServiceProvider can read it back without going through ServiceDiscovery.
           val provider = ServiceProvider(client, "$basePath/names", "standalone")
-          provider.getAllInstances().map { it.name } shouldBe listOf("standalone")
+          provider.getAllInstances().map { it.name } shouldBe ["standalone"]
           registry.unregisterService(instance)
         }
         client.deleteChildren(basePath)

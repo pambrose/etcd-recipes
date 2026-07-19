@@ -96,11 +96,11 @@ class EventFlowTests : StringSpec() {
 
             untilTrue(15.seconds) { seen.size == 3 } shouldBe true
             seen.map { it.first } shouldContainExactly
-              listOf(
+              [
                 PathChildrenCacheEvent.Type.CHILD_ADDED,
                 PathChildrenCacheEvent.Type.CHILD_UPDATED,
                 PathChildrenCacheEvent.Type.CHILD_REMOVED,
-              )
+              ]
           }
         }
       }
@@ -125,11 +125,11 @@ class EventFlowTests : StringSpec() {
 
             untilTrue(15.seconds) { seen.size == 3 } shouldBe true
             seen shouldContainExactly
-              listOf(
+              [
                 NodeCacheEvent.Type.CREATED,
                 NodeCacheEvent.Type.UPDATED,
                 NodeCacheEvent.Type.DELETED,
-              )
+              ]
           }
         }
       }
@@ -156,11 +156,11 @@ class EventFlowTests : StringSpec() {
 
             untilTrue(15.seconds) { seen.size == 3 } shouldBe true
             seen.map { it.first } shouldContainExactly
-              listOf(
+              [
                 PathChildrenCacheEvent.Type.CHILD_ADDED,
                 PathChildrenCacheEvent.Type.CHILD_UPDATED,
                 PathChildrenCacheEvent.Type.CHILD_REMOVED,
-              )
+              ]
             seen[0].second shouldBe Payload("v1")
             seen[1].second shouldBe Payload("v2")
           }

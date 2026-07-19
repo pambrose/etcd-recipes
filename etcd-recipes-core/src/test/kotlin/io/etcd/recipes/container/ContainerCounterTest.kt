@@ -37,7 +37,7 @@ class ContainerCounterTest :
       val expectedFinal = (incrementerCount * incrementsEach).toLong()
       val testId = newTestId("counter")
       val counterPath = "/counters/$testId"
-      val hostUrls = listOf(EtcdContainerNetwork.hostEndpoint())
+      val hostUrls = [EtcdContainerNetwork.hostEndpoint()]
 
       val containers =
         (1..incrementerCount).map { i ->

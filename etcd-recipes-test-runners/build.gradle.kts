@@ -21,4 +21,10 @@ tasks.shadowJar {
     // merge them (Shadow 9 warns about this).
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
+
+    // INCLUDE (above) also keeps harmless duplicate metadata that no transformer merges:
+    // per-dependency license text and Netty's per-module version stamp (jetcd pulls in ~14
+    // Netty modules, each shipping the same-named file). None are read at runtime; drop them
+    // so Shadow stops warning about duplicates.
+    exclude("META-INF/LICENSE", "META-INF/LICENSE.txt", "META-INF/io.netty.versions.properties")
 }

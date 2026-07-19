@@ -39,7 +39,7 @@ class ContainerServiceDiscoveryTest :
       val servicePath = "/discovery/$testId"
       val serviceName = "example-service"
       val shutdownKey = "/discovery-shutdown/$testId"
-      val hostUrls = listOf(EtcdContainerNetwork.hostEndpoint())
+      val hostUrls = [EtcdContainerNetwork.hostEndpoint()]
 
       val containers =
         (1..count).map { i ->

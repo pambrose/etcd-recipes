@@ -105,7 +105,7 @@ class SelfHealingKeepAliveTests : StringSpec() {
         mocks.observers.first().onCompleted()
 
         pollUntil(10.seconds) { events.any { it is LeaseEvent.Restored } } shouldBe true
-        establishedIds shouldBe listOf(100L, 101L)
+        establishedIds shouldBe [100L, 101L]
         healer.currentLeaseId shouldBe 101L
         healer.isHealthy shouldBe true
         mocks.registrations.size shouldBe 2

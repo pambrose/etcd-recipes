@@ -50,7 +50,7 @@ class DistributedPriorityQueueTest : StringSpec() {
     ) {
         val queuePath = "$basePath/threadedTestNoWait"
         val latch = CountDownLatch(threadCount)
-        val dequeuedData = mutableListOf<String>()
+        val dequeuedData: MutableList<String> = []
         val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
@@ -103,7 +103,7 @@ class DistributedPriorityQueueTest : StringSpec() {
     ) {
         val queuePath = "$basePath/threadedTestWithWait"
         val latch = CountDownLatch(threadCount)
-        val dequeuedData = synchronizedList(mutableListOf<String>())
+        val dequeuedData: MutableList<String> = synchronizedList([])
         val testData = List(iterCount) { "V %04d".format(it) }
 
         connectToEtcd(urls) { client ->
@@ -136,7 +136,7 @@ class DistributedPriorityQueueTest : StringSpec() {
     init {
         "serialTestNoWait" {
             val queuePath = "$basePath/serialTestNoWait"
-            val dequeuedData = mutableListOf<String>()
+            val dequeuedData: MutableList<String> = []
 
             connectToEtcd(urls) { client ->
                 client.getChildCount(queuePath) shouldBe 0
@@ -154,7 +154,7 @@ class DistributedPriorityQueueTest : StringSpec() {
 
         "serialTestWithWait" {
             val queuePath = "$basePath/serialPriorityTestWithWait"
-            val dequeuedData = mutableListOf<String>()
+            val dequeuedData: MutableList<String> = []
             val dequeueLatch = CountDownLatch(1)
             val enqueueLatch = CountDownLatch(1)
 
@@ -205,7 +205,7 @@ class DistributedPriorityQueueTest : StringSpec() {
             val queuePath = "$basePath/emptyWaitMixedPriority"
             val count = 25
             val values = List(count) { "mp%03d".format(it) }
-            val dequeued = synchronizedList(mutableListOf<String>())
+            val dequeued: MutableList<String> = synchronizedList([])
             val dequeueLatch = CountDownLatch(1)
             val enqueueLatch = CountDownLatch(1)
             val consumerReady = CountDownLatch(1)
@@ -318,7 +318,7 @@ class DistributedPriorityQueueTest : StringSpec() {
 
         "serialTestNoWaitWithPriorities" {
             val queuePath = "$basePath/serialTestNoWaitWithPriorities"
-            val dequeuedData = mutableListOf<String>()
+            val dequeuedData: MutableList<String> = []
 
             connectToEtcd(urls) { client ->
                 client.deleteChildren(queuePath)
@@ -337,7 +337,7 @@ class DistributedPriorityQueueTest : StringSpec() {
 
         "serialTestNoWaitWithReversedPriorities" {
             val queuePath = "$basePath/serialTestNoWaitWithReversedPriorities"
-            val dequeuedData = mutableListOf<String>()
+            val dequeuedData: MutableList<String> = []
 
             connectToEtcd(urls) { client ->
                 client.deleteChildren(queuePath)

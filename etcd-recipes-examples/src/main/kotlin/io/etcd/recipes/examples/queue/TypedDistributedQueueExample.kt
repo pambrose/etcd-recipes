@@ -29,13 +29,13 @@ import io.github.oshai.kotlinlogging.KotlinLogging
  */
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
   val path = "/queue/typed-example"
 
   connectToEtcd(urls) { client ->
     TypedDistributedQueue(client, path, jsonCodec<Order>()).use { queue ->
       queue.enqueue(Order(1, "widget"))
-      queue.enqueueAll(listOf(Order(2, "gadget"), Order(3, "gizmo")))
+      queue.enqueueAll([Order(2, "gadget"), Order(3, "gizmo")])
 
       repeat(3) {
         val order: Order = queue.dequeue()

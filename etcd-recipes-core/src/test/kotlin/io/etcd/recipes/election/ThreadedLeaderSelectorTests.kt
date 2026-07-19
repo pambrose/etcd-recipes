@@ -66,7 +66,7 @@ class ThreadedLeaderSelectorTests : StringSpec() {
         "threadedElection2Test" {
             val takeLeadershiptCounter = AtomicInt(0)
             val relinquishLeadershiptCounter = AtomicInt(0)
-            val electionList: MutableList<LeaderSelector> = synchronizedList(mutableListOf())
+            val electionList: MutableList<LeaderSelector> = synchronizedList([])
 
             val takeAction =
                 { selector: LeaderSelector ->

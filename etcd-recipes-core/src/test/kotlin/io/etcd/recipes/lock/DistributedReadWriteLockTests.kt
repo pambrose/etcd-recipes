@@ -148,7 +148,7 @@ class DistributedReadWriteLockTests : StringSpec() {
           val r3 = arrival("R3", write = false, expectedEntries = 5)
 
           release.set(true)
-          listOf(r1, r2, w1, r3).forEach { it.join(60_000) }
+          [r1, r2, w1, r3].forEach { it.join(60_000) }
           gateThread.join(10_000)
 
           grants.size shouldBe 4

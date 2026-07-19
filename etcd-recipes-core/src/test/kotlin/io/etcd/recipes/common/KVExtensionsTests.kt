@@ -98,7 +98,7 @@ class KVExtensionsTests : StringSpec() {
                 val getOption = getOption { isPrefix(true) }
                 val pairs = client.getKeyValuePairs(prefix, getOption).asString
 
-                pairs shouldContainExactlyInAnyOrder listOf("${prefix}a" to "1", "${prefix}b" to "2")
+                pairs shouldContainExactlyInAnyOrder ["${prefix}a" to "1", "${prefix}b" to "2"]
 
                 client.deleteChildren(path)
             }

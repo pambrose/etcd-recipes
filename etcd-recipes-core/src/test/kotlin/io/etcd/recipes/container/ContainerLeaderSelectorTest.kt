@@ -36,7 +36,7 @@ class ContainerLeaderSelectorTest :
       val count = 5
       val testId = newTestId("election")
       val electionPath = "/election/$testId"
-      val hostUrls = listOf(EtcdContainerNetwork.hostEndpoint())
+      val hostUrls = [EtcdContainerNetwork.hostEndpoint()]
 
       val containers =
         (1..count).map { i ->

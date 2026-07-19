@@ -70,7 +70,7 @@ class BugFixesTests : StringSpec() {
           val ready = CountDownLatch(threadCount)
           val go = CountDownLatch(1)
           val done = CountDownLatch(threadCount)
-          val results = mutableListOf<Long>()
+          val results: MutableList<Long> = []
 
           repeat(threadCount) {
             pool.execute {

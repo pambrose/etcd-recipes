@@ -74,7 +74,7 @@ class KeepAliveExtensionsTests : StringSpec() {
             connectToEtcd(urls) { client ->
                 client.deleteChildren(path)
 
-                val kvs = listOf("$path/m1" to "a".asByteSequence, "$path/m2" to "b".asByteSequence)
+                val kvs = ["$path/m1" to "a".asByteSequence, "$path/m2" to "b".asByteSequence]
                 client.putValuesWithKeepAlive(kvs, ttl) {
                     client.getValue("$path/m1")?.asString shouldBe "a"
                     client.getValue("$path/m2")?.asString shouldBe "b"

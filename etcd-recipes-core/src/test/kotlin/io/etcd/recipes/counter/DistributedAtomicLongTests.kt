@@ -135,8 +135,8 @@ class DistributedAtomicLongTests : StringSpec() {
                     withDistributedAtomicLong(client, path) {
                         val count = 25
                         val maxPause = 50
-                        val latchList = mutableListOf<CountDownLatch>()
-                        val exceptionList = mutableListOf<ExceptionHolder>()
+                        val latchList: MutableList<CountDownLatch> = []
+                        val exceptionList: MutableList<ExceptionHolder> = []
 
                         val (latch0, e0) =
                             threadWithExceptionCheck {

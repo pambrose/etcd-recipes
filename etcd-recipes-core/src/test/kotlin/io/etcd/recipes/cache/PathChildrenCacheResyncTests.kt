@@ -69,7 +69,7 @@ class PathChildrenCacheResyncTests : StringSpec() {
       val first = getCount.incrementAndFetch() == 1
       return mockk {
         every { kvs } returns
-          if (first) listOf(kv("a", "1")) else listOf(kv("a", "2"), kv("b", "3"))
+          if (first) [kv("a", "1")] else [kv("a", "2"), kv("b", "3")]
         every { isMore } returns false
         every { header } returns mockk { every { revision } returns if (first) 10L else 20L }
       }

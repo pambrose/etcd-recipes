@@ -74,9 +74,9 @@ class ServiceCacheResyncTests : StringSpec() {
       return mockk {
         every { kvs } returns
           if (first) {
-            listOf(kv(v1.id, v1.toJson()))
+            [kv(v1.id, v1.toJson())]
           } else {
-            listOf(kv(v1.id, v1Updated.toJson()), kv(v2.id, v2.toJson()))
+            [kv(v1.id, v1Updated.toJson()), kv(v2.id, v2.toJson())]
           }
         every { isMore } returns false
         every { header } returns mockk { every { revision } returns if (first) 10L else 20L }
@@ -111,7 +111,7 @@ class ServiceCacheResyncTests : StringSpec() {
         cache.addRecoveryListener { recovery += it }
         cache.start()
 
-        cache.instances.map { it.jsonPayload } shouldBe listOf("payload-1")
+        cache.instances.map { it.jsonPayload } shouldBe ["payload-1"]
         mocks.options.first().revision shouldBe 11 // snapshot revision + 1
 
         // etcd compacted away the watch anchor: jetcd reports a fatal death
@@ -122,7 +122,7 @@ class ServiceCacheResyncTests : StringSpec() {
         pollUntil(10.seconds) {
           mocks.options.size == 2 && mocks.options[1].revision == 21L
         } shouldBe true
-        cache.instances.map { it.jsonPayload }.sorted() shouldBe listOf("payload-1-updated", "payload-2")
+        cache.instances.map { it.jsonPayload }.sorted() shouldBe ["payload-1-updated", "payload-2"]
       }
     }
   }

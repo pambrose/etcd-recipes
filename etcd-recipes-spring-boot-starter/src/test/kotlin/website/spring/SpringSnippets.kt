@@ -56,7 +56,7 @@ class CustomEtcdConfig {
   @Bean(destroyMethod = "close")
   fun etcdClient(): Client =
     connectToEtcd(
-      EtcdConnectionConfig(endpoints = listOf("http://localhost:2379"), namespace = "/myapp/"),
+      EtcdConnectionConfig(endpoints = ["http://localhost:2379"], namespace = "/myapp/"),
       // The initReceiver escape hatch: raw jetcd builder options the config does not model.
       // Pass it by name — a trailing lambda would bind to the scoping `block` overload.
       initReceiver = { maxInboundMessageSize(8 * 1024 * 1024) },

@@ -43,7 +43,7 @@ class ProviderStrategyTests : StringSpec() {
       val list = instances(3)
       val strategy = RoundRobinStrategy()
       val picks = (1..6).map { strategy.select(list) }
-      picks shouldBe listOf(list[0], list[1], list[2], list[0], list[1], list[2])
+      picks shouldBe [list[0], list[1], list[2], list[0], list[1], list[2]]
     }
 
     "RoundRobinStrategy stays valid when the list shrinks" {
@@ -52,7 +52,7 @@ class ProviderStrategyTests : StringSpec() {
       strategy.select(three) // advance the cursor
       strategy.select(three)
       // List drops to 1: index must stay in range, never throw.
-      val one = listOf(three[0])
+      val one = [three[0]]
       repeat(5) { strategy.select(one) shouldBe three[0] }
     }
 

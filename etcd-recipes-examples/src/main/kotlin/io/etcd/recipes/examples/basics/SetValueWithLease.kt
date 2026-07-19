@@ -32,7 +32,7 @@ import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
   val path = "/foo"
   val keyval = "foobar"
   val latch = CountDownLatch(2)

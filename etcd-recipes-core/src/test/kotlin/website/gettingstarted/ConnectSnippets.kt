@@ -32,7 +32,7 @@ private val logger = KotlinLogging.logger {}
 fun connectBasic() {
   // --8<-- [start:basic]
   // `use` closes the client; the recipes never take ownership of it for you.
-  connectToEtcd(listOf("http://localhost:2379")).use { client ->
+  connectToEtcd(["http://localhost:2379"]).use { client ->
     client.putValue("/greeting", "hello")
     logger.info { client.getValue("/greeting", "<absent>") }
   }
@@ -43,7 +43,7 @@ fun connectScoped() {
   // --8<-- [start:scoped]
   // The block form closes the client when the block returns, even on a throw.
   val greeting =
-    connectToEtcd(listOf("http://localhost:2379")) { client ->
+    connectToEtcd(["http://localhost:2379"]) { client ->
       client.getValue("/greeting", "<absent>")
     }
   logger.info { greeting }
@@ -54,7 +54,7 @@ fun connectWithConfig() {
   // --8<-- [start:config]
   val config =
     EtcdConnectionConfig(
-      endpoints = listOf("https://etcd-1:2379", "https://etcd-2:2379"),
+      endpoints = ["https://etcd-1:2379", "https://etcd-2:2379"],
       user = "app",
       password = System.getenv("ETCD_PASSWORD"),
       // Every key this client touches is transparently prefixed with /prod.
@@ -80,7 +80,7 @@ fun connectWithBuilder() {
   // --8<-- [start:builder]
   // Drop to the jetcd ClientBuilder for anything the config class doesn't cover.
   connectToEtcd(
-    urls = listOf("http://localhost:2379"),
+    urls = ["http://localhost:2379"],
     initReceiver = { maxInboundMessageSize(8 * 1024 * 1024) },
   ).use { client ->
     logger.info { "Connected" }
@@ -90,7 +90,7 @@ fun connectWithBuilder() {
 
 fun pingEtcd() {
   // --8<-- [start:ping]
-  connectToEtcd(listOf("http://localhost:2379")).use { client ->
+  connectToEtcd(["http://localhost:2379"]).use { client ->
     // An active, count-only GET. Cheap enough for a health endpoint.
     if (!client.ping()) logger.error { "etcd is not reachable" }
   }

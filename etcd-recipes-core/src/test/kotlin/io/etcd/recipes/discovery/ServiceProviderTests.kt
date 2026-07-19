@@ -75,7 +75,7 @@ class ServiceProviderTests : StringSpec() {
                     every { key } returns "/services/names/my-service/abc".asByteSequence
                     every { value } returns instance.toJson().asByteSequence
                 }
-            val provider = ServiceProvider(clientReturning(listOf(kv)), "/services/names", "my-service")
+            val provider = ServiceProvider(clientReturning([kv]), "/services/names", "my-service")
 
             provider.getInstance().name shouldBe "my-service"
         }
@@ -99,7 +99,7 @@ class ServiceProviderTests : StringSpec() {
             val failing = serviceInstance("my-service", "failing")
             val provider =
                 ServiceProvider(
-                    clientReturningInstances(listOf(alive, failing)),
+                    clientReturningInstances([alive, failing]),
                     "/services/names",
                     "my-service",
                     strategy = RoundRobinStrategy(),

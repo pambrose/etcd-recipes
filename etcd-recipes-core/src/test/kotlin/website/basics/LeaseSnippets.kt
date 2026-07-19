@@ -93,10 +93,10 @@ fun putSeveralWithKeepAlive(client: Client) {
   // Several keys on ONE lease, so they appear together and vanish together. A reader can
   // never catch half a registration published and half of it expired.
   val kvs =
-    listOf(
+    [
       "/services/worker-1/host" to "10.0.0.1".asByteSequence,
       "/services/worker-1/port" to 8080.asByteSequence,
-    )
+    ]
 
   client.putValuesWithKeepAlive(kvs, 5L, onKeepAliveError = { e -> logger.error(e) { "Renewal stopped" } }) {
     logger.info { "Both keys are alive for exactly this block" }

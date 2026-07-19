@@ -141,7 +141,7 @@ class LeaderLatchTests : StringSpec() {
         gotLeadership.waitUntilTrue(20.seconds) shouldBe true
         latch.close()
         pollUntil(10.seconds) { events.contains("notLeader") } shouldBe true
-        events.toList() shouldBe listOf("isLeader", "notLeader")
+        events.toList() shouldBe ["isLeader", "notLeader"]
       }
     }
 

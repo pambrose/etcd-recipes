@@ -28,7 +28,7 @@ import kotlin.time.measureTimedValue
 
 fun main() {
   val logger = KotlinLogging.logger {}
-  val urls = listOf("http://localhost:2379")
+  val urls = ["http://localhost:2379"]
   val path = "/counters"
   val threadCount = 5
   val repeatCount = 10

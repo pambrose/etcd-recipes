@@ -101,7 +101,7 @@ class ThreadedMutexTests : StringSpec() {
 
           holder.unlock() shouldBe true
           waiters.forEach { it.join(30_000) }
-          order shouldBe listOf(1, 2, 3)
+          order shouldBe [1, 2, 3]
         }
       }
     }

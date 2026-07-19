@@ -47,7 +47,7 @@ class MicrometerGaugesTests : StringSpec() {
       val registry = SimpleMeterRegistry()
       registry.bindCacheSize(
         mockk<PathChildrenCache> {
-        every { currentData } returns listOf(mockk(), mockk(), mockk())
+        every { currentData } returns [mockk(), mockk(), mockk()]
       },
       )
       registry.find("etcd.cache.entries").gauge().shouldNotBeNull().value() shouldBe 3.0
@@ -55,7 +55,7 @@ class MicrometerGaugesTests : StringSpec() {
 
     "bindServiceCacheSize reports the service-cache instance count" {
       val registry = SimpleMeterRegistry()
-      registry.bindServiceCacheSize(mockk<ServiceCache> { every { instances } returns listOf(mockk(), mockk()) })
+      registry.bindServiceCacheSize(mockk<ServiceCache> { every { instances } returns [mockk(), mockk()] })
       registry.find("etcd.cache.entries").gauge().shouldNotBeNull().value() shouldBe 2.0
     }
 

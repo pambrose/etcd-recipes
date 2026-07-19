@@ -39,14 +39,14 @@ class ClientDefaultsTests : StringSpec() {
     }
 
     "connectToEtcd applies the recipe defaults" {
-      val builder = recipeClientBuilder(listOf("http://localhost:2379")) { this }
+      val builder = recipeClientBuilder(["http://localhost:2379"]) { this }
       builder.connectTimeout() shouldBe Duration.ofSeconds(5)
       builder.retryMaxDuration() shouldBe Duration.ofSeconds(30)
     }
 
     "user settings passed via initReceiver win over the recipe defaults" {
       val builder =
-        recipeClientBuilder(listOf("http://localhost:2379")) {
+        recipeClientBuilder(["http://localhost:2379"]) {
           connectTimeout(Duration.ofSeconds(1)).retryMaxDuration(Duration.ofSeconds(7))
         }
       builder.connectTimeout() shouldBe Duration.ofSeconds(1)

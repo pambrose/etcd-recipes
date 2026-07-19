@@ -100,7 +100,7 @@ class RecipeMetricsTests : StringSpec() {
             mutex.lock()
             mutex.unlock()
           }
-        metrics.lockWaits shouldBe listOf(true)
+        metrics.lockWaits shouldBe [true]
         metrics.lockHolds.load() shouldBe 1
       }
     }
@@ -114,7 +114,7 @@ class RecipeMetricsTests : StringSpec() {
             semaphore.acquire()
             semaphore.release()
           }
-        metrics.lockWaits shouldBe listOf(true)
+        metrics.lockWaits shouldBe [true]
         metrics.lockHolds.load() shouldBe 1
       }
     }
@@ -132,7 +132,7 @@ class RecipeMetricsTests : StringSpec() {
           selector.start()
           selector.waitOnLeadershipComplete()
         }
-        metrics.leadership shouldBe listOf(true, false)
+        metrics.leadership shouldBe [true, false]
       }
     }
 
@@ -145,7 +145,7 @@ class RecipeMetricsTests : StringSpec() {
             queue.enqueue("hello")
             queue.dequeue()
           }
-        metrics.queueOps shouldBe listOf("dequeue")
+        metrics.queueOps shouldBe ["dequeue"]
       }
     }
 
