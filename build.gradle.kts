@@ -126,18 +126,11 @@ subprojects {
         compilerOptions {
             // freeCompilerArgs.add("-Xreturn-value-checker=check")
             freeCompilerArgs.add("-Xcollection-literals")
-
             listOf(
                 "kotlin.time.ExperimentalTime",
                 "kotlin.ExperimentalUnsignedTypes",
                 "kotlin.concurrent.atomics.ExperimentalAtomicApi",
             ).forEach { freeCompilerArgs.add("-opt-in=$it") }
-        }
-    }
-
-    tasks.named<KotlinCompile>("compileTestKotlin") {
-        compilerOptions {
-            freeCompilerArgs.add("-Xcollection-literals")
         }
     }
 
