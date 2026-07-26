@@ -2,22 +2,29 @@
 
 > Kotlin/Java/JVM client library for [etcd](https://etcd.io) v3, built on top of
 > [jetcd](https://github.com/etcd-io/jetcd). Provides higher-level distributed
-> coordination primitives — barriers, leader election, queues, distributed counters,
-> service discovery, key/prefix caches — analogous to what
+> coordination primitives — barriers, locks, leader election, queues, distributed
+> counters, service discovery, key/prefix caches — analogous to what
 > [Apache Curator](https://curator.apache.org) provides for ZooKeeper.
 
 The library is a thin Kotlin extension layer over jetcd, not a wrapper. New recipes
 compose the `common/` extensions (`ClientExtensions`, `KVExtensions`, `LeaseExtensions`,
 `WatchExtensions`, `TxnExtensions`, `ByteSequenceExtensions`) rather than reaching into
 jetcd directly. Stateful recipes extend `EtcdConnector` (in `common/`), which owns the
-jetcd `Client`, tracks `startCalled` / `closeCalled`, and accumulates background-thread
-exceptions for the caller to inspect rather than throwing from worker threads.
+jetcd `Client`, tracks `startCalled` / `closeCalled`, derives a `connectionState`, and
+routes background-thread failures to a single sink the caller can poll (`exceptions`) or
+subscribe to (`BackgroundExceptionListener`) rather than throwing from a worker thread.
+
+The blocking API is the primary, Java-usable surface. A Kotlin-first coroutine surface
+(`io.etcd.recipes.coroutines`) sits alongside it: suspending twins of every blocking
+entry point plus `Flow` versions of the watch and listener streams. Nothing in the
+blocking API was changed to add it.
 
 JDK 17+ runtime. Compiler-wide opt-ins for `kotlin.time.ExperimentalTime`,
 `kotlin.ExperimentalUnsignedTypes`, and `kotlin.concurrent.atomics.ExperimentalAtomicApi`.
 
 ## Docs
 
+- [Documentation site](https://pambrose.github.io/etcd-recipes/): full guide — recipes, resilience, coroutines, observability, typed values, Java interop
 - [README](README.md): library overview, usage examples, build/test instructions
 - [CHANGELOG](CHANGELOG.md): version history
 - [CLAUDE.md](CLAUDE.md): contributor guide aimed at LLM tooling — module layout, architecture, build entry points
@@ -26,13 +33,32 @@ JDK 17+ runtime. Compiler-wide opt-ins for `kotlin.time.ExperimentalTime`,
 ## Recipes
 
 - `io.etcd.recipes.barrier` — `DistributedBarrier`, `DistributedBarrierWithCount`, `DistributedDoubleBarrier`
-- `io.etcd.recipes.cache` — `PathChildrenCache` (key-prefix cache with PUT/UPDATE/DELETE listeners)
+- `io.etcd.recipes.cache` — `PathChildrenCache` (key-prefix cache with PUT/UPDATE/DELETE listeners), `NodeCache<T>` (single-key cache), `TypedPathChildrenCache<T>`
 - `io.etcd.recipes.counter` — `DistributedAtomicLong`
-- `io.etcd.recipes.discovery` — `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider`
-- `io.etcd.recipes.election` — `LeaderSelector`, `LeaderSelectorListener`, `Participant`
-- `io.etcd.recipes.keyvalue` — `TransientKeyValue` (lease-backed key/value)
-- `io.etcd.recipes.queue` — `DistributedQueue`, `DistributedPriorityQueue`
-- `io.etcd.recipes.common` — Kotlin extensions over jetcd `Client`/`KV`/`Lease`/`Watch`/`Txn`
+- `io.etcd.recipes.discovery` — `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider` with pluggable `ProviderStrategy` (random / round-robin / sticky) and error-ejection
+- `io.etcd.recipes.election` — `LeaderSelector` (callback-scoped), `LeaderLatch` (holds leadership until `close()`), `LeaderObserver` (no candidacy), `Participant`
+- `io.etcd.recipes.keyvalue` — `TransientKeyValue` (lease-backed key/value), `TypedTransientKeyValue<T>`
+- `io.etcd.recipes.lock` — `DistributedMutex` (etcd's native lock service), `DistributedReadWriteLock` (fair shared/exclusive), `DistributedSemaphore` (counting)
+- `io.etcd.recipes.queue` — `DistributedQueue`, `DistributedPriorityQueue` (at-most-once, with `poll`/`tryDequeue`/`enqueueAll`), `DistributedWorkQueue` (at-least-once: claim/ack, visibility timeout, dead-lettering, delayed delivery)
+- `io.etcd.recipes.common` — Kotlin extensions over jetcd `Client`/`KV`/`Lease`/`Watch`/`Txn`; `EtcdCodec<T>` typed values; `ResilienceConfig`; `EtcdMetrics`
+- `io.etcd.recipes.coroutines` — suspending twins (`awaitPutValue`, `receive`, `withLock`, …) and `Flow` surfaces (`watchAsFlow`, `eventsAsFlow`, `leadershipAsFlow`, …)
+
+## Cross-cutting
+
+- **Resilience** (on by default) — watchers auto-resubscribe after fatal stream deaths and re-anchor after compaction; leases self-heal and re-run the recipe's establish hook; blocking RPCs are bounded by an operation timeout and retry retriable statuses. Tuned per recipe via a trailing `ResilienceConfig`; `ResilienceConfig.DISABLED` restores pre-0.12 behavior. A lost *leadership* lease is deliberately never healed — the leader steps down.
+- **Observability** — `EtcdMetrics`, a dependency-free SPI installed with `ResilienceConfig.withMetrics(...)` (RPC, watch-recovery, keep-alive, lock wait/hold, leadership transitions, queue, cache sync); push/pull background-exception channels; `isHealthy()` / `ping()`; recipe identity in the SLF4J MDC under `etcd.recipe`.
+- **Typed values** — `EtcdCodec<T>` (`ByteSequenceCodec`, `StringCodec`, `jsonCodec<T>()`, or `JacksonCodec<T>`) types the KV extensions and every `Typed*` recipe, replacing hand-marshalled `ByteSequence`s.
+
+## Modules
+
+Published to Maven Central under the group `com.pambrose`. The core artifact was renamed
+`etcd-recipes` → `etcd-recipes-core` in 0.12.0.
+
+- `etcd-recipes-core` — the library; no dependencies beyond jetcd, coroutines, and logging
+- `etcd-recipes-jackson` — `JacksonCodec<T>` for projects using Jackson
+- `etcd-recipes-micrometer` — `MicrometerEtcdMetrics` backend plus `EtcdGauges` binders
+- `etcd-recipes-spring-boot-starter` — auto-configured `Client` / `EtcdRecipes` beans from `etcd.recipes.*` properties, optional Actuator health indicator
+- `etcd-recipes-ktor` — Ktor `Application` plugin exposing `application.etcdClient` / `etcdRecipes`
 
 ## Examples
 
@@ -40,15 +66,22 @@ Every recipe has runnable `main()` demos under `etcd-recipes-examples/` in both
 [Kotlin](etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples/) and
 [Java](etcd-recipes-examples/src/main/java/io/etcd/recipes/examples/).
 
+The documentation site's code examples are separate: real source files under
+`src/test/.../website/` source sets, embedded into the Markdown at build time and
+type-checked by `./gradlew compileTestKotlin compileTestJava`.
+
 ## Testing
 
 - `make tests` — thread-based tests against a local etcd at `localhost:2379`
+  (`./etcd-start.sh` or `make etcd-start` starts one)
 - `make tests-tc` — same suite against a Testcontainers-managed etcd (no local etcd needed)
 - `make tests-container` — multi-container variant: each participant runs in its own
   container coordinating through a shared etcd container
+- Fault-injection tests (`io.etcd.recipes.fault`) pause / restart the etcd container to
+  exercise watch recovery and lease healing; gated behind `-PuseTestcontainers`
 
 ## Optional
 
 - [Source repository](https://github.com/pambrose/etcd-recipes)
-- [Maven Central artifact](https://central.sonatype.com/artifact/com.pambrose/etcd-recipes)
+- [Maven Central artifact](https://central.sonatype.com/artifact/com.pambrose/etcd-recipes-core)
 - [jetcd](https://github.com/etcd-io/jetcd) — the underlying etcd v3 Java client

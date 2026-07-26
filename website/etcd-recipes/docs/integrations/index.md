@@ -49,6 +49,18 @@ All published to Maven Central under the group `com.pambrose`, at version **0.12
 Each satellite depends on core, so naming a satellite is enough — you do not need to list
 core as well.
 
+The framework versions each satellite is built against:
+
+| Artifact | Built against |
+| --- | --- |
+| `etcd-recipes-jackson` | Jackson 2.22.x |
+| `etcd-recipes-micrometer` | Micrometer 1.17.x |
+| `etcd-recipes-spring-boot-starter` | Spring Boot 4.1.x |
+| `etcd-recipes-ktor` | Ktor 3.5.x |
+
+Each is an `api` dependency of its own module only — the core artifact pulls in none of
+them, so a project that wants no Micrometer never sees Micrometer on its classpath.
+
 ## `EtcdConnectionConfig`
 
 The framework modules exist because of one shared problem: a framework needs to build the

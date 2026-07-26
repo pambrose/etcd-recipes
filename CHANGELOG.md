@@ -7,10 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Connection-resilience release: watchers survive fatal stream deaths (part 1),
-leases self-heal and leaders step down on lease loss (part 2), and blocking RPCs
-gain timeouts and retries (part 3). Plus reliable-queue groundwork: bounded and
-non-blocking consumption on the existing queues.
+## [0.12.0] - 2026-07-26
+
+The largest release since the project began, in five themes:
+
+- **Connection resilience, on by default.** Watchers survive fatal stream deaths and
+  re-anchor after compaction (part 1), leases self-heal and leaders step down on lease
+  loss (part 2), and blocking RPCs gain operation timeouts and bounded retries instead
+  of parking forever (part 3).
+- **New recipes.** A whole `lock/` package (`DistributedMutex`,
+  `DistributedReadWriteLock`, `DistributedSemaphore`), `DistributedWorkQueue`
+  (at-least-once delivery with dead-lettering and delayed delivery), `LeaderLatch` /
+  `LeaderObserver`, `NodeCache<T>`, and a load-balancing `ServiceProvider`.
+- **A coroutine API.** Suspending twins of every blocking entry point plus `Flow`
+  versions of the watch and listener streams, in `io.etcd.recipes.coroutines`. The
+  blocking API is unchanged and remains the Java-facing surface.
+- **Typed values and framework packaging.** `EtcdCodec<T>` types the KV extensions and
+  every recipe that carried a raw payload, and four new optional modules cover Jackson,
+  Micrometer, Spring Boot, and Ktor.
+- **Observability.** A dependency-free `EtcdMetrics` SPI with a Micrometer binding,
+  push-based background-exception notification, health checks, and recipe identity in
+  the SLF4J MDC.
+
+Also fixes a lost-wakeup race shared by every waiter in the library (locks, barriers,
+and queues), and renames the published core artifact — see *Changed (breaking)* below.
+
+**Breaking:** the core Maven coordinate is now `com.pambrose:etcd-recipes-core`.
+
+### Changed (breaking: Maven coordinates)
+
+- The core Gradle module (and its directory) was renamed `etcd-recipes` →
+  **`etcd-recipes-core`**, so it reads as a sibling of the `-micrometer` / `-jackson` /
+  `-spring-boot-starter` / `-ktor` modules rather than the ambiguous bare name that also
+  names the repo and the shared module prefix. Because the artifactId derives from the
+  module name, the published coordinate becomes `com.pambrose:etcd-recipes-core` —
+  update your dependency declaration. **No package, class, or method name changed**:
+  everything stays under `io.etcd.recipes.*`, so the upgrade is a one-line build-file
+  edit. The repo, the sibling module names, and the Dokka footer keep the bare
+  `etcd-recipes` prefix. (#82)
+
+### Added (documentation site)
+
+- A 31-page documentation site under `website/`, built with
+  [Zensical](https://zensical.org) and published to
+  <https://pambrose.github.io/etcd-recipes/> by a new docs workflow: recipe guides with
+  Kotlin/Java tabs, the resilience and observability material, a coroutines section, a
+  Java-interop guide (`@JvmName` facades, the `@JvmOverloads` ladder, and where
+  `kotlin.time.Duration`'s value-class mangling leaves an API unreachable from Java),
+  and the integration pages.
+- None of the 306 code examples is written into the Markdown. Each is a real source file
+  in a Gradle test source set — in the module whose API it documents — embedded at build
+  time via `pymdownx.snippets`, so `./gradlew compileTestKotlin compileTestJava`
+  type-checks every example on the site against the actual API and a dangling snippet
+  reference fails the docs build rather than rendering an empty block. The snippet files
+  are plain uninvoked functions and contribute zero tests to the suite.
+- `make site` (serve locally), `make docs-check` (compile the snippets, then build the
+  site strictly — what CI runs), plus `clean-site` / `check-site` / `upgrade-site`.
+
+### Changed (build and tooling)
+
+- Kotlin `2.4.0` → `2.4.10`; Gradle wrapper `9.5.1` → `9.6.1`; common-utils `2.9.0` →
+  `3.2.1`; plus logback, junit, kotest, mockk, detekt, kotlinter, kover, shadow, and
+  maven-publish bumps. Testcontainers, Micrometer `1.17.0`, Jackson `2.22.1`, and Ktor
+  `3.5.1` are pinned in the catalog.
+- The satellite modules' inline dependency coordinates moved into the version catalog,
+  so every version in the build now lives in `gradle/libs.versions.toml`.
+- The Spring Boot starter targets **Spring Boot 4.1.x**. Spring Boot 4 extracts the
+  health API out of `spring-boot-actuator` into a separate `spring-boot-health`
+  artifact, so the health types now come from `org.springframework.boot.health.contributor`.
+  The starter's own API shape is unchanged.
+- Remaining `java.util.concurrent.atomic` usages across the library, examples, and tests
+  were converted to the stdlib `kotlin.concurrent.atomics` the repo had already
+  standardized on — behavior-preserving and API-neutral (on the JVM they compile to the
+  same primitives). (#81)
+- `listOf(...)` / `mutableListOf<T>()` factory calls migrated to Kotlin collection-literal
+  syntax; empty read-only lists keep `emptyList()` for the zero-allocation singleton.
+- `./etcd-start.sh` (renamed from `etcd.sh`) and a new `./etcd-stop.sh` that stops the
+  local etcd gracefully — SIGTERM, then SIGKILL after a 10s grace period — with
+  `make etcd-start` / `make etcd-stop` targets. Plus `make all-tests` to run the local,
+  Testcontainers, and multi-container variants in sequence.
+- The test suite fails fast with a clear message when local etcd is unreachable instead
+  of hanging (#49), Testcontainers' Ryuk reaper is enabled to silence prune-conflict
+  warnings (#48), and the CI timeout moved 30 → 45 minutes to accommodate the docs
+  compile. (#50)
 
 ### Added (cache: typed NodeCache + codec layer)
 
@@ -46,7 +125,7 @@ non-blocking consumption on the existing queues.
 - **`etcd-recipes-spring-boot-starter`** — auto-configures a `Client` bean (graceful shutdown via
   `destroyMethod = "close"`) and an `EtcdRecipes` bean from `etcd.recipes.*` properties, plus an
   optional Actuator `HealthIndicator`. `@ConditionalOnMissingBean` lets an app override any bean.
-  Spring Boot 3.5.x.
+  Spring Boot 4.1.x.
 - **`etcd-recipes-ktor`** — a Ktor `Application` plugin that connects from config (or an injected
   client) and closes a plugin-owned client on `ApplicationStopping`; exposes `Application.etcdClient`
   / `Application.etcdRecipes`. Ktor 3.5.x.

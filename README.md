@@ -134,9 +134,10 @@ connectToEtcd(EtcdConnectionConfig(endpoints = urls, namespace = "/myapp/", user
 
 Two optional modules wire that into the common server stacks.
 
-**Spring Boot** (`etcd-recipes-spring-boot-starter`) — configure `application.yml` and the client is
-auto-configured (and closed gracefully on shutdown), alongside an `EtcdRecipes` factory bean and an
-optional Actuator `etcd` health indicator:
+**Spring Boot 4.1.x** (`etcd-recipes-spring-boot-starter`) — configure `application.yml` and the
+client is auto-configured (and closed gracefully on shutdown), alongside an `EtcdRecipes` factory
+bean and an optional Actuator `etcd` health indicator. Every bean is `@ConditionalOnMissingBean`, so
+an app can override any of them:
 
 ```yaml
 etcd:
@@ -145,7 +146,7 @@ etcd:
     namespace: /myapp/
 ```
 
-**Ktor** (`etcd-recipes-ktor`) — install the plugin; `application.etcdClient` and
+**Ktor 3.5.x** (`etcd-recipes-ktor`) — install the plugin; `application.etcdClient` and
 `application.etcdRecipes` become available, and a plugin-owned client closes on `ApplicationStopping`:
 
 ```kotlin
@@ -451,6 +452,54 @@ settings (which win): a 5&nbsp;s `connectTimeout` and a 30&nbsp;s
 defaults already enable `waitForReady` and gRPC keepalive (30&nbsp;s /
 10&nbsp;s timeout).
 
+## Observability
+
+Distributed coordination fails quietly — a watch that stopped delivering, a lease
+that healed three times an hour, a lock whose median wait crept from 2&nbsp;ms to
+800&nbsp;ms. None of those throw. Three surfaces make them visible.
+
+**Metrics.** `EtcdMetrics` is a dependency-free SPI the library calls at its seams:
+RPC latency / attempts / outcome, watch-recovery transitions, keep-alive events,
+lock wait and hold times, leadership transitions, queue latency, and cache syncs.
+Every method has an empty default body, so an implementation overrides only what it
+cares about and the default (`EtcdMetrics.NoOp`) costs nothing:
+
+```kotlin
+val resilience = ResilienceConfig.DEFAULT.withMetrics(MicrometerEtcdMetrics(registry))
+val queue = DistributedQueue(client, "/queues/jobs", resilience = resilience)
+```
+
+The optional `etcd-recipes-micrometer` module supplies that backend — `etcd.rpc`,
+`etcd.watch.recovery`, `etcd.keepalive`, `etcd.lock.wait` / `etcd.lock.hold`,
+`etcd.election.transitions`, `etcd.queue`, `etcd.cache.sync` — plus `EtcdGauges`
+binders (`bindQueueDepth`, `bindCacheSize`, `bindAvailablePermits`,
+`bindLeadership`) for current values the push SPI can't express. Keys, paths, and
+lease ids reach the sink as context but deliberately never become tags; two of the
+gauges poll etcd on every scrape, which is documented on the binders.
+
+**Background exceptions.** A recipe can't throw at you from its own healer thread,
+so every background failure — keep-alive death, abandoned watcher, lost lock, a user
+callback that threw — goes to one sink with both a push and a pull interface:
+
+```kotlin
+cache.addBackgroundExceptionListener { context, t ->
+    log.error(t) { "$context failed" }   // context is e.g. PathChildrenCache[/cache/orders]
+}
+```
+
+`exceptions` / `hasExceptions` / `clearExceptions()` remain as the pull side, and
+`backgroundExceptionsAsFlow()` is the coroutine form. An empty `exceptions` list
+isn't the same as healthy — it means nothing failed since you last cleared it — so
+pair it with `connectionState` and `isHealthy()` (passive) or `ping()` (an active,
+bounded, non-mutating probe).
+
+**Logging context.** Recipe background threads run with the recipe's identity in the
+SLF4J MDC under `etcd.recipe`, restoring any prior value. Add `%X{etcd.recipe}` to
+your pattern and a stray warning from a healer thread stops being anonymous — every
+recipe's healer threads otherwise share one thread name.
+
+Full details: [Observability](https://pambrose.github.io/etcd-recipes/observability/).
+
 ## Compatibility
 
 - Built on [jetcd](https://github.com/etcd-io/jetcd) and targets etcd v3.
@@ -506,6 +555,29 @@ dependencies {
 </dependencies>
 ```
 
+### Optional modules
+
+The core artifact pulls in nothing beyond jetcd, coroutines, and logging. Each
+integration is a separate artifact, added only if you want it:
+
+| Artifact | Adds |
+|---|---|
+| `com.pambrose:etcd-recipes-jackson` | `JacksonCodec<T>` — an `EtcdCodec` for projects using Jackson rather than kotlinx-serialization |
+| `com.pambrose:etcd-recipes-micrometer` | `MicrometerEtcdMetrics` (the `EtcdMetrics` backend) and the `EtcdGauges` binders |
+| `com.pambrose:etcd-recipes-spring-boot-starter` | Auto-configured `Client` / `EtcdRecipes` beans plus an optional Actuator health indicator (Spring Boot 4.1.x) |
+| `com.pambrose:etcd-recipes-ktor` | The Ktor `Application` plugin (Ktor 3.5.x) |
+
+All four share the core's version:
+
+```kotlin
+implementation("com.pambrose:etcd-recipes-micrometer:0.12.0")
+```
+
+> **Upgrading from 0.11.0 or earlier:** the core coordinate changed from
+> `com.pambrose:etcd-recipes` to `com.pambrose:etcd-recipes-core` in 0.12.0, so it reads
+> as a sibling of the modules above. No package, class, or method name changed —
+> everything is still under `io.etcd.recipes.*`, so it is a one-line build-file edit.
+
 ## Building from source
 
 JDK 17 is required (the build is configured with a Kotlin JVM toolchain of 17). The Gradle wrapper
@@ -521,9 +593,11 @@ A `Makefile` wraps the most common entry points (`make help` lists everything):
 
 ```
 make build              # clean + build, skipping tests
+make etcd-start         # start a local etcd at localhost:2379 (make etcd-stop to stop it)
 make tests              # full test suite against a local etcd at localhost:2379
 make tests-tc           # full test suite against an ephemeral Testcontainers etcd
 make tests-container    # multi-container variant: each participant in its own container
+make all-tests          # all three variants in sequence
 make lint               # kotlinter + detekt
 make coverage           # Kover HTML + XML reports
 make kdocs              # Dokka HTML / Javadoc
@@ -536,7 +610,8 @@ make docs-check         # compile the doc snippets + build the site strictly
 `make tests` and the examples expect a local etcd at `http://localhost:2379`. Start one with:
 
 ```
-./etcd.sh
+./etcd-start.sh        # or: make etcd-start
+./etcd-stop.sh         # or: make etcd-stop  (SIGTERM, then SIGKILL after 10s)
 ```
 
 `make tests-tc` and `make tests-container` stand up etcd via Testcontainers and require Docker.

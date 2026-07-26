@@ -80,8 +80,9 @@ docker run --rm -p 2379:2379 \
 
 !!! tip "Working in a clone of the repo?"
 
-    `./etcd.sh` starts one with those flags, and `./etcd-stop.sh` shuts it down
-    gracefully. The data directory `default.etcd/` is gitignored.
+    `./etcd-start.sh` (or `make etcd-start`) starts one with those flags, and
+    `./etcd-stop.sh` (or `make etcd-stop`) shuts it down gracefully. The data directory
+    `default.etcd/` is gitignored.
 
 ## Your first program
 
