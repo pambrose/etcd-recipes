@@ -1,7 +1,7 @@
 # Spring Boot
 
 `etcd-recipes-spring-boot-starter` turns a few lines of `application.yml` into a connected,
-shared, gracefully-closed etcd client.
+shared, gracefully-closed etcd client. It targets **Spring Boot 4.1.x**.
 
 ```kotlin
 implementation("com.pambrose:etcd-recipes-spring-boot-starter:0.12.0")
@@ -137,12 +137,22 @@ The factory bean is the intended entry point for application code:
 ## Actuator health
 
 The nested `EtcdHealthConfiguration` is `@ConditionalOnClass(HealthIndicator::class)`, so
-the health indicator appears only when Actuator is on your classpath. The starter declares
-Actuator as `compileOnly` — it will never pull it in for you.
+the health indicator appears only when the health API is on your classpath. The starter
+declares it `compileOnly` — it will never pull it in for you.
 
 ```kotlin
 implementation("org.springframework.boot:spring-boot-starter-actuator")
 ```
+
+!!! note "Where `HealthIndicator` comes from in Spring Boot 4"
+
+    Boot 4 extracted the health API out of `spring-boot-actuator` into its own
+    `spring-boot-health` artifact, moving `Health`, `HealthIndicator` and `Status` to
+    **`org.springframework.boot.health.contributor`**. The starter compiles against both
+    (`compileOnly`), and the `@ConditionalOnClass` guard keys on the relocated
+    `HealthIndicator`. If you are porting health code from a Boot 3 app, that import is
+    the thing to change — the types themselves are the same shape. If the indicator does
+    not appear, check that `spring-boot-health` actually resolved onto your classpath.
 
 With it present, `EtcdHealthIndicator` maps `Client.ping()` — a bounded, non-mutating,
 count-only GET through the RPC retry funnel — onto Actuator's `UP` / `DOWN`:

@@ -11,6 +11,7 @@ JDK 17 and the Gradle wrapper. `make help` lists every target.
 make build      # ./gradlew clean build -x test
 make tests      # full suite against a local etcd at localhost:2379
 make tests-tc   # full suite against an ephemeral Testcontainers etcd (needs Docker)
+make all-tests  # local, Testcontainers and multi-container variants in sequence
 make lint       # ./gradlew lintKotlin detekt
 make coverage   # Kover HTML + XML + summary
 make kdocs      # Dokka API docs
@@ -19,8 +20,8 @@ make kdocs      # Dokka API docs
 `make tests` expects an etcd at `http://localhost:2379`:
 
 ```bash
-./etcd.sh        # start
-./etcd-stop.sh   # graceful shutdown
+./etcd-start.sh  # start          (or: make etcd-start)
+./etcd-stop.sh   # graceful shutdown — SIGTERM, then SIGKILL after 10s
 ```
 
 A single test class:
@@ -156,8 +157,18 @@ Run `make docs-check` and you are done.
 ## Versioning
 
 The library version lives in `gradle.properties`; Kotlin and dependency versions in
-`gradle/libs.versions.toml`. Bump both when releasing, and update the version references in
-`README.md` and `website/etcd-recipes/docs/getting-started/index.md`.
+`gradle/libs.versions.toml`. All modules share the one version.
+
+Releasing bumps `gradle.properties`, moves the `CHANGELOG.md` `[Unreleased]` section under
+the new heading, adds a `RELEASE_NOTES.md` entry, and updates the coordinates quoted in the
+docs — the README download snippets plus several pages on this site. They are all literal
+version strings, so:
+
+```bash
+git grep '0\.11\.0'   # find every reference to the outgoing version
+```
+
+is the reliable way to catch them; do not rely on the list of files staying accurate.
 
 ## CI
 

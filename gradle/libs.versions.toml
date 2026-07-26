@@ -12,10 +12,10 @@ serialization = "1.11.0"
 jetcd = "0.8.6"
 
 # Runtime libraries
-common-utils = "3.2.0"
+common-utils = "3.2.1"
 guava = "33.6.0-jre"
 kotlin-logging = "8.0.4"
-logback = "1.5.38"
+logback = "1.6.0"
 
 # Optional integration bindings (each used by a single satellite module)
 jackson = "2.22.1"
@@ -25,7 +25,7 @@ spring-boot = "4.1.0"
 
 # Testing
 junit = "6.1.2"
-kotest = "6.2.2"
+kotest = "6.2.3"
 mockk = "1.14.11"
 testcontainers = "2.0.5"
 
@@ -34,9 +34,9 @@ ben-manes-versions = "0.54.0"
 detekt = "2.0.0-alpha.5"
 dokka = "2.2.0"
 kotlinter = "5.6.0"
-kover = "0.9.8"
+kover = "0.9.9"
 maven-publish = "0.37.0"
-shadow = "9.6.0"
+shadow = "9.6.1"
 
 [libraries]
 # Main library

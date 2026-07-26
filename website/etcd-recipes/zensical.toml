@@ -2,7 +2,7 @@
 #
 # Configuration for the etcd-recipes documentation site.
 #
-# Build it with `make docs` from the repo root, or:
+# Build it with `make docs-check` from the repo root (`make site` to serve it), or:
 #
 #     cd website/etcd-recipes && zensical serve
 #
