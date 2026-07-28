@@ -36,7 +36,7 @@ import kotlin.time.Duration
 
 /**
  * Shared wait-on-DELETE machinery for the hand-rolled locks (read-write lock,
- * semaphore): parks on [CountDownLatch] until a DELETE fires (or [shouldWake]
+ * semaphore): parks on [CountDownLatch] until a DELETE fires (or `shouldWake`
  * says the predicate already holds — the pre-live gap and every recovery are
  * re-checked), someone else counts the latch down (lease-fatal, close), or the
  * deadline passes. Watch failures unpark and throw. Follows the queue/barrier
@@ -79,7 +79,7 @@ internal object WaiterSupport {
   /**
    * Waits for ANY DELETE under [prefix] — rank-based admission (the semaphore)
    * cannot watch a single predecessor, so every deletion wakes the waiter and
-   * [shouldWake] re-evaluates the full predicate on the pre-live gap and after
+   * `shouldWake` re-evaluates the full predicate on the pre-live gap and after
    * each recovery. Spurious wakes are safe: callers loop and re-check.
    */
   @Suppress("LongParameterList")
