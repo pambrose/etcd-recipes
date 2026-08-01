@@ -12,14 +12,14 @@ serialization = "1.11.0"
 jetcd = "0.8.6"
 
 # Runtime libraries
-common-utils = "3.2.1"
+common-utils = "3.2.2"
 guava = "33.6.0-jre"
 kotlin-logging = "8.0.4"
-logback = "1.6.0"
+logback = "1.6.1"
 
 # Optional integration bindings (each used by a single satellite module)
 jackson = "2.22.1"
-ktor = "3.5.1"
+ktor = "3.5.2"
 micrometer = "1.17.0"
 spring-boot = "4.1.0"
 
@@ -30,7 +30,7 @@ mockk = "1.14.11"
 testcontainers = "2.0.5"
 
 # Build tooling plugins
-ben-manes-versions = "0.54.0"
+ben-manes-versions = "0.57.0"
 detekt = "2.0.0-alpha.5"
 dokka = "2.2.0"
 kotlinter = "5.6.0"
@@ -100,7 +100,7 @@ dokka-javadoc = { id = "org.jetbrains.dokka-javadoc", version.ref = "dokka" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 
 # Dependency updates and publishing
-ben-manes-versions = { id = "com.github.ben-manes.versions", version.ref = "ben-manes-versions" }
+ben-manes-versions = { id = "io.github.ben-manes.versions", version.ref = "ben-manes-versions" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
 
 # Packaging
