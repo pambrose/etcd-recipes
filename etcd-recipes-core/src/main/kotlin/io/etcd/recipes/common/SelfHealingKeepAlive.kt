@@ -59,6 +59,7 @@ class SelfHealingKeepAlive internal constructor(
   private val client: Client,
   private val ttl: Duration,
   private val resilience: LeaseResilience,
+  private val rpc: RpcResilience,
   private val leaseListener: LeaseListener?,
   private val establish: (lease: LeaseGrantResponse) -> Boolean,
 ) : Closeable {
@@ -86,11 +87,24 @@ class SelfHealingKeepAlive internal constructor(
   val currentLeaseId: Long get() = lease?.id ?: -1L
   val isHealthy: Boolean get() = healthy && !closed.load()
 
+  // The grant runs under the caller's own RPC budget: a recipe configured for a
+  // short operation timeout must not sit through RpcResilience.DEFAULT's 30s x 5
+  // before reporting that etcd is unreachable.
+  @Suppress("TooGenericExceptionCaught")
   internal fun start() {
-    val granted = client.leaseGrant(ttl)
-    if (!establish(granted)) {
-      client.leaseRevoke(granted)
-      throw EtcdRecipeRuntimeException("Establish hook declined initial lease ${granted.id}")
+    val granted = client.leaseGrant(ttl, rpc)
+    val established =
+      try {
+        establish(granted)
+      } catch (e: Throwable) {
+        // Nothing is holding the lease if the hook blew up part-way, so release it
+        // here rather than strand it in etcd until its TTL runs out.
+        client.leaseRevoke(granted, rpc)
+        throw e
+      }
+    if (!established) {
+      client.leaseRevoke(granted, rpc)
+      throw EstablishDeclinedException(granted.id)
     }
     lease = granted
     synchronized(lock) { registration = register(granted) }
@@ -111,7 +125,7 @@ class SelfHealingKeepAlive internal constructor(
     } catch (e: InterruptedException) {
       Thread.currentThread().interrupt()
     }
-    lease?.let { client.leaseRevoke(it) }
+    lease?.let { client.leaseRevoke(it, rpc) }
   }
 
   private fun register(granted: LeaseGrantResponse): CloseableClient =
@@ -202,7 +216,7 @@ class SelfHealingKeepAlive internal constructor(
       if (!runEstablishForHeal(granted, expiredLeaseId)) return
       synchronized(lock) {
         if (closed.load()) {
-          client.leaseRevoke(granted)
+          client.leaseRevoke(granted, rpc)
           return
         }
         registration?.close()
@@ -226,7 +240,7 @@ class SelfHealingKeepAlive internal constructor(
     expiredLeaseId: Long,
   ): Boolean {
     if (establish(granted)) return true
-    client.leaseRevoke(granted)
+    client.leaseRevoke(granted, rpc)
     logger.warn { "Establish hook declined healed lease ${granted.id}; abandoning heal of $expiredLeaseId" }
     emit(LeaseEvent.Failed(expiredLeaseId, lastCause))
     return false
@@ -267,8 +281,20 @@ fun Client.selfHealingKeepAlive(
   ttl: Duration,
   resilience: LeaseResilience = LeaseResilience.DEFAULT,
   leaseListener: LeaseListener? = null,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
   establish: (lease: LeaseGrantResponse) -> Boolean,
-): SelfHealingKeepAlive = SelfHealingKeepAlive(this, ttl, resilience, leaseListener, establish).also { it.start() }
+): SelfHealingKeepAlive = SelfHealingKeepAlive(this, ttl, resilience, rpc, leaseListener, establish).also { it.start() }
+
+/**
+ * Thrown by [selfHealingKeepAlive] when the establish hook declines the lease it was
+ * given on the initial call — the caller's CAS lost, so the keys bound to that lease
+ * belong to somebody else and must not be reclaimed. Distinct from the plain
+ * [EtcdRecipeRuntimeException] an unreachable etcd produces, so a recipe can report
+ * "already taken" and "could not reach etcd" as the different failures they are.
+ */
+class EstablishDeclinedException(
+  val leaseId: Long,
+) : EtcdRecipeRuntimeException("Establish hook declined initial lease $leaseId")
 
 /**
  * True when this failure (or any cause in its chain) is etcd's NOT_FOUND

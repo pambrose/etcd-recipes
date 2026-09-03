@@ -113,6 +113,7 @@ constructor(
             leaseTtl,
             resilience.lease,
             leaseListener = { event -> onLeaseEvent(event) },
+            rpc = resilience.rpc,
           ) { lease ->
             client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) }, resilience.rpc)
             true

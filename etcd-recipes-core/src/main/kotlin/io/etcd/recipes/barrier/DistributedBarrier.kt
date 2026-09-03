@@ -106,6 +106,7 @@ constructor(
           leaseTtlSecs.seconds,
           resilience.lease,
           leaseListener = { event -> onBarrierLeaseEvent(event) },
+          rpc = resilience.rpc,
         ) { lease ->
           if (barrierRemoved.load()) {
             false // explicitly removed: do not re-arm

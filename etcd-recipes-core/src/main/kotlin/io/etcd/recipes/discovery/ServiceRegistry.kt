@@ -21,6 +21,7 @@ package io.etcd.recipes.discovery
 import com.google.common.collect.Maps.newConcurrentMap
 import com.pambrose.common.delegate.AtomicDelegates.nonNullableReference
 import io.etcd.jetcd.Client
+import io.etcd.recipes.common.EstablishDeclinedException
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
@@ -113,16 +114,23 @@ constructor(
         leaseTtlSecs.seconds,
         resilience.lease,
         leaseListener = { event -> onLeaseEvent(instancePath, event) },
+        rpc = resilience.rpc,
       ) { lease ->
         client.transaction(resilience.rpc) {
           If(instancePath.doesNotExist)
           Then(instancePath.setTo(context.currentJson, putOption { withLeaseId(lease.id) }))
         }.isSucceeded
       }
-    } catch (e: EtcdRecipeRuntimeException) {
+    } catch (e: EstablishDeclinedException) {
       // Initial CAS lost (key already present); the healer already revoked its lease.
       logger.debug(e) { "Registration CAS lost for $instancePath" }
-      throw EtcdRecipeException("Service registration failed for $instancePath")
+      throw EtcdRecipeException("Service registration failed for $instancePath: the key already exists", e)
+    } catch (e: EtcdRecipeRuntimeException) {
+      // Anything else is infrastructure — an unreachable etcd, an exhausted RPC
+      // budget. Carrying the cause is what lets a caller tell it apart from a lost
+      // CAS; without it the two are the same opaque "registration failed".
+      logger.debug(e) { "Registration failed for $instancePath" }
+      throw EtcdRecipeException("Service registration failed for $instancePath: ${e.message}", e)
     }
 
     // Only publish a fully-built context (healer set) into the map.

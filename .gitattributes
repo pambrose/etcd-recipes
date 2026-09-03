@@ -1,12 +1,19 @@
 #
 # https://help.github.com/articles/dealing-with-line-endings/
 #
-# Linux start script should use lf
-/gradlew        text eol=lf binary
-*.sh            text eol=lf binary
+
+# Normalize line endings in the repository; let Git detect what is text.
+* text=auto
+
+# Linux start scripts should use lf
+/gradlew        text eol=lf
+*.sh            text eol=lf
 
 # These are Windows script files and should use crlf
-*.bat           text eol=crlf binary
+*.bat           text eol=crlf
 
 # Binary files should be left untouched
 *.jar           binary
+
+# Generated lockfile — collapse in diffs
+website/uv.lock -diff linguist-generated=true
