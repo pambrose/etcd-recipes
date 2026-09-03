@@ -196,6 +196,7 @@ constructor(
             leaseTtlSecs.seconds,
             resilience.lease,
             leaseListener = { event -> onWaiterLeaseEvent(event) },
+            rpc = resilience.rpc,
           ) { lease ->
             if (keepAliveClosed.get()) {
               false

@@ -394,6 +394,7 @@ constructor(
           leaseTtlSecs.seconds,
           resilience.lease,
           leaseListener = { event -> onParticipationLeaseEvent(event) },
+          rpc = resilience.rpc,
         ) { lease ->
           client.transaction(resilience.rpc) {
             If(path.doesNotExist)

@@ -138,6 +138,7 @@ class DistributedWorkQueue
         config.visibilityTimeoutSecs.seconds,
         resilience.lease,
         leaseListener = { event -> onLeaseEvent(event) },
+        rpc = resilience.rpc,
       ) { true }
     }
   private val consumerLease: SelfHealingKeepAlive by consumerLeaseDelegate

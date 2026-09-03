@@ -236,6 +236,17 @@ class SelfHealingKeepAliveTests : StringSpec() {
       verify { mocks.lease.revoke(100L) }
     }
 
+    // A declining hook already revoked; a hook that *throws* used to escape start()
+    // with the lease still held, stranding it in etcd until its TTL ran out.
+    "initial establish that throws aborts and revokes the lease" {
+      val mocks = HealMocks()
+
+      shouldThrow<IllegalStateException> {
+        mocks.client.selfHealingKeepAlive(2.seconds, quickHeals(), null) { error("establish blew up") }
+      }
+      verify { mocks.lease.revoke(100L) }
+    }
+
     "close revokes the current lease best-effort" {
       val mocks = HealMocks()
       mocks.client.selfHealingKeepAlive(2.seconds, quickHeals(), null) { true }.close()
