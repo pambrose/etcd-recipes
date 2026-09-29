@@ -20,16 +20,24 @@ import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
+import io.etcd.jetcd.Lock
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.lease.LeaseGrantResponse
+import io.etcd.jetcd.lease.LeaseRevokeResponse
+import io.etcd.jetcd.lock.LockResponse
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.WatchOption
+import io.grpc.Status
+import io.grpc.StatusRuntimeException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.fetchAndDecrement
 
 /**
  * A real [Client] that runs a one-shot hook at a chosen jetcd call, so a test can land
@@ -57,6 +65,15 @@ class HookedClient(
 
   /** Runs before the next single-argument `leaseClient.grant(ttl)`. */
   val beforeLeaseGrant = AtomicReference<(() -> Unit)?>(null)
+
+  /** While set, `leaseClient.grant(ttl)` returns a future that never completes (an etcd brownout). */
+  val hangLeaseGrants = AtomicBoolean(false)
+
+  /** The next this-many `leaseClient.revoke(id)` calls fail with UNAVAILABLE. */
+  val failLeaseRevokes = AtomicInt(0)
+
+  /** While set, `lockClient.lock(name, leaseId)` fails with this. */
+  val failLocks = AtomicReference<Throwable?>(null)
 
   /** Every `watchClient.watch(key, option, listener)` call's key and option, in order. */
   val watchOptions = CopyOnWriteArrayList<Pair<String, WatchOption>>()
@@ -92,8 +109,16 @@ class HookedClient(
     object : Lease by delegate.leaseClient {
       override fun grant(ttl: Long): CompletableFuture<LeaseGrantResponse> {
         beforeLeaseGrant.exchange(null)?.invoke()
+        if (hangLeaseGrants.load()) return CompletableFuture()
         return delegate.leaseClient.grant(ttl)
       }
+
+      override fun revoke(leaseId: Long): CompletableFuture<LeaseRevokeResponse> =
+        if (failLeaseRevokes.fetchAndDecrement() > 0) {
+          CompletableFuture.failedFuture(StatusRuntimeException(Status.UNAVAILABLE.withDescription("revoke refused")))
+        } else {
+          delegate.leaseClient.revoke(leaseId)
+        }
     }
 
   private val watch =
@@ -111,6 +136,17 @@ class HookedClient(
   override fun getKVClient(): KV = kv
 
   override fun getLeaseClient(): Lease = lease
+
+  private val lock =
+    object : Lock by delegate.lockClient {
+      override fun lock(
+        name: ByteSequence,
+        leaseId: Long,
+      ): CompletableFuture<LockResponse> =
+        failLocks.load()?.let { CompletableFuture.failedFuture(it) } ?: delegate.lockClient.lock(name, leaseId)
+    }
+
+  override fun getLockClient(): Lock = lock
 
   override fun getWatchClient(): Watch = watch
 }

@@ -169,8 +169,8 @@ suspend fun <T> DistributedSemaphore.withPermit(action: suspend () -> T): T {
       action = action,
     )
   } finally {
-    // Instance-held permits: any thread may release, so a plain IO thread is fine
-    withContext(NonCancellable) { runInterruptible(Dispatchers.IO) { release() } }
+    // Release this call's own permit (acquired on [holder]), from a plain IO thread
+    withContext(NonCancellable) { runInterruptible(Dispatchers.IO) { release(holder) } }
   }
 }
 

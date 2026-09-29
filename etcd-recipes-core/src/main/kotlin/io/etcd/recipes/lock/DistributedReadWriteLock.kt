@@ -26,6 +26,7 @@ import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.LeaseEvent
 import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.RpcResilience
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildrenKeys
@@ -43,6 +44,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
@@ -87,8 +89,12 @@ constructor(
     val lease: AcquisitionLease,
     val entryKey: String,
     val rank: Long, // place in line: the entry's create revision, or an inherited one
+    // The acquisition this hold came from: a loss is applied only to the hold it belongs to
+    val attempt: Attempt,
   ) {
-    var holdCount = 1 // owner-thread confined
+    // Changed by the owner thread; read by a loss on jetcd's lease thread
+    @Volatile
+    var holdCount = 1
     val acquiredAt: ComparableTimeMark = TimeSource.Monotonic.markNow()
   }
 
@@ -192,8 +198,10 @@ constructor(
         return true
       }
       holds.remove(me)
+      // The hold is over: a fatal event for its lease from now on is stale
+      data.attempt.phase.compareAndSet(Phase.HOLDING, Phase.DEAD)
       resilience.metrics.recordLockHold(lockPath, data.acquiredAt.elapsedNow())
-      data.lease.close() // revoke deletes the entry, waking successors
+      data.lease.close() // revoke (retried) deletes the entry, waking successors
       return true
     }
 
@@ -210,6 +218,7 @@ constructor(
 
   @Suppress(
     "ReturnCount",
+    "ThrowsCount",
     "LoopWithTooManyJumpStatements",
     "LongMethod",
     "CyclomaticComplexMethod",
@@ -234,7 +243,9 @@ constructor(
     var mayInheritWriteRank = true
     outer@ while (true) {
       checkCloseNotCalled()
-      if (deadline != null && deadline.hasPassedNow()) return false
+      if (deadline.hasPassed()) return false
+      // A deadline bounds every RPC of the attempt, not just the wait
+      val bounded = resilience.within(deadline)
 
       val entryKey = "$entryParent${side.entryPrefix}$clientId:${randomId(TOKEN_LENGTH)}"
       // A write→read downgrade inherits the write entry's rank: see effectiveRank.
@@ -242,22 +253,29 @@ constructor(
       val inheritedRank = inheritedFrom?.rank
       val attempt = Attempt(me, entryKey)
       val lease =
-        AcquisitionLease(
-          client,
-          leaseTtlSecs,
-          resilience.rpc,
-          onTransient = { leaseId, e ->
-            recordException(e)
-            reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
-          },
-          onResumed = { leaseId -> reportLeaseEvent(LeaseEvent.Restored(leaseId, leaseId)) },
-          onFatal = { cause -> onEntryFatal(side, attempt, cause) },
-        )
+        try {
+          AcquisitionLease(
+            client,
+            leaseTtlSecs,
+            bounded.rpc,
+            onTransient = { leaseId, e ->
+              recordException(e)
+              reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
+            },
+            onResumed = { leaseId -> reportLeaseEvent(LeaseEvent.Restored(leaseId, leaseId)) },
+            onFatal = { cause -> onEntryFatal(side, attempt, cause) },
+          )
+        } catch (e: EtcdRecipeRuntimeException) {
+          if (deadline.hasPassed()) return false // time ran out during the grant
+          throw e
+        }
       attempts += attempt
       var acquired = false
       try {
+        // A close() that ran before this attempt registered found nothing to abort
+        if (closeCalled.load()) abortedByClose()
         val txn =
-          client.transaction(resilience.rpc) {
+          client.transaction(bounded.rpc) {
             If(entryKey.doesNotExist)
             Then(
               entryKey.setTo(
@@ -268,47 +286,55 @@ constructor(
           }
         if (!txn.isSucceeded) {
           // Random-suffix collision: effectively impossible; pace and retry
-          Thread.sleep(LEASE_HEAL_PAUSE_MS)
+          pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
           continue@outer
         }
         val ownCreateRevision =
-          client.getResponse(entryKey, rpc = resilience.rpc).kvs.firstOrNull()?.createRevision
+          client.getResponse(entryKey, rpc = bounded.rpc).kvs.firstOrNull()?.createRevision
             ?: run {
               // Entry already gone: the lease died in the creation window
-              Thread.sleep(LEASE_HEAL_PAUSE_MS)
+              pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
               continue@outer
             }
         val ownRank = inheritedRank ?: ownCreateRevision
 
         while (true) {
+          if (closeCalled.load()) abortedByClose()
           if (attempt.phase.load() == Phase.DEAD) {
-            Thread.sleep(LEASE_HEAL_PAUSE_MS)
+            pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
             continue@outer // fresh entry at the tail
           }
-          if (deadline != null && deadline.hasPassedNow()) return false
+          if (deadline.hasPassed()) return false
 
-          val conflict = nearestConflict(side, me, entryKey, ownRank)
+          val conflict = nearestConflict(side, me, entryKey, ownRank, bounded.rpc)
             ?: run {
               // A downgrade may only keep the write entry's place while that entry
               // still exists: once it is gone (a lease expiry not yet noticed here), a
               // writer queued behind it may already hold the lock. Retry as an
               // ordinary read at the tail. Checked after this entry was created, so a
               // write that vanishes later still finds this entry ahead of any writer.
-              if (inheritedFrom != null && !client.isKeyPresent(inheritedFrom.entryKey, resilience.rpc)) {
+              if (inheritedFrom != null && !client.isKeyPresent(inheritedFrom.entryKey, bounded.rpc)) {
                 mayInheritWriteRank = false
                 continue@outer
               }
               // Admitted: publish the hold BEFORE claiming the phase (a fatal in
               // the win window must always find the hold — or the CAS failure
               // below rolls it back).
-              holdsFor(side)[me] = EntryData(lease, entryKey, ownRank)
+              val data = EntryData(lease, entryKey, ownRank, attempt)
+              holdsFor(side)[me] = data
               if (attempt.phase.compareAndSet(Phase.WAITING, Phase.HOLDING)) {
+                if (closeCalled.load()) {
+                  // close() landed in the win window: don't hand out a lock on a closed lock
+                  holdsFor(side).remove(me, data)
+                  dispossessedFor(side).remove(me)
+                  abortedByClose()
+                }
                 dispossessedFor(side).remove(me)
                 acquired = true
                 return true
               }
-              holdsFor(side).remove(me)
-              Thread.sleep(LEASE_HEAL_PAUSE_MS)
+              holdsFor(side).remove(me, data)
+              pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
               continue@outer
             }
 
@@ -318,7 +344,7 @@ constructor(
           WaiterSupport.awaitKeyDeletion(
             client,
             conflict.key,
-            resilience,
+            bounded,
             latch,
             deadline,
             observedRevision = conflict.observedRevision,
@@ -328,11 +354,16 @@ constructor(
           attempt.wake.set(null)
           // Loop: re-evaluate the conflict set (it only shrinks)
         }
+      } catch (e: EtcdRecipeRuntimeException) {
+        // An RPC that failed once the deadline passed (bounded by it, it timed out): time ran out
+        if (deadline.hasPassed() && !closeCalled.load()) return false
+        throw e
       } finally {
         attempts -= attempt
         if (!acquired) {
-          // Revoke deletes the entry (safe on an already-dead lease), waking successors
-          lease.close()
+          // Revoke deletes the entry (safe on an already-dead lease), waking successors. A
+          // bounded acquisition gives it one short attempt, so it returns near its deadline.
+          if (deadline == null) lease.close() else lease.closePromptly()
         }
       }
       @Suppress("UNREACHABLE_CODE")
@@ -350,8 +381,9 @@ constructor(
     thread: Thread,
     ownEntryKey: String,
     ownRank: Long,
+    rpc: RpcResilience,
   ): Conflict? {
-    val snapshot = client.getResponse(entryParent, getOption { isPrefix(true) }, resilience.rpc)
+    val snapshot = client.getResponse(entryParent, getOption { isPrefix(true) }, rpc)
     val ownWriteEntry = writeHolds[thread]?.entryKey
     val conflict =
       snapshot.kvs
@@ -403,18 +435,21 @@ constructor(
       )
       attempt.wake.get()?.countDown()
     } else if (attempt.phase.load() == Phase.HOLDING) {
-      lockLost(side, attempt.owner, cause)
+      lockLost(side, attempt, cause)
     }
   }
 
   @Suppress("TooGenericExceptionCaught")
   private fun lockLost(
     side: Side,
-    thread: Thread,
+    attempt: Attempt,
     cause: Throwable?,
   ) {
     withRecipeLoggingContext {
-      val data = holdsFor(side).remove(thread) ?: return
+      val thread = attempt.owner
+      // Only this attempt's hold: a stale event must not take a newer hold of the same thread
+      val data = holdsFor(side)[thread]?.takeIf { it.attempt === attempt } ?: return
+      if (!holdsFor(side).remove(thread, data)) return
       dispossessedFor(side)[thread] = data.holdCount
       logger.warn(cause) { "${side.entryPrefix} lock on $lockPath lost by $clientId (lease expired)" }
       recordException(cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
@@ -436,6 +471,13 @@ constructor(
   }
 
   override fun doClose() {
+    // Abort in-flight waits first, so an attempt about to win can't publish a hold after
+    // the holds below are drained.
+    attempts.toList().forEach { attempt ->
+      if (attempt.phase.compareAndSet(Phase.WAITING, Phase.DEAD)) {
+        attempt.wake.get()?.countDown()
+      }
+    }
     [Side.READ, Side.WRITE].forEach { side ->
       val holds = holdsFor(side)
       holds.keys.toList().forEach { thread ->
@@ -445,14 +487,13 @@ constructor(
         }
       }
     }
-    attempts.toList().forEach { attempt ->
-      if (attempt.phase.compareAndSet(Phase.WAITING, Phase.DEAD)) {
-        attempt.wake.get()?.countDown()
-      }
-    }
     readLostListeners.clear()
     writeLostListeners.clear()
   }
+
+  // An acquisition that close() landed on: it fails rather than acquire on a closed recipe
+  private fun abortedByClose(cause: Throwable? = null): Nothing =
+    throw EtcdRecipeRuntimeException("Lock attempt on $lockPath aborted by close()", cause)
 
   companion object {
     private val logger = KotlinLogging.logger {}
