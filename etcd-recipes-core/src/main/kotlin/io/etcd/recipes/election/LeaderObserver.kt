@@ -27,7 +27,9 @@ import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CopyOnWriteArrayList
@@ -90,12 +92,14 @@ class LeaderObserver
       if (!startCalled.compareAndSet(false, true))
         throw EtcdRecipeRuntimeException("start() already called")
       // Seed the snapshot: a listener registered before start() reads currentLeader; only
-      // CHANGES (PUT/DELETE) fire callbacks, so no synthetic take/relinquish is emitted.
-      currentLeaderRef.store(readLeader())
+      // CHANGES (PUT/DELETE) fire callbacks, so no synthetic take/relinquish is emitted. The
+      // watch starts just past the seed read, so a hand-off during setup is still delivered.
+      val seed = client.getResponse(leaderKey, rpc = resilience.rpc)
+      currentLeaderRef.store(seed.kvs.firstOrNull()?.value?.asString?.let { ElectionPaths.stripLeaderClientId(it) })
       watcher =
         client.watcher(
           leaderKey,
-          WatchOption.DEFAULT,
+          watchOption { withRevision(seed.header.revision + 1) },
           resilience.watch,
           recoveryListener = WatchRecoveryListener { event -> onRecovery(event) },
           resyncWith = null,

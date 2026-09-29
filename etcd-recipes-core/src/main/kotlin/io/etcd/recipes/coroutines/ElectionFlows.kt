@@ -19,7 +19,7 @@
 package io.etcd.recipes.coroutines
 
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.options.WatchOption
+import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
@@ -27,7 +27,8 @@ import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.WatchResilience
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.getValue
+import io.etcd.recipes.common.getResponse
+import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import io.etcd.recipes.election.ElectionPaths
 import kotlinx.coroutines.channels.Channel
@@ -71,20 +72,23 @@ fun Client.leadershipAsFlow(
   callbackFlow {
     val leaderKey = ElectionPaths.leaderKey(electionPath)
 
-    fun emitCurrentLeader() {
-      val leader = getValue(leaderKey)?.asString?.let { ElectionPaths.stripLeaderClientId(it) }
-      trySendBlocking(if (leader != null) LeadershipEvent.Elected(leader) else LeadershipEvent.Vacated)
-    }
+    fun leadershipOf(response: GetResponse): LeadershipEvent =
+      response.kvs.firstOrNull()?.value?.asString
+        ?.let { LeadershipEvent.Elected(ElectionPaths.stripLeaderClientId(it)) }
+        ?: LeadershipEvent.Vacated
 
-    // Emit the current leader first so a late collector is not left blind.
-    emitCurrentLeader()
+    // Read the current leader, then watch from just past that read, so a hand-off during
+    // setup is still delivered.
+    val seed = awaitGetResponse(leaderKey)
 
     val recoveryListener =
       WatchRecoveryListener { event ->
         when (event) {
-          // A hand-off may have been missed while the stream was dead: re-read.
+          // A hand-off may have been missed only when the stream couldn't resume where it
+          // left off (a resync, or a resume from "now"): re-read then.
           is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-            emitCurrentLeader()
+            val gapPossible = event !is WatchRecoveryEvent.Resubscribed || event.resumeRevision == 0L
+            if (gapPossible) trySendBlocking(leadershipOf(getResponse(leaderKey)))
           }
 
           is WatchRecoveryEvent.Failed -> {
@@ -102,13 +106,17 @@ fun Client.leadershipAsFlow(
       }
 
     val watcher =
-      watcher(leaderKey, WatchOption.DEFAULT, resilience, recoveryListener, resyncWith = null) { response ->
+      watcher(
+        leaderKey,
+        watchOption { withRevision(seed.header.revision + 1) },
+        resilience,
+        recoveryListener,
+        resyncWith = null,
+      ) { response ->
         response.events.forEach { event ->
           when (event.eventType) {
             PUT -> {
-              trySendBlocking(
-                LeadershipEvent.Elected(ElectionPaths.stripLeaderClientId(event.keyValue.value.asString)),
-              )
+              trySendBlocking(LeadershipEvent.Elected(ElectionPaths.stripLeaderClientId(event.keyValue.value.asString)))
             }
 
             DELETE -> {
@@ -121,5 +129,7 @@ fun Client.leadershipAsFlow(
           }
         }
       }
+    // Emit the current leader first so a late collector is not left blind.
+    send(leadershipOf(seed))
     awaitClose { watcher.close() }
   }.buffer(capacity)
