@@ -145,13 +145,27 @@ class LeaderObserver
 
     // A hand-off can be lost while the stream is fatally dead; re-read the leader key
     // after recovery and replay the current state. Mirrors LeaderSelector.reportLeader's
-    // recovery listener.
-    private fun onRecovery(event: WatchRecoveryEvent) {
+    // recovery listener: a Resubscribed that resumed at a known revision replays every
+    // missed event itself, so only a resync or a resume from "now" can hide a hand-off.
+    // internal (not private) so recovery handling can be unit-tested directly.
+    @Suppress("TooGenericExceptionCaught")
+    internal fun onRecovery(event: WatchRecoveryEvent) {
       reportRecoveryEvent(event)
       when (event) {
         is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-          val leader = readLeader()
-          if (leader != null) setLeader(leader) else clearLeader()
+          val gapPossible = event !is WatchRecoveryEvent.Resubscribed || event.resumeRevision == 0L
+          if (gapPossible) {
+            val leader =
+              try {
+                readLeader()
+              } catch (e: Throwable) {
+                logger.error(e) { "Re-reading $leaderKey after watch recovery failed" }
+                recordException(e)
+                listeners.forEach { listener -> runCatching { listener.onError(e) } }
+                return
+              }
+            if (leader != null) setLeader(leader) else clearLeader()
+          }
         }
 
         is WatchRecoveryEvent.Failed -> {

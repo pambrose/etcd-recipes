@@ -131,7 +131,9 @@ than dropping out after one turn.
 
 Calling `start()` while a previous term is still in flight throws
 `EtcdRecipeRuntimeException("Previous call to start() not complete")` rather than
-quietly running two overlapping terms from one instance.
+quietly running two overlapping terms from one instance. `close()` ends a candidacy
+whether or not it won, so a standby that was closed before its turn can be started
+again too.
 
 ### Who else is running?
 

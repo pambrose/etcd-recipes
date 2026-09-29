@@ -67,8 +67,10 @@ import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.ZERO
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 @JvmOverloads
 fun <T> withLeaderSelector(
@@ -204,6 +206,7 @@ constructor(
       closeCalled.store(false)
       electedLeader.store(false)
       startCallAllowed.store(false)
+      resetConnectionState()
     }
 
     executor.execute {
@@ -304,7 +307,13 @@ constructor(
           logger.error(e) { "In start()" }
           recordException(e)
         } finally {
-          startThreadComplete.set(true)
+          // The candidacy is over whether or not it won (a standby's ends at close(), and
+          // Phase 1 can throw), so allow the next start(). Both flags flip under
+          // startCallLock so a new start() can't interleave and have its reset overwritten.
+          synchronized(startCallLock) {
+            startCallAllowed.store(true)
+            startThreadComplete.set(true)
+          }
         }
       }
     }
@@ -327,9 +336,13 @@ constructor(
   fun waitOnLeadershipComplete(timeout: Duration): Boolean {
     checkStartCalled()
     checkCloseNotCalled()
-    // Check startThreadComplete here in case start() was re-used without a call to close()
-    startThreadComplete.waitUntilTrueWithInterruption()
-    return leadershipComplete.waitUntilTrueWithInterruption(timeout)
+    // One deadline covers both waits: first the term itself, then the start worker's
+    // unwind (so a start() re-used without close() sees the finished candidacy). An
+    // untimed wait on startThreadComplete here made a standby's timed wait block until
+    // it won and finished a term, or was closed.
+    val started = TimeSource.Monotonic.markNow()
+    if (!leadershipComplete.waitUntilTrueWithInterruption(timeout)) return false
+    return startThreadComplete.waitUntilTrueWithInterruption((timeout - started.elapsedNow()).coerceAtLeast(ZERO))
   }
 
   // Blocking form of [isFinished]: waits until leadership completes (set by close()
@@ -356,10 +369,14 @@ constructor(
   }
 
   override fun doClose() {
-    checkStartCalled()
-
-    markLeadershipComplete()
-    startThreadComplete.waitUntilTrue()
+    if (startCalled.load()) {
+      markLeadershipComplete()
+      // close() from inside takeLeadership runs on the thread holding the term: waiting
+      // for the start worker would wait on itself. The term unwinds once takeLeadership
+      // returns. (The start worker's finally re-allows start().)
+      if (Thread.currentThread() !== leadershipThreadRef.load())
+        startThreadComplete.waitUntilTrue()
+    }
 
     if (userExecutor == null) (executor as ExecutorService).shutdown()
   }

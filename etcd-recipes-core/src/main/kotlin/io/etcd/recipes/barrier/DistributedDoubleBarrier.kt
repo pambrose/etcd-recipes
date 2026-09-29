@@ -46,8 +46,10 @@ constructor(
   memberCount: Int,
   val clientId: String = defaultClientId(),
 ) : Closeable {
-  private val enterBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("enter"), memberCount)
-  private val leaveBarrier = DistributedBarrierWithCount(client, barrierPath.appendToPath("leave"), memberCount)
+  private val enterBarrier =
+    DistributedBarrierWithCount(client, barrierPath.appendToPath("enter"), memberCount, clientId = clientId)
+  private val leaveBarrier =
+    DistributedBarrierWithCount(client, barrierPath.appendToPath("leave"), memberCount, clientId = clientId)
 
   init {
     require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }

@@ -23,7 +23,9 @@ import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.kv.DeleteResponse
+import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.lease.LeaseGrantResponse
+import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.WatchOption
 import java.util.concurrent.CompletableFuture
 import kotlin.concurrent.atomics.AtomicReference
@@ -40,6 +42,9 @@ class HookedClient(
   /** Runs before the next `kvClient.txn()`. */
   val beforeTxn = AtomicReference<(() -> Unit)?>(null)
 
+  /** Runs before the next `kvClient.get(key, option)`. */
+  val beforeGet = AtomicReference<(() -> Unit)?>(null)
+
   /** Runs before the next single-key `kvClient.delete(key)`. */
   val beforeDelete = AtomicReference<(() -> Unit)?>(null)
 
@@ -54,6 +59,14 @@ class HookedClient(
       override fun txn(): Txn {
         beforeTxn.exchange(null)?.invoke()
         return delegate.kvClient.txn()
+      }
+
+      override fun get(
+        key: ByteSequence,
+        option: GetOption,
+      ): CompletableFuture<GetResponse> {
+        beforeGet.exchange(null)?.invoke()
+        return delegate.kvClient.get(key, option)
       }
 
       override fun delete(key: ByteSequence): CompletableFuture<DeleteResponse> {
