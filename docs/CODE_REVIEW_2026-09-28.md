@@ -55,8 +55,8 @@
 
 #### Critical
 - [ ] [#1](#issue-1) `DistributedReadWriteLock` write→read downgrade deadlocks when another writer queues in between
-- [ ] [#2](#issue-2) Queue take steals and deletes keys from sibling paths that share the queue's string prefix
-- [ ] [#3](#issue-3) Colliding enqueue keys (millis + 3 random chars, blind put) silently overwrite queued items
+- [x] [#2](#issue-2) Queue take steals and deletes keys from sibling paths that share the queue's string prefix
+- [x] [#3](#issue-3) Colliding enqueue keys (millis + 3 random chars, blind put) silently overwrite queued items
 
 #### High
 - [ ] [#4](#issue-4) RPC retry predicate never matches real jetcd failures, so configured status-based retries are inert
@@ -96,7 +96,7 @@
 - [ ] [#36](#issue-36) A term won via the watch runs on the watch dispatcher, so `close()` can return while it still holds the key
 - [ ] [#37](#issue-37) A `LeaderSelector` closed without ever winning can't be restarted
 - [ ] [#38](#issue-38) Composite recipes (`LeaderLatch`, `ServiceProvider`) hide the health of the recipes they wrap
-- [ ] [#39](#issue-39) The uncommitted `DistributedBarrierWithCount` close-race fix leaves a pre-park window open
+- [x] [#39](#issue-39) The uncommitted `DistributedBarrierWithCount` close-race fix leaves a pre-park window open
 - [ ] [#40](#issue-40) The count-barrier trip releases the tripper before the global release is committed
 - [ ] [#41](#issue-41) Count-barrier waiting keys aren't scoped to a generation
 - [ ] [#42](#issue-42) `DistributedBarrier.setBarrier()` after `removeBarrier()` on the same instance silently fails
@@ -108,9 +108,9 @@
 - [ ] [#48](#issue-48) `tryLock`/`tryAcquire` deadlines don't bound the setup and cleanup RPCs
 - [ ] [#49](#issue-49) The work queue's empty-wait watch isn't revision-anchored (the lost wakeup that PR #68 fixed elsewhere)
 - [ ] [#50](#issue-50) An ambiguous take commit loses the item (plain queues) or strands the claim (work queue)
-- [ ] [#51](#issue-51) Retried enqueue puts can duplicate an item that was already consumed
+- [x] [#51](#issue-51) Retried enqueue puts can duplicate an item that was already consumed
 - [ ] [#52](#issue-52) `AbstractQueue` takes don't react to `close()`
-- [ ] [#53](#issue-53) `enqueue(value, Duration.INFINITE)` writes a poison key that breaks every receive
+- [x] [#53](#issue-53) `enqueue(value, Duration.INFINITE)` writes a poison key that breaks every receive
 - [ ] [#54](#issue-54) The orphan sweep issues one transaction per in-flight claim on every idle wake
 - [ ] [#55](#issue-55) `enqueueAll`'s within-batch order relies on etcd's unstable sort
 - [ ] [#56](#issue-56) `TransientKeyValue` parks an executor thread for its whole lifetime, and `start()` waits with no timeout
@@ -145,7 +145,7 @@
 - [ ] [#83](#issue-83) Locks expose no fencing token, and the default lease TTL is 2 s
 - [ ] [#84](#issue-84) Election and barrier API traps (`close()` before `start()`, unused `clientId`)
 - [ ] [#85](#issue-85) `LeaderObserver.onRecovery` replays leadership on every recovery
-- [ ] [#86](#issue-86) `DistributedBarrier.close()` doesn't unpark waiters, and its internal reads are close-checked
+- [x] [#86](#issue-86) `DistributedBarrier.close()` doesn't unpark waiters, and its internal reads are close-checked
 - [ ] [#87](#issue-87) Code-quality leftovers: Java atomics reintroduced, unused fields, stale `ElectionPaths`
 - [ ] [#88](#issue-88) `TransientKeyValue`: retrying `start()` after a failure can leave a published key that can't be removed
 - [ ] [#89](#issue-89) Work-queue sweeper failures are dropped at DEBUG

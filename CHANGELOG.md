@@ -21,6 +21,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   returns `false`) instead of leaving it to its timeout, and a `close()` during the
   waiter's watch setup no longer makes it throw `close() already called`.
 
+### Fixed (queues: items stay in their queue and are never overwritten)
+
+- A consumer parked on an empty `DistributedQueue` or `DistributedPriorityQueue` could
+  take — delete and return — an item from a *different* queue whose path shares its
+  string prefix (a take on `/jobs` stealing from `/jobs2/…` or `/jobs-retry/…`). The
+  wait now watches only the queue's own children.
+- Queue item keys were the enqueue millisecond plus 3 random characters, written with
+  an unconditional put, so two enqueues in the same millisecond could silently
+  overwrite one another. Keys now carry a 16-character random suffix and are created
+  only if absent (retrying with a fresh key), in `enqueue`, `enqueueAll`, and the
+  work queue's delayed-item promotion.
+- Enqueue writes are no longer retried. A retried put whose first attempt had in fact
+  landed could re-create an item that a consumer had already taken; an ambiguous
+  failure now reaches the caller instead.
+- `DistributedWorkQueue.enqueue(value, delay)` rejects an infinite delay, which used to
+  overflow into a key that made every receive on the queue throw. A delayed key whose
+  ready time cannot be parsed is now moved to the dead-letter space (and recorded)
+  rather than breaking receives.
+
 ## [0.12.0] - 2026-07-26
 
 The largest release since the project began, in five themes:

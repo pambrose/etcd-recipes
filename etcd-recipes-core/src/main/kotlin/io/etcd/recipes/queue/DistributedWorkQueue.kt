@@ -23,6 +23,7 @@ import com.pambrose.common.util.length
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.jetcd.watch.WatchEvent
@@ -47,7 +48,6 @@ import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.isLeaseNotFound
 import io.etcd.recipes.common.putOption
-import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.selfHealingKeepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
@@ -173,8 +173,7 @@ class DistributedWorkQueue
 
   fun enqueue(value: ByteSequence) {
     checkCloseNotCalled()
-    val key = keyFormat.format(itemsPath, System.currentTimeMillis(), randomId(3))
-    client.putValue(key, value, rpc = resilience.rpc)
+    client.createUniqueKey(value, resilience.rpc) { newItemKey(itemsPath, System.currentTimeMillis()) }
   }
 
   fun enqueue(
@@ -186,7 +185,7 @@ class DistributedWorkQueue
    * Enqueues [value] for delivery no earlier than [delay] from now (a zero or
    * negative delay enqueues immediately). Maturity is judged against client
    * clocks — skew between producers and consumers shifts delivery by the skew,
-   * which is tolerable at visibility-timeout scale.
+   * which is tolerable at visibility-timeout scale. An infinite delay is rejected.
    */
   fun enqueue(
     value: ByteSequence,
@@ -197,21 +196,20 @@ class DistributedWorkQueue
       enqueue(value)
       return
     }
+    // An infinite delay would overflow the ready time into a key that breaks every receive
+    require(delay.isFinite()) { "Delay must be finite: $delay" }
     val readyAt = System.currentTimeMillis() + delay.inWholeMilliseconds
-    val key = keyFormat.format(delayedPath, readyAt, randomId(3))
-    client.putValue(key, value, rpc = resilience.rpc)
+    client.createUniqueKey(value, resilience.rpc) { newItemKey(delayedPath, readyAt) }
   }
 
   /** Enqueues every value in one transaction (all-or-nothing), preserving order. */
   fun enqueueAll(values: Collection<ByteSequence>) {
     checkCloseNotCalled()
     if (values.isEmpty()) return
-    val millis = System.currentTimeMillis()
-    val puts =
-      values.mapIndexed { index, value ->
-        batchKeyFormat.format(itemsPath, millis, index, randomId(3)) setTo value
-      }
-    client.transaction(resilience.rpc) { Then(*puts.toTypedArray()) }
+    client.createUniqueKeys(values.toList(), resilience.rpc) {
+      val millis = System.currentTimeMillis()
+      values.indices.map { index -> batchKeyFormat.format(itemsPath, millis, index, randomId(ITEM_KEY_SUFFIX_LENGTH)) }
+    }
   }
 
   /** Blocking receive: waits until an item can be claimed. */
@@ -405,31 +403,57 @@ class DistributedWorkQueue
     }
   }
 
-  // Moves matured delayed items into items/ in ready-time order. The delayed key's
-  // basename is "<readyMillis>-<uniq>", which becomes the item key — so promoted
-  // items sort by ready time among themselves and interleave correctly with
-  // immediate items. CAS races between promoting consumers pick one winner.
+  // Moves matured delayed items into items/ in ready-time order. A delayed key's
+  // basename is "<readyMillis>-<uniq>", and the item is promoted under a key with the
+  // same ready time — so promoted items sort by ready time among themselves and
+  // interleave correctly with immediate items. The item key gets a fresh suffix and is
+  // guarded as absent, so a promotion can never overwrite a queued item. CAS races
+  // between promoting consumers pick one winner.
   private fun promoteMatured() {
     while (true) {
       val head = client.getFirstChild(delayedPath, SortTarget.KEY, resilience.rpc).kvs.firstOrNull() ?: return
-      val basename = head.key.asString.substringAfterLast('/')
-      if (readyMillisOf(basename) > System.currentTimeMillis()) return
+      val readyAt = readyMillisOf(head.key.asString.substringAfterLast('/'))
+      if (readyAt == null) {
+        deadLetterMalformedDelayed(head)
+        continue
+      }
+      if (readyAt > System.currentTimeMillis()) return
+      val itemKey = newItemKey(itemsPath, readyAt)
       client.transaction(resilience.rpc) {
-        If(equalTo(head.key, CmpTarget.modRevision(head.modRevision)))
-        Then(deleteOp(head.key), "$itemsPath/$basename" setTo head.value)
+        If(equalTo(head.key, CmpTarget.modRevision(head.modRevision)), itemKey.doesNotExist)
+        Then(deleteOp(head.key), itemKey setTo head.value)
       }
       // win or lose, re-read: the next head may also be mature
     }
   }
 
-  // How long until the earliest delayed item matures, or null when none exist.
-  private fun delayedHeadRemaining(): Duration? {
-    val head = client.getFirstChild(delayedPath, SortTarget.KEY, resilience.rpc).kvs.firstOrNull() ?: return null
+  // A delayed key whose ready time doesn't parse (written by another tool, or by an
+  // overflowed delay) would sit at the head of delayed/ and break every receive. Move it
+  // to the dead-letter space instead, where it stays visible, and record why.
+  private fun deadLetterMalformedDelayed(head: KeyValue) {
     val basename = head.key.asString.substringAfterLast('/')
-    return (readyMillisOf(basename) - System.currentTimeMillis()).coerceAtLeast(0L).milliseconds
+    val moved =
+      client.transaction(resilience.rpc) {
+        If(equalTo(head.key, CmpTarget.modRevision(head.modRevision)))
+        Then(deleteOp(head.key), "$dlqPath/$basename" setTo head.value)
+      }.isSucceeded
+    if (moved) recordException(EtcdRecipeRuntimeException("Dead-lettered malformed delayed key ${head.key.asString}"))
   }
 
-  private fun readyMillisOf(basename: String): Long = basename.substringBefore('-').toLong()
+  // How long until the earliest delayed item matures, or null when none exist. A
+  // malformed head is dead-lettered on the next promotion pass, so wake right away.
+  private fun delayedHeadRemaining(): Duration? =
+    client.getFirstChild(delayedPath, SortTarget.KEY, resilience.rpc).kvs.firstOrNull()?.let { head ->
+      val readyAt = readyMillisOf(head.key.asString.substringAfterLast('/'))
+      if (readyAt == null) Duration.ZERO else (readyAt - System.currentTimeMillis()).coerceAtLeast(0L).milliseconds
+    }
+
+  private fun readyMillisOf(basename: String): Long? = basename.substringBefore('-').toLongOrNull()
+
+  private fun newItemKey(
+    parentPath: String,
+    millis: Long,
+  ): String = keyFormat.format(parentPath, millis, randomId(ITEM_KEY_SUFFIX_LENGTH))
 
   // Parks until an item lands in items/ (or the deadline passes), on the resilient
   // watcher. Also wakes at least every sweepInterval so a parked consumer keeps
