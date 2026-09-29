@@ -100,9 +100,16 @@ private class ResilientWatcher(
   private val resyncWith: (() -> Long)?,
   private val block: (WatchResponse) -> Unit,
 ) : Watch.Watcher {
+  // The dispatcher's thread, so close() from a callback running on it doesn't wait on itself
+  @Volatile
+  private var dispatcherThread: Thread? = null
+
   private val dispatcher: ScheduledExecutorService =
     Executors.newSingleThreadScheduledExecutor { runnable ->
-      Thread(runnable, "etcd-watch-dispatcher").apply { isDaemon = true }
+      Thread(runnable, "etcd-watch-dispatcher").apply {
+        isDaemon = true
+        dispatcherThread = this
+      }
     }
   private val closed = AtomicBoolean(false)
   private val lock = Any() // guards delegate + pendingAttempt against close() racing recovery
@@ -121,7 +128,12 @@ private class ResilientWatcher(
       override fun onNext(response: WatchResponse) {
         dispatch {
           advanceRevision(response)
-          suspendedReported = false
+          // A response after a transient error means jetcd recovered the stream by itself;
+          // report it, or listeners (and connectionState) would stay SUSPENDED for good.
+          if (suspendedReported) {
+            suspendedReported = false
+            emit(WatchRecoveryEvent.Resubscribed(keyName, resumeRevision))
+          }
           runCatching { block(response) }
             .onFailure { e -> logger.error(e) { "Watch block for $keyName threw" } }
         }
@@ -156,6 +168,9 @@ private class ResilientWatcher(
       delegate?.close()
     }
     dispatcher.shutdown()
+    // close() from a callback on the dispatcher (a cache listener closing its cache) can't
+    // wait for itself to finish; the callback completes once it returns.
+    if (Thread.currentThread() === dispatcherThread) return
     // shutdown() refuses new tasks but does not wait for the currently-running
     // callback task. Without awaiting, the user's `block` could still be
     // executing on the dispatcher thread after withWatcher's receiver has

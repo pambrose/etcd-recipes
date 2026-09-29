@@ -23,9 +23,11 @@ package io.etcd.recipes.common
  *
  * [context] is a short, human-readable source hint (typically the recipe's clientId or
  * path plus a kind, e.g. `"DistributedMutex:ab12cd3 keep-alive"`) so a single handler
- * registered across many recipes can attribute the failure. Listeners run on the
- * reporting recipe's own thread (a healer/dispatcher thread, never jetcd's event loop);
- * a listener that throws is logged and dropped, never re-recorded.
+ * registered across many recipes can attribute the failure. Listeners run on the recipe's
+ * notifier thread, one at a time and in report order, never on the thread that hit the
+ * failure (which can be jetcd's event loop). A listener that blocks delays only that
+ * recipe's later notifications. A listener that throws is logged and dropped, never
+ * re-recorded.
  */
 fun interface BackgroundExceptionListener {
   fun onException(

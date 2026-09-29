@@ -20,10 +20,11 @@ import io.etcd.recipes.common.ConnectionState
 import io.etcd.recipes.common.ConnectionStateListener
 import io.etcd.recipes.common.EtcdConnector
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /**
  * The recipe's [ConnectionState] as a [Flow]: emits the current state on collection,
@@ -36,10 +37,13 @@ import kotlinx.coroutines.flow.conflate
  */
 fun EtcdConnector.connectionStateAsFlow(): Flow<ConnectionState> =
   callbackFlow {
-    val listener = ConnectionStateListener { newState, _ -> trySendBlocking(newState) }
-    // Emit the current state first so a late collector is not left blind until the
-    // next transition.
-    trySendBlocking(connectionState)
+    // Register first, then read: a change that lands in between still triggers a re-read.
+    // Each notification is only a signal to read the current state, so nothing is missed
+    // and a slow collector (conflated) always ends up on the latest state.
+    val listener = ConnectionStateListener { _, _ -> trySend(Unit) }
     addConnectionStateListener(listener)
+    trySend(Unit)
     awaitClose { removeConnectionStateListener(listener) }
   }.conflate()
+    .map { connectionState }
+    .distinctUntilChanged()

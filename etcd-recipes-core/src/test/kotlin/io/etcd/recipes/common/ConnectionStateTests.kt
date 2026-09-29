@@ -24,6 +24,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.mockk
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Unit tests for the connection-state machinery on [EtcdConnector]: recipes feed
@@ -85,8 +86,11 @@ class ConnectionStateTests : StringSpec() {
       connector.watchEvent(WatchRecoveryEvent.Suspended("/k", boom))
       connector.leaseEvent(LeaseEvent.Suspended(7L, boom))
       connector.watchEvent(WatchRecoveryEvent.Suspended("/k2", boom))
+      // Delivery is asynchronous but ordered: once this sentinel arrives, all earlier ones have
+      connector.watchEvent(WatchRecoveryEvent.Resubscribed("/k", 1))
 
-      transitions shouldBe [ConnectionState.SUSPENDED]
+      pollUntil(5.seconds) { ConnectionState.RECONNECTED in transitions } shouldBe true
+      transitions shouldBe [ConnectionState.SUSPENDED, ConnectionState.RECONNECTED]
     }
 
     "listener exceptions are recorded and do not block other listeners" {
@@ -97,6 +101,7 @@ class ConnectionStateTests : StringSpec() {
 
       connector.watchEvent(WatchRecoveryEvent.Suspended("/k", boom))
 
+      pollUntil(5.seconds) { seen.isNotEmpty() } shouldBe true
       seen shouldBe [ConnectionState.SUSPENDED]
       connector.hasExceptions shouldBe true
       connector.exceptions.first().shouldBeInstanceOf<IllegalStateException>()
@@ -105,12 +110,16 @@ class ConnectionStateTests : StringSpec() {
     "removed listeners stop receiving transitions" {
       val connector = TestConnector()
       val seen = CopyOnWriteArrayList<ConnectionState>()
+      val sentinel = CopyOnWriteArrayList<ConnectionState>()
       val listener = ConnectionStateListener { new, _ -> seen += new }
       connector.addConnectionStateListener(listener)
+      connector.addConnectionStateListener { new, _ -> sentinel += new }
       connector.watchEvent(WatchRecoveryEvent.Suspended("/k", boom))
       connector.removeConnectionStateListener(listener)
       connector.watchEvent(WatchRecoveryEvent.Resubscribed("/k", 1))
 
+      // Delivery is ordered: once the sentinel has the second change, the first was delivered
+      pollUntil(5.seconds) { ConnectionState.RECONNECTED in sentinel } shouldBe true
       seen shouldBe [ConnectionState.SUSPENDED]
     }
   }

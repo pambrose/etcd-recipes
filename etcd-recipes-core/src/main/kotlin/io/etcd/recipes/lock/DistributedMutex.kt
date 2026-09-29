@@ -190,10 +190,11 @@ class DistributedMutex
           client,
           leaseTtlSecs,
           resilience.rpc,
-          onTransient = { e ->
+          onTransient = { leaseId, e ->
             recordException(e)
-            reportLeaseEvent(LeaseEvent.Suspended(-1L, e))
+            reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
           },
+          onResumed = { leaseId -> reportLeaseEvent(LeaseEvent.Restored(leaseId, leaseId)) },
           onFatal = { cause -> onAttemptFatal(attempt, cause) },
         )
       attempts += attempt
@@ -289,16 +290,19 @@ class DistributedMutex
       dispossessed[thread] = data.holdCount
       logger.warn(cause) { "Lock on $lockPath lost by $clientId (lease expired)" }
       recordException(cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
-      reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
-      lockLostListeners.forEach { listener ->
-        try {
-          listener.onLockLost(cause)
-        } catch (e: Throwable) {
-          logger.error(e) { "Exception in lock-lost listener" }
-          recordException(e)
+      reportLeaseEvent(LeaseEvent.Expired(data.acquisitionLease.leaseId, cause))
+      // Off jetcd's lease thread: a listener may block or make an RPC
+      notifyAsync {
+        lockLostListeners.forEach { listener ->
+          try {
+            listener.onLockLost(cause)
+          } catch (e: Throwable) {
+            logger.error(e) { "Exception in lock-lost listener" }
+            recordException(e)
+          }
         }
+        if (interruptOnLockLoss) thread.interrupt()
       }
-      if (interruptOnLockLoss) thread.interrupt()
       data.acquisitionLease.closeWithoutRevoke() // lease already gone; no RPC on this thread
     }
   }

@@ -99,6 +99,20 @@ class ResilientWatcherTests : StringSpec() {
       }
     }
 
+    "a response after a transient error reports the stream as resubscribed" {
+      val mocks = WatchMocks()
+      val events = CopyOnWriteArrayList<WatchRecoveryEvent>()
+      mocks.client.watcher("/rw/transient", WatchOption.DEFAULT, quickRetries(), { events += it }, null) { }.use {
+        mocks.listeners.first().onNext(eventResponse(7))
+        mocks.listeners.first().onError(RuntimeException("stream reset")) // jetcd retries this one itself
+        mocks.listeners.first().onNext(eventResponse(8))
+        pollUntil(5.seconds) { events.size == 2 } shouldBe true
+        (events[0] is WatchRecoveryEvent.Suspended) shouldBe true
+        events[1] shouldBe WatchRecoveryEvent.Resubscribed("/rw/transient", 9L)
+        mocks.listeners.size shouldBe 1 // no resubscribe of our own: jetcd recovered the stream
+      }
+    }
+
     "recovery transitions increment the watch-recovery metric" {
       val mocks = WatchMocks()
       val kinds = CopyOnWriteArrayList<String>()

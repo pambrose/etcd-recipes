@@ -19,9 +19,9 @@ package io.etcd.recipes.coroutines
 import io.etcd.recipes.common.BackgroundException
 import io.etcd.recipes.common.BackgroundExceptionListener
 import io.etcd.recipes.common.EtcdConnector
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
@@ -32,16 +32,26 @@ import kotlinx.coroutines.flow.callbackFlow
  * [BackgroundExceptionListener] and cancellation removes it; it never starts or closes the
  * recipe.
  *
- * The listener fires on the reporting recipe's own thread (a healer/dispatcher thread), so
- * the channel is buffered (unlimited by default) — a failure is never dropped and the
- * reporting thread never blocks.
+ * The listener runs on the recipe's notifier thread, which must never block, so the
+ * channel is buffered and sends never wait: unlimited by default (a failure is never
+ * dropped), or, with a bounded [capacity], a slow collector loses the oldest failures.
  */
 fun EtcdConnector.backgroundExceptionsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<BackgroundException> =
   callbackFlow {
     val listener =
       BackgroundExceptionListener { context, throwable ->
-        trySendBlocking(BackgroundException(context, throwable))
+        trySend(BackgroundException(context, throwable))
       }
     addBackgroundExceptionListener(listener)
     awaitClose { removeBackgroundExceptionListener(listener) }
-  }.buffer(capacity)
+  }.buffer(capacity, overflowFor(capacity))
+
+// A bounded buffer drops its oldest entry rather than suspend the sender. Unlimited and
+// conflated buffers never suspend a sender anyway (conflated also rejects any other policy).
+private fun overflowFor(capacity: Int): BufferOverflow =
+  if (capacity == Channel.UNLIMITED ||
+    capacity == Channel.CONFLATED
+  )
+    BufferOverflow.SUSPEND
+    else
+    BufferOverflow.DROP_OLDEST

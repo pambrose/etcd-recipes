@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (notifications and connection state)
+
+- Listener callbacks no longer run on jetcd's event loop. `BackgroundExceptionListener`s,
+  `ConnectionStateListener`s, and lock-lost / permit-lost listeners (with the opt-in
+  interrupt) now run on a per-recipe notifier thread, one at a time and in report
+  order. Before, a lock's lease loss ran them inline on jetcd's lease callback thread,
+  so a listener that blocked or made an RPC stalled keep-alive processing for every
+  lease on the client. `recordException` never blocks.
+- `connectionState` no longer hides a dead stream. A `LOST` from a stream that is gone
+  for good (watch recovery or lease healing abandoned, or a failed start) now sticks
+  until the recipe restarts, so a later `RECONNECTED` from another, healthy stream can't
+  clear it. Before, `isHealthy()` could report true with the recipe's participation or
+  registration permanently gone. State changes are also delivered in the order they
+  happened, and `connectionStateAsFlow` registers before it reads, so it no longer
+  misses a change.
+- `connectionState` now leaves `SUSPENDED` after jetcd recovers a stream by itself. A
+  transient watch error is followed by `WatchRecoveryEvent.Resubscribed`, and a transient
+  keep-alive error by `LeaseEvent.Restored` with the same old and new id (self-healing
+  leases, lock and permit leases, and leadership leases). Before, one network blip left a
+  mutex `SUSPENDED` for life. Lock and permit leases also report their real lease id
+  (it was `-1`) and record keep-alive metrics.
+- `LeaderLatch` and `ServiceProvider` report the health of the recipes they wrap. A
+  standby latch whose participation lease can't heal, or a provider whose cache watch was
+  abandoned, now reads `LOST` / unhealthy, and their failures reach the wrapper's
+  `exceptions` as they happen, not only when a term ends.
+- `close()` from a cache listener (the watch dispatcher) or a lease listener (the healer)
+  no longer stalls 5 s waiting on its own thread.
+- `exceptions` keeps the most recent 100 failures. The new `droppedExceptionCount` counts
+  the rest, so a long-lived recipe's list no longer grows without bound.
+- `lockLostAsFlow` / `permitLostAsFlow` never block their notifier (a truly unlimited
+  buffer). A bounded `backgroundExceptionsAsFlow(capacity)` drops the oldest failures
+  instead of blocking the recipe's notifications.
+
 ### Fixed (RPC budgets and probes)
 
 - The recipe's `RpcResilience` (timeout, retries, and metrics) now reaches every RPC it

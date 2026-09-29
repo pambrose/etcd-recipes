@@ -40,7 +40,8 @@ import kotlin.time.Duration.Companion.seconds
  * The observer discriminates jetcd's signals: `onCompleted` (lease outlived its
  * TTL unrenewed) or a lease-not-found error mean the lease is gone → [onFatal];
  * any other stream error is transient (jetcd restarts the stream itself) →
- * [onTransient]. Neither callback fires on our own close.
+ * [onTransient], and the first renewal after one → [onResumed]. None of them fires on
+ * our own close. They run on jetcd's threads, so they must not block.
  *
  * [close] revokes — revocation is the sole authoritative abort of a server-side
  * lock wait (jetcd internally retries the lock RPC on safe-redo failures, and
@@ -52,11 +53,15 @@ internal class AcquisitionLease(
   private val client: Client,
   ttlSecs: Long,
   private val rpc: RpcResilience,
-  onTransient: (Throwable) -> Unit,
+  onTransient: (leaseId: Long, Throwable) -> Unit,
+  onResumed: (leaseId: Long) -> Unit,
   onFatal: (Throwable?) -> Unit,
 ) : Closeable {
   private val lease = client.leaseGrant(ttlSecs.seconds, rpc)
   private val closed = AtomicBoolean(false)
+
+  // Set by a transient stream error, cleared (with onResumed) by the next renewal
+  private val suspended = AtomicBoolean(false)
 
   val leaseId: Long get() = lease.id
 
@@ -64,14 +69,30 @@ internal class AcquisitionLease(
     client.leaseClient.keepAlive(
       lease.id,
       Observers.builder<LeaseKeepAliveResponse>()
-        .onNext { }
+        .onNext {
+          rpc.metrics.incrementKeepAlive("renewal", lease.id)
+          if (suspended.compareAndSet(true, false) && !closed.load()) {
+            rpc.metrics.incrementKeepAlive("restored", lease.id)
+            onResumed(lease.id)
+          }
+        }
         .onError { e ->
           if (!closed.load()) {
-            if (e.isLeaseNotFound()) onFatal(e) else onTransient(e)
+            if (e.isLeaseNotFound()) {
+              rpc.metrics.incrementKeepAlive("expired", lease.id)
+              onFatal(e)
+            } else {
+              suspended.store(true)
+              rpc.metrics.incrementKeepAlive("suspended", lease.id)
+              onTransient(lease.id, e)
+            }
           }
         }
         .onCompleted {
-          if (!closed.load()) onFatal(null)
+          if (!closed.load()) {
+            rpc.metrics.incrementKeepAlive("expired", lease.id)
+            onFatal(null)
+          }
         }
         .build(),
     )

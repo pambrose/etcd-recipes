@@ -49,7 +49,11 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
-/** Notified when a held permit's lease expires (crash/partition) and the permit is lost. */
+/**
+ * Notified when a held permit's lease expires (crash/partition) and the permit is lost. Runs
+ * on the semaphore's notifier thread, never on jetcd's lease callback thread, so it may block
+ * or make RPCs; it delays only the semaphore's later notifications.
+ */
 fun interface PermitLostListener {
   fun onPermitLost(cause: Throwable?)
 }
@@ -244,10 +248,11 @@ class DistributedSemaphore
           client,
           leaseTtlSecs,
           resilience.rpc,
-          onTransient = { e ->
+          onTransient = { leaseId, e ->
             recordException(e)
-            reportLeaseEvent(LeaseEvent.Suspended(-1L, e))
+            reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
           },
+          onResumed = { leaseId -> reportLeaseEvent(LeaseEvent.Restored(leaseId, leaseId)) },
           onFatal = { cause -> onEntryFatal(attempt, cause) },
         )
       attempts += attempt
@@ -376,16 +381,19 @@ class DistributedSemaphore
       dispossessedCount.incrementAndFetch()
       logger.warn(cause) { "Permit on $semaphorePath lost by $clientId (lease expired)" }
       recordException(cause ?: EtcdRecipeRuntimeException("Permit lease for $semaphorePath expired; permit lost"))
-      reportLeaseEvent(LeaseEvent.Expired(-1L, cause))
-      lostListeners.forEach { listener ->
-        try {
-          listener.onPermitLost(cause)
-        } catch (e: Throwable) {
-          logger.error(e) { "Exception in permit-lost listener" }
-          recordException(e)
+      reportLeaseEvent(LeaseEvent.Expired(data.lease.leaseId, cause))
+      // Off jetcd's lease thread: a listener may block or make an RPC
+      notifyAsync {
+        lostListeners.forEach { listener ->
+          try {
+            listener.onPermitLost(cause)
+          } catch (e: Throwable) {
+            logger.error(e) { "Exception in permit-lost listener" }
+            recordException(e)
+          }
         }
+        if (interruptOnPermitLoss) attempt.owner.interrupt()
       }
-      if (interruptOnPermitLoss) attempt.owner.interrupt()
       data.lease.closeWithoutRevoke() // lease already gone; no RPC on this thread
     }
   }

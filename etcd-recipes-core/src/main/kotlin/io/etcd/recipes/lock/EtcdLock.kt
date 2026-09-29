@@ -77,6 +77,11 @@ internal val EtcdLock.interruptsHolderOnLoss: Boolean
       else -> false
     }
 
+/**
+ * Notified when a held lock is lost (its lease expired). Runs on the lock's notifier thread,
+ * never on jetcd's lease callback thread, so it may block or make RPCs; it delays only the
+ * lock's later notifications.
+ */
 fun interface LockLostListener {
   fun onLockLost(cause: Throwable?)
 }

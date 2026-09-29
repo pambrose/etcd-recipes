@@ -91,6 +91,20 @@ class SelfHealingKeepAliveTests : StringSpec() {
     EtcdExceptionFactory.newEtcdException(ErrorCode.NOT_FOUND, "etcdserver: requested lease not found")
 
   init {
+    "the first renewal after a transient error reports the lease restored" {
+      val mocks = HealMocks()
+      val events = CopyOnWriteArrayList<LeaseEvent>()
+      mocks.client.selfHealingKeepAlive(2.seconds, quickHeals(), { events += it }) { true }.use {
+        val observer = mocks.observers.first()
+        observer.onError(RuntimeException("stream reset")) // transient: jetcd restarts the stream
+        observer.onNext(mockk(relaxed = true))
+        observer.onNext(mockk(relaxed = true))
+        pollUntil(5.seconds) { events.size == 2 } shouldBe true
+        (events[0] is LeaseEvent.Suspended) shouldBe true
+        events[1] shouldBe LeaseEvent.Restored(100L, 100L)
+      }
+    }
+
     "re-grants and re-establishes after keep-alive completion" {
       val mocks = HealMocks()
       val events = CopyOnWriteArrayList<LeaseEvent>()
