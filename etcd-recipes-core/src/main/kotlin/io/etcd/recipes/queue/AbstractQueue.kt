@@ -19,6 +19,7 @@
 package io.etcd.recipes.queue
 
 import com.pambrose.common.time.timeUnitToDuration
+import com.pambrose.common.util.ensureSuffix
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
@@ -138,43 +139,27 @@ abstract class AbstractQueue(
         isPrefix(true)
         withNoDelete(true)
       }
-    val keyFound = AtomicReference<KeyValue?>(null)
     val watchFailure = AtomicReference<Throwable?>(null)
-    val recoveryListener = waiterRecoveryListener(watchLatch, keyFound, watchFailure)
+    val recoveryListener = waiterRecoveryListener(watchLatch, watchFailure)
 
+    // Watch this queue's children only. A bare-path prefix watch would also match a
+    // sibling path that merely shares the string prefix (/jobs vs /jobs2/...).
     return client.withWatcher(
-      queuePath,
+      queuePath.ensureSuffix("/"),
       watchOption,
       resilience.watch,
       recoveryListener,
       resyncWith = null,
       { watchResponse ->
-        synchronized(watchLatch) {
-          for (watchEvent in watchResponse.events) {
-            if (watchEvent.eventType == WatchEvent.EventType.PUT) {
-              keyFound.compareAndSet(null, watchEvent.keyValue)
-              watchLatch.countDown()
-              break
-            }
-          }
-        }
+        if (watchResponse.events.any { it.eventType == WatchEvent.EventType.PUT }) watchLatch.countDown()
       },
     ) {
       // Poll once to UNBLOCK: a value may have arrived between watcher.use { } and the
       // watch going live in jetcd, and the watcher never delivers such a pre-live PUT,
-      // so a poll is needed to count the latch down. The gRPC call must run *outside*
-      // the synchronized block — the watcher callback runs on the jetcd Vert.x event
-      // loop and also takes watchLatch's monitor, so holding it while a gRPC response
-      // is pending would deadlock the event loop and never deliver the response.
-      if (watchLatch.count > 0) {
-        val waitingChildList = client.getFirstChild(queuePath, target, resilience.rpc).kvs
-        if (waitingChildList.isNotEmpty()) {
-          synchronized(watchLatch) {
-            keyFound.store(waitingChildList.first())
-            if (watchLatch.count > 0) watchLatch.countDown()
-          }
-        }
-      }
+      // so a poll is needed to count the latch down.
+      if (watchLatch.count > 0 && client.getFirstChild(queuePath, target, resilience.rpc).kvs.isNotEmpty())
+        watchLatch.countDown()
+
       if (deadline == null) {
         watchLatch.await()
       } else {
@@ -184,15 +169,16 @@ abstract class AbstractQueue(
         }
       }
 
-      // STRICT ORDERING: whichever PUT the watcher observed first (in keyFound) is not
-      // necessarily the head by sort order — a lower-priority key can be committed just
-      // before a higher-priority one. So after waking, re-query the actual first child
-      // by `target` and prefer it; this routes the wake-up path through the SAME
-      // head-selection as the non-empty fast path above, guaranteeing the
-      // highest-priority (KEY) / oldest (MOD) item. Fall back to the watcher's event only if the re-query is
-      // empty (a concurrent consumer already took the head) — the deleteRevKey CAS and
-      // the outer retry loop then still guarantee no loss or duplication.
-      val head = client.getFirstChild(queuePath, target, resilience.rpc).kvs.firstOrNull() ?: keyFound.load()
+      // STRICT ORDERING: whichever PUT woke the watcher is not necessarily the head by
+      // sort order — a lower-priority key can be committed just before a higher-priority
+      // one. So after waking, re-query the actual first child by `target`; this routes
+      // the wake-up path through the SAME head-selection as the non-empty fast path
+      // above, guaranteeing the highest-priority (KEY) / oldest (MOD) item. An empty
+      // re-query means a concurrent consumer already took the head: return null and
+      // the outer loop re-reads. (Never fall back to the key the watcher saw — the
+      // re-query is a linearizable read taken after the event, so a key it misses is
+      // already gone.)
+      val head = client.getFirstChild(queuePath, target, resilience.rpc).kvs.firstOrNull()
       if (head == null) {
         watchFailure.load()?.let { cause ->
           throw EtcdRecipeRuntimeException("Queue watch on $queuePath failed while waiting for an item", cause)
@@ -204,12 +190,11 @@ abstract class AbstractQueue(
 
   // A PUT can land while the watch stream is fatally dead and never be delivered.
   // After each recovery, poll the head the same way the pre-live gap poll in
-  // waitForFirstChild does (gRPC outside the latch monitor, on the watch dispatcher
-  // thread). An abandoned recovery unparks the waiter with the failure recorded so
-  // the caller errors out instead of parking forever.
+  // waitForFirstChild does (on the watch dispatcher thread). An abandoned recovery
+  // unparks the waiter with the failure recorded so the caller errors out instead of
+  // parking forever.
   private fun waiterRecoveryListener(
     watchLatch: CountDownLatch,
-    keyFound: AtomicReference<KeyValue?>,
     watchFailure: AtomicReference<Throwable?>,
   ): WatchRecoveryListener =
     WatchRecoveryListener { event ->
@@ -217,13 +202,7 @@ abstract class AbstractQueue(
         reportRecoveryEvent(event)
         when (event) {
           is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-            val children = client.getFirstChild(queuePath, target, resilience.rpc).kvs
-            if (children.isNotEmpty()) {
-              synchronized(watchLatch) {
-                keyFound.compareAndSet(null, children.first())
-                if (watchLatch.count > 0) watchLatch.countDown()
-              }
-            }
+            if (client.getFirstChild(queuePath, target, resilience.rpc).kvs.isNotEmpty()) watchLatch.countDown()
           }
 
           is WatchRecoveryEvent.Failed -> {
@@ -231,9 +210,7 @@ abstract class AbstractQueue(
               ?: EtcdRecipeRuntimeException("Watch on $queuePath abandoned while waiting for an item")
             watchFailure.store(cause)
             recordException(cause)
-            synchronized(watchLatch) {
-              if (watchLatch.count > 0) watchLatch.countDown()
-            }
+            watchLatch.countDown()
           }
 
           is WatchRecoveryEvent.Suspended -> {
