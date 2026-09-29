@@ -21,6 +21,7 @@ package io.etcd.recipes.queue
 import com.pambrose.common.concurrent.thread
 import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getChildCount
@@ -71,7 +72,7 @@ class DistributedPriorityQueueTest : StringSpec() {
                 }
             }
 
-            latch.await()
+            latch.awaitOrFail()
 
             client.getChildCount(queuePath) shouldBe 0
         }
@@ -124,7 +125,7 @@ class DistributedPriorityQueueTest : StringSpec() {
 
             withDistributedPriorityQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i], 1u) } }
 
-            latch.await()
+            latch.awaitOrFail()
 
             client.getChildCount(queuePath) shouldBe 0
         }
@@ -188,8 +189,8 @@ class DistributedPriorityQueueTest : StringSpec() {
                 }
             }
 
-            dequeueLatch.await()
-            enqueueLatch.await()
+            dequeueLatch.awaitOrFail()
+            enqueueLatch.awaitOrFail()
 
             dequeuedData.size shouldBe testData.size
             repeat(dequeuedData.size) { i -> dequeuedData[i] shouldBe testData[i] }
@@ -236,8 +237,8 @@ class DistributedPriorityQueueTest : StringSpec() {
                 }
             }
 
-            dequeueLatch.await()
-            enqueueLatch.await()
+            dequeueLatch.awaitOrFail()
+            enqueueLatch.awaitOrFail()
 
             dequeued shouldContainExactlyInAnyOrder values
         }
@@ -305,7 +306,7 @@ class DistributedPriorityQueueTest : StringSpec() {
                     }
                 }
 
-                latch.await()
+                latch.awaitOrFail()
 
                 withDistributedPriorityQueue(client, queuePath) {
                     val v = dequeue().asString

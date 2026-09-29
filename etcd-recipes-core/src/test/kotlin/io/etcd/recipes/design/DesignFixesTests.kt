@@ -23,6 +23,7 @@ import io.etcd.recipes.barrier.DistributedBarrierWithCount
 import io.etcd.recipes.barrier.DistributedDoubleBarrier
 import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.common.EtcdConnector
+import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.pollUntil
@@ -116,7 +117,7 @@ class DesignFixesTests : StringSpec() {
           }
         }
 
-        started.await()
+        started.awaitOrFail()
         // Close as soon as the waiting key appears — no settle sleep. The waiter is
         // still several RPCs short of the park at this point, and close() must cancel
         // it cleanly from anywhere in that window.
@@ -156,7 +157,7 @@ class DesignFixesTests : StringSpec() {
             finished.countDown()
           }
         }
-        started.await()
+        started.awaitOrFail()
         // Close from inside the pre-park window rather than sleeping past it.
         pollUntil(15.seconds) { doubleBarrier.enterWaiterCount >= 1 } shouldBe true
         doubleBarrier.close()

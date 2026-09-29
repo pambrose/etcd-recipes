@@ -20,6 +20,7 @@ package io.etcd.recipes.barrier
 
 import com.pambrose.common.concurrent.thread
 import com.pambrose.common.util.sleep
+import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
@@ -108,7 +109,7 @@ class DistributedBarrierTests : StringSpec() {
                 }
             }
 
-            completeLatch.await()
+            completeLatch.awaitOrFail()
 
             timeoutCount.load() shouldBe count
             advancedCount.load() shouldBe count
@@ -168,7 +169,7 @@ class DistributedBarrierTests : StringSpec() {
                     sleep(3.seconds)
                 }
 
-                finishedLatch.await()
+                finishedLatch.awaitOrFail()
 
                 holder.checkForException()
             }

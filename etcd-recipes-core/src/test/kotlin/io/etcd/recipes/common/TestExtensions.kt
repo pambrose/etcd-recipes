@@ -25,10 +25,12 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 private const val LOCAL_ETCD_HOST = "localhost"
@@ -107,13 +109,31 @@ fun nonblockingThreads(
   return Pair(finishedLatch, holder)
 }
 
+/**
+ * How long a test waits on its own threads or latches before failing. Kotest's timeout is
+ * coroutine-based and cannot interrupt a thread blocked in `CountDownLatch.await()`, so an
+ * unbounded wait turns a deadlock regression into a hang instead of a failure.
+ */
+val TEST_WAIT_LIMIT = 2.minutes
+
 fun blockingThreads(
   threadCount: Int,
+  timeout: Duration = TEST_WAIT_LIMIT,
   block: (index: Int) -> Unit,
 ) {
   val (finishedLatch, exception) = nonblockingThreads(threadCount, block = block)
-  finishedLatch.await()
+  if (!finishedLatch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS))
+    throw AssertionError("${finishedLatch.count} of $threadCount threads still running after $timeout")
   exception.checkForException()
+}
+
+/** A bounded [CountDownLatch.await]: fails, naming [what], if the latch is still closed after [timeout]. */
+fun CountDownLatch.awaitOrFail(
+  timeout: Duration = TEST_WAIT_LIMIT,
+  what: String = "latch",
+) {
+  if (!await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS))
+    throw AssertionError("Timed out after $timeout waiting for $what (count still $count)")
 }
 
 fun ExceptionHolder.checkForException() {
@@ -127,7 +147,8 @@ fun List<ExceptionHolder>.throwExceptionFromList() {
     throw e
 }
 
-fun List<CountDownLatch>.waitForAll() = forEach { it.await() }
+fun List<CountDownLatch>.waitForAll(timeout: Duration = TEST_WAIT_LIMIT) =
+  forEachIndexed { index, latch -> latch.awaitOrFail(timeout, "latch $index of $size") }
 
 fun threadWithExceptionCheck(block: () -> Unit): Pair<CountDownLatch, ExceptionHolder> {
   val latch = CountDownLatch(1)

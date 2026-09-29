@@ -19,6 +19,7 @@
 package io.etcd.recipes.election
 
 import com.pambrose.common.concurrent.thread
+import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.blockingThreads
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.pollUntil
@@ -53,7 +54,7 @@ class ParticipantTests : StringSpec() {
                                     logger.info { "${selector.clientId} elected leader" }
 
                                     // Wait until participation count has been taken
-                                    holdLatch.await()
+                                    holdLatch.awaitOrFail()
                                     // Each leader's participant lease only expires after its
                                     // selector closes. Wait for previous leaders' leases to
                                     // expire so we observe a strictly decreasing count.
@@ -74,7 +75,7 @@ class ParticipantTests : StringSpec() {
                     }
                 }
 
-                startedLatch.await()
+                startedLatch.awaitOrFail()
 
                 // Wait for participants to register
                 pollUntil(15.seconds) {
@@ -86,7 +87,7 @@ class ParticipantTests : StringSpec() {
 
                 holdLatch.countDown()
 
-                finishedLatch.await()
+                finishedLatch.awaitOrFail()
 
                 // After all leaders complete, etcd should evict every participant lease.
                 pollUntil(15.seconds) {

@@ -120,6 +120,10 @@ subprojects {
 
     tasks.named<Test>("test") {
         useJUnitPlatform()
+        // Backstop for a hang no bounded wait covers (the test helpers fail a stuck latch
+        // after TEST_WAIT_LIMIT). Under CI's 45-minute job timeout, so a hung run fails this
+        // task and still uploads its test reports instead of being cancelled without them.
+        timeout.set(java.time.Duration.ofMinutes(40))
         // Fork a new JVM for each test class so background threads / etcd watch
         // connections from one spec don't interfere with the next one.
         setForkEvery(1)
