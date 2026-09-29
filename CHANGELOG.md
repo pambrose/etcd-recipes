@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (packaging: dependency scopes)
+
+- The published `etcd-recipes-core` POM declared jetcd and kotlinx-serialization at
+  `runtime` scope although both appear in the public API (every recipe takes a jetcd
+  `Client`; `EtcdCodec` exposes `Json`/`KSerializer`), so a project that added only
+  `etcd-recipes-core`, as the README says, failed to compile. Both are now `api`
+  (`compile` scope in the POM), alongside kotlinx-coroutines.
+- Every published artifact forced `logback-classic` onto consumers — clashing with
+  Log4j 2 and other SLF4J backends (a Spring Boot app on `spring-boot-starter-log4j2`
+  could fail to start) — and each satellite also dragged in Guava and common-utils. The
+  libraries now depend on the SLF4J API alone; the satellites' POMs list only the core
+  artifact and their own framework.
+- Documented that Kotlin callers need Kotlin 2.3 or newer.
+
 ### Fixed (barriers: close() cancels in-flight waits)
 
 - `DistributedBarrierWithCount.close()` now cancels an in-flight `waitOnBarrier` cleanly

@@ -504,7 +504,11 @@ Full details: [Observability](https://pambrose.github.io/etcd-recipes/observabil
 
 - Built on [jetcd](https://github.com/etcd-io/jetcd) and targets etcd v3.
 - Requires Java 17+ at runtime (the published artifact is compiled against a JDK 17 toolchain).
-- Written in Kotlin; fully usable from Java and any other JVM language.
+- Written in Kotlin; fully usable from Java and any other JVM language. Kotlin callers need
+  Kotlin 2.3 or newer: the artifacts are compiled with Kotlin 2.4, and a Kotlin compiler reads
+  metadata at most one minor version ahead.
+- Logs through SLF4J and bundles no logging backend: bind SLF4J to the one your application
+  already uses (Logback, Log4j 2, …).
 
 
 ## Download
@@ -557,8 +561,10 @@ dependencies {
 
 ### Optional modules
 
-The core artifact pulls in nothing beyond jetcd, coroutines, and logging. Each
-integration is a separate artifact, added only if you want it:
+The core artifact brings jetcd, kotlinx-coroutines, and kotlinx-serialization (all three
+appear in its API), plus Guava, common-utils, and the SLF4J API (through kotlin-logging) at
+runtime — but no logging backend. Each integration is a separate artifact, added only if you
+want it:
 
 | Artifact | Adds |
 |---|---|

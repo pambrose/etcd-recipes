@@ -6,6 +6,9 @@ plugins {
 
 dependencies {
     implementation(project(":etcd-recipes-core"))
+    implementation(libs.common.utils.core)
+    implementation(libs.kotlin.logging)
+    runtimeOnly(libs.logback.classic)
 }
 
 tasks.shadowJar {
