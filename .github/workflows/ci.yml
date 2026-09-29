@@ -40,7 +40,9 @@ jobs:
         # two; running them separately invalidates the test cache and
         # re-runs the suite without testcontainers wiring, which then
         # hangs trying to reach localhost:2379.
-        run: ./gradlew check koverXmlReport -PuseTestcontainers
+        # testForks: test classes mostly wait on etcd and on JVM/container startup,
+        # so run more of them at once than the default of half the cores (2 here).
+        run: ./gradlew check koverXmlReport -PuseTestcontainers -PtestForks=4
 
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}

@@ -142,8 +142,15 @@ subprojects {
         // Run multiple test classes in parallel against the local etcd. Each
         // test namespaces its keys under its own path, so concurrent forks
         // do not collide. Cap at half the cores so etcd + coverage
-        // instrumentation aren't starved.
-        maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(2)
+        // instrumentation aren't starved. -PtestForks=N overrides it: most of a
+        // test class's time is spent waiting on etcd and on JVM/container startup,
+        // not on the CPU, so CI raises it (half of a 4-vCPU runner is only 2).
+        maxParallelForks =
+            providers.gradleProperty("testForks").orNull?.toIntOrNull()?.coerceAtLeast(1)
+                ?: (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(2)
+        val forks = maxParallelForks
+        val moduleName = project.name
+        doFirst { logger.lifecycle("Running $moduleName tests in up to $forks parallel forks") }
         // Opt-in: -PuseTestcontainers makes each forked JVM start its own
         // ephemeral etcd container instead of hitting localhost:2379.
         // Bare -PuseTestcontainers (empty value) and -PuseTestcontainers=true both enable;
