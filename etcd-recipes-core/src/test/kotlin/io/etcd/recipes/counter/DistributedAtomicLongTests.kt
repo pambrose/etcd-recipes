@@ -26,6 +26,7 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.threadWithExceptionCheck
 import io.etcd.recipes.common.throwExceptionFromList
 import io.etcd.recipes.common.urls
+import io.etcd.recipes.common.waitForAll
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
@@ -179,7 +180,7 @@ class DistributedAtomicLongTests : StringSpec() {
                         exceptionList += e3
 
                         // Wait for all the threads to finish
-                        latchList.forEach { it.await() }
+                        latchList.waitForAll()
 
                         // If an exception occurred, throw it
                         exceptionList.throwExceptionFromList()

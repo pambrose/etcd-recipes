@@ -20,6 +20,7 @@ package io.etcd.recipes.discovery
 
 import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.recipes.common.ExceptionHolder
+import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.captureException
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
@@ -103,7 +104,7 @@ class ServiceCacheTests : StringSpec() {
                   }
                 }
               }
-            finishedLatch.await()
+            finishedLatch.awaitOrFail()
             holder2.checkForException()
 
             // Wait for the watch stream to drain *before* the cache closes:

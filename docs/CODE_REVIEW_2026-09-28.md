@@ -128,7 +128,7 @@
 - [x] [#68](#issue-68) Every published artifact forces `logback-classic`, guava, and common-utils onto consumers
 - [ ] [#69](#issue-69) The Ktor plugin closes its client on `ApplicationStopping`, before user teardown runs
 - [ ] [#70](#issue-70) RPC-backed Micrometer gauges can stall the metrics scrape during an outage
-- [ ] [#71](#issue-71) A deadlocked test can hang CI for 45 min without identifying the test
+- [x] [#71](#issue-71) A deadlocked test can hang CI for 45 min without identifying the test
 
 #### Low
 - [ ] [#72](#issue-72) `close()` from a watcher's or healer's own thread always stalls 5 s
@@ -159,7 +159,7 @@
 - [ ] [#97](#issue-97) `withLock(timeout)`'s "null means not acquired" is false for a nullable `T`
 - [ ] [#98](#issue-98) Micrometer gauge binders can report the wrong recipe, and the documented example binds to recipes it then closes
 - [ ] [#99](#issue-99) `EtcdProperties` binding depends on a transitive `kotlin-reflect`, and the starter's tests don't check binding
-- [ ] [#100](#issue-100) `TransientKeyValueTest` counts every key under `/keyvalue`, which other test classes write to in parallel
+- [x] [#100](#issue-100) `TransientKeyValueTest` counts every key under `/keyvalue`, which other test classes write to in parallel
 - [ ] [#101](#issue-101) Some regression tests can't fail for the bug they target
 - [x] [#102](#issue-102) The minimum Kotlin version for consumers (2.3+) is undocumented
 - [ ] [#103](#issue-103) Documentation drift (`CLAUDE.md`, README, `llms.txt`, CHANGELOG, version string)

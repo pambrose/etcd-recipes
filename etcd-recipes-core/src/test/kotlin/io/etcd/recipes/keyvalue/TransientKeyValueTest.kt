@@ -32,9 +32,13 @@ import kotlin.time.Duration.Companion.seconds
 class TransientKeyValueTest : StringSpec() {
     private val defaultValue = "nothing"
 
+    // Namespaced per class: multiKVTest counts every key under its prefix, and other test
+    // classes write under /keyvalue concurrently against a shared local etcd.
+    private val base = "/keyvalue/${javaClass.simpleName}"
+
     init {
         "singleKVTest" {
-            val path = "/keyvalue/singleKVTest"
+            val path = "$base/singleKVTest"
             val id = randomId(8)
 
             connectToEtcd(urls) { client ->
@@ -55,7 +59,7 @@ class TransientKeyValueTest : StringSpec() {
 
         "multiKVTest" {
             val count = 25
-            val prefix = "/keyvalue"
+            val prefix = "$base/multi"
             val paths = List(count) { "$prefix/multiKVTest$it" }
             val ids = List(count) { randomId(8) }
 

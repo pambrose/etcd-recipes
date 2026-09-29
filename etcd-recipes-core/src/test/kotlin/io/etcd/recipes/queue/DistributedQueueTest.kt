@@ -20,6 +20,7 @@ package io.etcd.recipes.queue
 
 import com.pambrose.common.concurrent.thread
 import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getChildCount
@@ -68,7 +69,7 @@ class DistributedQueueTest : StringSpec() {
                 }
             }
 
-            latch.await()
+            latch.awaitOrFail()
 
             client.getChildCount(queuePath) shouldBe 0
         }
@@ -107,7 +108,7 @@ class DistributedQueueTest : StringSpec() {
                 }
             }
 
-            latch.await()
+            latch.awaitOrFail()
 
             client.getChildCount(queuePath) shouldBe 0
         }
@@ -168,7 +169,7 @@ class DistributedQueueTest : StringSpec() {
 
                 withDistributedQueue(client, queuePath) { repeat(iterCount) { i -> enqueue(testData[i]) } }
 
-                latch.await()
+                latch.awaitOrFail()
 
                 client.getChildCount(queuePath) shouldBe 0
             }
@@ -241,7 +242,7 @@ class DistributedQueueTest : StringSpec() {
                     }
                 }
 
-                latch.await()
+                latch.awaitOrFail()
 
                 withDistributedQueue(client, queuePath) {
                     val v = dequeue().asString

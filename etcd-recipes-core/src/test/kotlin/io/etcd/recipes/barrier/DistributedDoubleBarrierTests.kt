@@ -19,6 +19,7 @@
 package io.etcd.recipes.barrier
 
 import com.pambrose.common.util.random
+import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -118,20 +119,20 @@ class DistributedDoubleBarrierTests : StringSpec() {
                     }
 
                 withDistributedDoubleBarrier(client, path, count) {
-                    enterLatch.await()
+                    enterLatch.awaitOrFail()
                     pollUntil(5.seconds) { enterWaiterCount.toInt() == count - 1 } shouldBe true
                     enterWaiterCount.toInt() shouldBe count - 1
                     enterBarrier(99, this)
 
-                    leaveLatch.await()
+                    leaveLatch.awaitOrFail()
                     pollUntil(5.seconds) { leaveWaiterCount.toInt() == count - 1 } shouldBe true
                     leaveWaiterCount.toInt() shouldBe count - 1
                     leaveBarrier(99, this)
                 }
 
-                doneLatch.await()
+                doneLatch.awaitOrFail()
 
-                finishedLatch.await()
+                finishedLatch.awaitOrFail()
                 holder.checkForException()
             }
 

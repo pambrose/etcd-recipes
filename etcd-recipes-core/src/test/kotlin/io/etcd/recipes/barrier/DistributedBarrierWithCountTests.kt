@@ -20,6 +20,7 @@ package io.etcd.recipes.barrier
 
 import com.pambrose.common.util.random
 import com.pambrose.common.util.sleep
+import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.checkForException
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
@@ -88,14 +89,14 @@ class DistributedBarrierWithCountTests : StringSpec() {
                         }
                     }
 
-                retryLatch.await()
+                retryLatch.awaitOrFail()
                 sleep(2.seconds)
 
                 withDistributedBarrierWithCount(client, path, count) {
                     waiter(99, this)
                 }
 
-                finishedLatch.await()
+                finishedLatch.awaitOrFail()
 
                 holder.checkForException()
             }

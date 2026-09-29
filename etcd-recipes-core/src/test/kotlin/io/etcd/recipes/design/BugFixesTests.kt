@@ -23,6 +23,7 @@ import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.barrier.DistributedBarrier
 import io.etcd.recipes.cache.PathChildrenCache
+import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.deleteKey
@@ -84,7 +85,7 @@ class BugFixesTests : StringSpec() {
               }
             }
           }
-          ready.await()
+          ready.awaitOrFail()
           // Release all threads at once to maximize contention on the CAS path.
           go.countDown()
           done.await(30, TimeUnit.SECONDS) shouldBe true
@@ -248,7 +249,7 @@ class BugFixesTests : StringSpec() {
           client.watcher(path, WatchOption.DEFAULT) { resp ->
             if (resp.events.any { it.eventType == WatchEvent.EventType.PUT }) {
               callbackEntered.countDown()
-              releaseCallback.await()
+              releaseCallback.awaitOrFail()
               // Sleep briefly so a buggy close() that doesn't await would
               // race past this point.
               Thread.sleep(200)
