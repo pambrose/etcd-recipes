@@ -57,6 +57,8 @@ class ConnectionStateTests : StringSpec() {
       connector.watchEvent(WatchRecoveryEvent.Resubscribed("/k", 42))
       connector.connectionState shouldBe ConnectionState.RECONNECTED
 
+      // Listeners run on the connector's notifier: wait for both deliveries
+      pollUntil(5.seconds) { transitions.size == 2 } shouldBe true
       transitions shouldBe [
         ConnectionState.SUSPENDED to ConnectionState.CONNECTED,
         ConnectionState.RECONNECTED to ConnectionState.SUSPENDED,

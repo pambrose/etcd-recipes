@@ -74,7 +74,11 @@ interface EtcdMetrics {
     becameLeader: Boolean,
   ) {}
 
-  /** A queue operation ([op] is enqueue / dequeue) at [path] and how long it took. */
+  /**
+   * A queue operation at [path] and how long it took. [op] is `enqueue` or `dequeue` (the
+   * plain and priority queues), or, for the work queue, `enqueue`, `receive`, `ack`, or
+   * `dead-letter`.
+   */
   fun recordQueue(
     op: String,
     path: String,

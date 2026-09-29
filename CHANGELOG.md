@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (queue ambiguity, ordering, and cost)
+
+- A work-queue claim whose transaction response was lost after it committed is now
+  reconciled. The consumer re-reads the claim marker and, if the claim is its own, returns
+  the item. It used to throw, leaving the claim stranded on the consumer's healthy lease,
+  where no sweep would reclaim it until the instance closed. The plain queues' docs now
+  say that a take that fails may still have consumed the item.
+- `DistributedQueue`'s take picks the lowest key among the entries at the head's revision,
+  so an `enqueueAll` batch keeps argument order whatever etcd's sort does with equal
+  revisions.
+- Head selection is cheaper. The priority queue (and every key-ordered first-child read)
+  no longer asks etcd to sort, so etcd can stop at the first key instead of reading the
+  whole prefix. `DistributedQueue` finds its head with a keys-only read.
+- The work queue's orphan sweep diffs one keys-only read of `claimed/` against one of
+  `claims/`, and fetches payloads only for orphans. It used to issue a transaction for
+  every claim in flight on every empty receive: with 50 idle consumers and 50 items in
+  flight, about 2,500 transactions per enqueue. A receive that finds the queue empty
+  sweeps at most once a second per instance.
+- Queue metrics now cover enqueues (all queues), `tryDequeue`, and the work queue's
+  `receive`, `ack`, and dead-lettering, as the `etcd.queue` docs described. Before, only
+  `dequeue` and `poll` were recorded.
+- The typed `putValue` / `getValue` extensions have `@JvmOverloads`, and the misleading
+  `TypedTransientKeyValue.start()` KDoc is corrected.
+
 ### Fixed (lock lifecycle and semantics)
 
 - `close()` no longer races an acquisition in flight on `DistributedMutex`,

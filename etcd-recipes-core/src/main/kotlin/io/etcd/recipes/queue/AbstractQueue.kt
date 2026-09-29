@@ -24,6 +24,7 @@ import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.op.CmpTarget
+import io.etcd.jetcd.options.GetOption.SortOrder
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.common.EtcdConnector
@@ -38,6 +39,8 @@ import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.equalTo
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getFirstChild
+import io.etcd.recipes.common.getOption
+import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
@@ -74,12 +77,65 @@ abstract class AbstractQueue(
   // tryDequeue's taken entry (key and value); internal so the coroutine twins can restore it.
   internal fun tryDequeueEntry(): KeyValue? {
     checkCloseNotCalled()
+    val start = TimeSource.Monotonic.markNow()
     while (true) {
-      val childList = client.getFirstChild(queuePath, target, resilience.rpc).kvs
-      if (childList.isEmpty()) return null
-      val child = childList.first()
-      if (deleteRevKey(child)) return child
+      val child = readHead().entry ?: return null
+      if (deleteRevKey(child)) {
+        resilience.metrics.recordQueue("dequeue", queuePath, start.elapsedNow())
+        return child
+      }
       // CAS lost to a concurrent consumer; retry until a win or the queue drains
+    }
+  }
+
+  // The head entry (with its value), or none, plus the revision the read observed.
+  private class Head(
+    val entry: KeyValue?,
+    val revision: Long,
+  )
+
+  // Selects the head. KEY order (the priority queue) is a plain limit-1 range, which etcd
+  // answers without reading the whole prefix. MOD order (FIFO) needs etcd's sort, so a
+  // keys-only read finds the head's revision, and the lowest key at exactly that revision is
+  // the head: the entries of an enqueueAll batch share one revision and their keys follow
+  // argument order, while etcd's sort doesn't promise a stable order among them.
+  private fun readHead(): Head = if (target == SortTarget.KEY) readKeyOrderHead() else readRevisionOrderHead()
+
+  private fun readKeyOrderHead(): Head {
+    val response =
+      client.getResponse(queuePath.ensureSuffix("/"), getOption { isPrefix(true).withLimit(1) }, resilience.rpc)
+    return Head(response.kvs.firstOrNull(), response.header.revision)
+  }
+
+  private fun readRevisionOrderHead(): Head {
+    val prefix = queuePath.ensureSuffix("/")
+    while (true) {
+      val first =
+        client.getResponse(
+          prefix,
+          getOption {
+            isPrefix(true)
+            withSortField(target)
+            withSortOrder(SortOrder.ASCEND)
+            withKeysOnly(true)
+            withLimit(1)
+          },
+          resilience.rpc,
+        )
+      val headRevision = first.kvs.firstOrNull()?.modRevision ?: return Head(null, first.header.revision)
+      val tied =
+        client.getResponse(
+          prefix,
+          getOption {
+            isPrefix(true)
+            withMinModRevision(headRevision)
+            withMaxModRevision(headRevision)
+            withLimit(1)
+          },
+          resilience.rpc,
+        )
+      tied.kvs.firstOrNull()?.let { return Head(it, tied.header.revision) }
+      // Taken between the two reads: read the new head
     }
   }
 
@@ -117,10 +173,9 @@ abstract class AbstractQueue(
     while (true) {
       // An item found after close() must not be deleted and handed to a closed instance
       checkCloseNotCalled()
-      val firstChild = client.getFirstChild(queuePath, target, resilience.rpc)
-      val childList = firstChild.kvs
-      if (childList.isNotEmpty()) {
-        val child = childList.first()
+      val head = readHead()
+      val child = head.entry
+      if (child != null) {
         if (deleteRevKey(child)) {
           resilience.metrics.recordQueue("dequeue", queuePath, start.elapsedNow())
           return child
@@ -137,7 +192,7 @@ abstract class AbstractQueue(
       // the watch at the revision we observed the queue empty, so a PUT landing
       // in the watch-establishment window is still delivered (the pre-live poll
       // then only shortcuts the already-arrived case).
-      val winner = waitForFirstChild(deadline, firstChild.header.revision) ?: continue
+      val winner = waitForFirstChild(deadline, head.revision) ?: continue
       if (deleteRevKey(winner)) {
         resilience.metrics.recordQueue("dequeue", queuePath, start.elapsedNow())
         return winner
@@ -189,7 +244,7 @@ abstract class AbstractQueue(
       // Poll once to UNBLOCK: a value may have arrived between watcher.use { } and the
       // watch going live in jetcd, and the watcher never delivers such a pre-live PUT,
       // so a poll is needed to count the latch down.
-      if (watchLatch.count > 0 && client.getFirstChild(queuePath, target, resilience.rpc).kvs.isNotEmpty())
+      if (watchLatch.count > 0 && readHead().entry != null)
         watchLatch.countDown()
 
       if (deadline == null) {
@@ -211,7 +266,7 @@ abstract class AbstractQueue(
       // the outer loop re-reads. (Never fall back to the key the watcher saw — the
       // re-query is a linearizable read taken after the event, so a key it misses is
       // already gone.)
-      val head = client.getFirstChild(queuePath, target, resilience.rpc).kvs.firstOrNull()
+      val head = readHead().entry
       if (head == null) {
         watchFailure.load()?.let { cause ->
           throw EtcdRecipeRuntimeException("Queue watch on $queuePath failed while waiting for an item", cause)
@@ -235,7 +290,7 @@ abstract class AbstractQueue(
         reportRecoveryEvent(event)
         when (event) {
           is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-            if (client.getFirstChild(queuePath, target, resilience.rpc).kvs.isNotEmpty()) watchLatch.countDown()
+            if (readHead().entry != null) watchLatch.countDown()
           }
 
           is WatchRecoveryEvent.Failed -> {

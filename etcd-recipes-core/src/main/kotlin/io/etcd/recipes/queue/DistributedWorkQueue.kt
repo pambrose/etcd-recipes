@@ -41,6 +41,7 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.equalTo
+import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.getFirstChild
 import io.etcd.recipes.common.getKeyValuePairs
 import io.etcd.recipes.common.getOption
@@ -133,6 +134,12 @@ class DistributedWorkQueue
   // True while consecutive reclaim sweeps fail, so a persistent failure is recorded once.
   private val sweepFailing = AtomicBoolean(false)
 
+  // When a receive last swept for orphans because the queue looked empty: that sweep runs at
+  // most once per emptySweepInterval, since every consumer woken by an enqueue would repeat it.
+  @Volatile
+  private var lastEmptySweep: ComparableTimeMark? = null
+  private val emptySweepInterval get() = minOf(EMPTY_SWEEP_MIN_INTERVAL, config.sweepInterval)
+
   init {
     require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
   }
@@ -186,7 +193,9 @@ class DistributedWorkQueue
 
   fun enqueue(value: ByteSequence) {
     checkCloseNotCalled()
+    val start = TimeSource.Monotonic.markNow()
     client.createUniqueKey(value, resilience.rpc) { newItemKey(itemsPath, System.currentTimeMillis()) }
+    resilience.metrics.recordQueue("enqueue", queuePath, start.elapsedNow())
   }
 
   fun enqueue(
@@ -212,17 +221,21 @@ class DistributedWorkQueue
     // An infinite delay would overflow the ready time into a key that breaks every receive
     require(delay.isFinite()) { "Delay must be finite: $delay" }
     val readyAt = System.currentTimeMillis() + delay.inWholeMilliseconds
+    val start = TimeSource.Monotonic.markNow()
     client.createUniqueKey(value, resilience.rpc) { newItemKey(delayedPath, readyAt) }
+    resilience.metrics.recordQueue("enqueue", queuePath, start.elapsedNow())
   }
 
   /** Enqueues every value in one transaction (all-or-nothing), preserving order. */
   fun enqueueAll(values: Collection<ByteSequence>) {
     checkCloseNotCalled()
     if (values.isEmpty()) return
+    val start = TimeSource.Monotonic.markNow()
     client.createUniqueKeys(values.toList(), resilience.rpc) {
       val millis = System.currentTimeMillis()
       values.indices.map { index -> batchKeyFormat.format(itemsPath, millis, index, randomId(ITEM_KEY_SUFFIX_LENGTH)) }
     }
+    resilience.metrics.recordQueue("enqueue", queuePath, start.elapsedNow())
   }
 
   /** Blocking receive: waits until an item can be claimed. */
@@ -242,10 +255,10 @@ class DistributedWorkQueue
   /** Non-blocking receive: a claimed item, or null when nothing is claimable. */
   fun tryReceive(): WorkItem? {
     checkCloseNotCalled()
+    val start = TimeSource.Monotonic.markNow()
     promoteMatured()
-    claimHead(null).item?.let { return it }
-    reclaimOrphans()
-    return claimHead(null).item
+    val item = claimHead(null).item ?: if (sweepIfDue()) claimHead(null).item else null
+    return item?.also { recordReceive(start) }
   }
 
   /** The current dead letters (items that exhausted [WorkQueueConfig.maxDeliveries]). */
@@ -306,6 +319,7 @@ class DistributedWorkQueue
      */
     fun ack(): Boolean {
       checkCloseNotCalled()
+      val start = TimeSource.Monotonic.markNow()
       return client.transaction(resilience.rpc) {
         If(*isStillClaimed())
         Then(
@@ -313,7 +327,7 @@ class DistributedWorkQueue
           deleteOp("$claimedPath/$id".asByteSequence),
           deleteOp("$attemptsPath/$id".asByteSequence),
         )
-      }.isSucceeded
+      }.isSucceeded.also { resilience.metrics.recordQueue("ack", queuePath, start.elapsedNow()) }
     }
 
     /**
@@ -358,17 +372,33 @@ class DistributedWorkQueue
 
   @Suppress("ReturnCount")
   private fun receiveWithDeadline(deadline: ComparableTimeMark?): WorkItem? {
+    val start = TimeSource.Monotonic.markNow()
     while (true) {
       checkCloseNotCalled()
       promoteMatured()
-      claimHead(deadline).item?.let { return it }
-      reclaimOrphans()
+      claimHead(deadline).item?.let { return it.also { recordReceive(start) } }
+      val swept = sweepIfDue()
       val attempt = claimHead(deadline)
-      attempt.item?.let { return it }
+      attempt.item?.let { return it.also { recordReceive(start) } }
       if (deadline != null && deadline.hasPassedNow()) return null
-      awaitItem(deadline, attempt.emptyAtRevision)
+      // A sweep skipped for being too soon after the last one runs once it's due
+      awaitItem(deadline, attempt.emptyAtRevision, if (swept) null else untilSweepDue())
     }
   }
+
+  private fun recordReceive(start: ComparableTimeMark) =
+    resilience.metrics.recordQueue("receive", queuePath, start.elapsedNow())
+
+  // Reclaims orphans for a receive that found the queue empty, unless one did so moments ago.
+  private fun sweepIfDue(): Boolean {
+    if (untilSweepDue() > Duration.ZERO) return false
+    lastEmptySweep = TimeSource.Monotonic.markNow()
+    reclaimOrphans()
+    return true
+  }
+
+  private fun untilSweepDue(): Duration =
+    lastEmptySweep?.let { (emptySweepInterval - it.elapsedNow()).coerceAtLeast(Duration.ZERO) } ?: Duration.ZERO
 
   // A claimed head, or the revision at which items/ was seen empty (0 when unknown).
   private class ClaimAttempt(
@@ -409,17 +439,48 @@ class DistributedWorkQueue
             )
           }
         } catch (e: Exception) {
+          // The commit may have landed even though its response didn't: if the claim marker
+          // is ours, the item is ours, and returning it keeps the claim from being stranded.
+          if (!e.isLeaseNotFound()) {
+            reconcileClaim(id, head.value, attempt, leaseId)?.let { return ClaimAttempt(it, 0L) }
+            throw e
+          }
           // The consumer lease can die between reading its id and committing; the
           // healer re-grants it shortly (its keep-alive stream reports NOT_FOUND on
           // the next renewal), so pace briefly and retry with the fresh lease — unless
           // this queue is closed, the healer gave up, or the receive's deadline passed.
-          if (!e.isLeaseNotFound()) throw e
           if (!shouldRetryAfterLeaseLoss(e, deadline)) return ClaimAttempt(null, 0L)
           Thread.sleep(LEASE_HEAL_PAUSE_MS)
           continue
         }
       if (txn.isSucceeded) return ClaimAttempt(WorkItem(id, head.value, attempt, txn.header.revision), 0L)
       // Lost the head to a concurrent consumer; retry with the new head
+    }
+  }
+
+  // After a claim transaction failed without an answer: the item, if the claim marker shows
+  // this consumer's claim (its clientId, under the lease it claimed with); else null. An
+  // interrupted caller's flag is set aside for the re-read and restored afterward.
+  @Suppress("TooGenericExceptionCaught")
+  private fun reconcileClaim(
+    id: String,
+    value: ByteSequence,
+    attempt: Int,
+    leaseId: Long,
+  ): WorkItem? {
+    val interrupted = Thread.interrupted()
+    try {
+      val marker =
+        try {
+          client.getResponse("$claimsPath/$id", rpc = resilience.rpc).kvs.firstOrNull()
+        } catch (e: Exception) {
+          logger.debug(e) { "Couldn't re-read the claim on $id after an ambiguous commit" }
+          null
+        }
+      val ours = marker != null && marker.value.asString == clientId && marker.lease == leaseId
+      return if (ours) WorkItem(id, value, attempt, marker!!.createRevision) else null
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt()
     }
   }
 
@@ -457,36 +518,51 @@ class DistributedWorkQueue
     delivered: Int,
   ) {
     logger.warn { "Dead-lettering $id after $delivered deliveries" }
+    val start = TimeSource.Monotonic.markNow()
     client.transaction(resilience.rpc) {
       If(equalTo(head.key, CmpTarget.modRevision(head.modRevision)))
       Then(deleteOp(head.key), "$dlqPath/$id" setTo head.value)
     }
+    resilience.metrics.recordQueue("dead-letter", queuePath, start.elapsedNow())
   }
 
   // Finds claimed items whose claim marker expired (consumer died) and CAS-moves
   // each back to items/ — or to dlq/ once its attempts are exhausted. Races
   // between sweeping consumers are harmless: the claimed/ mod-revision guard
   // picks one winner, losers no-op.
+  //
+  // One keys-only read of each space, diffed here, finds the orphans; only they cost more
+  // RPCs. (claimed/ is read before claims/: a claim made in between shows up as claimed, so
+  // it is never mistaken for an orphan.)
   @Suppress("LoopWithTooManyJumpStatements")
   private fun reclaimOrphans() {
-    val orphans = client.getKeyValuePairs("$claimedPath/", getOption { isPrefix(true) }, resilience.rpc)
-    for ((fullKey, payload) in orphans) {
-      val id = fullKey.substringAfterLast('/')
-      if (client.isKeyPresent("$claimsPath/$id", resilience.rpc)) continue // still claimed
+    val claimedIds = client.getChildrenKeys(claimedPath, rpc = resilience.rpc).map { it.substringAfterLast('/') }
+    if (claimedIds.isEmpty()) return
+    val claimIds = client.getChildrenKeys(claimsPath, rpc = resilience.rpc).mapTo(HashSet()) {
+      it.substringAfterLast('/')
+    }
+    for (id in claimedIds) {
+      if (id in claimIds) continue // still claimed
 
-      val claimedKv = client.getResponse(fullKey, rpc = resilience.rpc).kvs.firstOrNull() ?: continue
+      val claimedKv = client.getResponse("$claimedPath/$id", rpc = resilience.rpc).kvs.firstOrNull() ?: continue
+      val payload = claimedKv.value
       val attempts = client.getValue("$attemptsPath/$id", 0, resilience.rpc)
       val destination =
         if (attempts >= config.maxDeliveries) "$dlqPath/$id" else "$itemsPath/$id"
       if (attempts >= config.maxDeliveries) {
         logger.warn { "Dead-lettering $id after $attempts deliveries" }
       }
-      client.transaction(resilience.rpc) {
-        If(
-          "$claimsPath/$id".doesNotExist,
-          equalTo(claimedKv.key, CmpTarget.modRevision(claimedKv.modRevision)),
-        )
-        Then(deleteOp(claimedKv.key), destination setTo payload)
+      val start = TimeSource.Monotonic.markNow()
+      val moved =
+        client.transaction(resilience.rpc) {
+          If(
+            "$claimsPath/$id".doesNotExist,
+            equalTo(claimedKv.key, CmpTarget.modRevision(claimedKv.modRevision)),
+          )
+          Then(deleteOp(claimedKv.key), destination setTo payload)
+        }.isSucceeded
+      if (moved && attempts >= config.maxDeliveries) {
+        resilience.metrics.recordQueue("dead-letter", queuePath, start.elapsedNow())
       }
     }
   }
@@ -569,13 +645,14 @@ class DistributedWorkQueue
   private fun awaitItem(
     deadline: ComparableTimeMark?,
     emptyAtRevision: Long,
+    sweepDueIn: Duration?,
   ) {
     val latch = CountDownLatch(1)
     parkedReceives += latch
     try {
       // A close() that ran before this receive registered found nothing to release
       if (closeCalled.load()) latch.countDown()
-      awaitItem(latch, deadline, emptyAtRevision)
+      awaitItem(latch, deadline, emptyAtRevision, sweepDueIn)
     } finally {
       parkedReceives -= latch
     }
@@ -585,6 +662,7 @@ class DistributedWorkQueue
     latch: CountDownLatch,
     deadline: ComparableTimeMark?,
     emptyAtRevision: Long,
+    sweepDueIn: Duration?,
   ) {
     val watchFailure = AtomicReference<Throwable?>(null)
     val recoveryListener = itemWaiterRecoveryListener(latch, watchFailure)
@@ -609,10 +687,11 @@ class DistributedWorkQueue
       if (latch.count > 0 && client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc).kvs.isNotEmpty()) {
         latch.countDown()
       }
-      // Wake when the deadline passes, the sweep interval elapses, or the earliest
-      // delayed item matures — whichever comes first.
+      // Wake when the deadline passes, the sweep interval elapses, the earliest delayed
+      // item matures, or a skipped empty-queue sweep is due — whichever comes first.
       var cap = config.sweepInterval
       delayedHeadRemaining()?.let { cap = minOf(cap, it) }
+      sweepDueIn?.let { cap = minOf(cap, it.coerceAtLeast(MIN_SWEEP_WAIT)) }
       val wait =
         if (deadline == null) cap else minOf(cap, -deadline.elapsedNow())
       if (wait > Duration.ZERO) {
@@ -711,5 +790,7 @@ class DistributedWorkQueue
     private val keyFormat = "%s/%0${Long.MAX_VALUE.length}d-%s"
     private val batchKeyFormat = "%s/%0${Long.MAX_VALUE.length}d-%05d-%s"
     private const val LEASE_HEAL_PAUSE_MS = 250L
+    private val EMPTY_SWEEP_MIN_INTERVAL = 1.seconds
+    private val MIN_SWEEP_WAIT = 10.milliseconds
   }
 }

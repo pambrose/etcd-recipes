@@ -25,6 +25,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.asByteSequence
+import kotlin.time.TimeSource
 
 fun <T> withDistributedQueue(
   client: Client,
@@ -49,9 +50,11 @@ class DistributedQueue
 
   fun enqueue(value: ByteSequence) {
     checkCloseNotCalled()
+    val start = TimeSource.Monotonic.markNow()
     client.createUniqueKey(value, resilience.rpc) {
       keyFormat.format(queuePath, System.currentTimeMillis(), randomId(ITEM_KEY_SUFFIX_LENGTH))
     }
+    resilience.metrics.recordQueue("enqueue", queuePath, start.elapsedNow())
   }
 
   /**
@@ -62,10 +65,12 @@ class DistributedQueue
   fun enqueueAll(values: Collection<ByteSequence>) {
     checkCloseNotCalled()
     if (values.isEmpty()) return
+    val start = TimeSource.Monotonic.markNow()
     client.createUniqueKeys(values.toList(), resilience.rpc) {
       val millis = System.currentTimeMillis()
       values.indices.map { index -> batchKeyFormat.format(queuePath, millis, index, randomId(ITEM_KEY_SUFFIX_LENGTH)) }
     }
+    resilience.metrics.recordQueue("enqueue", queuePath, start.elapsedNow())
   }
 
   companion object {

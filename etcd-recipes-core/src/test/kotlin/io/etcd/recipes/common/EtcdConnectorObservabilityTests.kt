@@ -88,16 +88,21 @@ class EtcdConnectorObservabilityTests : StringSpec() {
       connector.record("alpha keep-alive", boom)
 
       connector.exceptions shouldBe [boom]
+      // Listeners run on the connector's notifier: wait for the delivery
+      pollUntil(5.seconds) { seen.isNotEmpty() } shouldBe true
       seen shouldBe ["alpha keep-alive" to boom]
     }
 
     "a throwing background-exception listener is caught and does not recurse or re-record" {
       val connector = TestConnector(mockk())
       connector.addBackgroundExceptionListener { _, _ -> throw IllegalStateException("listener blew up") }
+      val delivered = CopyOnWriteArrayList<Throwable>()
+      connector.addBackgroundExceptionListener { _, t -> delivered += t } // runs after the throwing one
 
       connector.record("ctx", RuntimeException("original"))
 
       // Exactly the original is recorded — the listener's throw is logged, never re-recorded.
+      pollUntil(5.seconds) { delivered.isNotEmpty() } shouldBe true
       connector.exceptions.size shouldBe 1
     }
 

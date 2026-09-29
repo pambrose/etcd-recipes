@@ -66,6 +66,12 @@ instance should not take. That lets a consumer loop shut down cleanly.
 FIFO by arrival, ordered by mod revision (`SortTarget.MOD`) — etcd's own commit
 order, not a client clock.
 
+A take is at-most-once: the item is deleted before it reaches you, so a consumer that
+dies after the take loses it. That includes a take that fails with an exception. A
+delete whose response was lost may still have committed, so the item may be gone even
+though the call threw. For at-least-once delivery, use
+[`DistributedWorkQueue`](#distributedworkqueue).
+
 === "Kotlin"
 
     ```kotlin
@@ -123,8 +129,9 @@ nothing tells them the rest is never coming. One transaction has no such state:
 either every entry is visible at the same revision, or none is.
 
 Batched entries share that revision, so mod-revision order cannot separate them.
-Their keys embed the argument index instead, which is what keeps within-batch order
-equal to argument order.
+Their keys embed the argument index instead, and a take picks the lowest key among the
+entries at the head's revision, which is what keeps within-batch order equal to argument
+order (etcd's own sort doesn't promise a stable order among equal revisions).
 
 ### Scoped usage
 
@@ -419,10 +426,11 @@ all exist. Cancelling a wait consumes nothing and leaves no orphan claim. See
 
 ## Observability
 
-With the [Micrometer module](../integrations/index.md) wired in, `dequeue` and `poll`
-record to the `etcd.queue` timer (tagged `op`), measuring call → item in hand, so the
-timer includes the wait on an empty queue. Enqueues and the work queue's `receive`
-are not instrumented today. Queue paths never become tags — that would blow up
+With the [Micrometer module](../integrations/index.md) wired in, every queue records to
+the `etcd.queue` timer, tagged `op`: `enqueue` and `dequeue` for the plain and priority
+queues (`dequeue` covers `dequeue`, `poll`, and `tryDequeue`, measuring call → item in
+hand, so it includes the wait on an empty queue), and `enqueue`, `receive`, `ack`, and
+`dead-letter` for the work queue. Queue paths never become tags — that would blow up
 cardinality.
 
 `bindQueueDepth(queue)` binds a gauge to `size`, at one range-count RPC per scrape;
