@@ -58,6 +58,14 @@ fun <T> withTransientKeyValue(
     clientId,
   ).use { it.receiver() }
 
+/**
+ * Publishes [keyValue] at [keyPath] for as long as this instance is open, under a self-healing
+ * lease: if the lease expires (a partition longer than [leaseTtlSecs]), it is re-granted and
+ * the key re-published. [close] removes the key promptly.
+ *
+ * `userExecutor` is no longer used: publishing needs no thread of its own (the lease's
+ * renewal and healing run on internal threads). It remains for source and binary compatibility.
+ */
 class TransientKeyValue
 @JvmOverloads
 constructor(
@@ -66,13 +74,13 @@ constructor(
   val keyValue: String,
   val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   autoStart: Boolean = true,
-  private val userExecutor: Executor? = null,
+  @Suppress("UNUSED_PARAMETER", "unused") userExecutor: Executor? = null,
   val clientId: String = defaultClientId(),
   resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
 ) : EtcdConnector(client, resilience) {
-  private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
-  private val keepAliveWaitLatch = CountDownLatch(1)
-  private val keepAliveStartedLatch = CountDownLatch(1)
+  // The published key's lease, renewed (and healed) while this instance is open
+  @Volatile
+  private var healer: SelfHealingKeepAlive? = null
   private val leaseListeners = CopyOnWriteArrayList<LeaseListener>()
 
   /** Registers a listener for lease lifecycle events (expiry, healing, failure). */
@@ -93,6 +101,10 @@ constructor(
 
   override val exceptionContext get() = "TransientKeyValue[$keyPath]"
 
+  /**
+   * Publishes the key and returns once it is published. A failure throws
+   * [EtcdRecipeRuntimeException] and leaves the instance unstarted, so `start()` can be retried.
+   */
   @Suppress("TooGenericExceptionCaught")
   @Synchronized
   fun start(): TransientKeyValue {
@@ -100,68 +112,36 @@ constructor(
       throw EtcdRecipeRuntimeException("start() already called")
     checkCloseNotCalled()
 
-    executor.execute {
-      withRecipeLoggingContext {
-        var healer: SelfHealingKeepAlive? = null
-        try {
-          val leaseTtl = leaseTtlSecs.seconds
-          logger.debug { "$leaseTtl keep-alive started for $clientId $keyPath" }
-          // Self-healing: if the lease expires (partition longer than the TTL), the
-          // healer re-grants it and re-puts the key, instead of the key silently
-          // vanishing while this recipe still looks healthy.
-          healer = client.selfHealingKeepAlive(
-            leaseTtl,
-            resilience.lease,
-            leaseListener = { event -> onLeaseEvent(event) },
-            rpc = resilience.rpc,
-          ) { lease ->
-            client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) }, resilience.rpc)
-            true
-          }
-          keepAliveStartedLatch.countDown()
-          keepAliveWaitLatch.await()
-          logger.debug { "$leaseTtl keep-alive terminated for $clientId $keyPath" }
-        } catch (e: Throwable) {
-          logger.error(e) { "In start()" }
-          recordException(e)
-        } finally {
-          runCatching { healer?.close() }
-          // Always release the start() caller, even on failure. The previous
-          // version only counted down inside the keepAlive callback, so if the
-          // initial put / lease grant threw, start() would block on
-          // keepAliveStartedLatch forever.
-          keepAliveStartedLatch.countDown()
-          startThreadComplete.set(true)
+    healer =
+      try {
+        // Self-healing: if the lease expires (partition longer than the TTL), the
+        // healer re-grants it and re-puts the key, instead of the key silently
+        // vanishing while this recipe still looks healthy.
+        client.selfHealingKeepAlive(
+          leaseTtlSecs.seconds,
+          resilience.lease,
+          leaseListener = { event -> onLeaseEvent(event) },
+          rpc = resilience.rpc,
+        ) { lease ->
+          client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) }, resilience.rpc)
+          true
         }
+      } catch (e: Exception) {
+        // Nothing was left behind (a failed establish revokes its lease), so a retry starts clean
+        recordException(e)
+        throw EtcdRecipeRuntimeException("start() failed for $keyPath", e)
       }
-    }
-
-    keepAliveStartedLatch.await()
-
-    // Surface a setup failure to the caller of start() so they don't believe
-    // a non-running keepAlive is healthy. Mark startCalled only on success;
-    // marking before checking would let close() proceed past checkStartCalled()
-    // on an instance that never actually started.
-    val startupError = exceptionList.value.firstOrNull()
-    if (startupError != null) {
-      // Constructor with autoStart=true throws here; the user never gets a
-      // reference to call close(), so we must release our owned executor
-      // before propagating, otherwise the thread (and JVM exit) leaks.
-      if (userExecutor == null) (executor as ExecutorService).shutdown()
-      throw EtcdRecipeRuntimeException("start() failed: $startupError")
-    }
 
     startCalled.store(true)
+    startThreadComplete.set(true)
     return this
   }
 
+  // Revokes the lease, which removes the key. A no-op on an instance that never started.
+  @Synchronized
   override fun doClose() {
-    checkStartCalled()
-
-    keepAliveWaitLatch.countDown()
-    startThreadComplete.waitUntilTrue()
-
-    if (userExecutor == null) (executor as ExecutorService).shutdown()
+    healer?.close()
+    healer = null
   }
 
   // Record every lease event on the exceptions list the way the old keep-alive

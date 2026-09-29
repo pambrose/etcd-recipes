@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (`TransientKeyValue` lifecycle)
+
+- `TransientKeyValue` no longer parks an executor thread for its whole life. `start()`
+  publishes the key synchronously under its self-healing lease, which renews on internal
+  threads. Instances sharing a single-thread or small executor used to hang in the
+  constructor or `start()`, since the second instance's task never ran; with a larger pool,
+  each instance silently held a thread. `userExecutor` is no longer used and remains for
+  compatibility.
+- A `start()` that fails can be retried. The retry used to rethrow the first attempt's
+  error (or, with the recipe's own executor, `RejectedExecutionException`) while a new
+  task published the key anyway, and `close()` then threw "start() not called", leaving the
+  key published for the life of the process. `close()` on an instance that never started
+  is now a no-op.
+
 ### Fixed (queue ambiguity, ordering, and cost)
 
 - A work-queue claim whose transaction response was lost after it committed is now
