@@ -78,13 +78,12 @@ fun counterDelete(client: Client) {
 
 fun counterResilience(client: Client) {
   // --8<-- [start:resilience]
-  // withDistributedAtomicLong does not expose resilience; construct directly for that.
-  DistributedAtomicLong(
-    client = client,
-    counterPath = "/counters/orders",
-    default = 0L,
-    resilience = ResilienceConfig.DEFAULT,
-  ).use { counter ->
+  withDistributedAtomicLong(client, "/counters/orders", resilience = ResilienceConfig.DEFAULT) {
+    logger.info { "Current: ${get()}" }
+  }
+
+  // Or on the constructor:
+  DistributedAtomicLong(client, "/counters/orders", resilience = ResilienceConfig.DEFAULT).use { counter ->
     logger.info { "Current: ${counter.get()}" }
   }
   // --8<-- [end:resilience]

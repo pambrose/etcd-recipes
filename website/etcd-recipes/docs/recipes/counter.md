@@ -108,8 +108,9 @@ backoff sleep.
 
 !!! warning "A hot counter is a contention point, not a throughput device"
 
-    The retry loop is unbounded, and its backoff is a random sleep from a window that
-    widens with each failed attempt. Under low contention that is invisible. Under high
+    The retry loop is unbounded (only `close()` ends it early), and its backoff is a
+    random sleep from a window that widens with each failed attempt, up to one second.
+    Under low contention that is invisible. Under high
     contention — many clients hammering one path
     — throughput collapses: every client is serialized through one etcd key, and each
     loser pays a full round trip plus a sleep before trying again. There is no fairness
@@ -122,6 +123,13 @@ backoff sleep.
 
 Note also that a mutation is two round trips, not one: the `GET` and the `Txn`. That is
 the price of returning the value you committed.
+
+!!! warning "A mutator that throws may still have counted"
+
+    If `increment()` or another mutator throws because an RPC failed or timed out, the
+    outcome is unknown. The transaction may have been applied even though its response
+    was lost, so blindly repeating the call can count twice. When that matters, read
+    `get()` to reconcile, or make the increment idempotent at a higher level.
 
 ## Deleting
 
@@ -139,8 +147,9 @@ the price of returning the value you committed.
 
 `delete` is `@JvmStatic` and takes a `Client` and a path. It is deliberately not an
 instance method: removing the key out from under live instances is a destructive
-administrative act, not a step in a counter's lifecycle. The next instance to touch the
-path will re-create it with *its* `default`.
+administrative act, not a step in a counter's lifecycle. Live instances keep working
+after it: `get()` reads the absent counter as that instance's `default`, and the next
+update from any instance re-creates the key from *its* `default`.
 
 Closing a `DistributedAtomicLong` does not delete anything. The counter is durable etcd
 state with no lease behind it; it outlives every process that ever touched it, until
@@ -152,17 +161,17 @@ someone deletes it.
 --8<-- "kotlin/website/counter/CounterSnippets.kt:scoped"
 ```
 
-!!! note "`withDistributedAtomicLong` does not expose `resilience`"
+!!! note "Passing `resilience`"
 
-    Its parameters are `(client, counterPath, default, receiver)`. Construct
-    `DistributedAtomicLong` directly when you need a non-default `ResilienceConfig`:
+    `withDistributedAtomicLong` takes `resilience` too, as does the constructor:
 
     ```kotlin
     --8<-- "kotlin/website/counter/CounterSnippets.kt:resilience"
     ```
 
     Note what resilience does and does not cover here. It governs the individual RPCs —
-    retries and timeouts on the `GET` and the `Txn`. The CAS retry loop is separate and
+    retries and a timeout on the `GET`, and a single bounded attempt at the `Txn`. The CAS
+    retry loop is separate and
     always on; you cannot turn it off, because a lost CAS is not a failure, it is the
     algorithm working. See [Resilience](../resilience/index.md).
 
