@@ -175,8 +175,8 @@ fun interface LeaseListener {
 | Event | What it tells you |
 | --- | --- |
 | `Suspended` | The stream errored; jetcd is retrying it. The lease is probably fine. |
-| `Expired` | The lease is gone and the keys with it. Healing follows unless the policy forbids it. **Ownership may already be someone else's.** |
-| `Restored` | A new lease was granted and the owned keys were re-established under it. Note the id changed. |
+| `Expired` | Renewal stopped. Usually the lease is gone and the keys with it — **ownership may already be someone else's**. Healing follows unless the policy forbids it, and first asks etcd: a lease that is in fact still alive (renewals lost across an etcd leader change) is just renewed again. |
+| `Restored` | Renewal resumed. If `oldLeaseId == newLeaseId`, the lease never died in etcd and the keys never went away. Otherwise a new lease was granted and the owned keys were re-established under it. |
 | `Failed` | Healing was abandoned — the policy was exhausted, or the establish hook declined. |
 
 Register with `addLeaseListener` on `TransientKeyValue`, `TypedTransientKeyValue`,
@@ -186,9 +186,11 @@ deadlock the client. As a `Flow`, see [Flows](../coroutines/flows.md).
 
 !!! warning "`Restored` is not `Nothing happened`"
 
-    Between `Expired` and `Restored` your key genuinely did not exist. Anyone who read
-    etcd in that window saw it missing, and anyone waiting for it to disappear got what
-    they were waiting for. Healing restores the key; it cannot un-observe the gap.
+    When the lease id changed, your key genuinely did not exist between `Expired` and
+    `Restored`. Anyone who read etcd in that window saw it missing, and anyone waiting
+    for it to disappear got what they were waiting for. Healing restores the key; it
+    cannot un-observe the gap. (A `Restored` with the same id means the lease was still
+    alive in etcd, so there was no gap.)
 
 ## The barrier's spurious-lift window
 

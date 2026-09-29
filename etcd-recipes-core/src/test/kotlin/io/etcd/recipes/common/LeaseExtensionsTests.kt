@@ -20,6 +20,8 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Lease
+import io.etcd.jetcd.common.exception.ErrorCode
+import io.etcd.jetcd.common.exception.EtcdExceptionFactory
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lease.LeaseKeepAliveResponse
 import io.etcd.jetcd.support.CloseableClient
@@ -51,17 +53,22 @@ class LeaseExtensionsTests : StringSpec() {
     private fun leaseOf(leaseId: Long): LeaseGrantResponse = mockk { every { id } returns leaseId }
 
     init {
-        "keepAlive surfaces a stream error through onKeepAliveError" {
+        // Only a lost lease (NOT_FOUND) means renewal stopped; a transient stream error
+        // is restarted by jetcd itself (see KeepAliveReportingTests).
+        "keepAlive surfaces a lost-lease stream error through onKeepAliveError" {
             val observerSlot = slot<StreamObserver<LeaseKeepAliveResponse>>()
             val client = capturingClient(leaseId = 5L, observerSlot = observerSlot)
 
             val recorded: MutableList<Throwable> = []
             client.keepAlive(leaseOf(5L)) { recorded += it }
 
-            val boom = RuntimeException("stream broke")
-            observerSlot.captured.onError(boom)
+            val gone = EtcdExceptionFactory.newEtcdException(
+              ErrorCode.NOT_FOUND,
+              "etcdserver: requested lease not found",
+            )
+            observerSlot.captured.onError(gone)
 
-            recorded shouldContainExactly [boom]
+            recorded shouldContainExactly [gone]
         }
 
         // onCompleted carries no throwable, so keepAlive synthesizes an

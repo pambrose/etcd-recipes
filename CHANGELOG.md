@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (lease healing and registration lifecycle)
+
+- A heal no longer re-grants a lease that is still alive in etcd. jetcd reports a lease
+  "gone" from its own client-side deadline; after an etcd leader change the new leader
+  extends every lease, so the lease and its keys can outlive that report. Re-granting
+  then made the establish CAS lose to the recipe's own key and the old lease lapsed, so a
+  `ServiceRegistry` instance, barrier, or election participant was permanently lost
+  after the cluster recovered. The healer now asks etcd first and, if the lease is alive,
+  resumes renewing it (`LeaseEvent.Restored` with the same old and new id).
+- A heal whose establish hook throws now revokes the lease it granted, as the initial
+  establish already did, instead of leaving a key bound to a lease nobody renews.
+- `ServiceRegistry.close()` releases every registration even when one instance's cleanup
+  delete fails (etcd unreachable at shutdown): it used to throw at the first failure and
+  leave the remaining instances renewing their leases inside a closed registry. The
+  cleanup delete now runs under the registry's RPC budget.
+- Re-registering an instance whose key had vanished no longer leaks the previous
+  registration's keep-alive and healer thread.
+- `DistributedBarrier.setBarrier`, `DistributedBarrierWithCount.waitOnBarrier`, and
+  `LeaderSelector` participation no longer report an infrastructure failure (a refused
+  or failed lease grant) as a lost CAS; it propagates with its cause.
+- `keepAlive(lease, onKeepAliveError)` now calls `onKeepAliveError` only when renewal
+  actually stopped (the stream completed, or etcd reported the lease not found). A
+  transient stream error — which jetcd restarts itself, with renewal continuing — is
+  logged at warn instead of reported as a lost lease.
+
 ### Changed (RPC engine: real jetcd failures, reads-only retries)
 
 - The retry check only recognized jetcd's `EtcdException`, but jetcd's KV, lease, and

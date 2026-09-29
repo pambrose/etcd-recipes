@@ -26,6 +26,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.barrier.DistributedBarrierWithCount.Companion.defaultClientId
+import io.etcd.recipes.common.EstablishDeclinedException
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
@@ -211,8 +212,11 @@ constructor(
         } catch (e: EtcdRecipeRuntimeException) {
           // A close() that lands before the establish hook runs (during the ready CAS
           // or the lease grant) makes the hook decline: that is a cancellation, not a
-          // lost CAS. The healer has already revoked its lease either way.
+          // lost CAS. The healer has already revoked its lease either way. Only a
+          // declined establish is a lost CAS; any other failure (an unreachable etcd, a
+          // refused grant, an interrupt) propagates as itself.
           if (cancelled.get()) return false
+          if (e !is EstablishDeclinedException) throw e
           logger.debug(e) { "Waiting-path CAS lost for $myWaitingPath" }
           throw EtcdRecipeException("Failed to set waitingPath", e)
         }

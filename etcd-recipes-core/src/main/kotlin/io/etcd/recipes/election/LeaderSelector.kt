@@ -29,6 +29,7 @@ import io.etcd.jetcd.support.Observers
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.jetcd.watch.WatchEvent.EventType.UNRECOGNIZED
+import io.etcd.recipes.common.EstablishDeclinedException
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
@@ -401,10 +402,12 @@ constructor(
             Then(path.setTo(clientId, putOption { withLeaseId(lease.id) }))
           }.isSucceeded
         }
-      } catch (e: EtcdRecipeRuntimeException) {
-        // Initial CAS lost (the healer already revoked its lease).
+      } catch (e: EstablishDeclinedException) {
+        // Initial CAS lost (the healer already revoked its lease). Any other failure
+        // (an unreachable etcd, a refused grant) is not a lost CAS and propagates with
+        // its cause.
         logger.debug(e) { "Participation CAS lost for $path" }
-        throw EtcdRecipeException("Participation registration failed [$path]")
+        throw EtcdRecipeException("Participation registration failed [$path]", e)
       }
 
     // Run until closed; closing the healer revokes the participation lease promptly

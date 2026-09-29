@@ -63,8 +63,8 @@
 - [x] [#5](#issue-5) Published core POM scopes jetcd and kotlinx-serialization as runtime-only although both are in the public API
 - [x] [#6](#issue-6) `DistributedReadWriteLock` conflict scan bleeds into sibling lock paths (missing trailing `/`)
 - [x] [#7](#issue-7) `DistributedReadWriteLock`: a `clientId` containing `/` lets a reader and a writer hold at once
-- [ ] [#8](#issue-8) Lease heal leaks the newly granted lease when the establish hook throws
-- [ ] [#9](#issue-9) Self-healing CAS hooks can't reclaim their own key, and a client-side deadline is treated as server expiry
+- [x] [#8](#issue-8) Lease heal leaks the newly granted lease when the establish hook throws
+- [x] [#9](#issue-9) Self-healing CAS hooks can't reclaim their own key, and a client-side deadline is treated as server expiry
 - [ ] [#10](#issue-10) Listener and `recordException` callbacks run on jetcd's Vert.x event loop, contrary to the documented contract
 - [ ] [#11](#issue-11) `LeaderSelector.waitOnLeadershipComplete(timeout)` ignores its timeout
 - [ ] [#12](#issue-12) `LeaderSelector.close()` from inside `takeLeadership` self-deadlocks
@@ -74,7 +74,7 @@
 - [ ] [#16](#issue-16) `DistributedWorkQueue.requeue()` bypasses `maxDeliveries`, so poison messages loop forever
 - [ ] [#17](#issue-17) Work-queue `claimHead` lease-not-found retry is unbounded and ignores the deadline and `close()`
 - [ ] [#18](#issue-18) A work-queue `receive()` in flight across `close()` creates a lease after close, and its item can never be acked
-- [ ] [#19](#issue-19) `ServiceRegistry.close()` can block about 2 min, then throw part-way through and leave healers running
+- [x] [#19](#issue-19) `ServiceRegistry.close()` can block about 2 min, then throw part-way through and leave healers running
 - [ ] [#20](#issue-20) `PathChildrenCache` priming start swallows load failures and leaves a dead cache that reports healthy
 - [ ] [#21](#issue-21) Coroutine `withLock` / `withPermit` / `awaitAcquire` leak the hold when cancellation races a successful acquire
 - [ ] [#22](#issue-22) Coroutine queue twins lose or strand items when cancellation races a successful take
@@ -100,7 +100,7 @@
 - [ ] [#40](#issue-40) The count-barrier trip releases the tripper before the global release is committed
 - [ ] [#41](#issue-41) Count-barrier waiting keys aren't scoped to a generation
 - [ ] [#42](#issue-42) `DistributedBarrier.setBarrier()` after `removeBarrier()` on the same instance silently fails
-- [ ] [#43](#issue-43) A broad `catch (EtcdRecipeRuntimeException)` reports infrastructure failures as a lost CAS
+- [x] [#43](#issue-43) A broad `catch (EtcdRecipeRuntimeException)` reports infrastructure failures as a lost CAS
 - [ ] [#44](#issue-44) `close()` races in-flight lock and permit acquisitions
 - [ ] [#45](#issue-45) `DistributedMutex` retries non-retriable lock failures forever, and `tryLock` reports them as a timeout
 - [ ] [#46](#issue-46) Semaphore `release()` frees another thread's live permit before consuming a lost one
@@ -119,7 +119,7 @@
 - [ ] [#59](#issue-59) One malformed or newer-schema service instance breaks discovery for the whole service
 - [ ] [#60](#issue-60) `PathChildrenCache.rebuild()` can permanently undo a watch event
 - [ ] [#61](#issue-61) `ServiceProvider` error counts never reset, and down-entries accumulate
-- [ ] [#62](#issue-62) Re-registering after `LeaseEvent.Failed` leaks the old healer
+- [x] [#62](#issue-62) Re-registering after `LeaseEvent.Failed` leaks the old healer
 - [ ] [#63](#issue-63) `interruptibleOn` misses re-wrapped interrupts, so some cancellations surface as `EtcdRecipeException`
 - [ ] [#64](#issue-64) `interruptOnPermitLoss` / `interruptOnLockLoss` misfire under the suspend surface
 - [ ] [#65](#issue-65) `leadershipAsFlow`: a blocking uncancellable GET, swallowed re-read failures, and a fixed RPC budget
@@ -133,7 +133,7 @@
 #### Low
 - [ ] [#72](#issue-72) `close()` from a watcher's or healer's own thread always stalls 5 s
 - [ ] [#73](#issue-73) Closing the `Client` while a watcher is open makes it retry forever, silently
-- [ ] [#74](#issue-74) `keepAlive()` reports transient stream errors as "renewal stopped"
+- [x] [#74](#issue-74) `keepAlive()` reports transient stream errors as "renewal stopped"
 - [ ] [#75](#issue-75) The `EtcdConnector` exception list grows without bound
 - [ ] [#76](#issue-76) The compaction fallback resumes one revision too late
 - [ ] [#77](#issue-77) `Duration`-typed APIs hidden from Java (`EtcdRecipes.distributedPriorityQueue`, `LeaderLatch` `closeJoinTimeout`)
