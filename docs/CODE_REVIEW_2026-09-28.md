@@ -68,8 +68,8 @@
 - [x] [#10](#issue-10) Listener and `recordException` callbacks run on jetcd's Vert.x event loop, contrary to the documented contract
 - [x] [#11](#issue-11) `LeaderSelector.waitOnLeadershipComplete(timeout)` ignores its timeout
 - [x] [#12](#issue-12) `LeaderSelector.close()` from inside `takeLeadership` self-deadlocks
-- [ ] [#13](#issue-13) `LeaderSelector.start()` can hang forever, uninterruptibly
-- [ ] [#14](#issue-14) Watch-triggered election attempts swallow Phase-1 failures and never retry, so the election can be left leaderless
+- [x] [#13](#issue-13) `LeaderSelector.start()` can hang forever, uninterruptibly
+- [x] [#14](#issue-14) Watch-triggered election attempts swallow Phase-1 failures and never retry, so the election can be left leaderless
 - [x] [#15](#issue-15) `DistributedAtomicLong` is permanently broken if first-use initialization fails
 - [x] [#16](#issue-16) `DistributedWorkQueue.requeue()` bypasses `maxDeliveries`, so poison messages loop forever
 - [x] [#17](#issue-17) Work-queue `claimHead` lease-not-found retry is unbounded and ignores the deadline and `close()`
@@ -91,9 +91,9 @@
 - [x] [#31](#issue-31) The RPC budget isn't threaded through several helpers and call sites
 - [x] [#32](#issue-32) `ping()` and the Spring health indicator can block about 150 s, and RBAC-scoped clusters always report DOWN
 - [x] [#33](#issue-33) Unit tests mock jetcd using the library's own assumptions, so resilience bugs can't surface
-- [ ] [#34](#issue-34) Leader-key watches are not revision-anchored, so a hand-off during setup is missed
-- [ ] [#35](#issue-35) Step-down leaves `attemptLeadership` set, so a DELETE can start a second concurrent term
-- [ ] [#36](#issue-36) A term won via the watch runs on the watch dispatcher, so `close()` can return while it still holds the key
+- [x] [#34](#issue-34) Leader-key watches are not revision-anchored, so a hand-off during setup is missed
+- [x] [#35](#issue-35) Step-down leaves `attemptLeadership` set, so a DELETE can start a second concurrent term
+- [x] [#36](#issue-36) A term won via the watch runs on the watch dispatcher, so `close()` can return while it still holds the key
 - [x] [#37](#issue-37) A `LeaderSelector` closed without ever winning can't be restarted
 - [x] [#38](#issue-38) Composite recipes (`LeaderLatch`, `ServiceProvider`) hide the health of the recipes they wrap
 - [x] [#39](#issue-39) The uncommitted `DistributedBarrierWithCount` close-race fix leaves a pre-park window open

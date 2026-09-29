@@ -23,6 +23,7 @@ import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.randomId
 import com.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lease.LeaseKeepAliveResponse
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.support.Observers
@@ -45,6 +46,7 @@ import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildrenValues
+import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.isKeyNotPresent
 import io.etcd.recipes.common.isKeyPresent
@@ -60,18 +62,23 @@ import io.etcd.recipes.common.withWatcher
 import io.etcd.recipes.election.LeaderSelector.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.stub.StreamObserver
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 @JvmOverloads
@@ -151,23 +158,22 @@ constructor(
       interruptOnLeaseLoss,
     )
 
-  private var executor: Executor = userExecutor ?: Executors.newFixedThreadPool(3)
+  // Runs the candidacy: every election attempt and the term, on one thread. The leader-key
+  // watch and the participation lease run on their own internal threads, so a user executor
+  // needs only one free thread.
+  private var executor: Executor = userExecutor ?: Executors.newSingleThreadExecutor()
   private val terminateWatch = BooleanMonitor(false)
   private val terminateKeepAlive = BooleanMonitor(false)
   private val leadershipComplete = BooleanMonitor(false)
-  private val attemptLeadership = BooleanMonitor(true)
   private val electedLeader = AtomicBoolean(false)
   private val startCallLock = Any()
-
-  // Serializes the leadership-claim section of attemptToBecomeLeader (CAS + guard
-  // resets) across the start() worker and the watch-dispatcher thread. Deliberately
-  // NOT the instance monitor: close() is @Synchronized on the instance, so holding
-  // the instance monitor across takeLeadership (the previous @Synchronized) made a
-  // close() during active leadership deadlock. This lock is released before the
-  // takeLeadership block runs, so close() can flip the termination monitors meanwhile.
-  private val electionLock = Any()
   private val startCallAllowed = AtomicBoolean(true)
   private val leaderPath = electionPath.withLeaderSuffix
+
+  // Wakes the candidacy loop to run for leader: the leader key was deleted, a watch recovery
+  // may have missed that, or the selector is finishing. The watch only ever signals here, so
+  // no election attempt or term runs on the watch dispatcher.
+  private val attemptSignals = LinkedBlockingQueue<Unit>()
 
   // Step-down machinery: set for the duration of a leadership hold so a fatal
   // keep-alive event (lease gone) can end leadership from the observer thread.
@@ -186,10 +192,14 @@ constructor(
 
   val isFinished get() = leadershipComplete.get()
 
-  @Suppress("TooGenericExceptionCaught", "LongMethod")
+  /**
+   * Starts this candidacy: runs for leader now and whenever the leader key is deleted, until a
+   * term completes or [close]. Returns once the leader-key watch is established; throws
+   * [EtcdRecipeRuntimeException] when it can't be (a closed client, an unreachable etcd), or when
+   * interrupted while waiting, in which case the interrupt flag is restored.
+   */
+  @Suppress("TooGenericExceptionCaught")
   fun start(): LeaderSelector {
-    val electionSetup = BooleanMonitor(false)
-
     synchronized(startCallLock) {
       if (!startCallAllowed.load())
         throw EtcdRecipeRuntimeException("Previous call to start() not complete")
@@ -197,132 +207,215 @@ constructor(
       // Re-create the internal executor if a previous close() shut it down,
       // so the instance can be re-used across start()/close() cycles.
       if (userExecutor == null && (executor as ExecutorService).isShutdown)
-        executor = Executors.newFixedThreadPool(3)
+        executor = Executors.newSingleThreadExecutor()
 
       terminateWatch.set(false)
       terminateKeepAlive.set(false)
       leadershipComplete.set(false)
       startThreadComplete.set(false)
-      attemptLeadership.set(true)
       startCalled.store(true)
       closeCalled.store(false)
       electedLeader.store(false)
       startCallAllowed.store(false)
+      attemptSignals.clear()
       resetConnectionState()
     }
 
-    executor.execute {
-      withRecipeLoggingContext {
-        try {
-          val watchStarted = BooleanMonitor(false)
-          val watchComplete = BooleanMonitor(false)
-          val advertiseComplete = BooleanMonitor(false)
+    val watchReady = CompletableFuture<Unit>()
+    val watchThread = thread(name = "etcd-election-watch", isDaemon = true) { runLeaderWatch(watchReady) }
+    val participationThread = thread(name = "etcd-election-participation", isDaemon = true) { runParticipation() }
+    val helpers = listOf(watchThread, participationThread)
+    try {
+      watchReady.get()
+      executor.execute { withRecipeLoggingContext { runCandidacy(helpers) } }
+    } catch (e: Throwable) {
+      // A failed or interrupted watch setup, or e.g. a shut-down user executor rejecting the candidacy
+      abortStart(helpers)
+      throw startFailure(e)
+    }
+    return this
+  }
 
-          executor.execute {
-            withRecipeLoggingContext {
-              try {
-                val watchOption = watchOption { withNoPut(true) }
+  private fun startFailure(e: Throwable): Throwable =
+    when (e) {
+      is InterruptedException -> {
+        Thread.currentThread().interrupt()
+        EtcdRecipeRuntimeException("Interrupted while starting the election on $electionPath", e)
+      }
 
-                // The leader-key DELETE is this node's only re-election trigger. If it
-                // is lost while the watch stream is fatally dead (compaction resync, or
-                // a death before any event), the node would never run for leader again —
-                // so after each recovery, re-probe the leader key and run if it is gone.
-                // attemptToBecomeLeader CAS-guards against a concurrent winner.
-                val recoveryListener =
-                  WatchRecoveryListener { event ->
-                    withRecipeLoggingContext {
-                      reportRecoveryEvent(event)
-                      when (event) {
-                        is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-                          if (client.isKeyNotPresent(leaderPath, resilience.rpc))
-                            attemptToBecomeLeader(client)
-                        }
+      is ExecutionException -> {
+        EtcdRecipeRuntimeException("Couldn't watch the leader key of $electionPath", e.cause ?: e)
+      }
 
-                        is WatchRecoveryEvent.Failed -> {
-                          val cause = event.cause
-                            ?: EtcdRecipeRuntimeException(
-                              "Watch on $leaderPath abandoned; no further re-election attempts",
-                            )
-                          logger.error(cause) { "Leader watch on $leaderPath abandoned" }
-                          recordException(cause)
-                        }
-
-                        is WatchRecoveryEvent.Suspended -> {
-                          // jetcd (transient) or the recovery loop (fatal) is already on it
-                        }
-                      }
-                    }
-                  }
-
-                client.withWatcher(
-                  leaderPath,
-                  watchOption,
-                  resilience.watch,
-                  recoveryListener,
-                  resyncWith = null,
-                  { watchResponse ->
-                    for (event in watchResponse.events) {
-                      if (event.eventType == DELETE) {
-                        // Run for leader whenever leader key is deleted
-                        attemptToBecomeLeader(client)
-                      }
-                    }
-                  },
-                ) {
-                  watchStarted.set(true)
-                  terminateWatch.waitUntilTrue()
-                }
-              } catch (e: Throwable) {
-                logger.error(e) { "In withWatchClient()" }
-                recordException(e)
-              } finally {
-                watchComplete.set(true)
-              }
-            }
-          }
-
-          executor.execute {
-            withRecipeLoggingContext {
-              try {
-                advertiseParticipation()
-              } catch (e: Throwable) {
-                logger.error(e) { "In advertiseParticipation()" }
-                recordException(e)
-              } finally {
-                advertiseComplete.set(true)
-              }
-            }
-          }
-
-          // Wait for the watcher to start
-          watchStarted.waitUntilTrue()
-
-          electionSetup.set(true)
-
-          // Clients should run for leader in case they are the first to run
-          attemptToBecomeLeader(client)
-
-          leadershipComplete.waitUntilTrue()
-          watchComplete.waitUntilTrue()
-          advertiseComplete.waitUntilTrue()
-        } catch (e: Throwable) {
-          logger.error(e) { "In start()" }
-          recordException(e)
-        } finally {
-          // The candidacy is over whether or not it won (a standby's ends at close(), and
-          // Phase 1 can throw), so allow the next start(). Both flags flip under
-          // startCallLock so a new start() can't interleave and have its reset overwritten.
-          synchronized(startCallLock) {
-            startCallAllowed.store(true)
-            startThreadComplete.set(true)
-          }
-        }
+      else -> {
+        e
       }
     }
 
-    electionSetup.waitUntilTrue()
+  // Undoes a start() that failed before its candidacy began, so the selector stays closable
+  // and can be started again.
+  private fun abortStart(helpers: List<Thread>) {
+    markLeadershipComplete()
+    helpers.forEach { it.join(HELPER_JOIN_MILLIS) }
+    synchronized(startCallLock) {
+      startCallAllowed.store(true)
+      startThreadComplete.set(true)
+    }
+  }
 
-    return this
+  // Watches the leader key for deletions, which only signal the candidacy loop. Anchored just
+  // past a read of the key, so a deletion that lands while the watch is being set up is still
+  // delivered. The leader key's DELETE is this node's only re-election trigger, so a recovery
+  // that may have missed one (a compaction resync, or a death before any event) signals too.
+  @Suppress("TooGenericExceptionCaught")
+  private fun runLeaderWatch(watchReady: CompletableFuture<Unit>) {
+    withRecipeLoggingContext {
+      try {
+        val anchor = client.getResponse(leaderPath, rpc = resilience.rpc).header.revision + 1
+        val recoveryListener =
+          WatchRecoveryListener { event ->
+            withRecipeLoggingContext {
+              reportRecoveryEvent(event)
+              when (event) {
+                is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+                  signalAttempt()
+                }
+
+                is WatchRecoveryEvent.Failed -> {
+                  val cause = event.cause
+                    ?: EtcdRecipeRuntimeException("Watch on $leaderPath abandoned; no further re-election attempts")
+                  logger.error(cause) { "Leader watch on $leaderPath abandoned" }
+                  recordException(cause)
+                }
+
+                is WatchRecoveryEvent.Suspended -> {
+                  // jetcd (transient) or the recovery loop (fatal) is already on it
+                }
+              }
+            }
+          }
+        client.withWatcher(
+          leaderPath,
+          watchOption {
+            withNoPut(true)
+            withRevision(anchor)
+          },
+          resilience.watch,
+          recoveryListener,
+          resyncWith = null,
+          { watchResponse -> if (watchResponse.events.any { it.eventType == DELETE }) signalAttempt() },
+        ) {
+          watchReady.complete(Unit)
+          terminateWatch.waitUntilTrue()
+        }
+      } catch (e: Throwable) {
+        logger.error(e) { "Leader watch on $leaderPath failed" }
+        recordException(e)
+        watchReady.completeExceptionally(e)
+      }
+    }
+  }
+
+  @Suppress("TooGenericExceptionCaught")
+  private fun runParticipation() {
+    withRecipeLoggingContext {
+      try {
+        advertiseParticipation()
+      } catch (e: Throwable) {
+        logger.error(e) { "In advertiseParticipation()" }
+        recordException(e)
+      }
+    }
+  }
+
+  private fun signalAttempt() {
+    attemptSignals.offer(Unit)
+  }
+
+  // The candidacy: runs for leader now and on each signal until a term completes or the
+  // selector finishes. Every attempt and the term run here, one at a time, so a term never
+  // overlaps another (a deletion signalled while a term is unwinding just ends the loop) and
+  // close() waits for the term however it was won. An attempt that fails rather than loses
+  // (a refused grant, a transaction that timed out) is retried, paced by the watch retry
+  // policy; otherwise no deletion would ever come to trigger another, and the election could
+  // stay leaderless.
+  @Suppress("TooGenericExceptionCaught")
+  private fun runCandidacy(helpers: List<Thread>) {
+    try {
+      val backoff = AttemptBackoff()
+      var lease: LeaseGrantResponse? = null
+      signalAttempt()
+      while (lease == null && awaitAttemptSignal(backoff.delay)) {
+        lease = attemptOnce(backoff)
+      }
+      lease?.let { holdLeadership(it) }
+    } catch (e: InterruptedException) {
+      logger.debug(e) { "Candidacy on $electionPath interrupted" }
+    } catch (e: Throwable) {
+      logger.error(e) { "In the candidacy on $electionPath" }
+      recordException(e)
+    } finally {
+      markLeadershipComplete()
+      helpers.forEach { it.join(HELPER_JOIN_MILLIS) }
+      // Both flags flip under startCallLock so a new start() can't interleave and have its
+      // reset overwritten.
+      synchronized(startCallLock) {
+        startCallAllowed.store(true)
+        startThreadComplete.set(true)
+      }
+    }
+  }
+
+  // Waits for a signal to run for leader, or for [retryDelay] after a failed attempt. Coalesces
+  // queued signals (one attempt answers them all). False once the candidacy is finishing.
+  private fun awaitAttemptSignal(retryDelay: Duration?): Boolean {
+    if (retryDelay ==
+      null
+    )
+      attemptSignals.take()
+      else
+      attemptSignals.poll(retryDelay.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+    attemptSignals.clear()
+    return !leadershipComplete.get()
+  }
+
+  // One election attempt: the lease on a win, else null (lost, or failed and to be retried).
+  @Suppress("TooGenericExceptionCaught")
+  private fun attemptOnce(backoff: AttemptBackoff): LeaseGrantResponse? =
+    try {
+      claimLeadership().also { backoff.reset() }
+    } catch (e: Throwable) {
+      val delay = backoff.failed()
+      logger.warn(e) {
+        "Election attempt on $electionPath failed; ${delay?.let {
+          "retrying in $it"
+        } ?: "retrying on the next deletion"}"
+      }
+      recordException(e)
+      null
+    }
+
+  // Paces retries of failed election attempts by the watch retry policy.
+  private inner class AttemptBackoff {
+    private var failures = 0
+    private var failingSince: TimeMark? = null
+
+    /** The wait before the next attempt, or null to wait for the next deletion signal. */
+    var delay: Duration? = null
+      private set
+
+    fun reset() {
+      failures = 0
+      failingSince = null
+      delay = null
+    }
+
+    fun failed(): Duration? {
+      failures += 1
+      val since = failingSince ?: TimeSource.Monotonic.markNow().also { failingSince = it }
+      delay = resilience.watch.retryPolicy.nextDelay(failures, since.elapsedNow())
+      return delay
+    }
   }
 
   @Throws(InterruptedException::class)
@@ -368,6 +461,7 @@ constructor(
     terminateWatch.set(true)
     terminateKeepAlive.set(true)
     leadershipComplete.set(true)
+    signalAttempt() // wake the candidacy loop so it can finish
   }
 
   override fun doClose() {
@@ -460,59 +554,48 @@ constructor(
     }
   }
 
-  // This will not return until election failure or leader surrenders leadership after being elected
-  @Suppress("ReturnCount", "TooGenericExceptionCaught")
-  private fun attemptToBecomeLeader(client: Client): Boolean {
-    // Phase 1 — claim leadership under electionLock (NOT the instance monitor) so
-    // concurrent candidates (start() worker vs watch-dispatcher) are serialized
-    // without blocking close(). Returns the granted lease on a win, or returns
-    // false on every losing path after revoking its own lease.
-    val lease =
-      synchronized(electionLock) {
-        if (isLeader || !attemptLeadership.get()) {
-          return false
-        }
+  // Phase 1: the leader-key CAS. Returns the lease this node now leads under, or null when
+  // another candidate leads (no lease is left behind). Throws when the attempt failed rather
+  // than lost, after revoking its lease: a transaction whose outcome is unknown may have
+  // committed, and revoking the lease removes the key it would have written.
+  private fun claimLeadership(): LeaseGrantResponse? =
+    // Someone leads: wait for the deletion rather than spend a lease grant on a CAS that can't win
+    if (client.isKeyPresent(leaderPath, resilience.rpc)) null else casForLeadership()
 
-        // Create unique token to avoid collision from clients with same id
-        val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
-
-        // Prime lease to give keepAliveWith a chance to get started; route through
-        // the common/ extension layer rather than reaching into jetcd directly.
-        val granted = client.leaseGrant(leaseTtlSecs.seconds, resilience.rpc)
-
-        // Check the key name. If it is not found, then set it
-        val txn =
-          client.transaction(resilience.rpc) {
-            If(leaderPath.doesNotExist)
-            Then(leaderPath.setTo(uniqueToken, putOption { withLeaseId(granted.id) }))
-          }
-
-        // The CAS is authoritative: txn.isSucceeded means this client created the
-        // leader key with uniqueToken. (The previous getValue re-read only guarded
-        // the tiny window where another client overwrote it between commit and read.)
-        if (!txn.isSucceeded) {
-          // Failed to become leader: revoke the lease we just created so it does
-          // not linger in etcd until TTL. Without this, every losing candidate in
-          // an election leaks a lease per turnover.
-          client.leaseRevoke(granted, resilience.rpc)
-          return false
-        }
-
-        // Mark elected inside the lock so a concurrent candidate sees isLeader and bails.
-        electedLeader.store(true)
-        resilience.metrics.incrementLeadershipTransition(electionPath, becameLeader = true)
-        granted
+  @Suppress("TooGenericExceptionCaught")
+  private fun casForLeadership(): LeaseGrantResponse? {
+    // Create unique token to avoid collision from clients with same id
+    val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
+    val granted = client.leaseGrant(leaseTtlSecs.seconds, resilience.rpc)
+    val won =
+      try {
+        client.transaction(resilience.rpc) {
+          If(leaderPath.doesNotExist)
+          Then(leaderPath.setTo(uniqueToken, putOption { withLeaseId(granted.id) }))
+        }.isSucceeded
+      } catch (e: Throwable) {
+        client.leaseRevoke(granted, resilience.rpc)
+        throw e
       }
+    if (!won) {
+      // Lost the CAS: revoke the lease so it does not linger in etcd until its TTL.
+      client.leaseRevoke(granted, resilience.rpc)
+      return null
+    }
+    electedLeader.store(true)
+    resilience.metrics.incrementLeadershipTransition(electionPath, becameLeader = true)
+    return granted
+  }
 
-    // Phase 2 — hold leadership with NO lock held, so a close() on another thread
-    // can run doClose() -> markLeadershipComplete() and release a takeLeadership
-    // that is waiting on isFinished/waitUntilFinished. Exits when leadership is
-    // relinquished (takeLeadership returns) or the lease is lost (step-down).
-    //
-    // Leadership is intentionally NOT self-healed: an expired lease means etcd
-    // deleted the leader key and another candidate may already lead — reclaiming
-    // would race the new leader. A fatal keep-alive event (stream completed, or
-    // NOT_FOUND "requested lease not found") instead steps this leader down.
+  // Phase 2: holds leadership until it is relinquished (takeLeadership returns) or the lease
+  // is lost (step-down), on the candidacy thread, which close() waits for.
+  //
+  // Leadership is intentionally NOT self-healed: an expired lease means etcd
+  // deleted the leader key and another candidate may already lead — reclaiming
+  // would race the new leader. A fatal keep-alive event (stream completed, or
+  // NOT_FOUND "requested lease not found") instead steps this leader down.
+  @Suppress("TooGenericExceptionCaught")
+  private fun holdLeadership(lease: LeaseGrantResponse) {
     leadershipThreadRef.store(Thread.currentThread())
     leadershipLeaseId.store(lease.id)
     leaseLostDuringLeadership.store(false)
@@ -538,26 +621,16 @@ constructor(
         logger.error(e) { "In relinquishLeadership()" }
         recordException(e)
       }
-
       takeLeadershipError?.let { throw it }
-      return !leaseLostDuringLeadership.load()
     } catch (e: Throwable) {
-      logger.error(e) { "In attemptToBecomeLeader()" }
+      logger.error(e) { "In takeLeadership()" }
       recordException(e)
-      return false
     } finally {
       registration.close()
       // Revoke the leadership lease promptly on relinquish (#7) instead of at TTL.
       client.leaseRevoke(lease, resilience.rpc)
       leadershipThreadRef.store(null)
-      // Reset the election guards under the same lock Phase 1 reads them, so a
-      // concurrent candidate never observes a half-updated guard set.
-      synchronized(electionLock) {
-        attemptLeadership.set(false)
-        startCallAllowed.store(true)
-        electedLeader.store(false)
-      }
-      // Do this after leadership is complete so the thread does not terminate early
+      electedLeader.store(false)
       markLeadershipComplete()
     }
   }
@@ -609,6 +682,9 @@ constructor(
 
   companion object {
     private val logger = KotlinLogging.logger {}
+
+    // How long a finishing candidacy waits for its watch and participation threads to end
+    private const val HELPER_JOIN_MILLIS = 10_000L
 
     private val String.withParticipationSuffix get() = appendToPath("participants")
     private val String.withLeaderSuffix get() = appendToPath("LEADER")

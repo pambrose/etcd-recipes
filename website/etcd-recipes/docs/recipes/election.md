@@ -53,10 +53,23 @@ successor can win immediately.
     ```
 
 `start()` returns as soon as the leader watch is live and this node is in the running —
-it does **not** block until you win. The blocking call is `waitOnLeadershipComplete()`,
-which returns once this node has led and finished its term, or once `close()` ends its
-candidacy. A node that never wins stays parked there, which is the point: it is standing
-by to take over.
+it does **not** block until you win. If the watch can't be set up (a closed client, an
+unreachable etcd), `start()` throws instead. The blocking call is
+`waitOnLeadershipComplete()`, which returns once this node has led and finished its term,
+or once `close()` ends its candidacy. A node that never wins stays parked there, which is
+the point: it is standing by to take over.
+
+Every election attempt and the term itself run on one thread: the selector's executor
+(one thread is enough if you pass your own), while the leader watch and the
+participation lease run on internal threads. That has three consequences worth knowing:
+
+- `close()` waits for a term in progress, however it was won, so when it returns the
+  leader key is gone and `takeLeadership` is no longer running. A term that ignores
+  `waitUntilFinished()` / `isFinished` holds `close()` up until it returns.
+- A term can't overlap another on the same selector.
+- An attempt that fails rather than loses (a lease grant refused, a transaction that timed
+  out during an etcd blip) is retried, paced by the watch `RetryPolicy`, instead of
+  leaving the election leaderless until someone else happens to run.
 
 There are two constructors and they are the same constructor. The Kotlin one takes the
 callbacks as lambdas (`takeLeadershipBlock` / `relinquishLeadershipBlock`) and wraps them

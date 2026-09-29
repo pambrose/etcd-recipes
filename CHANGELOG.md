@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (`LeaderSelector` candidacy)
+
+- `LeaderSelector` now runs every election attempt and its term on one thread (the
+  selector's executor), and the leader-key watch only signals it. That fixes three
+  problems:
+  - `close()` now waits for a term won through the watch, as it already did for one won at
+    `start()`. That term used to run on the watch dispatcher, so `close()` returned after 5
+    s while the node still held the leader key and its keep-alive.
+  - A step-down can't start a second term while the first is still unwinding. A replayed
+    deletion used to start one concurrently on the dispatcher, invisible and unstoppable.
+  - An election attempt that fails rather than loses (a refused lease grant, a transaction
+    that timed out during an etcd blip) is retried, paced by the watch `RetryPolicy`, and
+    its lease is revoked. It used to be logged and dropped, and with the leader key already
+    gone no deletion would ever trigger another attempt, so the election could stay
+    leaderless.
+- `LeaderSelector.start()` can no longer hang. The watch and participation tasks run on
+  internal threads, so a user executor needs only one free thread (it hung with fewer than
+  three). A watch that can't be set up (a closed client, an unreachable etcd) makes
+  `start()` throw; it used to hang or, on a closed client, return a selector that never ran.
+  A `start()` rejected by a shut-down executor leaves the selector closable, and an
+  interrupted `start()` throws with the interrupt flag restored.
+- The leader-key watches of `LeaderSelector`, `LeaderObserver`, and `leadershipAsFlow` are
+  anchored just past the read that precedes them, so a hand-off during setup is no longer
+  missed. It could leave a candidate standing by forever, or an observer showing a stale
+  leader until the next hand-off. `leadershipAsFlow` also re-reads after a recovery only
+  when events could have been missed, like `LeaderObserver`.
+
 ### Fixed (resilient watcher revisions)
 
 - A compaction whose resync fails is no longer forgotten. The next recovery attempt
