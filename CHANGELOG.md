@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (queue lifecycle and delivery)
+
+- `DistributedWorkQueue`: `maxDeliveries` now caps redelivery through `WorkItem.requeue()`
+  too. It was checked only when a crashed consumer's claims were reclaimed, so a poison
+  message whose handler called `requeue()` (the README's canonical consumer) came back
+  forever, and a single-consumer deployment made no progress. The next receive now
+  dead-letters an item that has already been delivered `maxDeliveries` times.
+- `DistributedWorkQueue`: a receive no longer retries a dead consumer lease without
+  limit. It now throws once lease healing is abandoned (a bounded or disabled
+  `LeaseResilience`) or the queue is closed. A bounded `receive(timeout)` returns `null`
+  at its timeout while a heal is still in progress. It used to spin at 4 Hz, three RPCs
+  per pass, past its timeout and past `close()`.
+- `DistributedWorkQueue.close()` releases a parked `receive()`, which then throws. It
+  used to stay parked, and once an item arrived it created the consumer lease (keep-alive,
+  healer, and sweeper) after close. It then claimed an item that could never be acked,
+  and that nothing would ever reclaim, until the `Client` closed. A close that races the
+  lease's creation now releases the new lease instead of claiming under it.
+- `DistributedQueue` / `DistributedPriorityQueue`: `close()` releases a parked
+  `dequeue()` or `poll()`, which then throws, the way `close()` already released barrier
+  waiters. The take used to park until an item arrived, and then deleted it and handed it
+  to the closed instance.
+- `DistributedWorkQueue`'s empty-queue wait is anchored at the revision the queue was
+  seen empty. An item enqueued while the watch was being established was not delivered
+  until the next sweep interval (30 s by default), so `receive(10.seconds)` could return
+  `null` with an item in the queue. The other queues were fixed the same way in 0.12.0.
+- `DistributedWorkQueue`'s reclaim-sweep failures now reach `exceptions` and the
+  background exception listener, once per failing streak. They were logged at DEBUG and
+  dropped, so a persistent failure silently disabled background reclaim.
+- `WorkItem.ack()` and `requeue()` are guarded on the specific claim, not just the
+  consumer instance. After a claim lapsed and the same instance received the item again,
+  the earlier item's `ack()` used to return `true` and delete the new claim.
+
 ### Fixed (`DistributedAtomicLong` recovery)
 
 - A failed first-use initialization no longer breaks the instance for good. A transient

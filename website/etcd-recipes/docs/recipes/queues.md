@@ -49,6 +49,10 @@ not fail — it re-reads the new head and tries again. When the queue is empty t
 take parks on a watcher rather than polling, and re-reads the head after waking:
 the first PUT the watcher happens to see is not necessarily the head by sort order.
 
+`close()` releases a parked `dequeue()` or `poll()`, which then throws
+`EtcdRecipeRuntimeException` rather than waiting for an item that the closed
+instance should not take. That lets a consumer loop shut down cleanly.
+
 !!! note "`size` is an RPC, and advisory"
 
     etcd cannot push a count, so `size` issues a range-count on every read. It is
@@ -270,7 +274,10 @@ Delivery is at-least-once, and the duplicate is not hypothetical: a consumer
 partitioned for longer than its visibility timeout keeps working on an item that has
 already been redelivered elsewhere. Both consumers run the handler. Only one `ack()`
 wins — the other returns `false`, because the ack is guarded on the claim still
-belonging to this consumer.
+belonging to this consumer. The guard is on the specific claim, not only on the
+consumer: if a claim lapses and the same queue instance receives the item again, the
+earlier `WorkItem`'s `ack()` and `requeue()` return `false` rather than acting on the
+newer claim.
 
 Which is why `ack()` and `requeue()` return `Boolean` rather than `Unit`, and why
 `false` deserves a log line: it does not mean the work failed, it means **the work
@@ -285,9 +292,11 @@ consumer wait out the visibility timeout for a crash that did not happen.
 
 ### Dead letters
 
-An item that keeps failing cannot be redelivered forever. Once its attempts reach
-`maxDeliveries`, the reclaim sweep routes it to the dead-letter space instead of
-back to the queue:
+An item that keeps failing cannot be redelivered forever. Once it has been delivered
+`maxDeliveries` times, it goes to the dead-letter space instead of back to the queue.
+That holds on both paths back: the reclaim sweep dead-letters a crashed consumer's
+item, and the next receive dead-letters an item a handler handed back with
+`requeue()`:
 
 === "Kotlin"
 
@@ -347,7 +356,13 @@ your outstanding claims are gone even though healing will succeed. See
 
 Closing the queue revokes the lease, which makes any unacked claims reclaimable at
 once rather than after the visibility timeout — a clean shutdown returns work to the
-fleet immediately.
+fleet immediately. A `receive()` parked on an empty queue is released and throws
+`EtcdRecipeRuntimeException`, so nothing is claimed for a closed consumer.
+
+If healing is abandoned (a bounded `LeaseResilience` policy ran out, or healing is
+disabled), a receive that finds work throws instead of retrying the dead lease, since
+no claim can succeed. While a heal is still in progress, a bounded `receive(timeout)`
+keeps retrying only until its timeout and then returns `null`.
 
 ### Two gaps worth knowing
 

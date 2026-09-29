@@ -28,6 +28,7 @@ import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.WatchOption
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.concurrent.atomics.AtomicReference
 
 /**
@@ -50,6 +51,9 @@ class HookedClient(
 
   /** Runs before the next single-argument `leaseClient.grant(ttl)`. */
   val beforeLeaseGrant = AtomicReference<(() -> Unit)?>(null)
+
+  /** Every `watchClient.watch(key, option, listener)` call's key and option, in order. */
+  val watchOptions = CopyOnWriteArrayList<Pair<String, WatchOption>>()
 
   /** Runs after the next `watchClient.watch(key, option, listener)` returns its watcher. */
   val afterWatch = AtomicReference<(() -> Unit)?>(null)
@@ -89,7 +93,10 @@ class HookedClient(
         key: ByteSequence,
         option: WatchOption,
         listener: Watch.Listener,
-      ): Watch.Watcher = delegate.watchClient.watch(key, option, listener).also { afterWatch.exchange(null)?.invoke() }
+      ): Watch.Watcher {
+        watchOptions += key.asString to option
+        return delegate.watchClient.watch(key, option, listener).also { afterWatch.exchange(null)?.invoke() }
+      }
     }
 
   override fun getKVClient(): KV = kv
