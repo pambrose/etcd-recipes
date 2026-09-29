@@ -65,6 +65,18 @@ interface EtcdLock {
   fun removeLockLostListener(listener: LockLostListener)
 }
 
+/**
+ * Whether this lock interrupts its holder when a hold is lost (`interruptOnLockLoss`).
+ * The suspend `withLock` cancels its action instead, since its holder is a coroutine.
+ */
+internal val EtcdLock.interruptsHolderOnLoss: Boolean
+  get() =
+    when (this) {
+      is DistributedMutex -> interruptOnLockLoss
+      is DistributedReadWriteLock.LockView -> interruptsOnLoss
+      else -> false
+    }
+
 fun interface LockLostListener {
   fun onLockLost(cause: Throwable?)
 }

@@ -317,6 +317,22 @@ class DistributedWorkQueue
     }
 
     /**
+     * Returns the item to the queue as though this delivery never happened: its attempt
+     * count goes back to what it was before this claim. For a receive whose caller was
+     * cancelled just as it claimed the item, so the item never reached anyone.
+     */
+    internal fun unclaim(): Boolean =
+      client.transaction(resilience.rpc) {
+        If(*isStillClaimed())
+        Then(
+          "$itemsPath/$id" setTo value,
+          deleteOp("$claimsPath/$id".asByteSequence),
+          deleteOp("$claimedPath/$id".asByteSequence),
+          if (attempt > 1) "$attemptsPath/$id" setTo (attempt - 1) else deleteOp("$attemptsPath/$id".asByteSequence),
+        )
+      }.isSucceeded
+
+    /**
      * Returns the item to the queue early (attempts preserved). Once it has been
      * delivered [WorkQueueConfig.maxDeliveries] times, the next receive dead-letters it
      * instead of delivering it again.
