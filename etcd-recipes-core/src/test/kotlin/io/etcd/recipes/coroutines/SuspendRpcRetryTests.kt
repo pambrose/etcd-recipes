@@ -131,15 +131,17 @@ class SuspendRpcRetryTests : StringSpec() {
       }
     }
 
-    "non-retriable failures propagate without retry" {
+    "non-retriable failures surface without retry, carrying the cause" {
       runTest {
         val calls = AtomicInt(0)
-        shouldThrow<IllegalArgumentException> {
-          suspendRetryRpc<String>(quick(), "bad-request") {
-            calls.incrementAndFetch()
-            CompletableFuture.failedFuture(IllegalArgumentException("bad key"))
+        val e =
+          shouldThrow<EtcdRecipeRuntimeException> {
+            suspendRetryRpc<String>(quick(), "bad-request") {
+              calls.incrementAndFetch()
+              CompletableFuture.failedFuture(IllegalArgumentException("bad key"))
+            }
           }
-        }
+        (e.cause is IllegalArgumentException) shouldBe true
         calls.load() shouldBe 1
       }
     }
@@ -193,9 +195,11 @@ class SuspendRpcRetryTests : StringSpec() {
 
     "suspendAwaitRpc never retries, even on retriable failures" {
       runTest {
-        shouldThrow<EtcdException> {
-          suspendAwaitRpc<String>(quick(), "one-shot", CompletableFuture.failedFuture(unavailable()))
-        }
+        val e =
+          shouldThrow<EtcdRecipeRuntimeException> {
+            suspendAwaitRpc<String>(quick(), "one-shot", CompletableFuture.failedFuture(unavailable()))
+          }
+        (e.cause is EtcdException) shouldBe true
       }
     }
 

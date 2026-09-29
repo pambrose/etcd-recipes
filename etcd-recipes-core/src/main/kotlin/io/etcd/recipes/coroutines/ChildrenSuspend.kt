@@ -120,6 +120,6 @@ suspend fun Client.awaitDeleteChildren(
       isPrefix(true)
       withPrevKV(true)
     }
-  return suspendRetryRpc(rpc, "deleteChildren($keyName)") { kvClient.delete(trailingKey.asByteSequence, deleteOption) }
+  return suspendAwaitRpc(rpc, "deleteChildren($keyName)", kvClient.delete(trailingKey.asByteSequence, deleteOption))
     .prevKvs.map { it.key.asString }
 }

@@ -124,26 +124,36 @@ Because `RetryPolicy` is a `fun interface`, a lambda is a policy:
 
 ### Which failures are retried
 
-RPC retries are deliberately narrow. Only three gRPC statuses are retriable:
+RPC retries are deliberately narrow — in *which calls* retry and in *which failures*
+count. Only calls that are safe to repeat retry: reads (`getValue`, `getResponse`, the
+children queries), and the two writes whose duplicate is harmless — `unlock` (its key is
+unique to one acquisition) and `leaseGrant` (a spare lease just expires). For those,
+three gRPC statuses and an attempt timeout are retriable:
 
-| Status | Why retrying is safe |
+| Status | Why retrying a read is safe |
 | --- | --- |
-| `UNAVAILABLE` | The server was unreachable or shutting down. The call did not run. |
+| `UNAVAILABLE` | The server was unreachable, shutting down, or between leaders. |
 | `INTERNAL` | etcd reported a transport-level fault, not a rejected request. |
-| `DEADLINE_EXCEEDED` | Our own attempt deadline fired; a fresh attempt is a fresh chance. |
+| `DEADLINE_EXCEEDED` | An attempt deadline fired; a fresh attempt is a fresh chance. |
 
 Everything else — `NOT_FOUND`, `INVALID_ARGUMENT`, `PERMISSION_DENIED`, a compare
-failure — propagates unchanged. Those are answers, not accidents: the server
-understood the request and said no, and retrying would only produce the same no more
-slowly.
+failure — is not retried. Those are answers, not accidents: the server understood the
+request and said no, and retrying would only produce the same no more slowly. Every
+failure reaches the caller as an `EtcdRecipeRuntimeException` whose cause is the
+original failure (the gRPC status, the timeout, or the interrupt — in which case the
+thread's interrupt flag is restored too).
 
-!!! danger "Transactions are never retried, whatever the policy says"
+!!! danger "Writes and transactions are never retried, whatever the policy says"
 
-    A failed transaction commit is **ambiguous**: it may have been applied before the
-    response was lost. Retrying it blindly could apply it twice, which is exactly the
-    failure a CAS exists to prevent. `operationTimeout` still bounds the call; the
-    retry decision belongs to the recipe's own CAS loop, which re-reads and re-compares
-    before trying again.
+    A write that failed or timed out is **ambiguous**: it may have been applied before
+    the response was lost — `UNAVAILABLE` can arrive after the server applied it, and a
+    timed-out attempt can still land later. Retrying blindly could apply a write twice,
+    or re-apply it after a newer write and silently revert that one, which is exactly
+    the failure a CAS exists to prevent. So `putValue`, `deleteKey`, `deleteChildren`,
+    `compact`, and every `transaction` make **one** attempt, bounded by
+    `operationTimeout`; the retry decision belongs to the recipe's own loop, which
+    re-reads and re-compares before trying again. (etcd's own Go client draws the same
+    line.)
 
 The retriable-status set lives in `RpcRetry.kt` and is `internal` — it is not part of
 the public surface, and there is no hook to extend it. That is intentional: the safe

@@ -31,16 +31,17 @@ import io.etcd.jetcd.options.PutOption
 
 private const val MAX_GET_ATTEMPTS = 10
 
-// Puts are retried on retriable statuses: values here are last-writer-wins, so a
-// duplicate apply from an ambiguous first attempt is harmless. CAS puts go through
-// transaction { }, which is never retried.
+// Plain writes (puts, deletes, compact) make one bounded attempt and are never retried:
+// a write that failed or timed out may still have been applied, and a blind retry could
+// land after a newer write and silently revert it. CAS puts go through transaction { },
+// which is never retried either; reads retry (see retryRpc).
 @JvmOverloads
 fun Client.putValue(
   keyName: String,
   keyval: ByteSequence,
   option: PutOption = PutOption.DEFAULT,
   rpc: RpcResilience = RpcResilience.DEFAULT,
-): PutResponse = retryRpc(rpc, "putValue($keyName)") { kvClient.put(keyName.asByteSequence, keyval, option) }
+): PutResponse = awaitRpc(rpc, "putValue($keyName)", kvClient.put(keyName.asByteSequence, keyval, option))
 
 @JvmOverloads
 fun Client.putValue(
@@ -73,7 +74,7 @@ fun Client.deleteKeys(vararg keyNames: String) = keyNames.forEach { deleteKey(it
 fun Client.deleteKey(
   keyName: String,
   rpc: RpcResilience = RpcResilience.DEFAULT,
-): DeleteResponse = retryRpc(rpc, "deleteKey($keyName)") { kvClient.delete(keyName.asByteSequence) }
+): DeleteResponse = awaitRpc(rpc, "deleteKey($keyName)", kvClient.delete(keyName.asByteSequence))
 
 // Get responses
 internal fun Client.getResponse(
@@ -154,7 +155,7 @@ fun Client.compact(
   revision: Long,
   option: CompactOption = CompactOption.DEFAULT,
   rpc: RpcResilience = RpcResilience.DEFAULT,
-): CompactResponse = retryRpc(rpc, "compact($revision)") { kvClient.compact(revision, option) }
+): CompactResponse = awaitRpc(rpc, "compact($revision)", kvClient.compact(revision, option))
 
 // Key checking
 @JvmOverloads

@@ -28,11 +28,14 @@ import kotlin.time.Duration.Companion.seconds
  * default `waitForReady` semantics, a call issued against an unreachable server
  * parked forever. [operationTimeout] bounds each attempt, and [retryPolicy]
  * retries attempts that failed with a retriable status (UNAVAILABLE, INTERNAL,
- * DEADLINE_EXCEEDED) or timed out.
+ * DEADLINE_EXCEEDED) or timed out — for reads, and for [unlock] and [leaseGrant], whose
+ * duplicates are harmless.
  *
- * Transactions ([transaction]) are never retried regardless of policy: a failed
- * commit is ambiguous (it may have been applied), and compare-and-swap retry
- * decisions belong to the recipes' own CAS loops. The timeout still applies.
+ * Plain writes ([putValue], [deleteKey], [deleteChildren], [compact]) and transactions
+ * ([transaction]) are never retried regardless of policy: a write that failed or timed
+ * out is ambiguous (it may have been applied, or may still land later), and retry
+ * decisions belong to the recipes' own loops. The timeout still applies. Every failure
+ * surfaces as [EtcdRecipeRuntimeException] with the original failure as its cause.
  */
 class RpcResilience
   @JvmOverloads
