@@ -73,8 +73,10 @@ watch at **snapshot revision + 1**. That ordering is the whole recipe:
   where the snapshot left off — no gap, no overlap.
 
 This is etcd's standard bootstrap, and the same fix is applied everywhere this library
-establishes a watch. It is also why compaction of the watched revision re-syncs
-transparently: the resync is the same snapshot-and-re-anchor operation.
+establishes a watch. It is also why compaction of the watched revision re-syncs without
+losing state: the resync is the same snapshot-and-re-anchor operation. What changed during
+the gap reaches listeners as ordinary events (a child removed, added, or updated), because
+no watch event ever will.
 
 ### Reading
 
@@ -169,6 +171,10 @@ convenience form — `buildInitial = true` maps to `BUILD_INITIAL_CACHE`, `false
 `NORMAL` — and `start(mode, waitOnStartComplete)` is the one that can reach
 `POST_INITIALIZED_EVENT`. Both default `waitOnStartComplete` to `true`.
 
+`INITIALIZED` fires before the watch starts, so it precedes every child event, and every
+listener receives the same snapshot. An `INITIALIZED` listener may call `rebuild()`,
+`clear()`, or `close()`.
+
 !!! warning "`NORMAL` does not start with what is already there"
 
     `NORMAL` skips the snapshot entirely and watches from now. Children that existed
@@ -198,6 +204,12 @@ block your caller, then bound the wait yourself:
 `waitOnStartComplete()` with no argument waits indefinitely; the `Duration` and
 `(long, TimeUnit)` overloads bound it and return `false` on timeout. All three throw
 `InterruptedException`.
+
+If the snapshot can't be loaded (etcd unreachable past the RPC budget, say), the cache
+never starts watching, so it would never update. Rather than present that as a healthy,
+empty cache, it fails: `start()` with the default wait throws
+`EtcdRecipeRuntimeException`, as does `waitOnStartComplete()`, `connectionState` moves to
+`LOST`, and no `INITIALIZED` fires.
 
 ### Reading
 
@@ -262,10 +274,11 @@ every entry locally without touching etcd.
 !!! note "`rebuild()` is a repair tool, not a refresh"
 
     The watcher already keeps the cache converged, including across compaction. A manual
-    `rebuild()` races the live watch on any key that changes during the snapshot, and last
-    writer wins — so it can momentarily *un*-apply an event you already saw. Rely on the
-    watcher for ordering; reach for `rebuild()` when you have reason to believe the cache
-    drifted.
+    `rebuild()` runs alongside the live watch. A snapshot older than an event the watch
+    has already applied is re-read rather than applied, so a rebuild never undoes an
+    event for good. A key can still show an older value briefly while the watch catches
+    up to the snapshot. `rebuild()` fires no events. Rely on the watcher for ordering;
+    reach for `rebuild()` when you have reason to believe the cache drifted.
 
 ### Watch recovery and resilience
 

@@ -75,7 +75,7 @@
 - [x] [#17](#issue-17) Work-queue `claimHead` lease-not-found retry is unbounded and ignores the deadline and `close()`
 - [x] [#18](#issue-18) A work-queue `receive()` in flight across `close()` creates a lease after close, and its item can never be acked
 - [x] [#19](#issue-19) `ServiceRegistry.close()` can block about 2 min, then throw part-way through and leave healers running
-- [ ] [#20](#issue-20) `PathChildrenCache` priming start swallows load failures and leaves a dead cache that reports healthy
+- [x] [#20](#issue-20) `PathChildrenCache` priming start swallows load failures and leaves a dead cache that reports healthy
 - [ ] [#21](#issue-21) Coroutine `withLock` / `withPermit` / `awaitAcquire` leak the hold when cancellation races a successful acquire
 - [ ] [#22](#issue-22) Coroutine queue twins lose or strand items when cancellation races a successful take
 
@@ -114,10 +114,10 @@
 - [ ] [#54](#issue-54) The orphan sweep issues one transaction per in-flight claim on every idle wake
 - [ ] [#55](#issue-55) `enqueueAll`'s within-batch order relies on etcd's unstable sort
 - [ ] [#56](#issue-56) `TransientKeyValue` parks an executor thread for its whole lifetime, and `start()` waits with no timeout
-- [ ] [#57](#issue-57) `PathChildrenCache` fires INITIALIZED after the watch is live: out of order, a snapshot per listener, and a deadlock
-- [ ] [#58](#issue-58) A compaction resync updates caches silently, so listeners and flows never see the gap's changes
+- [x] [#57](#issue-57) `PathChildrenCache` fires INITIALIZED after the watch is live: out of order, a snapshot per listener, and a deadlock
+- [x] [#58](#issue-58) A compaction resync updates caches silently, so listeners and flows never see the gap's changes
 - [ ] [#59](#issue-59) One malformed or newer-schema service instance breaks discovery for the whole service
-- [ ] [#60](#issue-60) `PathChildrenCache.rebuild()` can permanently undo a watch event
+- [x] [#60](#issue-60) `PathChildrenCache.rebuild()` can permanently undo a watch event
 - [ ] [#61](#issue-61) `ServiceProvider` error counts never reset, and down-entries accumulate
 - [x] [#62](#issue-62) Re-registering after `LeaseEvent.Failed` leaks the old healer
 - [ ] [#63](#issue-63) `interruptibleOn` misses re-wrapped interrupts, so some cancellations surface as `EtcdRecipeException`
@@ -152,7 +152,7 @@
 - [x] [#90](#issue-90) `ack()`/`requeue()` are guarded on the instance's `clientId`, not on the specific claim
 - [ ] [#91](#issue-91) Queue metrics and small interop and docs gaps
 - [ ] [#92](#issue-92) Head selection makes etcd read and sort the whole range (O(N²) drain)
-- [ ] [#93](#issue-93) `TypedPathChildrenCache`: one throwing listener stops the event reaching the rest
+- [x] [#93](#issue-93) `TypedPathChildrenCache`: one throwing listener stops the event reaching the rest
 - [ ] [#94](#issue-94) Discovery lifecycle and naming traps
 - [ ] [#95](#issue-95) `eventsAsFlow().onStart { }` doesn't guarantee the cache listener is registered
 - [ ] [#96](#issue-96) The docs claim every blocking call has a suspending twin, but several don't

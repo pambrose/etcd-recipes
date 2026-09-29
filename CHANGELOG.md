@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (cache event path)
+
+- A primed `PathChildrenCache` start (`BUILD_INITIAL_CACHE` / `POST_INITIALIZED_EVENT`)
+  that can't load its snapshot now fails instead of reporting a healthy, empty cache that
+  would never update. `start()` (with the default wait) and `waitOnStartComplete()` throw
+  `EtcdRecipeRuntimeException` carrying the cause, `connectionState` moves to `LOST`, and
+  no `INITIALIZED` fires. Before, the failure was only recorded: no watch was ever
+  created, `isHealthy()` stayed true, and `POST_INITIALIZED_EVENT` listeners received an
+  empty snapshot and concluded the prefix was empty.
+- `INITIALIZED` now fires before the watch starts, so it precedes every child event. Every
+  listener receives the same immutable snapshot. Before, events the anchored watch
+  replayed could arrive before `INITIALIZED`, and each listener got its own later copy of
+  the map, so a listener doing `state = initialData` could revert to a stale value for
+  good.
+- An `INITIALIZED` listener that calls `rebuild()`, `clear()`, or `close()` no longer
+  deadlocks `start()`, which used to hold the cache monitor while waiting for the
+  listener.
+- A compaction resync now tells listeners what changed during the gap. `PathChildrenCache`
+  fires `CHILD_REMOVED` / `CHILD_ADDED` / `CHILD_UPDATED`, `ServiceCache` fires
+  `DELETE` / `PUT`, and `NodeCache` fires `CREATED` / `UPDATED` / `DELETED`, and so do
+  their `eventsAsFlow` flows. Before, the maps converged silently, and state derived from
+  events stayed wrong indefinitely.
+- `PathChildrenCache.rebuild()` no longer permanently undoes a concurrent watch event. A
+  snapshot older than an event the watch has already applied is re-read rather than
+  applied. Before, a child deleted while the rebuild's snapshot was in flight was put
+  back and stayed in `currentData` forever.
+- `TypedPathChildrenCache` delivers each event to every typed listener even when one
+  throws, as the untyped cache does. A snapshot child that can't be decoded is left out
+  of `INITIALIZED` instead of suppressing it for everyone. Failures still reach
+  `untyped.exceptions`.
+
 ### Fixed (queue lifecycle and delivery)
 
 - `DistributedWorkQueue`: `maxDeliveries` now caps redelivery through `WorkItem.requeue()`

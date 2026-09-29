@@ -30,6 +30,7 @@ import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.pollUntil
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -44,7 +45,8 @@ import kotlin.time.Duration.Companion.seconds
  * Drives [PathChildrenCache] through a compaction-killed watch with a mocked jetcd
  * [Client] (in the style of [io.etcd.recipes.common.FailingLeaseMocks]): the cache
  * must reconcile its map from a fresh snapshot and re-anchor the replacement watch
- * at the snapshot's revision, so `currentData` converges despite the lost history.
+ * at the snapshot's revision, so `currentData` converges despite the lost history —
+ * and tell its listeners what changed in the gap, since no watch event ever will.
  */
 class PathChildrenCacheResyncTests : StringSpec() {
   private class CacheMocks(
@@ -63,13 +65,13 @@ class PathChildrenCacheResyncTests : StringSpec() {
         every { this@mockk.value } returns value.asByteSequence
       }
 
-    // GET #1 (initial snapshot): {a=1} at revision 10. Every later GET (resync
-    // snapshot): {a=2, b=3} at revision 20.
+    // GET #1 (initial snapshot): {a=1, c=9} at revision 10. Every later GET (resync
+    // snapshot): {a=2, b=3} at revision 20 — c removed, a updated, b added in the gap.
     private fun getResponse(): GetResponse {
       val first = getCount.incrementAndFetch() == 1
       return mockk {
         every { kvs } returns
-          if (first) [kv("a", "1")] else [kv("a", "2"), kv("b", "3")]
+          if (first) [kv("a", "1"), kv("c", "9")] else [kv("a", "2"), kv("b", "3")]
         every { isMore } returns false
         every { header } returns mockk { every { revision } returns if (first) 10L else 20L }
       }
@@ -100,10 +102,12 @@ class PathChildrenCacheResyncTests : StringSpec() {
       val recovery = CopyOnWriteArrayList<WatchRecoveryEvent>()
 
       PathChildrenCache(mocks.client, mocks.cachePath).use { cache ->
+        val events = CopyOnWriteArrayList<Triple<PathChildrenCacheEvent.Type, String, String?>>()
+        cache.addListener { events += Triple(it.type, it.childName, it.data?.asString) }
         cache.addRecoveryListener { recovery += it }
         cache.start(true)
 
-        cache.currentDataAsMap.mapValues { it.value.asString } shouldBe mapOf("a" to "1")
+        cache.currentDataAsMap.mapValues { it.value.asString } shouldBe mapOf("a" to "1", "c" to "9")
         mocks.options.first().revision shouldBe 11 // snapshot revision + 1
 
         // etcd compacted away the watch anchor: jetcd reports a fatal death
@@ -119,6 +123,15 @@ class PathChildrenCacheResyncTests : StringSpec() {
           mocks.options.size == 2 && mocks.options[1].revision == 21L
         } shouldBe true
         cache.currentDataAsMap.mapValues { it.value.asString } shouldBe mapOf("a" to "2", "b" to "3")
+        withClue("the resync changed the cache without telling its listeners") {
+          events.toSet() shouldBe
+            setOf(
+              Triple(PathChildrenCacheEvent.Type.CHILD_REMOVED, "c", "9"),
+              Triple(PathChildrenCacheEvent.Type.CHILD_UPDATED, "a", "2"),
+              Triple(PathChildrenCacheEvent.Type.CHILD_ADDED, "b", "3"),
+            )
+          events.size shouldBe 3
+        }
       }
     }
   }

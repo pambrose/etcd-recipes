@@ -62,11 +62,16 @@ class TypedPathChildrenCache<T>(
 
   private val listeners: MutableList<TypedPathChildrenCacheListener<T>> = CopyOnWriteArrayList()
 
-  // A single adapter on the underlying cache decodes each event and re-emits to the typed
-  // listeners. A decode failure here propagates into the underlying cache's per-listener
-  // try/catch, which records it (surfaced on untyped.exceptions) and skips the event.
+  // A single adapter on the underlying cache decodes each event and re-emits it to every
+  // typed listener, as the untyped cache does. An event whose own value can't be decoded is
+  // skipped; a snapshot child that can't be decoded is left out of INITIALIZED. Failures
+  // (decode errors and listener throws) are rethrown once every listener has run, the first
+  // carrying the rest as suppressed, so the underlying cache records them on
+  // untyped.exceptions.
+  @Suppress("TooGenericExceptionCaught")
   private val adapter =
     PathChildrenCacheListener { event ->
+      val failures = mutableListOf<Throwable>()
       val typedEvent =
         TypedPathChildrenCacheEvent(
           event.childName,
@@ -74,9 +79,24 @@ class TypedPathChildrenCache<T>(
           event.data?.let { codec.decode(it) },
         ).apply {
           if (event.type == PathChildrenCacheEvent.Type.INITIALIZED)
-            initialDataVal = event.initialData.map { TypedChildData(it.key, codec.decode(it.value)) }
+            initialDataVal =
+              event.initialData.mapNotNull { child ->
+                runCatching { TypedChildData(child.key, codec.decode(child.value)) }
+                  .onFailure { failures += it }
+                  .getOrNull()
+              }
         }
-      listeners.forEach { it.childEvent(typedEvent) }
+      listeners.forEach { listener ->
+        try {
+          listener.childEvent(typedEvent)
+        } catch (e: Throwable) {
+          failures += e
+        }
+      }
+      failures.firstOrNull()?.let { first ->
+        failures.drop(1).filter { it !== first }.forEach(first::addSuppressed)
+        throw first
+      }
     }
 
   init {

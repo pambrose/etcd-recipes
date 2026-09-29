@@ -76,7 +76,7 @@ class ServiceCache
     // produced. Then start the watch anchored at revision+1 so the watch
     // stream has zero overlap and zero gap relative to the snapshot — this
     // is the standard etcd pattern for consistent cache initialization.
-    val anchorRevision = reconcile()
+    val anchorRevision = reconcile(emitEvents = false)
 
     val watchOption = watchOption {
       isPrefix(true)
@@ -88,7 +88,7 @@ class ServiceCache
       watchOption,
       resilience.watch,
       recoveryListener = { event -> onRecoveryEvent(event) },
-      resyncWith = { reconcile() },
+      resyncWith = { reconcile(emitEvents = true) },
     ) { watchResponse ->
       watchResponse.events
         .forEach { event ->
@@ -98,26 +98,11 @@ class ServiceCache
             WatchEvent.EventType.PUT -> {
               val isAdd = !serviceMap.containsKey(stripped)
               serviceMap[stripped] = v
-              listeners.forEach { listener ->
-                try {
-                  listener.cacheChanged(event.eventType, isAdd, stripped, ServiceInstance.toObject(v))
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in cacheChanged()" }
-                  recordException(e)
-                }
-              }
+              notifyListeners(WatchEvent.EventType.PUT, isAdd, stripped, v)
             }
 
             WatchEvent.EventType.DELETE -> {
-              val prevValue = serviceMap.remove(stripped)?.let { ServiceInstance.toObject(it) }
-              listeners.forEach { listener ->
-                try {
-                  listener.cacheChanged(event.eventType, false, stripped, prevValue)
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in cacheChanged()" }
-                  recordException(e)
-                }
-              }
+              notifyListeners(WatchEvent.EventType.DELETE, false, stripped, serviceMap.remove(stripped))
             }
 
             WatchEvent.EventType.UNRECOGNIZED -> {
@@ -137,11 +122,31 @@ class ServiceCache
     return this
   }
 
+  // Tells every listener about one change. [json] is the instance's new value, or its
+  // previous value on a DELETE.
+  @Suppress("TooGenericExceptionCaught")
+  private fun notifyListeners(
+    type: WatchEvent.EventType,
+    isAdd: Boolean,
+    name: String,
+    json: String?,
+  ) {
+    listeners.forEach { listener ->
+      try {
+        listener.cacheChanged(type, isAdd, name, json?.let { ServiceInstance.toObject(it) })
+      } catch (e: Throwable) {
+        logger.error(e) { "Exception in cacheChanged()" }
+        recordException(e)
+      }
+    }
+  }
+
   // Snapshot etcd's current instances, reconcile the live map in place (drop keys no
   // longer present, upsert the rest), and return the next watch anchor (snapshot
   // revision + 1). Runs during start() and, on the watch dispatcher thread, during
   // compaction resync — deliberately not synchronized (see PathChildrenCache.reconcile).
-  private fun reconcile(): Long {
+  // A resync reports the gap's changes to listeners, since no watch event ever will.
+  private fun reconcile(emitEvents: Boolean): Long {
     val start = TimeSource.Monotonic.markNow()
     val trailingServicePath = servicePath.ensureSuffix("/")
     val trailingNamesPath = namesPath.ensureSuffix("/")
@@ -152,9 +157,16 @@ class ServiceCache
     val resp = client.getResponse(trailingServicePath, getOption, resilience.rpc)
     val fresh =
       resp.kvs.associate { kv -> kv.key.asString.substring(trailingNamesPath.length) to kv.value.asString }
+    val removed = serviceMap.filterKeys { it !in fresh }
+    val changed = fresh.filter { (name, json) -> serviceMap[name] != json }
+    val added = changed.keys.filterNot { it in serviceMap }.toSet()
     serviceMap.keys.retainAll(fresh.keys)
     serviceMap.putAll(fresh)
     resilience.metrics.recordCacheSync(servicePath, start.elapsedNow(), serviceMap.size)
+    if (emitEvents) {
+      removed.forEach { (name, json) -> notifyListeners(WatchEvent.EventType.DELETE, false, name, json) }
+      changed.forEach { (name, json) -> notifyListeners(WatchEvent.EventType.PUT, name in added, name, json) }
+    }
     return resp.header.revision + 1
   }
 

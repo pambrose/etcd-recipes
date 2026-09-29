@@ -46,6 +46,12 @@ class HookedClient(
   /** Runs before the next `kvClient.get(key, option)`. */
   val beforeGet = AtomicReference<(() -> Unit)?>(null)
 
+  /**
+   * Runs after the next `kvClient.get(key, option)` has its response, before the caller
+   * sees it. (That call blocks for the response, so the hook never runs on a gRPC thread.)
+   */
+  val afterGet = AtomicReference<(() -> Unit)?>(null)
+
   /** Runs before the next single-key `kvClient.delete(key)`. */
   val beforeDelete = AtomicReference<(() -> Unit)?>(null)
 
@@ -70,7 +76,10 @@ class HookedClient(
         option: GetOption,
       ): CompletableFuture<GetResponse> {
         beforeGet.exchange(null)?.invoke()
-        return delegate.kvClient.get(key, option)
+        val after = afterGet.exchange(null) ?: return delegate.kvClient.get(key, option)
+        val response = delegate.kvClient.get(key, option).get()
+        after()
+        return CompletableFuture.completedFuture(response)
       }
 
       override fun delete(key: ByteSequence): CompletableFuture<DeleteResponse> {
