@@ -26,8 +26,12 @@ import org.slf4j.MDC
 import java.io.Closeable
 import java.util.Collections.synchronizedList
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.incrementAndFetch
 
 open class EtcdConnector(
   protected val client: Client,
@@ -55,6 +59,14 @@ open class EtcdConnector(
         emptyList()
 
   val hasExceptions get() = exceptionList.isInitialized() && exceptionList.value.isNotEmpty()
+
+  private val droppedExceptions = AtomicLong(0L)
+
+  /**
+   * How many recorded exceptions were dropped from [exceptions], which keeps only the most
+   * recent [MAX_RECORDED_EXCEPTIONS] so a long-lived recipe's list can't grow without bound.
+   */
+  val droppedExceptionCount: Long get() = droppedExceptions.load()
 
   fun clearExceptions() {
     if (exceptionList.isInitialized()) exceptionList.value.clear()
@@ -97,23 +109,60 @@ open class EtcdConnector(
   }
 
   /**
-   * The single sink for background failures: records [throwable] in [exceptions] and pushes
-   * it to every [BackgroundExceptionListener] with a short source [context]. Recipes call
-   * this instead of appending to the exception list directly. A listener that throws is
-   * logged and dropped — never re-recorded — so notification cannot recurse.
+   * The single sink for background failures: records [throwable] in [exceptions] (keeping the
+   * most recent [MAX_RECORDED_EXCEPTIONS]) and pushes it to every [BackgroundExceptionListener]
+   * with a short source [context], on this connector's notifier thread. Recipes call this
+   * instead of appending to the exception list directly. It never blocks, so it is safe from
+   * any thread, including jetcd's. A listener that throws is logged and dropped — never
+   * re-recorded — so notification cannot recurse.
    */
   @Suppress("TooGenericExceptionCaught")
   protected fun recordException(
     context: String,
     throwable: Throwable,
   ) {
-    exceptionList.value += throwable
-    backgroundExceptionListeners.forEach { listener ->
-      try {
-        listener.onException(context, throwable)
-      } catch (e: Throwable) {
-        logger.error(e) { "Background-exception listener threw while handling [$context]" }
+    val list = exceptionList.value
+    synchronized(list) {
+      if (list.size >= MAX_RECORDED_EXCEPTIONS) {
+        list.removeAt(0)
+        droppedExceptions.incrementAndFetch()
       }
+      list += throwable
+    }
+    // The listeners registered when it was reported get it, even one removed before delivery
+    val targets = backgroundExceptionListeners.toList()
+    if (targets.isEmpty()) return
+    notifyAsync {
+      targets.forEach { listener ->
+        try {
+          listener.onException(context, throwable)
+        } catch (e: Throwable) {
+          logger.error(e) { "Background-exception listener threw while handling [$context]" }
+        }
+      }
+    }
+  }
+
+  // Listener callbacks run here, one at a time, in the order they were reported: never on the
+  // reporting thread, which can be jetcd's event loop (lease keep-alive callbacks), where a
+  // listener that blocks or makes an RPC would stall every lease and watch on the client.
+  private val notifierDelegate =
+    lazy {
+      Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "etcd-recipe-notifier").apply { isDaemon = true }
+      }
+    }
+
+  /**
+   * Runs [task] on this connector's notifier thread, after everything queued before it. Recipes
+   * use it for user callbacks fired from a thread that must not block (a lost lock's listeners
+   * and interrupt run from jetcd's lease callback). A task queued after [close] is dropped.
+   */
+  protected fun notifyAsync(task: () -> Unit) {
+    try {
+      notifierDelegate.value.execute { withRecipeLoggingContext(task) }
+    } catch (e: RejectedExecutionException) {
+      logger.debug(e) { "Notification dropped: $exceptionContext is closed" }
     }
   }
 
@@ -123,6 +172,18 @@ open class EtcdConnector(
 
   private val connectionStateRef = AtomicReference(ConnectionState.CONNECTED)
   private val connectionStateListeners = CopyOnWriteArrayList<ConnectionStateListener>()
+
+  // Serializes a state change with queuing its notification, so listeners see changes in the
+  // order they happened. Also guards lostForGood.
+  private val transitionLock = Any()
+
+  // Set by a LOST from a stream that is gone for good (watch recovery or lease healing
+  // abandoned, or a failed start). Until the recipe restarts, other streams' events can't
+  // clear it: a later RECONNECTED from a healthy stream would otherwise mask a dead one.
+  private var lostForGood = false
+
+  /** Whether this connector reported a LOST that nothing but a restart clears. */
+  internal val isLostForGood: Boolean get() = synchronized(transitionLock) { lostForGood }
 
   /**
    * Coarse connection health, derived passively from the watch-recovery and lease
@@ -144,21 +205,47 @@ open class EtcdConnector(
       is WatchRecoveryEvent.Suspended -> transitionTo(ConnectionState.SUSPENDED)
       is WatchRecoveryEvent.Resubscribed -> transitionTo(ConnectionState.RECONNECTED)
       is WatchRecoveryEvent.Resynced -> transitionTo(ConnectionState.RECONNECTED)
-      is WatchRecoveryEvent.Failed -> transitionTo(ConnectionState.LOST)
+      is WatchRecoveryEvent.Failed -> transitionTo(ConnectionState.LOST, forGood = true)
     }
   }
 
   /**
    * Returns [connectionState] to [ConnectionState.CONNECTED] when a reusable recipe starts a
-   * new cycle, so it does not report the previous cycle's LOST. Listeners see the transition.
+   * new cycle, so it does not report the previous cycle's LOST (even one that was otherwise
+   * permanent). Listeners see the transition.
    */
-  protected fun resetConnectionState() = transitionTo(ConnectionState.CONNECTED)
+  protected fun resetConnectionState() {
+    synchronized(transitionLock) {
+      lostForGood = false
+      transitionTo(ConnectionState.CONNECTED)
+    }
+  }
 
   /**
    * Reports [ConnectionState.LOST] for a recipe that can no longer track etcd for a reason
    * no watch or lease event carries, such as a start that failed before its watch existed.
+   * Like an abandoned stream, it lasts until the recipe restarts.
    */
-  protected fun reportConnectionLost() = transitionTo(ConnectionState.LOST)
+  protected fun reportConnectionLost() = transitionTo(ConnectionState.LOST, forGood = true)
+
+  /**
+   * For a recipe built from other recipes: mirrors [inner]'s recorded failures and connection
+   * state into this connector, including a LOST that is permanent. Returns the handle that
+   * stops forwarding (call it when [inner] is retired).
+   */
+  protected fun forwardHealthOf(inner: EtcdConnector): () -> Unit {
+    val exceptionListener = BackgroundExceptionListener { context, throwable -> recordException(context, throwable) }
+    val stateListener =
+      ConnectionStateListener { newState, _ ->
+        transitionTo(newState, forGood = newState == ConnectionState.LOST && inner.isLostForGood)
+      }
+    inner.addBackgroundExceptionListener(exceptionListener)
+    inner.addConnectionStateListener(stateListener)
+    return {
+      inner.removeBackgroundExceptionListener(exceptionListener)
+      inner.removeConnectionStateListener(stateListener)
+    }
+  }
 
   /** Recipes feed their lease events here to drive [connectionState]. */
   protected fun reportLeaseEvent(event: LeaseEvent) {
@@ -166,23 +253,34 @@ open class EtcdConnector(
       is LeaseEvent.Suspended -> transitionTo(ConnectionState.SUSPENDED)
       is LeaseEvent.Expired -> transitionTo(ConnectionState.LOST)
       is LeaseEvent.Restored -> transitionTo(ConnectionState.RECONNECTED)
-      is LeaseEvent.Failed -> transitionTo(ConnectionState.LOST)
+      is LeaseEvent.Failed -> transitionTo(ConnectionState.LOST, forGood = true)
     }
   }
 
   @Suppress("TooGenericExceptionCaught")
-  private fun transitionTo(newState: ConnectionState) {
-    // exchange() makes the transition atomic; equal states are dropped so repeated
-    // Suspended reports during one outage notify once. Listeners run on the
-    // reporting thread — recipes report from their own dispatcher/healer threads,
-    // never from jetcd's event loop.
-    val previous = connectionStateRef.exchange(newState)
-    if (previous == newState) return
-    connectionStateListeners.forEach { listener ->
-      try {
-        listener.stateChanged(newState, previous)
-      } catch (e: Throwable) {
-        recordException("connection-state-listener", e)
+  private fun transitionTo(
+    newState: ConnectionState,
+    forGood: Boolean = false,
+  ) {
+    // Change and queue the notification under one lock, so listeners (on the notifier thread)
+    // see changes in the order they happened. Equal states are dropped, so repeated Suspended
+    // reports during one outage notify once. A permanent LOST blocks every other change.
+    synchronized(transitionLock) {
+      if (lostForGood) return
+      if (forGood) lostForGood = true
+      val previous = connectionStateRef.exchange(newState)
+      // The listeners registered when the state changed get it, even one removed before delivery
+      val targets = connectionStateListeners.toList()
+      if (previous != newState && targets.isNotEmpty()) {
+        notifyAsync {
+          targets.forEach { listener ->
+            try {
+              listener.stateChanged(newState, previous)
+            } catch (e: Throwable) {
+              recordException("connection-state-listener", e)
+            }
+          }
+        }
       }
     }
   }
@@ -211,7 +309,12 @@ open class EtcdConnector(
   @Synchronized
   final override fun close() {
     if (!closeCalled.compareAndSet(false, true)) return
-    doClose()
+    try {
+      doClose()
+    } finally {
+      // Notifications already queued (including doClose()'s own) still run; later ones drop
+      if (notifierDelegate.isInitialized()) notifierDelegate.value.shutdown()
+    }
   }
 
   protected open fun doClose() {}
@@ -219,6 +322,9 @@ open class EtcdConnector(
   companion object {
     private val logger = KotlinLogging.logger {}
     internal const val TOKEN_LENGTH = 7
+
+    /** How many exceptions [exceptions] keeps; older ones count in [droppedExceptionCount]. */
+    const val MAX_RECORDED_EXCEPTIONS = 100
     internal const val DEFAULT_TTL_SECS = 2L
 
     /** SLF4J MDC key under which [withRecipeLoggingContext] publishes the recipe's identity. */

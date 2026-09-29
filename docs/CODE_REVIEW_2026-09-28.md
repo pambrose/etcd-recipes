@@ -65,7 +65,7 @@
 - [x] [#7](#issue-7) `DistributedReadWriteLock`: a `clientId` containing `/` lets a reader and a writer hold at once
 - [x] [#8](#issue-8) Lease heal leaks the newly granted lease when the establish hook throws
 - [x] [#9](#issue-9) Self-healing CAS hooks can't reclaim their own key, and a client-side deadline is treated as server expiry
-- [ ] [#10](#issue-10) Listener and `recordException` callbacks run on jetcd's Vert.x event loop, contrary to the documented contract
+- [x] [#10](#issue-10) Listener and `recordException` callbacks run on jetcd's Vert.x event loop, contrary to the documented contract
 - [x] [#11](#issue-11) `LeaderSelector.waitOnLeadershipComplete(timeout)` ignores its timeout
 - [x] [#12](#issue-12) `LeaderSelector.close()` from inside `takeLeadership` self-deadlocks
 - [ ] [#13](#issue-13) `LeaderSelector.start()` can hang forever, uninterruptibly
@@ -83,8 +83,8 @@
 - [x] [#23](#issue-23) Non-retriable RPC failures escape as a raw checked `ExecutionException`
 - [x] [#24](#issue-24) A per-attempt timeout doesn't cancel the gRPC call, so timed-out writes can land after later ones
 - [x] [#25](#issue-25) Interrupts are handled inconsistently by the RPC engine and swallowed by `leaseRevoke`
-- [ ] [#26](#issue-26) `connectionState` never leaves `SUSPENDED` after jetcd recovers a stream on its own
-- [ ] [#27](#issue-27) `connectionState` is last-writer-wins across independent streams, and notifications can arrive out of order
+- [x] [#26](#issue-26) `connectionState` never leaves `SUSPENDED` after jetcd recovers a stream on its own
+- [x] [#27](#issue-27) `connectionState` is last-writer-wins across independent streams, and notifications can arrive out of order
 - [ ] [#28](#issue-28) The compaction marker is lost when a resync attempt fails
 - [ ] [#29](#issue-29) Un-anchored watches lose events across a recovery, and createNotify advances the resume revision early
 - [x] [#30](#issue-30) `putValuesWithKeepAlive` never revokes its lease, and its multi-key puts aren't atomic
@@ -95,7 +95,7 @@
 - [ ] [#35](#issue-35) Step-down leaves `attemptLeadership` set, so a DELETE can start a second concurrent term
 - [ ] [#36](#issue-36) A term won via the watch runs on the watch dispatcher, so `close()` can return while it still holds the key
 - [x] [#37](#issue-37) A `LeaderSelector` closed without ever winning can't be restarted
-- [ ] [#38](#issue-38) Composite recipes (`LeaderLatch`, `ServiceProvider`) hide the health of the recipes they wrap
+- [x] [#38](#issue-38) Composite recipes (`LeaderLatch`, `ServiceProvider`) hide the health of the recipes they wrap
 - [x] [#39](#issue-39) The uncommitted `DistributedBarrierWithCount` close-race fix leaves a pre-park window open
 - [ ] [#40](#issue-40) The count-barrier trip releases the tripper before the global release is committed
 - [ ] [#41](#issue-41) Count-barrier waiting keys aren't scoped to a generation
@@ -131,10 +131,10 @@
 - [x] [#71](#issue-71) A deadlocked test can hang CI for 45 min without identifying the test
 
 #### Low
-- [ ] [#72](#issue-72) `close()` from a watcher's or healer's own thread always stalls 5 s
+- [x] [#72](#issue-72) `close()` from a watcher's or healer's own thread always stalls 5 s
 - [ ] [#73](#issue-73) Closing the `Client` while a watcher is open makes it retry forever, silently
 - [x] [#74](#issue-74) `keepAlive()` reports transient stream errors as "renewal stopped"
-- [ ] [#75](#issue-75) The `EtcdConnector` exception list grows without bound
+- [x] [#75](#issue-75) The `EtcdConnector` exception list grows without bound
 - [ ] [#76](#issue-76) The compaction fallback resumes one revision too late
 - [ ] [#77](#issue-77) `Duration`-typed APIs hidden from Java (`EtcdRecipes.distributedPriorityQueue`, `LeaderLatch` `closeJoinTimeout`)
 - [ ] [#78](#issue-78) Passwords appear in `toString()`, and half-configured mTLS is silently ignored

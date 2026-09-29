@@ -30,6 +30,7 @@ import io.mockk.mockk
 import org.slf4j.MDC
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Covers the observability surface added to [EtcdConnector] (idea #7 phase 1): the
@@ -103,12 +104,16 @@ class EtcdConnectorObservabilityTests : StringSpec() {
     "removeBackgroundExceptionListener stops delivery" {
       val connector = TestConnector(mockk())
       val count = CopyOnWriteArrayList<Throwable>()
+      val sentinel = CopyOnWriteArrayList<Throwable>()
       val listener = BackgroundExceptionListener { _, t -> count += t }
       connector.addBackgroundExceptionListener(listener)
+      connector.addBackgroundExceptionListener { _, t -> sentinel += t }
       connector.record("ctx", RuntimeException("1"))
       connector.removeBackgroundExceptionListener(listener)
       connector.record("ctx", RuntimeException("2"))
 
+      // Delivery is ordered: once the sentinel has the second, the first was delivered
+      pollUntil(5.seconds) { sentinel.size == 2 } shouldBe true
       count.size shouldBe 1
     }
 

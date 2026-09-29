@@ -64,11 +64,21 @@ class SelfHealingKeepAlive internal constructor(
   private val leaseListener: LeaseListener?,
   private val establish: (lease: LeaseGrantResponse) -> Boolean,
 ) : Closeable {
+  // The healer's thread, so close() from a lease listener running on it doesn't wait on itself
+  @Volatile
+  private var healerThread: Thread? = null
+
   private val healer: ScheduledExecutorService =
     Executors.newSingleThreadScheduledExecutor { runnable ->
-      Thread(runnable, "etcd-lease-healer").apply { isDaemon = true }
+      Thread(runnable, "etcd-lease-healer").apply {
+        isDaemon = true
+        healerThread = this
+      }
     }
   private val closed = AtomicBoolean(false)
+
+  // Set when a transient stream error was reported; the next renewal reports the recovery
+  private val transientlySuspended = AtomicBoolean(false)
   private val lock = Any() // guards registration + pendingAttempt against close() racing a heal
 
   @Volatile
@@ -120,7 +130,8 @@ class SelfHealingKeepAlive internal constructor(
     }
     healer.shutdown()
     try {
-      if (!healer.awaitTermination(5, TimeUnit.SECONDS)) {
+      // close() from a listener on the healer can't wait for itself to finish
+      if (Thread.currentThread() !== healerThread && !healer.awaitTermination(5, TimeUnit.SECONDS)) {
         logger.warn { "Lease healer did not terminate within 5 seconds; a heal attempt may still be running" }
       }
     } catch (e: InterruptedException) {
@@ -136,6 +147,11 @@ class SelfHealingKeepAlive internal constructor(
         .onNext { next ->
           logger.debug { "KeepAlive next resp: $next" }
           resilience.metrics.incrementKeepAlive("renewal", granted.id)
+          // jetcd restarted the stream after a transient error and renewal resumed: say so,
+          // or listeners (and connectionState) would stay SUSPENDED for good.
+          if (transientlySuspended.compareAndSet(true, false)) {
+            dispatch { emit(LeaseEvent.Restored(granted.id, granted.id)) }
+          }
         }
         .onError { e -> onStreamEvent(granted, e) }
         .onCompleted { onStreamEvent(granted, null) }
@@ -157,6 +173,7 @@ class SelfHealingKeepAlive internal constructor(
       if (expired) {
         startHeal(granted.id, error)
       } else {
+        transientlySuspended.store(true)
         emit(LeaseEvent.Suspended(granted.id, error))
       }
     }

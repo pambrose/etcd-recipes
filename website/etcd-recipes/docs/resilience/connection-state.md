@@ -46,6 +46,19 @@ reason the states mean what they mean:
 | `LeaseEvent.Restored` | `RECONNECTED` |
 | `LeaseEvent.Failed` | `LOST` |
 
+A stream that jetcd recovers by itself (a transient watch or keep-alive error) reports that
+too: the watch emits `Resubscribed` and the lease `Restored` with the same old and new id,
+so `SUSPENDED` always resolves.
+
+A recipe often runs several streams (a leader election has a participation lease and a
+leader watch, for example). A `LOST` from a stream that is gone for good — a `Failed`
+event, or a start that failed — **sticks**: until the recipe restarts, no event from its
+other, healthy streams can move it off `LOST`, which would otherwise hide the dead one. A
+lock loss (`Expired`) does not stick; the next acquisition's lease reports afresh.
+
+A recipe built from other recipes reports theirs as its own: a `LeaderLatch` its
+current term's selector, a `ServiceProvider` its cache.
+
 Note the sharpest line in that table: **`LeaseEvent.Expired` → `LOST`**, immediately,
 before any healing is attempted. That is not pessimism. An expired lease means etcd
 already deleted your keys, and for a lock or a leadership claim it means a successor
@@ -72,13 +85,14 @@ more informative than the destination — `SUSPENDED → RECONNECTED` is a blip 
 while `LOST → RECONNECTED` means you got your key back but somebody may have seen it
 missing in between.
 
-!!! note "Transitions are deduplicated, and listeners run on the reporting thread"
+!!! note "Transitions are deduplicated, ordered, and delivered on the notifier"
 
     Repeated `Suspended` reports during one outage notify **once**: an equal state is
-    dropped, atomically. Listeners run on whichever recipe thread reported the event —
-    a healer or a watch dispatcher, never jetcd's event loop — so a listener that
-    blocks stalls that recipe's recovery, and a listener that throws is recorded on
-    `exceptions` under the context `connection-state-listener` rather than escaping.
+    dropped, atomically. Listeners run on the recipe's notifier thread, one at a time
+    and in the order the state changed, never on the reporting thread (which can be
+    jetcd's event loop). A listener that blocks delays only that recipe's later
+    notifications, and a listener that throws is recorded on `exceptions` under the
+    context `connection-state-listener` rather than escaping.
 
 ## `isHealthy()` vs `ping()`
 

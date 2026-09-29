@@ -20,9 +20,10 @@ import io.etcd.recipes.lock.DistributedSemaphore
 import io.etcd.recipes.lock.EtcdLock
 import io.etcd.recipes.lock.LockLostListener
 import io.etcd.recipes.lock.PermitLostListener
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 
 /** A lost-lock notification carrying the (optional) cause. */
@@ -39,23 +40,23 @@ data class PermitLostEvent(
  * Emits a [LockLostEvent] whenever a held lock is lost (its lease expired). Collection
  * registers a listener and cancellation removes it; it never closes the lock.
  *
- * The listener fires on jetcd's lease-callback thread, which must never block, so the
- * channel is unconditionally unlimited (no backpressure option).
+ * The listener runs on the lock's notifier thread, which must never block, so the channel
+ * is unconditionally unlimited (no backpressure option) and sends never wait.
  */
 fun EtcdLock.lockLostAsFlow(): Flow<LockLostEvent> =
   callbackFlow {
-    val listener = LockLostListener { cause -> trySendBlocking(LockLostEvent(cause)) }
+    val listener = LockLostListener { cause -> trySend(LockLostEvent(cause)) }
     addLockLostListener(listener)
     awaitClose { removeLockLostListener(listener) }
-  }
+  }.buffer(Channel.UNLIMITED)
 
 /**
  * Emits a [PermitLostEvent] whenever a held permit is lost. Same lifecycle and
- * lease-callback-thread constraint as [lockLostAsFlow].
+ * notifier-thread constraint as [lockLostAsFlow].
  */
 fun DistributedSemaphore.permitLostAsFlow(): Flow<PermitLostEvent> =
   callbackFlow {
-    val listener = PermitLostListener { cause -> trySendBlocking(PermitLostEvent(cause)) }
+    val listener = PermitLostListener { cause -> trySend(PermitLostEvent(cause)) }
     addPermitLostListener(listener)
     awaitClose { removePermitLostListener(listener) }
-  }
+  }.buffer(Channel.UNLIMITED)

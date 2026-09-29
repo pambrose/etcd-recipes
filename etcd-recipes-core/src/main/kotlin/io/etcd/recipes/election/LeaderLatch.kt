@@ -165,6 +165,10 @@ class LeaderLatch
                 interruptOnLeaseLoss = interruptOnLeaseLoss,
               ).also {
                 currentSelector.store(it)
+                // Each term's selector is a fresh set of streams: report their health (and
+                // not a retired selector's) as the latch's own, from the start of the term.
+                resetConnectionState()
+                forwardHealthOf(it)
                 it.start()
               }
             }
@@ -178,7 +182,6 @@ class LeaderLatch
             logger.debug(e) { "Latch worker interrupted while awaiting term end" }
           }
 
-          if (sel.hasExceptions) sel.exceptions.forEach { recordException(it) }
           runCatching { sel.close() }.onFailure { recordException(it) }
 
           if (closing.load()) return

@@ -78,7 +78,9 @@ class ServiceProvider
     fun start(): ServiceProvider {
       if (startCalled.load()) throw EtcdRecipeRuntimeException("start() already called")
       checkCloseNotCalled()
-      cache = ServiceCache(client, namesPath, serviceName, resilience).start()
+      // Report the owned cache's failures and connection state as the provider's own: an
+      // abandoned watch means getInstance() serves a list that is no longer updating.
+      cache = ServiceCache(client, namesPath, serviceName, resilience).also { forwardHealthOf(it) }.start()
       startCalled.store(true)
       startThreadComplete.set(true)
       return this

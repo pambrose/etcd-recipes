@@ -30,7 +30,7 @@ coroutine-native alternative to registering a listener.
 | `DistributedWorkQueue.leaseEventsAsFlow(capacity)` | `LeaseEvent` | `capacity` |
 | `ServiceRegistry.leaseEventsAsFlow(capacity)` | `LeaseEvent` | `capacity` |
 | `EtcdConnector.connectionStateAsFlow()` | `ConnectionState` | conflated |
-| `EtcdConnector.backgroundExceptionsAsFlow(capacity)` | `BackgroundException` | `capacity` |
+| `EtcdConnector.backgroundExceptionsAsFlow(capacity)` | `BackgroundException` | `capacity`; a bounded one drops the oldest |
 | `EtcdLock.lockLostAsFlow()` | `LockLostEvent` | unbounded, not tunable |
 | `DistributedSemaphore.permitLostAsFlow()` | `PermitLostEvent` | unbounded, not tunable |
 
@@ -69,10 +69,10 @@ shared stream, use `.shareIn(scope)` / `.stateIn(scope)`.
 
 ### What `capacity` actually means
 
-Every one of these listeners fires on a thread that must not be blocked: jetcd's watch
-dispatcher, a recipe's lease-healer thread, or jetcd's lease-callback thread. They
-push with `trySendBlocking`, which under the `UNLIMITED` default never blocks — so a
-slow collector's backlog grows in memory, and the producing thread sails on.
+Every one of these listeners fires on a thread that must not be blocked: a recipe's
+watch dispatcher, its lease-healer thread, or its notifier thread. Under the `UNLIMITED`
+default a send never blocks, so a slow collector's backlog grows in memory, and the
+producing thread sails on.
 
 Setting a bounded `capacity` **opts into backpressure**, and the thing that
 experiences that backpressure is the producer's dispatcher thread:
@@ -238,11 +238,10 @@ data class PermitLostEvent(val cause: Throwable?)
 !!! note "These two take no `capacity` — deliberately"
 
     Every other flow here lets you opt into backpressure. These do not, because their
-    listeners fire on jetcd's **lease-callback thread**, which must never block: park
-    it and you stop the keep-alives for every lease on that client, which is a
-    spectacular way to turn one lost lock into all of them. The channel is therefore
-    unconditionally unbounded, and no argument is offered that could make it
-    otherwise.
+    listeners fire on the recipe's **notifier thread**, which must never block: park it
+    and every later notification from that lock (and its interrupt on loss) waits. The
+    channel is therefore unconditionally unbounded, and no argument is offered that
+    could make it otherwise.
 
     The practical consequence is small — lock loss is rare and one event per loss is
     not a volume problem — but it is why the signature differs.
@@ -281,9 +280,10 @@ benefits from processing a stale `SUSPENDED` after `RECONNECTED` has already lan
 It is also cold — `.stateIn(scope)` gives you a shared `StateFlow`.
 
 `backgroundExceptionsAsFlow` is the push counterpart to the pull-only
-`EtcdConnector.exceptions` list. Its listener fires on the reporting recipe's own
-thread, so it is buffered: a failure is never dropped, and the reporting thread never
-blocks.
+`EtcdConnector.exceptions` list. Its listener fires on the recipe's notifier thread, so
+sends never wait: with the default unlimited buffer a failure is never dropped, and with
+a bounded `capacity` a slow collector loses the oldest failures rather than stalling the
+recipe's other notifications.
 
 See [Connection state](../resilience/connection-state.md).
 

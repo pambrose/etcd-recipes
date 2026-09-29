@@ -59,6 +59,7 @@ import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import io.etcd.recipes.election.LeaderSelector.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.grpc.stub.StreamObserver
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -564,19 +565,26 @@ constructor(
   // Discriminates leadership keep-alive stream events: fatal (stream completed =
   // lease outlived its TTL unrenewed, or NOT_FOUND = lease gone) steps the leader
   // down; anything else is transient — jetcd restarts the stream itself.
-  private fun leadershipKeepAliveObserver(leaseId: Long) =
-    Observers.builder<LeaseKeepAliveResponse>()
-      .onNext { next -> logger.debug { "Leadership keep-alive resp: $next" } }
+  private fun leadershipKeepAliveObserver(leaseId: Long): StreamObserver<LeaseKeepAliveResponse> {
+    val suspended = AtomicBoolean(false)
+    return Observers.builder<LeaseKeepAliveResponse>()
+      .onNext { next ->
+        logger.debug { "Leadership keep-alive resp: $next" }
+        // The first renewal after a transient error: jetcd restarted the stream by itself
+        if (suspended.compareAndSet(true, false)) reportLeaseEvent(LeaseEvent.Restored(leaseId, leaseId))
+      }
       .onError { e ->
         if (e.isLeaseNotFound()) {
           stepDownFromLeadership(e)
         } else {
+          suspended.store(true)
           recordException(e)
           reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
         }
       }
       .onCompleted { stepDownFromLeadership(null) }
       .build()
+  }
 
   // Ends leadership when the lease is gone: isLeader turns false immediately, the
   // finished monitors are flipped so waitUntilFinished()/waitOnLeadershipComplete()

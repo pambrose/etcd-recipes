@@ -96,9 +96,13 @@ handler registered across a dozen recipes can still say which one failed.
 --8<-- "kotlin/website/observability/MetricsSnippets.kt:exceptions-flow"
 ```
 
-Listeners run on the reporting recipe's own thread — a healer or dispatcher, never
-jetcd's event loop. A listener that throws is logged and dropped, never re-recorded, so
+Listeners run on the recipe's notifier thread, one at a time and in the order the
+failures were reported, never on the thread that hit the failure (which can be jetcd's
+event loop). A listener that throws is logged and dropped, never re-recorded, so
 notification cannot recurse. See [Core concepts](getting-started/concepts.md).
+
+`exceptions` keeps the most recent 100 failures; `droppedExceptionCount` says how many
+older ones it let go, so a long-lived recipe's list can't grow without bound.
 
 !!! tip "An empty `exceptions` list is not the same as healthy"
 
