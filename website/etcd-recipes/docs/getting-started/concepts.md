@@ -173,7 +173,8 @@ event somewhere and get out.
     Many recipes accept a `userExecutor`, letting you run listener callbacks on your own
     pool. That is the clean way to do real work in response to a cache or election event.
     A `LeaderSelector` needs only one free thread from it: its term runs there, and its
-    watch and participation lease run on internal threads.
+    watch and participation lease run on internal threads. A `TransientKeyValue` needs
+    none.
 
 ## Identity: `clientId`
 

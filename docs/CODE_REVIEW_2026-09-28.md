@@ -113,7 +113,7 @@
 - [x] [#53](#issue-53) `enqueue(value, Duration.INFINITE)` writes a poison key that breaks every receive
 - [x] [#54](#issue-54) The orphan sweep issues one transaction per in-flight claim on every idle wake
 - [x] [#55](#issue-55) `enqueueAll`'s within-batch order relies on etcd's unstable sort
-- [ ] [#56](#issue-56) `TransientKeyValue` parks an executor thread for its whole lifetime, and `start()` waits with no timeout
+- [x] [#56](#issue-56) `TransientKeyValue` parks an executor thread for its whole lifetime, and `start()` waits with no timeout
 - [x] [#57](#issue-57) `PathChildrenCache` fires INITIALIZED after the watch is live: out of order, a snapshot per listener, and a deadlock
 - [x] [#58](#issue-58) A compaction resync updates caches silently, so listeners and flows never see the gap's changes
 - [ ] [#59](#issue-59) One malformed or newer-schema service instance breaks discovery for the whole service
@@ -147,7 +147,7 @@
 - [x] [#85](#issue-85) `LeaderObserver.onRecovery` replays leadership on every recovery
 - [x] [#86](#issue-86) `DistributedBarrier.close()` doesn't unpark waiters, and its internal reads are close-checked
 - [ ] [#87](#issue-87) Code-quality leftovers: Java atomics reintroduced, unused fields, stale `ElectionPaths`
-- [ ] [#88](#issue-88) `TransientKeyValue`: retrying `start()` after a failure can leave a published key that can't be removed
+- [x] [#88](#issue-88) `TransientKeyValue`: retrying `start()` after a failure can leave a published key that can't be removed
 - [x] [#89](#issue-89) Work-queue sweeper failures are dropped at DEBUG
 - [x] [#90](#issue-90) `ack()`/`requeue()` are guarded on the instance's `clientId`, not on the specific claim
 - [x] [#91](#issue-91) Queue metrics and small interop and docs gaps

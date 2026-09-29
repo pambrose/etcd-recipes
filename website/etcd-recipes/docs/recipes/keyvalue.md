@@ -43,9 +43,8 @@ default.
     - **You cannot register a lease listener in time.** The keep-alive is already running
       when you get the reference, so `addLeaseListener` after construction may miss early
       events.
-    - **The reference you never received still owns resources.** The constructor
-      shuts down its own executor before propagating a startup failure, precisely because
-      you have no object to `close()`.
+    - **The reference you never received owns nothing.** A startup failure leaves no lease
+      or thread behind, which matters precisely because you have no object to `close()`.
 
 Pass `autoStart = false` to get the ordinary deferred-start behaviour that the rest of the
 library gives you:
@@ -62,18 +61,20 @@ library gives you:
     --8<-- "java/website/keyvalue/TransientKeyValueSnippets.java:deferred-start"
     ```
 
-`start()` is `@Synchronized` and one-shot: a second call throws
-`EtcdRecipeRuntimeException`, as does calling it after `close()`. It blocks until the
-keep-alive is actually running (or has failed), so when it returns without throwing, the
-key is published.
+`start()` is `@Synchronized` and one-shot once it succeeds: a second call throws
+`EtcdRecipeRuntimeException`, as does calling it after `close()`. It returns once the key is
+published, and throws if that fails. A failed `start()` leaves nothing behind, so you can
+call it again once etcd is reachable. `close()` on an instance that never started is a
+no-op.
 
 The full parameter list is
 `(client, keyPath, keyValue, leaseTtlSecs, autoStart, userExecutor, clientId, resilience)`.
 `leaseTtlSecs` is how long the key survives your silence — the shorter it is, the faster
 your absence is noticed and the more renewal traffic you generate. `clientId` defaults to a
-generated identifier and tags this publisher in the recipe's logs. `userExecutor` lets you
-supply the thread the keep-alive parks on; leave it `null` and the recipe owns a
-single-thread executor it shuts down on `close()`.
+generated identifier and tags this publisher in the recipe's logs. `userExecutor` is no longer
+used: publishing holds no thread of its own (the lease is renewed and healed on internal
+threads), so instances can share any executor, or none. The parameter remains for
+compatibility.
 
 ## This lease is healed
 
