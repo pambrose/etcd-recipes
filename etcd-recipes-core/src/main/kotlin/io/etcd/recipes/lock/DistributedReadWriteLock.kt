@@ -21,7 +21,7 @@ package io.etcd.recipes.lock
 import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
-import io.etcd.jetcd.options.GetOption
+import io.etcd.jetcd.KeyValue
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.LeaseEvent
@@ -31,6 +31,7 @@ import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.getOption
 import io.etcd.recipes.common.getResponse
+import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
@@ -59,7 +60,9 @@ import kotlin.time.TimeSource
  *
  * Thread-per-acquisition holds, per-side reentrancy, cooperative lock-lost, and
  * write→read downgrade are as in [DistributedMutex]; read→write upgrade throws
- * (it would self-deadlock).
+ * (it would self-deadlock). A downgraded read keeps the write entry's place in line
+ * (its *rank*, carried in the read entry's value), so a writer that queued behind the
+ * write hold keeps waiting until the downgraded read is released too.
  */
 class DistributedReadWriteLock
 @JvmOverloads
@@ -83,6 +86,7 @@ constructor(
   private class EntryData(
     val lease: AcquisitionLease,
     val entryKey: String,
+    val rank: Long, // place in line: the entry's create revision, or an inherited one
   ) {
     var holdCount = 1 // owner-thread confined
     val acquiredAt: ComparableTimeMark = TimeSource.Monotonic.markNow()
@@ -106,9 +110,16 @@ constructor(
   private val writeLostListeners = CopyOnWriteArrayList<LockLostListener>()
   private val attempts = CopyOnWriteArrayList<Attempt>()
 
+  // Entries live directly under this; the scan and the side classification both work
+  // relative to it, so a sibling lock whose path merely shares the string prefix
+  // (/order-1 vs /order-10) is never in the snapshot.
+  private val entryParent = "$lockPath/"
+
   init {
     require(lockPath.isNotEmpty()) { "Lock path cannot be empty" }
     require(leaseTtlSecs > 0) { "Lease TTL must be > 0" }
+    // An entry's value is its clientId, so one shaped like a carried rank would be read as one
+    require(!clientId.startsWith(RANK_VALUE_PREFIX)) { "clientId cannot start with \"$RANK_VALUE_PREFIX\": $clientId" }
   }
 
   override val exceptionContext get() = "DistributedReadWriteLock[$lockPath]"
@@ -153,8 +164,7 @@ constructor(
     override val isLocked: Boolean
       get() {
         checkCloseNotCalled()
-        return client.getChildrenKeys(lockPath, rpc = resilience.rpc)
-          .any { it.substringAfterLast('/').startsWith(side.entryPrefix) }
+        return client.getChildrenKeys(lockPath, rpc = resilience.rpc).any { isEntryOf(it, side) }
       }
 
     override val holdCount: Int get() = holdsFor(side)[Thread.currentThread()]?.holdCount ?: 0
@@ -218,11 +228,15 @@ constructor(
       )
     }
 
+    var mayInheritWriteRank = true
     outer@ while (true) {
       checkCloseNotCalled()
       if (deadline != null && deadline.hasPassedNow()) return false
 
-      val entryKey = "$lockPath/${side.entryPrefix}$clientId:${randomId(TOKEN_LENGTH)}"
+      val entryKey = "$entryParent${side.entryPrefix}$clientId:${randomId(TOKEN_LENGTH)}"
+      // A write→read downgrade inherits the write entry's rank: see effectiveRank.
+      val inheritedFrom = if (side == Side.READ && mayInheritWriteRank) writeHolds[me] else null
+      val inheritedRank = inheritedFrom?.rank
       val attempt = Attempt(me, entryKey)
       val lease =
         AcquisitionLease(
@@ -241,7 +255,12 @@ constructor(
         val txn =
           client.transaction(resilience.rpc) {
             If(entryKey.doesNotExist)
-            Then(entryKey.setTo(clientId, putOption { withLeaseId(lease.leaseId) }))
+            Then(
+              entryKey.setTo(
+                inheritedRank?.let { "$RANK_VALUE_PREFIX$it" } ?: clientId,
+                putOption { withLeaseId(lease.leaseId) },
+              ),
+            )
           }
         if (!txn.isSucceeded) {
           // Random-suffix collision: effectively impossible; pace and retry
@@ -255,6 +274,7 @@ constructor(
               Thread.sleep(LEASE_HEAL_PAUSE_MS)
               continue@outer
             }
+        val ownRank = inheritedRank ?: ownCreateRevision
 
         while (true) {
           if (attempt.phase.load() == Phase.DEAD) {
@@ -263,12 +283,21 @@ constructor(
           }
           if (deadline != null && deadline.hasPassedNow()) return false
 
-          val conflict = nearestConflict(side, me, entryKey, ownCreateRevision)
+          val conflict = nearestConflict(side, me, entryKey, ownRank)
             ?: run {
+              // A downgrade may only keep the write entry's place while that entry
+              // still exists: once it is gone (a lease expiry not yet noticed here), a
+              // writer queued behind it may already hold the lock. Retry as an
+              // ordinary read at the tail. Checked after this entry was created, so a
+              // write that vanishes later still finds this entry ahead of any writer.
+              if (inheritedFrom != null && !client.isKeyPresent(inheritedFrom.entryKey, resilience.rpc)) {
+                mayInheritWriteRank = false
+                continue@outer
+              }
               // Admitted: publish the hold BEFORE claiming the phase (a fatal in
               // the win window must always find the hold — or the CAS failure
               // below rolls it back).
-              holdsFor(side)[me] = EntryData(lease, entryKey)
+              holdsFor(side)[me] = EntryData(lease, entryKey, ownRank)
               if (attempt.phase.compareAndSet(Phase.WAITING, Phase.HOLDING)) {
                 dispossessedFor(side).remove(me)
                 acquired = true
@@ -307,46 +336,48 @@ constructor(
     }
   }
 
-  // One consistent snapshot (a single ranged read), sorted by create revision.
-  // The nearest EARLIER conflicting entry is the wait target; the calling
-  // thread's own write entry is excluded so write→read downgrade admits. The
-  // snapshot's revision rides along so the wait can anchor its DELETE-watch at
-  // the point the conflict was observed present (see WaiterSupport).
+  // One consistent snapshot (a single ranged read) of this lock's entries. The
+  // nearest EARLIER-ranked conflicting entry is the wait target; the calling thread's
+  // own write entry is excluded so write→read downgrade admits. The snapshot's revision
+  // rides along so the wait can anchor its DELETE-watch at the point the conflict was
+  // observed present (see WaiterSupport).
   private fun nearestConflict(
     side: Side,
     thread: Thread,
     ownEntryKey: String,
-    ownCreateRevision: Long,
+    ownRank: Long,
   ): Conflict? {
-    val snapshot =
-      client.getResponse(
-        lockPath,
-        getOption {
-          isPrefix(true)
-          withSortField(GetOption.SortTarget.CREATE)
-          withSortOrder(GetOption.SortOrder.ASCEND)
-        },
-        resilience.rpc,
-      )
+    val snapshot = client.getResponse(entryParent, getOption { isPrefix(true) }, resilience.rpc)
     val ownWriteEntry = writeHolds[thread]?.entryKey
     val conflict =
       snapshot.kvs
         .asSequence()
-        .filter { it.createRevision < ownCreateRevision }
-        .filter { kv ->
-          val basename = kv.key.asString.substringAfterLast('/')
-          when (side) {
-            Side.WRITE -> true
-
-            // any earlier entry conflicts with a writer
-            Side.READ -> basename.startsWith(Side.WRITE.entryPrefix)
-          }
-        }
-        .filter { it.key.asString != ownEntryKey && it.key.asString != ownWriteEntry }
-        .maxByOrNull { it.createRevision }
+        .map { kv -> kv.key.asString to effectiveRank(kv) }
+        .filter { (key, rank) -> rank < ownRank && key != ownEntryKey && key != ownWriteEntry }
+        // any earlier entry conflicts with a writer; only earlier writers with a reader
+        .filter { (key, _) -> side == Side.WRITE || isEntryOf(key, Side.WRITE) }
+        .maxByOrNull { (_, rank) -> rank }
         ?: return null
-    return Conflict(conflict.key.asString, snapshot.header.revision)
+    return Conflict(conflict.first, snapshot.header.revision)
   }
+
+  // An entry's side, judged by its name under the lock path. Not by the last path
+  // segment: a clientId may itself contain '/'.
+  private fun isEntryOf(
+    key: String,
+    side: Side,
+  ): Boolean = key.removePrefix(entryParent).startsWith(side.entryPrefix)
+
+  // An entry's place in line. Normally its create revision; a downgraded read entry
+  // carries the rank of the write entry it was taken under, so it sorts where that write
+  // did. That rank is always inherited while the write entry still exists, so a writer
+  // queued behind the write sees the downgraded read before the write can vanish.
+  private fun effectiveRank(kv: KeyValue): Long =
+    kv.value.asString
+      .takeIf { it.startsWith(RANK_VALUE_PREFIX) }
+      ?.removePrefix(RANK_VALUE_PREFIX)
+      ?.toLongOrNull()
+      ?: kv.createRevision
 
   // Nearest earlier conflicting entry plus the revision at which the ranged read
   // observed it present.
@@ -419,5 +450,8 @@ constructor(
   companion object {
     private val logger = KotlinLogging.logger {}
     private const val LEASE_HEAL_PAUSE_MS = 250L
+
+    // Value prefix of a downgraded read entry: "rank:<revision>". Other entries hold the clientId.
+    private const val RANK_VALUE_PREFIX = "rank:"
   }
 }
