@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (barriers: close() cancels in-flight waits)
+
+- `DistributedBarrierWithCount.close()` now cancels an in-flight `waitOnBarrier` cleanly
+  (it returns `false`) wherever the waiter has got to. Previously a `close()` that
+  landed before the waiter parked either made `waitOnBarrier` throw — a cause-less
+  `EtcdRecipeException("Failed to set waitingPath")` during the ready CAS or lease
+  grant, or `EtcdRecipeRuntimeException("close() already called")` from its internal
+  reads — or went unseen, leaving the waiter parked until its timeout. `close()` also
+  cancels every concurrent waiter on the instance, not only the most recent one, and a
+  genuine waiting-key CAS failure now carries its cause.
+- `DistributedBarrier.close()` now releases a thread parked in `waitOnBarrier` (it
+  returns `false`) instead of leaving it to its timeout, and a `close()` during the
+  waiter's watch setup no longer makes it throw `close() already called`.
+
 ## [0.12.0] - 2026-07-26
 
 The largest release since the project began, in five themes:
