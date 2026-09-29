@@ -92,7 +92,8 @@ fun Client.getChildrenValues(
   keyName: String,
   target: GetOption.SortTarget = GetOption.SortTarget.KEY,
   order: SortOrder = SortOrder.ASCEND,
-): List<ByteSequence> = getChildren(keyName, target, order).values
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+): List<ByteSequence> = getChildren(keyName, target, order, rpc = rpc).values
 
 @JvmOverloads
 fun Client.getChildCount(

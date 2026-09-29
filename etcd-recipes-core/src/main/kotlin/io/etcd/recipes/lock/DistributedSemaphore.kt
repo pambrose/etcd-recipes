@@ -26,6 +26,7 @@ import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.LeaseEvent
 import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.RpcResilience
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildCount
@@ -182,10 +183,13 @@ class DistributedSemaphore
   internal fun holdsPermitAcquiredOn(owner: Thread): Boolean = holds.any { it.owner === owner }
 
   /** Advisory: permits minus live holder/waiter entries, floored at zero. */
-  fun availablePermits(): Int {
+  fun availablePermits(): Int = availablePermits(resilience.rpc)
+
+  /** [availablePermits] under [rpc], such as the single short attempt of [RpcResilience.PROBE] for a gauge. */
+  fun availablePermits(rpc: RpcResilience): Int {
     checkCloseNotCalled()
-    validatePermits()
-    val entries = client.getChildCount(holdersPath, resilience.rpc).toInt()
+    validatePermits(rpc)
+    val entries = client.getChildCount(holdersPath, rpc).toInt()
     return (permits - entries).coerceAtLeast(0)
   }
 
@@ -199,17 +203,17 @@ class DistributedSemaphore
 
   // CAS-create the canonical count, or verify it matches; once per instance.
   // The ctor stays RPC-free like every recipe, so this runs lazily on first use.
-  private fun validatePermits() {
+  private fun validatePermits(rpc: RpcResilience = resilience.rpc) {
     if (permitsValidated.load()) return
     var canonical = -1
     while (canonical == -1) {
       // -1 = key deleted between the failed CAS and the read; CAS again
       val txn =
-        client.transaction(resilience.rpc) {
+        client.transaction(rpc) {
           If(permitsKey.doesNotExist)
           Then(permitsKey setTo permits)
         }
-      canonical = if (txn.isSucceeded) permits else client.getValue(permitsKey, -1, resilience.rpc)
+      canonical = if (txn.isSucceeded) permits else client.getValue(permitsKey, -1, rpc)
     }
     if (canonical != permits) {
       throw SemaphorePermitMismatchException(semaphorePath, permits, canonical)

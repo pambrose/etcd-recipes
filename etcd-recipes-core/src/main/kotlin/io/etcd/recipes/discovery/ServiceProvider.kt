@@ -89,7 +89,7 @@ class ServiceProvider
       if (startCalled.load())
         cache?.instances ?: emptyList()
       else
-        client.getChildrenValues(instancesPath).map { ServiceInstance.toObject(it.asString) }
+        client.getChildrenValues(instancesPath, rpc = resilience.rpc).map { ServiceInstance.toObject(it.asString) }
 
     /**
      * Selects one available instance via the configured [strategy]. Throws the typed

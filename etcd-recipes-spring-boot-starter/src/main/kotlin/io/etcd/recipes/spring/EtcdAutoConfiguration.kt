@@ -25,6 +25,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.boot.health.autoconfigure.contributor.ConditionalOnEnabledHealthIndicator
 import org.springframework.boot.health.contributor.HealthIndicator
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -47,12 +48,19 @@ class EtcdAutoConfiguration {
   @ConditionalOnMissingBean
   fun etcdRecipes(client: Client): EtcdRecipes = EtcdRecipes(client)
 
-  /** Contributed only when Actuator's [HealthIndicator] is on the classpath. */
+  /**
+   * Contributed only when Actuator's [HealthIndicator] is on the classpath, and switched off by
+   * `management.health.etcd.enabled=false` like any other Actuator health indicator.
+   */
   @Configuration(proxyBeanMethods = false)
   @ConditionalOnClass(HealthIndicator::class)
   class EtcdHealthConfiguration {
     @Bean
+    @ConditionalOnEnabledHealthIndicator("etcd")
     @ConditionalOnMissingBean(name = ["etcdHealthIndicator"])
-    fun etcdHealthIndicator(client: Client): HealthIndicator = EtcdHealthIndicator(client)
+    fun etcdHealthIndicator(
+      client: Client,
+      properties: EtcdProperties,
+    ): HealthIndicator = EtcdHealthIndicator(client, properties.health.timeout)
   }
 }

@@ -176,6 +176,8 @@ a weak reference, so a bound gauge does not keep the recipe alive.
     `bindQueueDepth` and `bindAvailablePermits` poll the server. A 10-second scrape
     interval across 200 instances is 20 range-counts per second against etcd purely for
     dashboards. Bind them where the number is worth the load, and mind the interval.
+    Each read is one attempt bounded at 2 seconds (`RpcResilience.PROBE`), so during an
+    outage they report `NaN` rather than stalling the scrape.
 
 Binding several instances of the same gauge to one registry needs distinguishing `tags`
 — every binder takes them. See [Integrations](integrations/index.md) for setup,

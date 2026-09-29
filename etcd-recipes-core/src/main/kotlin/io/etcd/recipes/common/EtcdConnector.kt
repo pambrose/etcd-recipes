@@ -199,8 +199,10 @@ open class EtcdConnector(
    * the same retry/timeout funnel as every other RPC. Returns false instead of throwing when
    * etcd cannot be reached within the RPC timeout.
    */
-  fun ping(): Boolean =
-    runCatching { client.getResponse(PING_PROBE_KEY, getOption { withCountOnly(true) }, resilience.rpc) }.isSuccess
+  fun ping(): Boolean = ping(RpcResilience.PROBE.withMetrics(resilience.metrics))
+
+  /** [ping] under [rpc] rather than the default single short attempt ([RpcResilience.PROBE]). */
+  fun ping(rpc: RpcResilience): Boolean = client.ping(rpc)
 
   // Template-method close: idempotency is enforced here so subclasses cannot
   // forget to guard against double-close. Subclasses override doClose() for
@@ -218,7 +220,6 @@ open class EtcdConnector(
     private val logger = KotlinLogging.logger {}
     internal const val TOKEN_LENGTH = 7
     internal const val DEFAULT_TTL_SECS = 2L
-    private const val PING_PROBE_KEY = "health-check-probe"
 
     /** SLF4J MDC key under which [withRecipeLoggingContext] publishes the recipe's identity. */
     const val RECIPE_MDC_KEY = "etcd.recipe"

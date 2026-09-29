@@ -84,33 +84,37 @@ fun Client.putValueWithKeepAlive(
   block: () -> Unit,
 ) = putValuesWithKeepAlive([keyName to keyval], ttl, block = block)
 
+@JvmOverloads
 fun Client.putValuesWithKeepAlive(
   kvs: Collection<Pair<String, ByteSequence>>,
   ttlSecs: Long,
   onKeepAliveError: (Throwable) -> Unit = {},
+  rpc: RpcResilience = RpcResilience.DEFAULT,
   block: () -> Unit,
-) = putValuesWithKeepAlive(kvs, ttlSecs.seconds, onKeepAliveError, block)
+) = putValuesWithKeepAlive(kvs, ttlSecs.seconds, onKeepAliveError, rpc, block)
 
+@JvmOverloads
 @Suppress("TooGenericExceptionCaught")
 fun Client.putValuesWithKeepAlive(
   kvs: Collection<Pair<String, ByteSequence>>,
   ttl: Duration,
   onKeepAliveError: (Throwable) -> Unit = {},
+  rpc: RpcResilience = RpcResilience.DEFAULT,
   block: () -> Unit,
 ) {
-  val lease = leaseGrant(ttl)
-  // Original code never revoked the lease if a put threw or if keepAliveWith
-  // could not start, so a transient etcd error during initial setup would
-  // strand a lease for ttl seconds.
+  val lease = leaseGrant(ttl, rpc)
+  // Revoke the lease however this ends — a failed put, a keep-alive that can't start, or
+  // the block returning or throwing — so the keys go with the block rather than lingering
+  // until the TTL runs out.
   try {
-    for (kv in kvs) {
-      putValue(kv.first, kv.second, putOption { withLeaseId(lease.id) })
+    // One transaction, so a reader never sees half of a multi-key registration
+    transaction(rpc) {
+      Then(*kvs.map { (key, value) -> key.setTo(value, putOption { withLeaseId(lease.id) }) }.toTypedArray())
     }
-  } catch (e: Throwable) {
-    leaseRevoke(lease)
-    throw e
+    // onKeepAliveError lets a holder observe the keep-alive dying after setup
+    // succeeds (renewal stream errors or stops) rather than only on close().
+    keepAliveWith(lease, onKeepAliveError) { block() }
+  } finally {
+    leaseRevoke(lease, rpc)
   }
-  // onKeepAliveError lets a holder observe the keep-alive dying after setup
-  // succeeds (renewal stream errors or stops) rather than only on close().
-  keepAliveWith(lease, onKeepAliveError) { block() }
 }

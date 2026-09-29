@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (RPC budgets and probes)
+
+- The recipe's `RpcResilience` (timeout, retries, and metrics) now reaches every RPC it
+  makes. Several calls fell back to the default (5 × 30 s, uninstrumented):
+  - `ServiceDiscovery.queryForNames` / `queryForInstances`, which did so while holding
+    the discovery monitor;
+  - the cache from `serviceCache(name)`, which now inherits the discovery's config;
+  - `ServiceProvider.getAllInstances`;
+  - `LeaderSelector`'s leadership lease revoke, which could delay `close()` for 30 s
+    during a partition.
+
+  `getChildrenValues`, `deleteKeys`, `putValuesWithKeepAlive`, and
+  `LeaderSelector.getParticipants` take a trailing `rpc` parameter.
+- `putValuesWithKeepAlive` / `putValueWithKeepAlive` now revoke their lease when the block
+  ends (returns or throws), so the keys go with the block instead of living up to a TTL
+  longer. The keys are written in one transaction, so a reader never sees half of a
+  multi-key registration.
+- `Client.ping()` and a recipe's `ping()` now make a single attempt bounded at 2 seconds
+  (the new `RpcResilience.PROBE`) instead of retrying for about 2.5 minutes during an
+  outage. A definite refusal from etcd (`PERMISSION_DENIED`, `NOT_FOUND`, …) counts as
+  reachable, so a prefix-scoped RBAC user no longer reads as permanently down. Recipes
+  gain `ping(rpc)`.
+- Spring Boot: the health indicator probes with `etcd.recipes.health.timeout` (default
+  2 s), and `management.health.etcd.enabled=false` now switches it off. Before, every
+  `/actuator/health` call could hang for minutes during an etcd outage.
+- Micrometer: `bindQueueDepth` / `bindAvailablePermits` read with `RpcResilience.PROBE`
+  (overridable through a new `rpc` argument), so during an outage they report `NaN`
+  promptly instead of holding the scrape past its timeout. `AbstractQueue.size(rpc)` and
+  `DistributedSemaphore.availablePermits(rpc)` are the new accessor overloads.
+
 ### Fixed (coroutine cancellation safety)
 
 - A coroutine cancelled just as its blocking call *succeeded* no longer leaks what the

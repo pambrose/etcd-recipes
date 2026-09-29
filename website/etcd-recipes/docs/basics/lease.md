@@ -145,9 +145,10 @@ overloads — `String`, `Int`, `Long`, and `ByteSequence` values, each with a `t
 !!! tip "A stranded lease is a leak"
 
     Granting a lease and then throwing before renewal starts leaves it alive on the server for
-    its whole TTL, holding your keys up. `putValuesWithKeepAlive` revokes the lease if any put
-    throws on the way in, which is the bug this shape exists to prevent. Hand-rolled
-    grant-then-put sequences should do the same.
+    its whole TTL, holding your keys up. `putValuesWithKeepAlive` revokes the lease however it
+    ends — a failed put on the way in, or the block returning or throwing — so the keys go
+    with the block instead of lingering for up to a TTL. Hand-rolled grant-then-put sequences
+    should do the same.
 
 ### Several keys, one lease
 
@@ -163,13 +164,9 @@ overloads — `String`, `Int`, `Long`, and `ByteSequence` values, each with a `t
     --8<-- "java/website/basics/LeaseSnippets.java:put-values-with-keep-alive"
     ```
 
-`putValuesWithKeepAlive` binds every key in the collection to a **single** lease, so they
-expire together. A reader can never catch half a registration published and half of it expired
-— which is why `ServiceDiscovery` registers this way rather than with a lease per key.
-
-The puts themselves are separate RPCs, so the keys do not *appear* atomically. If readers must
-never see a partial registration on the way in, publish a single key with a
-[typed value](../typed-values.md) instead, or gate visibility behind one final key.
+`putValuesWithKeepAlive` binds every key in the collection to a **single** lease and writes
+them in one transaction, so they appear together and expire together. A reader can never
+catch half a registration published, or half of it expired.
 
 ## What happens when a lease expires
 

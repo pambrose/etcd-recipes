@@ -21,11 +21,15 @@ package io.etcd.recipes.spring
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
 import io.etcd.jetcd.kv.GetResponse
+import io.grpc.StatusRuntimeException
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import org.springframework.boot.health.contributor.Status
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 
 /** The health indicator maps the client's reachability probe to Actuator UP / DOWN. */
@@ -39,6 +43,21 @@ class EtcdHealthIndicatorTests : StringSpec() {
   init {
     "reports UP when the probe succeeds" {
       val client = clientWhoseProbe(CompletableFuture.completedFuture(mockk<GetResponse>(relaxed = true)))
+      EtcdHealthIndicator(client).health().status shouldBe Status.UP
+    }
+
+    "gives up on the probe at its timeout" {
+      val client = clientWhoseProbe(CompletableFuture()) // never answers
+      val start = System.nanoTime()
+      EtcdHealthIndicator(client, Duration.ofMillis(200)).health().status shouldBe Status.DOWN
+      withClue("the health check outlived its timeout") {
+        (System.nanoTime() - start) shouldBeLessThan Duration.ofMillis(1_500).toNanos()
+      }
+    }
+
+    "reports UP when etcd refuses the probe key (a prefix-scoped RBAC user)" {
+      val client =
+        clientWhoseProbe(CompletableFuture.failedFuture(StatusRuntimeException(io.grpc.Status.PERMISSION_DENIED)))
       EtcdHealthIndicator(client).health().status shouldBe Status.UP
     }
 
