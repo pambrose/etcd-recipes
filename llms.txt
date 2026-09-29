@@ -54,7 +54,7 @@ JDK 17+ runtime. Compiler-wide opt-ins for `kotlin.time.ExperimentalTime`,
 Published to Maven Central under the group `com.pambrose`. The core artifact was renamed
 `etcd-recipes` → `etcd-recipes-core` in 0.12.0.
 
-- `etcd-recipes-core` — the library; no dependencies beyond jetcd, coroutines, and logging
+- `etcd-recipes-core` — the library; brings jetcd, kotlinx-coroutines, and kotlinx-serialization (all in its API) and the SLF4J API, but no logging backend
 - `etcd-recipes-jackson` — `JacksonCodec<T>` for projects using Jackson
 - `etcd-recipes-micrometer` — `MicrometerEtcdMetrics` backend plus `EtcdGauges` binders
 - `etcd-recipes-spring-boot-starter` — auto-configured `Client` / `EtcdRecipes` beans from `etcd.recipes.*` properties, optional Actuator health indicator

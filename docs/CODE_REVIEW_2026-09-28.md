@@ -60,7 +60,7 @@
 
 #### High
 - [ ] [#4](#issue-4) RPC retry predicate never matches real jetcd failures, so configured status-based retries are inert
-- [ ] [#5](#issue-5) Published core POM scopes jetcd and kotlinx-serialization as runtime-only although both are in the public API
+- [x] [#5](#issue-5) Published core POM scopes jetcd and kotlinx-serialization as runtime-only although both are in the public API
 - [x] [#6](#issue-6) `DistributedReadWriteLock` conflict scan bleeds into sibling lock paths (missing trailing `/`)
 - [x] [#7](#issue-7) `DistributedReadWriteLock`: a `clientId` containing `/` lets a reader and a writer hold at once
 - [ ] [#8](#issue-8) Lease heal leaks the newly granted lease when the establish hook throws
@@ -125,7 +125,7 @@
 - [ ] [#65](#issue-65) `leadershipAsFlow`: a blocking uncancellable GET, swallowed re-read failures, and a fixed RPC budget
 - [ ] [#66](#issue-66) A terminal watch failure never completes the watch and leadership flows
 - [ ] [#67](#issue-67) The suspend RPC engine never records `EtcdMetrics.recordRpc`
-- [ ] [#68](#issue-68) Every published artifact forces `logback-classic`, guava, and common-utils onto consumers
+- [x] [#68](#issue-68) Every published artifact forces `logback-classic`, guava, and common-utils onto consumers
 - [ ] [#69](#issue-69) The Ktor plugin closes its client on `ApplicationStopping`, before user teardown runs
 - [ ] [#70](#issue-70) RPC-backed Micrometer gauges can stall the metrics scrape during an outage
 - [ ] [#71](#issue-71) A deadlocked test can hang CI for 45 min without identifying the test
@@ -161,7 +161,7 @@
 - [ ] [#99](#issue-99) `EtcdProperties` binding depends on a transitive `kotlin-reflect`, and the starter's tests don't check binding
 - [ ] [#100](#issue-100) `TransientKeyValueTest` counts every key under `/keyvalue`, which other test classes write to in parallel
 - [ ] [#101](#issue-101) Some regression tests can't fail for the bug they target
-- [ ] [#102](#issue-102) The minimum Kotlin version for consumers (2.3+) is undocumented
+- [x] [#102](#issue-102) The minimum Kotlin version for consumers (2.3+) is undocumented
 - [ ] [#103](#issue-103) Documentation drift (`CLAUDE.md`, README, `llms.txt`, CHANGELOG, version string)
 - [ ] [#104](#issue-104) Most examples depend on helper libraries that consumers won't have
 - [ ] [#105](#issue-105) CI hygiene (token permissions, action versions, ungated docs deploy)

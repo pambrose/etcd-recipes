@@ -5,7 +5,9 @@
 | | |
 | --- | --- |
 | Java | 17 or newer |
+| Kotlin (Kotlin callers only) | 2.3 or newer |
 | etcd | v3 |
+| Logging | any SLF4J backend — none is bundled |
 
 ## Add the dependency
 

@@ -80,32 +80,16 @@ configureVersions()
 subprojects {
     description = name
 
+    // Only test dependencies are shared. Each module declares its own main dependencies in
+    // its build file, so a published artifact's POM carries exactly what that module needs:
+    // a blanket implementation list here once shipped jetcd at runtime scope in the core POM
+    // (breaking consumers' compile) and a logging backend in every artifact.
     dependencies {
-        "implementation"(rootProject.libs.kotlinx.serialization.json)
-        // api: Flow and suspend modifiers appear in the io.etcd.recipes.coroutines public surface
-        "api"(rootProject.libs.kotlinx.coroutines.core)
-
-        "implementation"(rootProject.libs.jetcd.core)
-
-        "implementation"(rootProject.libs.guava)
-
-        "implementation"(rootProject.libs.common.utils.core)
-        "implementation"(rootProject.libs.common.utils.guava)
-
-        "implementation"(rootProject.libs.kotlin.logging)
-        "implementation"(rootProject.libs.logback.classic)
-
         "testImplementation"(rootProject.libs.bundles.testing)
+        "testImplementation"(rootProject.libs.kotlin.logging)
         "testRuntimeOnly"(rootProject.libs.bundles.testing.runtime)
-    }
-
-    // The library's tests include a container-based variant that reads result keys
-    // written by the runners module. The runners module already depends on the library,
-    // so this is a test-only one-way dependency, not a cycle.
-    if (name == coreName) {
-        dependencies {
-            "testImplementation"(project(":$libraryName-test-runners"))
-        }
+        // A logging backend for test output only; library artifacts depend on the SLF4J API alone
+        "testRuntimeOnly"(rootProject.libs.logback.classic)
     }
 
     // The library and its optional bindings are published; the examples and test-runners aren't.
