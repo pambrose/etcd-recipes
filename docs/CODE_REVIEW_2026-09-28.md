@@ -54,15 +54,15 @@
 ### Checklist
 
 #### Critical
-- [ ] [#1](#issue-1) `DistributedReadWriteLock` write→read downgrade deadlocks when another writer queues in between
+- [x] [#1](#issue-1) `DistributedReadWriteLock` write→read downgrade deadlocks when another writer queues in between
 - [x] [#2](#issue-2) Queue take steals and deletes keys from sibling paths that share the queue's string prefix
 - [x] [#3](#issue-3) Colliding enqueue keys (millis + 3 random chars, blind put) silently overwrite queued items
 
 #### High
 - [ ] [#4](#issue-4) RPC retry predicate never matches real jetcd failures, so configured status-based retries are inert
 - [ ] [#5](#issue-5) Published core POM scopes jetcd and kotlinx-serialization as runtime-only although both are in the public API
-- [ ] [#6](#issue-6) `DistributedReadWriteLock` conflict scan bleeds into sibling lock paths (missing trailing `/`)
-- [ ] [#7](#issue-7) `DistributedReadWriteLock`: a `clientId` containing `/` lets a reader and a writer hold at once
+- [x] [#6](#issue-6) `DistributedReadWriteLock` conflict scan bleeds into sibling lock paths (missing trailing `/`)
+- [x] [#7](#issue-7) `DistributedReadWriteLock`: a `clientId` containing `/` lets a reader and a writer hold at once
 - [ ] [#8](#issue-8) Lease heal leaks the newly granted lease when the establish hook throws
 - [ ] [#9](#issue-9) Self-healing CAS hooks can't reclaim their own key, and a client-side deadline is treated as server expiry
 - [ ] [#10](#issue-10) Listener and `recordException` callbacks run on jetcd's Vert.x event loop, contrary to the documented contract

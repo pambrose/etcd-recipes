@@ -40,6 +40,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ready time cannot be parsed is now moved to the dead-letter space (and recorded)
   rather than breaking receives.
 
+### Fixed (read-write lock: downgrade, sibling paths, clientId)
+
+- A write→read downgrade deadlocked when another process's writer had queued behind
+  the write hold: the new read entry waited on that writer, which waited on the write
+  hold the downgrading thread could not release. A downgraded read entry now keeps the
+  write entry's place in line (it carries the write's rank in its value), so it is
+  admitted at once and the queued writer keeps waiting until the downgraded read is
+  released too. A downgrade from a write entry that has already vanished server-side
+  retries as an ordinary read instead of taking a place it no longer holds. Clients
+  from earlier versions do not honor the carried rank, so avoid downgrading while a
+  mixed-version fleet shares a lock. Because the rank rides in the entry value, a
+  `clientId` starting with `rank:` is now rejected.
+- The conflict scan read the lock path without a trailing `/`, so a lock also counted
+  the entries of any sibling lock whose path shared its string prefix (`/order-1` vs
+  `/order-10`) — false contention, and a self-deadlock for a thread holding one while
+  taking the other. It now reads only the lock's own entries.
+- Entries were classified by their last path segment, so a writer whose `clientId`
+  contained `/` was invisible to readers, letting a reader and a writer hold at once
+  (and misreporting `isLocked`). Entries are now classified by their name under the
+  lock path.
+
 ## [0.12.0] - 2026-07-26
 
 The largest release since the project began, in five themes:
