@@ -21,9 +21,11 @@ package io.etcd.recipes.common
 import com.github.dockerjava.api.model.ExposedPort
 import com.github.dockerjava.api.model.PortBinding
 import com.github.dockerjava.api.model.Ports
+import org.testcontainers.DockerClientFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.utility.DockerImageName
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -39,14 +41,30 @@ internal object EtcdTestContainer {
   // changes), and the fault tests restart the container while jetcd clients keep
   // dialing the original endpoint. A fixed binding lives in the container's
   // HostConfig and survives restarts. Probing a free port and then binding it is
-  // racy across parallel test forks (observed: "port is already allocated" under
-  // a full-suite run), so startup retries with a fresh port on bind conflicts.
+  // racy — another test fork, the Gradle daemon, or an IDE can take the port first —
+  // so startup retries with a fresh port on bind conflicts.
+  //
+  // For a local Docker daemon the port is published on 127.0.0.1 only, and the
+  // endpoint names 127.0.0.1. Published on the wildcard address, a port that another
+  // process already holds on 127.0.0.1 does not fail on Docker Desktop for macOS: the
+  // container starts, and Java — which resolves localhost to 127.0.0.1 first — sends
+  // every client request to that other process instead of etcd. On 127.0.0.1 the same
+  // collision is a start-time bind error, which the retry below handles.
   private const val START_ATTEMPTS = 5
+  private const val LOOPBACK = "127.0.0.1"
+  private val BIND_CONFLICTS = listOf("port is already allocated", "address already in use")
 
-  private class RunningContainer(
+  // Where the tests reach Docker's published ports: "localhost" for a local daemon
+  // (Docker Desktop, a CI runner), otherwise a remote daemon's address.
+  private val dockerHost: String by lazy { DockerClientFactory.instance().dockerHostIpAddress() }
+  private val localDocker: Boolean by lazy { InetAddress.getByName(dockerHost).isLoopbackAddress }
+
+  internal class RunningContainer(
     val container: GenericContainer<*>,
     val hostPort: Int,
-  )
+  ) {
+    val endpoint: String get() = "http://${if (localDocker) LOOPBACK else dockerHost}:$hostPort"
+  }
 
   // Lazy: the container is only started when a test in this JVM actually
   // asks for the endpoint. With forkEvery=1 each test class is its own JVM,
@@ -54,9 +72,17 @@ internal object EtcdTestContainer {
   // handles cleanup; the explicit shutdown hook is belt-and-suspenders that
   // stops the container promptly when the test JVM exits.
   private val running: RunningContainer by lazy {
+    startEtcd().also { started ->
+      Runtime.getRuntime().addShutdownHook(Thread { runCatching { started.container.stop() } })
+    }
+  }
+
+  // Starts an etcd container bound to a fixed host port from [nextHostPort], retrying with
+  // the next port on a bind conflict. Internal so a test can hand it a port that is taken.
+  internal fun startEtcd(nextHostPort: () -> Int = { ServerSocket(0).use { it.localPort } }): RunningContainer {
     var lastFailure: Exception? = null
     repeat(START_ATTEMPTS) {
-      val hostPort = ServerSocket(0).use { it.localPort }
+      val hostPort = nextHostPort()
       // Only the client port is exposed: the peer port is unused on a single node,
       // and the fixed-binding modifier below replaces ALL host-port bindings — an
       // exposed port without a binding would stall Testcontainers' startup check.
@@ -64,7 +90,10 @@ internal object EtcdTestContainer {
         .withExposedPorts(CLIENT_PORT)
         .withCreateContainerCmdModifier { cmd ->
           cmd.hostConfig?.withPortBindings(
-            PortBinding(Ports.Binding.bindPort(hostPort), ExposedPort.tcp(CLIENT_PORT)),
+            PortBinding(
+              if (localDocker) Ports.Binding.bindIpAndPort(LOOPBACK, hostPort) else Ports.Binding.bindPort(hostPort),
+              ExposedPort.tcp(CLIENT_PORT),
+            ),
           )
         }
         .withCommand(
@@ -75,16 +104,15 @@ internal object EtcdTestContainer {
         .waitingFor(Wait.forLogMessage(".*ready to serve client requests.*\\n", 1))
       try {
         c.start()
-        Runtime.getRuntime().addShutdownHook(Thread { runCatching { c.stop() } })
-        return@lazy RunningContainer(c, hostPort)
+        return RunningContainer(c, hostPort)
       } catch (e: Exception) {
         lastFailure = e
         runCatching { c.stop() }
         val portConflict =
           generateSequence<Throwable>(e) { t -> t.cause?.takeIf { it !== t } }
-            .any { it.message?.contains("port is already allocated") == true }
+            .any { t -> BIND_CONFLICTS.any { t.message?.contains(it) == true } }
         if (!portConflict) throw e
-        // Another fork (or process) won the probed port; retry with a fresh one
+        // Another process won the probed port; retry with a fresh one
       }
     }
     throw IllegalStateException("etcd container failed to start after $START_ATTEMPTS attempts", lastFailure)
@@ -92,7 +120,7 @@ internal object EtcdTestContainer {
 
   private val container: GenericContainer<*> get() = running.container
 
-  fun endpoint(): String = "http://${container.host}:${running.hostPort}"
+  fun endpoint(): String = running.endpoint
 
   // ---- Fault-injection controls (used by io.etcd.recipes.fault tests) ----
   // These mutate the private container; they are only meaningful under
