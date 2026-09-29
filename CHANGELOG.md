@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (election lifecycle)
+
+- `LeaderSelector.waitOnLeadershipComplete(timeout)` now honors its timeout. It first
+  waited, untimed, for the start worker to finish, which only happens when the candidacy
+  ends — so a standby's timed wait blocked until it won and finished a term, or was
+  closed. The coroutine `awaitLeadershipComplete(timeout)` inherited the same bug.
+- `LeaderSelector.close()` called from inside `takeLeadership` no longer deadlocks.
+  `close()` waited for the start worker, which was the calling thread when this node
+  won at `start()`.
+- A `LeaderSelector` closed without ever winning (or whose start worker failed) can be
+  started again; `start()` used to throw "Previous call to start() not complete". A
+  restart also resets `connectionState`, so it no longer reports the previous candidacy's
+  `LOST`.
+- `close()` on a `LeaderSelector` that was never started no longer throws "start() not
+  called", matching `LeaderLatch` and `LeaderObserver`. A `withLeaderSelector { }` block
+  that never started it used to throw out of `use`.
+- `LeaderObserver` no longer replays `takeLeadership` for the current leader after every
+  watch recovery, only when events could have been missed (a resync, or a resubscribe
+  that could not resume at a known revision). A failure re-reading the leader there now
+  reaches `LeaderListener.onError` and `exceptions` instead of being swallowed.
+- `DistributedDoubleBarrier` now passes its `clientId` to its enter and leave barriers;
+  it was accepted but never used.
+
 ### Fixed (lease healing and registration lifecycle)
 
 - A heal no longer re-grants a lease that is still alive in etcd. jetcd reports a lease

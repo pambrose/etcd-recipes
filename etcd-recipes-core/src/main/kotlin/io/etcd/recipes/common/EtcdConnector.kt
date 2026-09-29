@@ -148,6 +148,12 @@ open class EtcdConnector(
     }
   }
 
+  /**
+   * Returns [connectionState] to [ConnectionState.CONNECTED] when a reusable recipe starts a
+   * new cycle, so it does not report the previous cycle's LOST. Listeners see the transition.
+   */
+  protected fun resetConnectionState() = transitionTo(ConnectionState.CONNECTED)
+
   /** Recipes feed their lease events here to drive [connectionState]. */
   protected fun reportLeaseEvent(event: LeaseEvent) {
     when (event) {

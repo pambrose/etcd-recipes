@@ -66,8 +66,8 @@
 - [x] [#8](#issue-8) Lease heal leaks the newly granted lease when the establish hook throws
 - [x] [#9](#issue-9) Self-healing CAS hooks can't reclaim their own key, and a client-side deadline is treated as server expiry
 - [ ] [#10](#issue-10) Listener and `recordException` callbacks run on jetcd's Vert.x event loop, contrary to the documented contract
-- [ ] [#11](#issue-11) `LeaderSelector.waitOnLeadershipComplete(timeout)` ignores its timeout
-- [ ] [#12](#issue-12) `LeaderSelector.close()` from inside `takeLeadership` self-deadlocks
+- [x] [#11](#issue-11) `LeaderSelector.waitOnLeadershipComplete(timeout)` ignores its timeout
+- [x] [#12](#issue-12) `LeaderSelector.close()` from inside `takeLeadership` self-deadlocks
 - [ ] [#13](#issue-13) `LeaderSelector.start()` can hang forever, uninterruptibly
 - [ ] [#14](#issue-14) Watch-triggered election attempts swallow Phase-1 failures and never retry, so the election can be left leaderless
 - [ ] [#15](#issue-15) `DistributedAtomicLong` is permanently broken if first-use initialization fails
@@ -94,7 +94,7 @@
 - [ ] [#34](#issue-34) Leader-key watches are not revision-anchored, so a hand-off during setup is missed
 - [ ] [#35](#issue-35) Step-down leaves `attemptLeadership` set, so a DELETE can start a second concurrent term
 - [ ] [#36](#issue-36) A term won via the watch runs on the watch dispatcher, so `close()` can return while it still holds the key
-- [ ] [#37](#issue-37) A `LeaderSelector` closed without ever winning can't be restarted
+- [x] [#37](#issue-37) A `LeaderSelector` closed without ever winning can't be restarted
 - [ ] [#38](#issue-38) Composite recipes (`LeaderLatch`, `ServiceProvider`) hide the health of the recipes they wrap
 - [x] [#39](#issue-39) The uncommitted `DistributedBarrierWithCount` close-race fix leaves a pre-park window open
 - [ ] [#40](#issue-40) The count-barrier trip releases the tripper before the global release is committed
@@ -143,8 +143,8 @@
 - [ ] [#81](#issue-81) Read-write lock and semaphore releases rely on a single, un-retried revoke
 - [ ] [#82](#issue-82) Lock-loss bookkeeping is keyed by thread, and `holdCount` is read cross-thread without synchronization
 - [ ] [#83](#issue-83) Locks expose no fencing token, and the default lease TTL is 2 s
-- [ ] [#84](#issue-84) Election and barrier API traps (`close()` before `start()`, unused `clientId`)
-- [ ] [#85](#issue-85) `LeaderObserver.onRecovery` replays leadership on every recovery
+- [x] [#84](#issue-84) Election and barrier API traps (`close()` before `start()`, unused `clientId`)
+- [x] [#85](#issue-85) `LeaderObserver.onRecovery` replays leadership on every recovery
 - [x] [#86](#issue-86) `DistributedBarrier.close()` doesn't unpark waiters, and its internal reads are close-checked
 - [ ] [#87](#issue-87) Code-quality leftovers: Java atomics reintroduced, unused fields, stale `ElectionPaths`
 - [ ] [#88](#issue-88) `TransientKeyValue`: retrying `start()` after a failure can leave a published key that can't be removed
