@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (resilient watcher revisions)
+
+- A compaction whose resync fails is no longer forgotten. The next recovery attempt
+  resyncs again instead of resubscribing at the compacted revision and reporting
+  `Resubscribed` with nothing reconciled. A recovery whose new stream dies before
+  delivering anything keeps spending the same retry budget instead of restarting it, so a
+  bounded `WatchResilience` does reach `Failed`.
+- An un-anchored watch (no start revision) now resumes from the revision it was created
+  at, so writes committed while it was recovering are replayed rather than lost. An
+  anchored watch no longer jumps its resume point to the created notification's revision
+  before the replay of older events has finished. The watcher requests the created
+  notification internally and hides it from the watch block unless the caller asked for
+  it.
+- Without `resyncWith`, a compaction now resumes the watch at the compacted revision (the
+  oldest etcd still serves) rather than one past it, which skipped that revision's events.
+- Closing the `Client` while a watcher is open now ends its recovery with
+  `WatchRecoveryEvent.Failed` instead of retrying forever, silently, every few seconds.
+  Each failed recovery attempt is logged at debug.
+
 ### Fixed (notifications and connection state)
 
 - Listener callbacks no longer run on jetcd's event loop. `BackgroundExceptionListener`s,

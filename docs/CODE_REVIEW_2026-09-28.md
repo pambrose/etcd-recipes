@@ -85,8 +85,8 @@
 - [x] [#25](#issue-25) Interrupts are handled inconsistently by the RPC engine and swallowed by `leaseRevoke`
 - [x] [#26](#issue-26) `connectionState` never leaves `SUSPENDED` after jetcd recovers a stream on its own
 - [x] [#27](#issue-27) `connectionState` is last-writer-wins across independent streams, and notifications can arrive out of order
-- [ ] [#28](#issue-28) The compaction marker is lost when a resync attempt fails
-- [ ] [#29](#issue-29) Un-anchored watches lose events across a recovery, and createNotify advances the resume revision early
+- [x] [#28](#issue-28) The compaction marker is lost when a resync attempt fails
+- [x] [#29](#issue-29) Un-anchored watches lose events across a recovery, and createNotify advances the resume revision early
 - [x] [#30](#issue-30) `putValuesWithKeepAlive` never revokes its lease, and its multi-key puts aren't atomic
 - [x] [#31](#issue-31) The RPC budget isn't threaded through several helpers and call sites
 - [x] [#32](#issue-32) `ping()` and the Spring health indicator can block about 150 s, and RBAC-scoped clusters always report DOWN
@@ -132,10 +132,10 @@
 
 #### Low
 - [x] [#72](#issue-72) `close()` from a watcher's or healer's own thread always stalls 5 s
-- [ ] [#73](#issue-73) Closing the `Client` while a watcher is open makes it retry forever, silently
+- [x] [#73](#issue-73) Closing the `Client` while a watcher is open makes it retry forever, silently
 - [x] [#74](#issue-74) `keepAlive()` reports transient stream errors as "renewal stopped"
 - [x] [#75](#issue-75) The `EtcdConnector` exception list grows without bound
-- [ ] [#76](#issue-76) The compaction fallback resumes one revision too late
+- [x] [#76](#issue-76) The compaction fallback resumes one revision too late
 - [ ] [#77](#issue-77) `Duration`-typed APIs hidden from Java (`EtcdRecipes.distributedPriorityQueue`, `LeaderLatch` `closeJoinTimeout`)
 - [ ] [#78](#issue-78) Passwords appear in `toString()`, and half-configured mTLS is silently ignored
 - [ ] [#79](#issue-79) Gaps in background logging context (MDC)

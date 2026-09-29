@@ -182,9 +182,15 @@ taking a `WatchResilience` is the fix.
     --8<-- "java/website/basics/WatchSnippets.java:resilient"
     ```
 
-Recovery re-subscribes from the revision just past the last observed event, so **no event is
-lost or duplicated across a recovery** — with one exception, which is the whole reason
-`resyncWith` exists.
+Recovery re-subscribes from the revision just past the last observed event, or, before any event,
+from where the watch started. An un-anchored watch counts as starting at the revision it was
+created at, so a write committed while the watch was recovering is replayed, **not lost**, with
+one exception, which is the whole reason `resyncWith` exists. (The watcher asks etcd for its
+created notification to learn that revision, and hides it from your block unless you asked for
+it with `withCreateNotify`.)
+
+A watch whose `Client` is closed can't recover, so it ends with `WatchRecoveryEvent.Failed`
+instead of retrying forever.
 
 ### `resyncWith` and the compaction gap
 
@@ -203,8 +209,10 @@ Its contract:
 - **Returns the revision to re-anchor at.** Nothing else uses the return value.
 - **Runs on the dispatcher thread**, so a blocking GET inside it is expected and correct.
   It cannot deadlock the event loop, which is precisely why the hop exists.
-- **If you omit it**, the watch resumes just past the compacted revision — the gap is not
-  filled, only reported, via `WatchRecoveryEvent.Resynced`.
+- **If it throws**, the next recovery attempt calls it again: the compaction isn't forgotten,
+  and the watch doesn't report itself recovered until a resync succeeds.
+- **If you omit it**, the watch resumes at the compacted revision (the oldest one etcd still
+  serves) — the gap is not filled, only reported, via `WatchRecoveryEvent.Resynced`.
 
 !!! warning "If you maintain derived state, supply `resyncWith`"
 

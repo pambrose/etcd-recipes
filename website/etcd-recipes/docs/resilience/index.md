@@ -204,7 +204,7 @@ return the revision to resume from (typically the GET's `header.revision + 1`).
 
 !!! warning "Without `resyncWith`, a gap is reported but not repaired"
 
-    The watch resumes just past the compacted revision and you get a
+    The watch resumes at the compacted revision (the oldest one etcd still serves) and you get a
     `WatchRecoveryEvent.Resynced` telling you which range was lost. If you keep derived
     state — a cache, a membership set, a counter — that event is a notification that
     your state is now wrong, not a promise that it was fixed. Supply `resyncWith`.

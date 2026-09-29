@@ -26,6 +26,7 @@ import io.etcd.jetcd.common.exception.EtcdExceptionFactory
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchResponse
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
@@ -34,6 +35,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -51,11 +54,14 @@ class ResilientWatcherTests : StringSpec() {
     val options = CopyOnWriteArrayList<WatchOption>()
     val watchers = CopyOnWriteArrayList<Watch.Watcher>()
     var failSubscribesAfter = Int.MAX_VALUE
+    var subscribeFailure: () -> Throwable = { IllegalStateException("subscribe refused") }
+    val subscribeAttempts = AtomicInt(0)
 
     val watch: Watch =
       mockk {
         every { watch(any<ByteSequence>(), any<WatchOption>(), any<Watch.Listener>()) } answers {
-          if (listeners.size >= failSubscribesAfter) throw IllegalStateException("subscribe refused")
+          subscribeAttempts.incrementAndFetch()
+          if (listeners.size >= failSubscribesAfter) throw subscribeFailure()
           options += secondArg<WatchOption>()
           listeners += thirdArg<Watch.Listener>()
           mockk<Watch.Watcher>(relaxed = true).also { watchers += it }
@@ -73,12 +79,21 @@ class ResilientWatcherTests : StringSpec() {
             every { keyValue } returns mockk<KeyValue> { every { modRevision } returns rev }
           }
         }
+      every { isCreatedNotify } returns false
       every { header } returns mockk { every { revision } returns (modRevisions.maxOrNull() ?: 0L) }
+    }
+
+  private fun createdResponse(headerRevision: Long): WatchResponse =
+    mockk {
+      every { events } returns emptyList()
+      every { isCreatedNotify } returns true
+      every { header } returns mockk { every { revision } returns headerRevision }
     }
 
   private fun progressResponse(headerRevision: Long): WatchResponse =
     mockk {
       every { events } returns emptyList()
+      every { isCreatedNotify } returns false
       every { header } returns mockk { every { revision } returns headerRevision }
     }
 
@@ -195,7 +210,7 @@ class ResilientWatcherTests : StringSpec() {
         }
     }
 
-    "compaction death without resyncWith resumes just past the compacted revision" {
+    "compaction death without resyncWith resumes at the compacted revision" {
       val mocks = WatchMocks()
       val events = CopyOnWriteArrayList<WatchRecoveryEvent>()
       val compacted = EtcdExceptionFactory.newCompactedException(200)
@@ -203,10 +218,97 @@ class ResilientWatcherTests : StringSpec() {
         .use {
           mocks.listeners.first().die(compacted)
           pollUntil(5.seconds) { mocks.listeners.size == 2 } shouldBe true
-          mocks.options[1].revision shouldBe 201
+          // etcd's compact_revision is the oldest revision a watcher can still receive
+          mocks.options[1].revision shouldBe 200
           pollUntil(5.seconds) { events.any { e -> e is WatchRecoveryEvent.Resynced } } shouldBe true
-          events.filterIsInstance<WatchRecoveryEvent.Resynced>().first().anchorRevision shouldBe 201
+          events.filterIsInstance<WatchRecoveryEvent.Resynced>().first().anchorRevision shouldBe 200
         }
+    }
+
+    "a failed resync is retried rather than skipped" {
+      val mocks = WatchMocks()
+      val events = CopyOnWriteArrayList<WatchRecoveryEvent>()
+      val resyncs = AtomicInt(0)
+      val resync = {
+        if (resyncs.incrementAndFetch() <= 2) throw IllegalStateException("resync GET failed")
+        300L
+      }
+      mocks.client.watcher("/rw/resync-retry", WatchOption.DEFAULT, quickRetries(), { events += it }, resync) { }
+        .use {
+          mocks.listeners.first().die(EtcdExceptionFactory.newCompactedException(250))
+          pollUntil(5.seconds) {
+            events.any { it is WatchRecoveryEvent.Resynced || it is WatchRecoveryEvent.Resubscribed }
+            } shouldBe true
+          withClue("a resubscribe skipped the resync after it failed: $events") {
+            events.none { it is WatchRecoveryEvent.Resubscribed } shouldBe true
+          }
+          resyncs.load() shouldBe 3
+          mocks.options.last().revision shouldBe 300
+        }
+    }
+
+    "a recovery whose new stream dies at once keeps spending the same retry budget" {
+      val mocks = WatchMocks()
+      val events = CopyOnWriteArrayList<WatchRecoveryEvent>()
+      val bounded = WatchResilience(RetryPolicy.bounded(maxAttempts = 3, delay = 10.milliseconds))
+      mocks.client.watcher("/rw/budget", WatchOption.DEFAULT, bounded, { events += it }, null) { }.use {
+        var died = 0
+        // Every new stream dies before delivering anything; the recovery never took hold
+        while (died < 10 && events.none { it is WatchRecoveryEvent.Failed }) {
+          pollUntil(5.seconds) { mocks.listeners.size > died || events.any { it is WatchRecoveryEvent.Failed } }
+          if (mocks.listeners.size > died) mocks.listeners[died++].die()
+        }
+        withClue("each resubscribe reset the retry budget; $died deaths") {
+          pollUntil(5.seconds) { events.any { it is WatchRecoveryEvent.Failed } } shouldBe true
+        }
+      }
+    }
+
+    "an anchored watch's created notification doesn't advance the resume revision" {
+      val mocks = WatchMocks()
+      val option = watchOption {
+        withRevision(5L)
+        withCreateNotify(true)
+      }
+      mocks.client.watcher("/rw/created-anchored", option, quickRetries(), null, null) { }.use {
+        mocks.listeners.first().onNext(createdResponse(headerRevision = 20L))
+        mocks.listeners.first().die()
+        pollUntil(5.seconds) { mocks.listeners.size == 2 } shouldBe true
+        withClue("resumed past events 5..20 that were never replayed") { mocks.options[1].revision shouldBe 5L }
+      }
+    }
+
+    "an un-anchored watch resumes from its creation revision, and hides the forced created notification" {
+      val mocks = WatchMocks()
+      val delivered = CopyOnWriteArrayList<WatchResponse>()
+      mocks.client.watcher("/rw/created-unanchored", WatchOption.DEFAULT, quickRetries(), null, null) {
+        delivered += it
+      }
+        .use {
+          withClue("an un-anchored watch didn't ask for its created notification") {
+            mocks.options.first().isCreatedNotify shouldBe true
+          }
+          mocks.listeners.first().onNext(createdResponse(headerRevision = 20L))
+          mocks.listeners.first().die()
+          pollUntil(5.seconds) { mocks.listeners.size == 2 } shouldBe true
+          mocks.options[1].revision shouldBe 21L
+          withClue("the caller got a created notification it didn't ask for") { delivered.size shouldBe 0 }
+        }
+    }
+
+    "a closed client ends recovery instead of retrying forever" {
+      val mocks = WatchMocks()
+      val events = CopyOnWriteArrayList<WatchRecoveryEvent>()
+      mocks.failSubscribesAfter = 1
+      mocks.subscribeFailure = { EtcdExceptionFactory.newClosedWatchClientException() }
+      val patient = WatchResilience(RetryPolicy.bounded(maxAttempts = 1_000, delay = 10.milliseconds))
+      mocks.client.watcher("/rw/closed-client", WatchOption.DEFAULT, patient, { events += it }, null) { }.use {
+        mocks.listeners.first().die()
+        withClue("a closed client was retried: $events") {
+          pollUntil(5.seconds) { events.any { it is WatchRecoveryEvent.Failed } } shouldBe true
+        }
+        mocks.subscribeAttempts.load() shouldBe 2
+      }
     }
 
     "recovery listener sees Suspended then Resubscribed" {
