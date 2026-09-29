@@ -64,7 +64,7 @@ class DistributedMutex
     val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
     resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
     val clientId: String = defaultClientId(DistributedMutex::class.simpleName!!),
-    private val interruptOnLockLoss: Boolean = false,
+    internal val interruptOnLockLoss: Boolean = false,
   ) : EtcdConnector(client, resilience),
     EtcdLock {
   private class LockData(

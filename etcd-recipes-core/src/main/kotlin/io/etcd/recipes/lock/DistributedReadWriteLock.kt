@@ -72,7 +72,7 @@ constructor(
   val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
   resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
   val clientId: String = defaultClientId(DistributedReadWriteLock::class.simpleName!!),
-  private val interruptOnLockLoss: Boolean = false,
+  internal val interruptOnLockLoss: Boolean = false,
 ) : EtcdConnector(client, resilience) {
   internal enum class Side(
     val entryPrefix: String,
@@ -133,9 +133,12 @@ constructor(
 
   private fun listenersFor(side: Side) = if (side == Side.READ) readLostListeners else writeLostListeners
 
-  private inner class LockView(
+  internal inner class LockView(
     private val side: Side,
   ) : EtcdLock {
+    // The owning lock's interruptOnLockLoss, for the suspend surface
+    internal val interruptsOnLoss: Boolean get() = interruptOnLockLoss
+
     override fun lock() {
       val timed = !isHeldByCurrentThread // don't time reentrant re-locks
       val start = TimeSource.Monotonic.markNow()

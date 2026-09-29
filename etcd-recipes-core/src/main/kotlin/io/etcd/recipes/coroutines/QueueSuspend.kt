@@ -17,23 +17,39 @@
 package io.etcd.recipes.coroutines
 
 import io.etcd.jetcd.ByteSequence
+import io.etcd.jetcd.KeyValue
 import io.etcd.recipes.queue.AbstractQueue
 import io.etcd.recipes.queue.DistributedPriorityQueue
 import io.etcd.recipes.queue.DistributedQueue
+import kotlinx.coroutines.Dispatchers
 import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /**
  * Suspending twin of [AbstractQueue.dequeue]: waits until an item is available.
- * Cancellation interrupts the wait and leaves the queue intact — no item is
- * consumed. Compose with `withTimeout { }` or use the bounded overload.
+ * Cancellation interrupts the wait and consumes nothing. A cancellation that lands just
+ * as the take succeeded puts the item back under its original key. A
+ * [io.etcd.recipes.queue.DistributedPriorityQueue] item keeps its place; a
+ * [io.etcd.recipes.queue.DistributedQueue] orders by commit revision, so the item
+ * rejoins at the tail. If etcd is unreachable at that moment, the item is lost and the
+ * failure recorded. For at-least-once delivery, use
+ * [io.etcd.recipes.queue.DistributedWorkQueue].
+ * Compose with `withTimeout { }` or use the bounded overload.
  */
-suspend fun AbstractQueue.receive(): ByteSequence = etcdInterruptible { dequeue() }
+suspend fun AbstractQueue.receive(): ByteSequence = takeRestoringOnCancel { takeEntry(null) }!!
 
-/** Suspending twin of [AbstractQueue.poll]: an item, or null once [timeout] elapses. */
-suspend fun AbstractQueue.receive(timeout: Duration): ByteSequence? = etcdInterruptible { poll(timeout) }
+/** Suspending twin of [AbstractQueue.poll]: an item, or null once [timeout] elapses. See [receive]. */
+suspend fun AbstractQueue.receive(timeout: Duration): ByteSequence? {
+  require(timeout > Duration.ZERO) { "Timeout must be positive: $timeout" }
+  val deadline = TimeSource.Monotonic.markNow() + timeout
+  return takeRestoringOnCancel { takeEntry(deadline) }
+}
 
-/** Suspending twin of [AbstractQueue.tryDequeue] (non-blocking claim; RPCs still run off-thread). */
-suspend fun AbstractQueue.awaitTryDequeue(): ByteSequence? = etcdInterruptible { tryDequeue() }
+/** Suspending twin of [AbstractQueue.tryDequeue] (non-blocking claim; RPCs still run off-thread). See [receive]. */
+suspend fun AbstractQueue.awaitTryDequeue(): ByteSequence? = takeRestoringOnCancel { tryDequeueEntry() }
+
+private suspend fun AbstractQueue.takeRestoringOnCancel(take: AbstractQueue.() -> KeyValue?): ByteSequence? =
+  interruptibleAcquire(Dispatchers.IO, { take() }, { entry -> entry?.let { restoreTaken(it) } })?.value
 
 /** Suspending twin of [DistributedQueue.enqueue]. */
 suspend fun DistributedQueue.awaitEnqueue(value: ByteSequence): Unit = etcdInterruptible { enqueue(value) }

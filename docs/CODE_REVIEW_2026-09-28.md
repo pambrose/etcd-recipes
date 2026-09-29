@@ -76,8 +76,8 @@
 - [x] [#18](#issue-18) A work-queue `receive()` in flight across `close()` creates a lease after close, and its item can never be acked
 - [x] [#19](#issue-19) `ServiceRegistry.close()` can block about 2 min, then throw part-way through and leave healers running
 - [x] [#20](#issue-20) `PathChildrenCache` priming start swallows load failures and leaves a dead cache that reports healthy
-- [ ] [#21](#issue-21) Coroutine `withLock` / `withPermit` / `awaitAcquire` leak the hold when cancellation races a successful acquire
-- [ ] [#22](#issue-22) Coroutine queue twins lose or strand items when cancellation races a successful take
+- [x] [#21](#issue-21) Coroutine `withLock` / `withPermit` / `awaitAcquire` leak the hold when cancellation races a successful acquire
+- [x] [#22](#issue-22) Coroutine queue twins lose or strand items when cancellation races a successful take
 
 #### Medium
 - [x] [#23](#issue-23) Non-retriable RPC failures escape as a raw checked `ExecutionException`
@@ -120,8 +120,8 @@
 - [x] [#60](#issue-60) `PathChildrenCache.rebuild()` can permanently undo a watch event
 - [ ] [#61](#issue-61) `ServiceProvider` error counts never reset, and down-entries accumulate
 - [x] [#62](#issue-62) Re-registering after `LeaseEvent.Failed` leaks the old healer
-- [ ] [#63](#issue-63) `interruptibleOn` misses re-wrapped interrupts, so some cancellations surface as `EtcdRecipeException`
-- [ ] [#64](#issue-64) `interruptOnPermitLoss` / `interruptOnLockLoss` misfire under the suspend surface
+- [x] [#63](#issue-63) `interruptibleOn` misses re-wrapped interrupts, so some cancellations surface as `EtcdRecipeException`
+- [x] [#64](#issue-64) `interruptOnPermitLoss` / `interruptOnLockLoss` misfire under the suspend surface
 - [ ] [#65](#issue-65) `leadershipAsFlow`: a blocking uncancellable GET, swallowed re-read failures, and a fixed RPC budget
 - [ ] [#66](#issue-66) A terminal watch failure never completes the watch and leadership flows
 - [ ] [#67](#issue-67) The suspend RPC engine never records `EtcdMetrics.recordRpc`

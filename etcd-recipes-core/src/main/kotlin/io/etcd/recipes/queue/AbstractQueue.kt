@@ -31,10 +31,13 @@ import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
+import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.deleteOp
+import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.equalTo
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getFirstChild
+import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
@@ -62,16 +65,19 @@ abstract class AbstractQueue(
   // The latches of takes parked on an empty queue, so close() can release them.
   private val parkedTakes: MutableSet<CountDownLatch> = ConcurrentHashMap.newKeySet()
 
-  fun dequeue(): ByteSequence = checkNotNull(takeWithDeadline(null)) { "unbounded take returned empty" }
+  fun dequeue(): ByteSequence = checkNotNull(takeEntry(null)) { "unbounded take returned empty" }.value
 
   /** Non-blocking take: the head item, or null when the queue is empty. */
-  fun tryDequeue(): ByteSequence? {
+  fun tryDequeue(): ByteSequence? = tryDequeueEntry()?.value
+
+  // tryDequeue's taken entry (key and value); internal so the coroutine twins can restore it.
+  internal fun tryDequeueEntry(): KeyValue? {
     checkCloseNotCalled()
     while (true) {
       val childList = client.getFirstChild(queuePath, target, resilience.rpc).kvs
       if (childList.isEmpty()) return null
       val child = childList.first()
-      if (deleteRevKey(child)) return child.value
+      if (deleteRevKey(child)) return child
       // CAS lost to a concurrent consumer; retry until a win or the queue drains
     }
   }
@@ -79,7 +85,7 @@ abstract class AbstractQueue(
   /** Bounded take: the head item, or null once [timeout] elapses without one. */
   fun poll(timeout: Duration): ByteSequence? {
     require(timeout > Duration.ZERO) { "Timeout must be positive: $timeout" }
-    return takeWithDeadline(TimeSource.Monotonic.markNow() + timeout)
+    return takeEntry(TimeSource.Monotonic.markNow() + timeout)?.value
   }
 
   fun poll(
@@ -94,9 +100,10 @@ abstract class AbstractQueue(
   val size: Int get() = client.getChildCount(queuePath, resilience.rpc).toInt()
 
   // The single consumption loop: a null [deadline] never expires (the unbounded
-  // take), otherwise the wait is bounded and an expired deadline yields null.
+  // take), otherwise the wait is bounded and an expired deadline yields null. Returns
+  // the taken entry (key and value); internal so the coroutine twins can restore it.
   @Suppress("LoopWithTooManyJumpStatements", "ReturnCount")
-  private fun takeWithDeadline(deadline: ComparableTimeMark?): ByteSequence? {
+  internal fun takeEntry(deadline: ComparableTimeMark?): KeyValue? {
     checkCloseNotCalled()
     val start = TimeSource.Monotonic.markNow() // dequeue latency = call → item in hand
 
@@ -112,7 +119,7 @@ abstract class AbstractQueue(
         val child = childList.first()
         if (deleteRevKey(child)) {
           resilience.metrics.recordQueue("dequeue", queuePath, start.elapsedNow())
-          return child.value
+          return child
         }
         logger.debug { "Lost CAS to concurrent consumer, retrying without watcher" }
         continue
@@ -129,7 +136,7 @@ abstract class AbstractQueue(
       val winner = waitForFirstChild(deadline, firstChild.header.revision) ?: continue
       if (deleteRevKey(winner)) {
         resilience.metrics.recordQueue("dequeue", queuePath, start.elapsedNow())
-        return winner.value
+        return winner
       }
     }
   }
@@ -241,6 +248,27 @@ abstract class AbstractQueue(
         }
       }
     }
+
+  /**
+   * Puts back an entry that [takeEntry] took but that never reached its caller (a
+   * coroutine cancelled just as the take succeeded), under its original key. A
+   * key-ordered queue (priority) returns it to its place; a revision-ordered one (FIFO)
+   * gets it at the tail. The create-only guard means it never overwrites a key. A
+   * failure is recorded; the item is then lost.
+   */
+  @Suppress("TooGenericExceptionCaught")
+  internal fun restoreTaken(entry: KeyValue) {
+    try {
+      val restored =
+        client.transaction(resilience.rpc) {
+          If(entry.key.asString.doesNotExist)
+          Then(entry.key.asString setTo entry.value)
+        }.isSucceeded
+      if (!restored) logger.warn { "Not restoring ${entry.key.asString}: the key already exists" }
+    } catch (e: Exception) {
+      recordException(EtcdRecipeRuntimeException("Couldn't restore an item taken by a cancelled receive", e))
+    }
+  }
 
   // Releases takes parked on an empty queue; each then fails instead of waiting for an item.
   override fun doClose() {

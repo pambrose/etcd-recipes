@@ -18,6 +18,7 @@ package io.etcd.recipes.coroutines
 
 import io.etcd.jetcd.ByteSequence
 import io.etcd.recipes.queue.DistributedWorkQueue
+import kotlinx.coroutines.Dispatchers
 import kotlin.time.Duration
 
 /** Suspending twin of [DistributedWorkQueue.enqueue]. */
@@ -50,16 +51,25 @@ suspend fun DistributedWorkQueue.awaitEnqueueAll(values: Collection<ByteSequence
 
 /**
  * Suspending twin of [DistributedWorkQueue.receive]: waits until an item can be
- * claimed. Cancellation interrupts the wait without leaving an orphan claim.
+ * claimed. Cancellation interrupts the wait without leaving an orphan claim. A
+ * cancellation that lands just as the claim succeeded returns the item to the queue
+ * without spending a delivery attempt, since it never reached the caller.
  */
-suspend fun DistributedWorkQueue.awaitReceive(): DistributedWorkQueue.WorkItem = etcdInterruptible { receive() }
+suspend fun DistributedWorkQueue.awaitReceive(): DistributedWorkQueue.WorkItem = claimUnclaimingOnCancel { receive() }!!
 
-/** Suspending twin of the bounded [DistributedWorkQueue.receive]. */
+/** Suspending twin of the bounded [DistributedWorkQueue.receive]; see [awaitReceive]. */
 suspend fun DistributedWorkQueue.awaitReceive(timeout: Duration): DistributedWorkQueue.WorkItem? =
-  etcdInterruptible { receive(timeout) }
+  claimUnclaimingOnCancel { receive(timeout) }
 
-/** Suspending twin of [DistributedWorkQueue.tryReceive]. */
-suspend fun DistributedWorkQueue.awaitTryReceive(): DistributedWorkQueue.WorkItem? = etcdInterruptible { tryReceive() }
+/** Suspending twin of [DistributedWorkQueue.tryReceive]; see [awaitReceive]. */
+suspend fun DistributedWorkQueue.awaitTryReceive(): DistributedWorkQueue.WorkItem? =
+  claimUnclaimingOnCancel {
+  tryReceive()
+}
+
+private suspend fun DistributedWorkQueue.claimUnclaimingOnCancel(
+  claim: DistributedWorkQueue.() -> DistributedWorkQueue.WorkItem?,
+): DistributedWorkQueue.WorkItem? = interruptibleAcquire(Dispatchers.IO, { claim() }, { item -> item?.unclaim() })
 
 /** Suspending twin of [DistributedWorkQueue.WorkItem.ack]. */
 suspend fun DistributedWorkQueue.WorkItem.awaitAck(): Boolean = etcdInterruptible { ack() }

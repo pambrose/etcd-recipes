@@ -94,7 +94,7 @@ class DistributedSemaphore
     val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
     resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
     val clientId: String = defaultClientId(DistributedSemaphore::class.simpleName!!),
-    private val interruptOnPermitLoss: Boolean = false,
+    internal val interruptOnPermitLoss: Boolean = false,
   ) : EtcdConnector(client, resilience) {
   private enum class Phase { WAITING, HOLDING, DEAD }
 
@@ -177,6 +177,9 @@ class DistributedSemaphore
     }
     throw IllegalStateException("No permit is held on $semaphorePath by this instance")
   }
+
+  /** Whether a live permit acquired on [owner] is still held (not released or lost). */
+  internal fun holdsPermitAcquiredOn(owner: Thread): Boolean = holds.any { it.owner === owner }
 
   /** Advisory: permits minus live holder/waiter entries, floored at zero. */
   fun availablePermits(): Int {

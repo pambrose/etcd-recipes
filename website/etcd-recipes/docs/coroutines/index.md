@@ -230,15 +230,33 @@ counting toward the barrier; a cancelled `queue.receive()` consumes nothing; a
 cancelled `withLock` acquisition leaves nothing queued behind a lock it will never
 take. **Cancellation is safe, not merely fast.**
 
-**3. The failure reaches you as `CancellationException`.** The blocking RPC engine
-catches a mid-call `InterruptedException` and rethrows it wrapped in an
-`EtcdRecipeRuntimeException` — sometimes wrapped twice, because it re-sets the
-interrupt flag first so a subsequent RPC on the same thread can wrap it again.
-`runInterruptible` cannot recognise either as cancellation. The bridge therefore walks
-the entire cause chain, and since a thread inside `runInterruptible` is interrupted
-*only* by coroutine cancellation, an `InterruptedException` anywhere in that chain
-unambiguously means "you were cancelled" — and is re-surfaced as
-`CancellationException`.
+That includes the narrow window where the blocking call *succeeded* just as the
+coroutine was cancelled. `withContext`, which `runInterruptible` is built on, discards
+a result that arrives after its caller was cancelled, so the bridge gives back what
+the call got before the cancellation propagates:
+
+| Twin | Acquired just as it was cancelled |
+| --- | --- |
+| `withLock`, `withPermit`, `awaitAcquire`, `awaitTryAcquire` | released |
+| `AbstractQueue.receive` / `awaitTryDequeue` | put back under its original key: a priority queue keeps its place, a FIFO queue (ordered by commit revision) gets it at the tail |
+| `DistributedWorkQueue.awaitReceive` / `awaitTryReceive` | returned to the queue without spending a delivery attempt |
+
+Putting a queue item back needs etcd. If etcd is unreachable at that moment, the
+item is lost and the failure is recorded on the queue's `exceptions`, so a plain
+queue is at-most-once under cancellation. For at-least-once delivery, use
+`DistributedWorkQueue`.
+
+**3. The failure reaches you as `CancellationException`.** A recipe reports the
+interrupt however its call path does. The blocking RPC engine rethrows it wrapped in an
+`EtcdRecipeRuntimeException`, sometimes twice, because it re-sets the interrupt flag so
+a subsequent RPC on the same thread can wrap it again. Service registration re-wraps it
+in the checked `EtcdRecipeException`, and a few paths replace it with a new exception
+that has no cause at all. `runInterruptible` recognises none of these as cancellation.
+So the bridge classifies the failure by the caller's job. `JobSupport` flips a job to
+cancelling *before* it interrupts the worker, so a failure from a caller that is no
+longer active is its cancellation. An `InterruptedException` anywhere in the cause
+chain is a second signal. Either way it resurfaces as `CancellationException`, with the
+original failure as its cause.
 
 ```kotlin
 --8<-- "kotlin/website/coroutines/SuspendSnippets.kt:cancellation-surfaces"
@@ -251,12 +269,13 @@ unambiguously means "you were cancelled" — and is re-surfaced as
     dashboards on every clean shutdown. The bridge exists so that never happens.
     Structured concurrency's normal rules apply: catch it only to log, then rethrow.
 
-!!! note "Why not an `isActive` check?"
+!!! note "Why the job check is not racy"
 
-    The obvious implementation — catch the exception, ask whether the `Job` is
-    cancelled, and translate if so — is racy. The interrupt can be delivered a hair
-    before the `Job`'s state flips to cancelled, which lets a "failure" escape from
-    what was really a cancellation. Inspecting the cause chain has no such window.
+    It would be if the interrupt could arrive before the job's state changed. It
+    can't: `runInterruptible` interrupts the worker from a cancellation handler, and
+    `JobSupport` runs those handlers only after the job is already cancelling. The
+    cause-chain walk alone, which an earlier version relied on, missed every failure
+    that dropped or re-wrapped the interrupt.
 
 Composing with `withTimeout` / `withTimeoutOrNull` works exactly as you would expect,
 and is usually nicer than the bounded overloads when you want one deadline over
@@ -306,6 +325,15 @@ a `null` return always means "not acquired" — nothing was left queued:
 --8<-- "kotlin/website/coroutines/SuspendSnippets.kt:with-lock-timeout"
 ```
 
+The hold belongs to that dedicated thread, not to your coroutine, so the thread-keyed
+properties (`isHeldByCurrentThread`, `holdCount`) don't describe a suspend holder. On a
+lock built with `interruptOnLockLoss`, losing the hold (its lease expired) cancels the
+body instead, and `withLock` throws `HoldLostException`: the suspend counterpart of
+interrupting the holder thread. It is not a bare `CancellationException`, which a
+`launch`ed caller would treat as a quiet cancellation. Without the option, the body
+keeps running after a loss, as a blocking holder does; listen with `lockLostAsFlow()`
+if you need to know.
+
 !!! danger "The suspending `withLock` is not reentrant"
 
     The blocking `withLock` is reentrant, tracked by `holdCount`. The suspending one
@@ -331,6 +359,13 @@ therefore harmless, and the split surface is safe:
 ```kotlin
 --8<-- "kotlin/website/coroutines/SuspendSnippets.kt:semaphore-split"
 ```
+
+Each suspending acquire runs on its own short-lived thread, which the semaphore
+records as the permit's holder. So `interruptOnPermitLoss` never interrupts a shared
+`Dispatchers.IO` worker that has moved on to someone else's coroutine. Under
+`withPermit`, the option instead cancels the body when *its* permit is lost, and
+`withPermit` throws `HoldLostException`. Other holders on the same instance keep
+running.
 
 `withPermit` is still the form to reach for, for the same reason `use` beats a manual
 `close()`:

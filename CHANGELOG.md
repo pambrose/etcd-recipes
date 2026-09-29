@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (coroutine cancellation safety)
+
+- A coroutine cancelled just as its blocking call *succeeded* no longer leaks what the
+  call got. `withContext`, which `runInterruptible` is built on, discards a result that
+  arrives after its caller was cancelled. That leaked:
+  - a `withLock` hold, which deadlocked every contender until `close()`, since the
+    releasing thread was gone;
+  - a `withPermit` / `awaitAcquire` / `awaitTryAcquire` permit;
+  - a `receive()` item from `DistributedQueue` / `DistributedPriorityQueue`, deleted and
+    dropped;
+  - an `awaitReceive()` claim, stranded until the instance closed.
+
+  Each is now given back before the cancellation propagates. A lock or permit is
+  released. A queue item is put back under its original key: a priority queue keeps its
+  place, and a FIFO queue, ordered by commit revision, gets it at the tail. A work item
+  returns to the queue without spending a delivery attempt.
+- A blocking call cancelled mid-flight now always surfaces as `CancellationException`, with
+  the original failure as its cause. Before, an interrupt re-wrapped in the checked
+  `EtcdRecipeException` (`awaitRegisterService`) or replaced by an exception with no
+  cause (a barrier's "Failed to set waitingPath") escaped as that error. The bridge now
+  classifies by the caller's job state as well as by the cause chain.
+- `interruptOnPermitLoss` no longer interrupts a shared `Dispatchers.IO` worker. The
+  suspending semaphore acquires now run on their own short-lived thread, so the permit's
+  recorded holder is never a pooled thread running someone else's coroutine.
+
+### Added (suspend holders and lock loss)
+
+- On a lock or semaphore built with `interruptOnLockLoss` / `interruptOnPermitLoss`, losing
+  the hold now cancels the suspending `withLock` / `withPermit` body. The call then throws
+  the new `HoldLostException` (an `EtcdRecipeRuntimeException`). For a semaphore, only the
+  holder whose permit was lost is affected. Before, the option interrupted an idle
+  confined thread (locks) or an unrelated pooled thread (semaphores), and the body never
+  learned of the loss.
+
 ### Fixed (cache event path)
 
 - A primed `PathChildrenCache` start (`BUILD_INITIAL_CACHE` / `POST_INITIALIZED_EVENT`)
