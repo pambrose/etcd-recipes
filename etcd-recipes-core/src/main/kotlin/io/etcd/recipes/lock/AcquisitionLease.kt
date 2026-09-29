@@ -23,9 +23,11 @@ import io.etcd.jetcd.lease.LeaseKeepAliveResponse
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.support.Observers
 import io.etcd.recipes.common.RpcResilience
+import io.etcd.recipes.common.awaitRpc
 import io.etcd.recipes.common.isLeaseNotFound
 import io.etcd.recipes.common.leaseGrant
-import io.etcd.recipes.common.leaseRevoke
+import io.etcd.recipes.common.retryRpc
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.Closeable
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.time.Duration.Companion.seconds
@@ -49,6 +51,8 @@ import kotlin.time.Duration.Companion.seconds
  * already-lost path, where the lease is gone and callbacks run on jetcd's
  * threads (no blocking revoke RPC there).
  */
+private val logger = KotlinLogging.logger {}
+
 internal class AcquisitionLease(
   private val client: Client,
   ttlSecs: Long,
@@ -104,10 +108,43 @@ internal class AcquisitionLease(
     }
   }
 
+  /**
+   * Stops renewal and revokes the lease, which deletes its entry (a release, or the abort of a
+   * wait). The revoke is retried on retriable failures: one lost revoke would otherwise leave the
+   * entry blocking every successor until the lease's TTL runs out. Failures are logged, not
+   * thrown, since the lease still expires on its own.
+   */
+  @Suppress("TooGenericExceptionCaught")
   override fun close() {
     if (closed.compareAndSet(false, true)) {
       registration.close()
-      client.leaseRevoke(lease, rpc) // best-effort; deletes the entry / aborts the wait
+      try {
+        retryRpc(rpc, "leaseRevoke(${lease.id})") { client.leaseClient.revoke(lease.id) }
+      } catch (e: Exception) {
+        logger.debug(e) { "leaseRevoke(${lease.id}) failed; the lease will expire on its TTL" }
+      }
+    }
+  }
+
+  /**
+   * Like [close], but the revoke gets a single short attempt ([RpcResilience.PROBE]) — for an
+   * acquisition that must return near its deadline. Normally the entry is still gone when this
+   * returns; during an etcd brownout it overruns by at most that attempt, and a failed revoke
+   * leaves the lease to its TTL.
+   */
+  @Suppress("TooGenericExceptionCaught")
+  fun closePromptly() {
+    if (closed.compareAndSet(false, true)) {
+      registration.close()
+      try {
+        awaitRpc(
+          RpcResilience.PROBE.withMetrics(rpc.metrics),
+          "leaseRevoke(${lease.id})",
+          client.leaseClient.revoke(lease.id),
+        )
+      } catch (e: Exception) {
+        logger.debug(e) { "leaseRevoke(${lease.id}) failed; the lease will expire on its TTL" }
+      }
     }
   }
 }

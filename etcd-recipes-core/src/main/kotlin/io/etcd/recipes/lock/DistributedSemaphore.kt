@@ -37,6 +37,7 @@ import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -47,6 +48,7 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
@@ -80,11 +82,12 @@ class SemaphorePermitMismatchException(
  * entry lives, so capacity is provably never exceeded and grants are FIFO.
  *
  * Unlike [EtcdLock], holds are instance-level, Java-`Semaphore`-style: any thread
- * may [release], releases are LIFO among this instance's holds, and acquisitions
- * are never reentrant (each [acquire] consumes a fresh permit). A permit whose
- * lease expires is lost **cooperatively**: capacity frees server-side, listeners
- * fire, connection state reports LOST, and the matching [release] returns false
- * (interruption of the acquiring thread is opt-in via `interruptOnPermitLoss`).
+ * may [release], and acquisitions are never reentrant (each [acquire] consumes a
+ * fresh permit). A release gives up a permit the calling thread acquired first (see
+ * [release]). A permit whose lease expires is lost **cooperatively**: capacity frees
+ * server-side, listeners fire, connection state reports LOST, and the acquiring
+ * thread's matching [release] returns false (interruption of the acquiring thread is
+ * opt-in via `interruptOnPermitLoss`).
  *
  * Waiters watch the holders prefix for any DELETE and re-evaluate their rank —
  * rank admission has no single predecessor key, so a prefix watch is the only
@@ -125,7 +128,11 @@ class DistributedSemaphore
   }
 
   private val holds = ConcurrentLinkedDeque<PermitData>()
-  private val dispossessedCount = AtomicInt(0)
+
+  // Permits lost (lease expired, or released by close()) that a release() hasn't consumed
+  // yet, per acquiring thread, so a release consumes its own lost permit rather than giving
+  // up another thread's live one.
+  private val lostPermits = ConcurrentHashMap<Thread, Int>()
   private val lostListeners = CopyOnWriteArrayList<PermitLostListener>()
   private val attempts = CopyOnWriteArrayList<Attempt>()
   private val permitsValidated = AtomicBoolean(false)
@@ -141,12 +148,14 @@ class DistributedSemaphore
 
   override val exceptionContext get() = "DistributedSemaphore[$semaphorePath]"
 
+  @Throws(InterruptedException::class)
   fun acquire() {
     val start = TimeSource.Monotonic.markNow()
     check(acquireInternal(null)) { "unbounded acquisition returned without a permit" }
     resilience.metrics.recordLockWait(semaphorePath, start.elapsedNow(), acquired = true)
   }
 
+  @Throws(InterruptedException::class)
   fun tryAcquire(timeout: Duration): Boolean {
     require(timeout > Duration.ZERO) { "Timeout must be positive: $timeout" }
     val start = TimeSource.Monotonic.markNow()
@@ -155,32 +164,52 @@ class DistributedSemaphore
     return acquired
   }
 
+  @Throws(InterruptedException::class)
   fun tryAcquire(
     timeout: Long,
     timeUnit: TimeUnit,
   ): Boolean = tryAcquire(timeUnitToDuration(timeout, timeUnit))
 
   /**
-   * Releases this instance's most recently acquired live permit (LIFO). Returns
-   * false when the consumed hold had already been lost or released by close();
-   * throws [IllegalStateException] when this instance holds nothing at all.
+   * Releases a permit, choosing in this order: a live permit the calling thread acquired;
+   * else one it acquired that was lost (lease expired, or released by close()), and then
+   * returns false; else, for an acquire and release on different threads, any live permit,
+   * then any lost one. So a thread whose permit was lost never gives up another thread's
+   * live permit. Throws [IllegalStateException] when this instance holds nothing at all.
    */
-  fun release(): Boolean {
-    val data = holds.pollFirst()
-    if (data != null) {
-      resilience.metrics.recordLockHold(semaphorePath, data.acquiredAt.elapsedNow())
-      data.lease.close() // revoke deletes the entry, waking waiters
-      return true
+  fun release(): Boolean = release(Thread.currentThread())
+
+  // [release] on behalf of [owner], the thread that acquired the permit (withPermit acquires
+  // on one thread and releases on another).
+  @Suppress("ReturnCount")
+  internal fun release(owner: Thread): Boolean {
+    holds.firstOrNull { it.owner === owner }?.let { data ->
+      if (holds.remove(data)) return releaseHold(data)
     }
-    while (true) {
-      val slots = dispossessedCount.load()
-      if (slots <= 0) break
-      if (dispossessedCount.compareAndSet(slots, slots - 1)) {
-        logger.debug { "release() on $semaphorePath after the permit was lost or released by close()" }
-        return false
-      }
-    }
+    if (takeLostPermit(owner)) return false
+    holds.pollFirst()?.let { return releaseHold(it) }
+    if (lostPermits.keys.any { takeLostPermit(it) }) return false
     throw IllegalStateException("No permit is held on $semaphorePath by this instance")
+  }
+
+  private fun releaseHold(data: PermitData): Boolean {
+    resilience.metrics.recordLockHold(semaphorePath, data.acquiredAt.elapsedNow())
+    data.lease.close() // revoke (retried) deletes the entry, waking waiters
+    return true
+  }
+
+  private fun takeLostPermit(owner: Thread): Boolean {
+    var taken = false
+    lostPermits.computeIfPresent(owner) { _, count ->
+      taken = true
+      if (count > 1) count - 1 else null
+    }
+    if (taken) logger.debug { "release() on $semaphorePath after the permit was lost or released by close()" }
+    return taken
+  }
+
+  private fun recordLostPermit(owner: Thread) {
+    lostPermits.merge(owner, 1, Int::plus)
   }
 
   /** Whether a live permit acquired on [owner] is still held (not released or lost). */
@@ -227,6 +256,7 @@ class DistributedSemaphore
 
   @Suppress(
     "ReturnCount",
+    "ThrowsCount",
     "LoopWithTooManyJumpStatements",
     "LongMethod",
     "CyclomaticComplexMethod",
@@ -239,47 +269,60 @@ class DistributedSemaphore
 
     outer@ while (true) {
       checkCloseNotCalled()
-      if (deadline != null && deadline.hasPassedNow()) return false
+      if (deadline.hasPassed()) return false
+      // A deadline bounds every RPC of the attempt, not just the wait
+      val bounded = resilience.within(deadline)
 
       val entryKey = "$holdersPath/$clientId:${randomId(TOKEN_LENGTH)}"
       val attempt = Attempt(me, entryKey)
       val lease =
-        AcquisitionLease(
-          client,
-          leaseTtlSecs,
-          resilience.rpc,
-          onTransient = { leaseId, e ->
-            recordException(e)
-            reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
-          },
-          onResumed = { leaseId -> reportLeaseEvent(LeaseEvent.Restored(leaseId, leaseId)) },
-          onFatal = { cause -> onEntryFatal(attempt, cause) },
-        )
+        try {
+          AcquisitionLease(
+            client,
+            leaseTtlSecs,
+            bounded.rpc,
+            onTransient = { leaseId, e ->
+              recordException(e)
+              reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
+            },
+            onResumed = { leaseId -> reportLeaseEvent(LeaseEvent.Restored(leaseId, leaseId)) },
+            onFatal = { cause -> onEntryFatal(attempt, cause) },
+          )
+        } catch (e: EtcdRecipeRuntimeException) {
+          if (deadline.hasPassed()) return false // time ran out during the grant
+          throw e
+        }
       attempts += attempt
       var acquired = false
       try {
+        // A close() that ran before this attempt registered found nothing to abort
+        if (closeCalled.load()) abortedByClose()
         val txn =
-          client.transaction(resilience.rpc) {
+          client.transaction(bounded.rpc) {
             If(entryKey.doesNotExist)
             Then(entryKey.setTo(clientId, putOption { withLeaseId(lease.leaseId) }))
           }
         if (!txn.isSucceeded) {
           // Random-suffix collision: effectively impossible; pace and retry
-          Thread.sleep(LEASE_HEAL_PAUSE_MS)
+          pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
           continue@outer
         }
 
         while (true) {
+          if (closeCalled.load())
+            throw EtcdRecipeRuntimeException(
+              "Permit attempt on $semaphorePath aborted by close()",
+            )
           if (attempt.phase.load() == Phase.DEAD) {
-            Thread.sleep(LEASE_HEAL_PAUSE_MS)
+            pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
             continue@outer // fresh entry at the tail
           }
-          if (deadline != null && deadline.hasPassedNow()) return false
+          if (deadline.hasPassed()) return false
 
-          val snap = rankOf(entryKey)
+          val snap = rankOf(entryKey, bounded.rpc)
             ?: run {
               // Own entry gone: the lease died in the window
-              Thread.sleep(LEASE_HEAL_PAUSE_MS)
+              pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
               continue@outer
             }
           if (snap.rank < permits) {
@@ -290,11 +333,25 @@ class DistributedSemaphore
             attempt.holdData = data
             holds.addFirst(data)
             if (attempt.phase.compareAndSet(Phase.WAITING, Phase.HOLDING)) {
+              if (closeCalled.load()) {
+                // close() landed in the admission window: don't hand out a permit on a closed
+                // semaphore. If close() already drained this hold, undo the lost permit it recorded.
+                if (!holds.remove(data))
+                  lostPermits.computeIfPresent(me) { _, count ->
+                    if (count >
+                  1
+                    )
+                    count - 1
+                    else
+                    null
+                  }
+                abortedByClose()
+              }
               acquired = true
               return true
             }
             holds.remove(data)
-            Thread.sleep(LEASE_HEAL_PAUSE_MS)
+            pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
             continue@outer
           }
 
@@ -304,12 +361,12 @@ class DistributedSemaphore
           WaiterSupport.awaitPrefixDeletion(
             client,
             "$holdersPath/",
-            resilience,
+            bounded,
             latch,
             deadline,
             observedRevision = snap.observedRevision,
             shouldWake = {
-              val now = rankOf(entryKey)
+              val now = rankOf(entryKey, bounded.rpc)
               now == null || now.rank < permits
             },
             reportRecovery = { event -> reportRecoveryEvent(event) },
@@ -318,11 +375,16 @@ class DistributedSemaphore
           attempt.wake.store(null)
           // Loop: re-evaluate the rank (it only shrinks while the entry lives)
         }
+      } catch (e: EtcdRecipeRuntimeException) {
+        // An RPC that failed once the deadline passed (bounded by it, it timed out): time ran out
+        if (deadline.hasPassed() && !closeCalled.load()) return false
+        throw e
       } finally {
         attempts -= attempt
         if (!acquired) {
-          // Revoke deletes the entry (safe on an already-dead lease), waking waiters
-          lease.close()
+          // Revoke deletes the entry (safe on an already-dead lease), waking waiters. A
+          // bounded acquisition gives it one short attempt, so it returns near its deadline.
+          if (deadline == null) lease.close() else lease.closePromptly()
         }
       }
       @Suppress("UNREACHABLE_CODE")
@@ -334,7 +396,10 @@ class DistributedSemaphore
   // plus the revision at which that snapshot observed the blockers present (so
   // the wait can anchor its DELETE-watch there); null once the entry no longer
   // exists (its lease died).
-  private fun rankOf(entryKey: String): RankSnapshot? {
+  private fun rankOf(
+    entryKey: String,
+    rpc: RpcResilience,
+  ): RankSnapshot? {
     val snapshot =
       client.getResponse(
         "$holdersPath/",
@@ -343,7 +408,7 @@ class DistributedSemaphore
           withSortField(GetOption.SortTarget.CREATE)
           withSortOrder(GetOption.SortOrder.ASCEND)
         },
-        resilience.rpc,
+        rpc,
       )
     val idx = snapshot.kvs.indexOfFirst { it.key.asString == entryKey }
     return if (idx < 0) null else RankSnapshot(idx, snapshot.header.revision)
@@ -378,7 +443,7 @@ class DistributedSemaphore
     withRecipeLoggingContext {
       val data = attempt.holdData ?: return
       if (!holds.remove(data)) return // already released, or close() took it
-      dispossessedCount.incrementAndFetch()
+      recordLostPermit(data.owner)
       logger.warn(cause) { "Permit on $semaphorePath lost by $clientId (lease expired)" }
       recordException(cause ?: EtcdRecipeRuntimeException("Permit lease for $semaphorePath expired; permit lost"))
       reportLeaseEvent(LeaseEvent.Expired(data.lease.leaseId, cause))
@@ -399,18 +464,24 @@ class DistributedSemaphore
   }
 
   override fun doClose() {
-    while (true) {
-      val data = holds.pollFirst() ?: break
-      dispossessedCount.incrementAndFetch()
-      data.lease.close()
-    }
+    // Abort in-flight waits first, so an attempt about to be admitted can't publish a hold
+    // after the holds below are drained.
     attempts.toList().forEach { attempt ->
       if (attempt.phase.compareAndSet(Phase.WAITING, Phase.DEAD)) {
         attempt.wake.load()?.countDown()
       }
     }
+    while (true) {
+      val data = holds.pollFirst() ?: break
+      recordLostPermit(data.owner)
+      data.lease.close()
+    }
     lostListeners.clear()
   }
+
+  // An acquisition that close() landed on: it fails rather than acquire on a closed recipe
+  private fun abortedByClose(cause: Throwable? = null): Nothing =
+    throw EtcdRecipeRuntimeException("Permit attempt on $semaphorePath aborted by close()", cause)
 
   companion object {
     private val logger = KotlinLogging.logger {}

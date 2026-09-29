@@ -29,6 +29,8 @@ import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.getChildCount
+import io.etcd.recipes.common.isLeaseNotFound
+import io.etcd.recipes.common.isRetriableRpcFailure
 import io.etcd.recipes.common.unlock
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CompletableFuture
@@ -39,6 +41,7 @@ import java.util.concurrent.TimeoutException
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
@@ -70,8 +73,12 @@ class DistributedMutex
   private class LockData(
     val acquisitionLease: AcquisitionLease,
     val ownershipKey: ByteSequence,
+    // The acquisition this hold came from: a loss is applied only to the hold it belongs to
+    val attempt: Attempt,
   ) {
-    var holdCount = 1 // guarded by owner-thread confinement
+    // Changed by the owner thread; read by a loss on jetcd's lease thread
+    @Volatile
+    var holdCount = 1
     val acquiredAt: ComparableTimeMark = TimeSource.Monotonic.markNow()
   }
 
@@ -101,6 +108,7 @@ class DistributedMutex
 
   override val exceptionContext get() = "DistributedMutex[$lockPath]"
 
+  @Throws(InterruptedException::class)
   override fun lock() {
     val timed = !isHeldByCurrentThread // don't time reentrant re-locks
     val start = TimeSource.Monotonic.markNow()
@@ -108,6 +116,7 @@ class DistributedMutex
     if (timed) resilience.metrics.recordLockWait(lockPath, start.elapsedNow(), acquired = true)
   }
 
+  @Throws(InterruptedException::class)
   override fun tryLock(timeout: Duration): Boolean {
     require(timeout > Duration.ZERO) { "Timeout must be positive: $timeout" }
     val timed = !isHeldByCurrentThread
@@ -117,6 +126,7 @@ class DistributedMutex
     return acquired
   }
 
+  @Throws(InterruptedException::class)
   override fun tryLock(
     timeout: Long,
     timeUnit: TimeUnit,
@@ -168,7 +178,14 @@ class DistributedMutex
     throw IllegalMonitorStateException("Current thread does not hold the lock on $lockPath")
   }
 
-  @Suppress("ReturnCount", "ThrowsCount", "LoopWithTooManyJumpStatements", "TooGenericExceptionCaught", "LongMethod")
+  @Suppress(
+    "ReturnCount",
+    "ThrowsCount",
+    "LoopWithTooManyJumpStatements",
+    "TooGenericExceptionCaught",
+    "LongMethod",
+    "CyclomaticComplexMethod",
+  )
   private fun acquire(deadline: ComparableTimeMark?): Boolean {
     checkCloseNotCalled()
     val me = Thread.currentThread()
@@ -179,27 +196,34 @@ class DistributedMutex
 
     while (true) {
       checkCloseNotCalled()
-      if (deadline != null && deadline.hasPassedNow()) return false
+      if (deadline.hasPassed()) return false
 
       val attempt = Attempt(me)
       // The lease is kept alive from grant, through the server-side wait, and
       // across the hold; its fatal callback drives both mid-wait aborts and
-      // lock-lost while holding.
+      // lock-lost while holding. A deadline bounds the grant too.
       val lease =
-        AcquisitionLease(
-          client,
-          leaseTtlSecs,
-          resilience.rpc,
-          onTransient = { leaseId, e ->
-            recordException(e)
-            reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
-          },
-          onResumed = { leaseId -> reportLeaseEvent(LeaseEvent.Restored(leaseId, leaseId)) },
-          onFatal = { cause -> onAttemptFatal(attempt, cause) },
-        )
+        try {
+          AcquisitionLease(
+            client,
+            leaseTtlSecs,
+            resilience.rpc.within(deadline),
+            onTransient = { leaseId, e ->
+              recordException(e)
+              reportLeaseEvent(LeaseEvent.Suspended(leaseId, e))
+            },
+            onResumed = { leaseId -> reportLeaseEvent(LeaseEvent.Restored(leaseId, leaseId)) },
+            onFatal = { cause -> onAttemptFatal(attempt, cause) },
+          )
+        } catch (e: EtcdRecipeRuntimeException) {
+          if (deadline.hasPassed()) return false // time ran out during the grant
+          throw e
+        }
       attempts += attempt
       var acquired = false
       try {
+        // A close() that ran before this attempt registered found nothing to abort
+        if (closeCalled.load()) abortedByClose()
         val future = client.lockClient.lock(lockPath.asByteSequence, lease.leaseId)
         attempt.future = future
 
@@ -216,34 +240,44 @@ class DistributedMutex
             future.cancel(true)
             throw e
           } catch (e: Exception) {
-            // Lease death mid-wait, "no leader", or a close() abort. Retry with a
-            // fresh lease (paced); tryLock stays bounded by the loop's deadline check.
-            recordException(e)
             if (closeCalled.load()) {
-              throw EtcdRecipeRuntimeException("Lock attempt on $lockPath aborted by close()", e)
+              abortedByClose(e)
             }
-            Thread.sleep(LEASE_HEAL_PAUSE_MS)
+            // Only lease death mid-wait and transient RPC failures ("no leader", a timeout)
+            // are worth another attempt; anything else (permission denied) never heals.
+            if (!isRetriableLockFailure(attempt, e)) throw EtcdRecipeRuntimeException("Lock on $lockPath failed", e)
+            // Retry with a fresh lease (paced); tryLock stays bounded by the deadline.
+            recordException(e)
+            pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
             continue
           }
 
         // Publish the hold BEFORE claiming the phase, so a fatal that lands in the
         // win window always finds the hold to dispossess (or the CAS failure below
         // rolls it back) — never a silently-dead "held" lock.
-        threadData[me] = LockData(lease, response.key)
+        val data = LockData(lease, response.key, attempt)
+        threadData[me] = data
         if (attempt.phase.compareAndSet(Phase.WAITING, Phase.HOLDING)) {
+          if (closeCalled.load()) {
+            // close() landed in the win window: don't hand out a lock on a closed mutex
+            threadData.remove(me, data)
+            dispossessed.remove(me)
+            abortedByClose()
+          }
           dispossessed.remove(me)
           acquired = true
           return true
         }
         // The lease died in the win window: roll back and retry as a loser
-        threadData.remove(me)
+        threadData.remove(me, data)
         continue
       } finally {
         attempts -= attempt
         if (!acquired) {
           // Revoke is idempotent and safe on an already-dead lease; it deletes any
-          // just-granted ownership key and aborts the server-side wait.
-          lease.close()
+          // just-granted ownership key and aborts the server-side wait. A bounded
+          // acquisition gives it one short attempt, so it returns near its deadline.
+          if (deadline == null) lease.close() else lease.closePromptly()
         }
       }
     }
@@ -273,20 +307,28 @@ class DistributedMutex
         cause ?: EtcdRecipeRuntimeException("Lock lease expired while waiting on $lockPath"),
       )
     } else if (attempt.phase.load() == Phase.HOLDING) {
-      lockLost(attempt.owner, cause)
+      lockLost(attempt, cause)
     }
   }
+
+  private fun isRetriableLockFailure(
+    attempt: Attempt,
+    e: Exception,
+  ): Boolean = attempt.phase.load() == Phase.DEAD || e.isLeaseNotFound() || e.isRetriableRpcFailure()
 
   // Cooperative dispossession (once-guarded by the map removal): state flips,
   // listeners fire, LOST is reported; interruption is opt-in because critical
   // sections are inline user code.
   @Suppress("TooGenericExceptionCaught")
   private fun lockLost(
-    thread: Thread,
+    attempt: Attempt,
     cause: Throwable?,
   ) {
     withRecipeLoggingContext {
-      val data = threadData.remove(thread) ?: return
+      val thread = attempt.owner
+      // Only this attempt's hold: a stale event must not take a newer hold of the same thread
+      val data = threadData[thread]?.takeIf { it.attempt === attempt } ?: return
+      if (!threadData.remove(thread, data)) return
       dispossessed[thread] = data.holdCount
       logger.warn(cause) { "Lock on $lockPath lost by $clientId (lease expired)" }
       recordException(cause ?: EtcdRecipeRuntimeException("Lock lease for $lockPath expired; lock lost"))
@@ -308,6 +350,8 @@ class DistributedMutex
   }
 
   private fun releaseHold(data: LockData) {
+    // The hold is over: a fatal event for its lease from now on is stale
+    data.attempt.phase.compareAndSet(Phase.HOLDING, Phase.DEAD)
     resilience.metrics.recordLockHold(lockPath, data.acquiredAt.elapsedNow())
     // Prompt FIFO handoff via the unlock RPC; the revoke below is belt-and-braces
     // (it deletes the ownership key even if the unlock RPC failed).
@@ -317,15 +361,8 @@ class DistributedMutex
   }
 
   override fun doClose() {
-    // Release every thread's hold; owners become dispossessed so their later
-    // unlock() returns false instead of throwing. Never blocks on user threads.
-    threadData.keys.toList().forEach { thread ->
-      threadData.remove(thread)?.let { data ->
-        dispossessed[thread] = data.holdCount
-        releaseHold(data)
-      }
-    }
-    // Abort in-flight waits; each attempt's finally revokes its lease.
+    // Abort in-flight waits first, so an attempt about to win can't publish a hold after
+    // the holds below are drained; each attempt's finally revokes its lease.
     attempts.toList().forEach { attempt ->
       if (attempt.phase.compareAndSet(Phase.WAITING, Phase.DEAD)) {
         attempt.future?.completeExceptionally(
@@ -333,8 +370,20 @@ class DistributedMutex
         )
       }
     }
+    // Then release every thread's hold; owners become dispossessed so their later
+    // unlock() returns false instead of throwing. Never blocks on user threads.
+    threadData.keys.toList().forEach { thread ->
+      threadData.remove(thread)?.let { data ->
+        dispossessed[thread] = data.holdCount
+        releaseHold(data)
+      }
+    }
     lockLostListeners.clear()
   }
+
+  // An acquisition that close() landed on: it fails rather than acquire on a closed recipe
+  private fun abortedByClose(cause: Throwable? = null): Nothing =
+    throw EtcdRecipeRuntimeException("Lock attempt on $lockPath aborted by close()", cause)
 
   companion object {
     private val logger = KotlinLogging.logger {}

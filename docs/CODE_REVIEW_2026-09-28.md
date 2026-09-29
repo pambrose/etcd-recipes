@@ -101,11 +101,11 @@
 - [ ] [#41](#issue-41) Count-barrier waiting keys aren't scoped to a generation
 - [ ] [#42](#issue-42) `DistributedBarrier.setBarrier()` after `removeBarrier()` on the same instance silently fails
 - [x] [#43](#issue-43) A broad `catch (EtcdRecipeRuntimeException)` reports infrastructure failures as a lost CAS
-- [ ] [#44](#issue-44) `close()` races in-flight lock and permit acquisitions
-- [ ] [#45](#issue-45) `DistributedMutex` retries non-retriable lock failures forever, and `tryLock` reports them as a timeout
-- [ ] [#46](#issue-46) Semaphore `release()` frees another thread's live permit before consuming a lost one
-- [ ] [#47](#issue-47) Java can't catch `InterruptedException` from the concrete `DistributedMutex` / `DistributedSemaphore` types
-- [ ] [#48](#issue-48) `tryLock`/`tryAcquire` deadlines don't bound the setup and cleanup RPCs
+- [x] [#44](#issue-44) `close()` races in-flight lock and permit acquisitions
+- [x] [#45](#issue-45) `DistributedMutex` retries non-retriable lock failures forever, and `tryLock` reports them as a timeout
+- [x] [#46](#issue-46) Semaphore `release()` frees another thread's live permit before consuming a lost one
+- [x] [#47](#issue-47) Java can't catch `InterruptedException` from the concrete `DistributedMutex` / `DistributedSemaphore` types
+- [x] [#48](#issue-48) `tryLock`/`tryAcquire` deadlines don't bound the setup and cleanup RPCs
 - [x] [#49](#issue-49) The work queue's empty-wait watch isn't revision-anchored (the lost wakeup that PR #68 fixed elsewhere)
 - [ ] [#50](#issue-50) An ambiguous take commit loses the item (plain queues) or strands the claim (work queue)
 - [x] [#51](#issue-51) Retried enqueue puts can duplicate an item that was already consumed
@@ -140,8 +140,8 @@
 - [ ] [#78](#issue-78) Passwords appear in `toString()`, and half-configured mTLS is silently ignored
 - [ ] [#79](#issue-79) Gaps in background logging context (MDC)
 - [x] [#80](#issue-80) `DistributedAtomicLong` resilience gaps (no close check, uncapped backoff, undocumented ambiguous commits)
-- [ ] [#81](#issue-81) Read-write lock and semaphore releases rely on a single, un-retried revoke
-- [ ] [#82](#issue-82) Lock-loss bookkeeping is keyed by thread, and `holdCount` is read cross-thread without synchronization
+- [x] [#81](#issue-81) Read-write lock and semaphore releases rely on a single, un-retried revoke
+- [x] [#82](#issue-82) Lock-loss bookkeeping is keyed by thread, and `holdCount` is read cross-thread without synchronization
 - [ ] [#83](#issue-83) Locks expose no fencing token, and the default lease TTL is 2 s
 - [x] [#84](#issue-84) Election and barrier API traps (`close()` before `start()`, unused `clientId`)
 - [x] [#85](#issue-85) `LeaderObserver.onRecovery` replays leadership on every recovery

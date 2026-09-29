@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (lock lifecycle and semantics)
+
+- `close()` no longer races an acquisition in flight on `DistributedMutex`,
+  `DistributedReadWriteLock`, or `DistributedSemaphore`. It now aborts waits before
+  draining holds, and an acquisition re-checks `close()` after registering and after
+  winning. Before, one that was granting its lease when `close()` ran could still acquire
+  afterward, leaving a closed recipe holding the lock with a live keep-alive, or returning
+  `true` for a lock `close()` had already released.
+- `DistributedMutex` retries only failures that can heal: lease death, "no leader", and
+  retriable RPC statuses. Anything else, such as permission denied on the lock path, is
+  thrown as `EtcdRecipeRuntimeException`. `lock()` used to retry it forever (four lease
+  grants a second), and `tryLock` reported it as a timeout.
+- `DistributedSemaphore.release()` gives up a live permit the calling thread acquired,
+  else one it lost (returning `false`), and only then falls back to any permit. Before, a
+  thread whose permit was lost released another thread's live permit, admitting one more
+  holder than the semaphore allows. `withPermit` releases its own permit exactly.
+- `tryLock` / `tryAcquire` deadlines now bound the lease grant, reads, transactions, and
+  pauses of the attempt, not just the wait. The abort's revoke gets one short attempt.
+  During an etcd brownout a `tryLock(500.milliseconds)` returns `false` close to its
+  timeout instead of about two minutes later.
+- A read-write-lock or semaphore release retries its revoke, so one lost revoke no longer
+  leaves the entry blocking every successor until its lease TTL runs out.
+- `DistributedMutex.lock` / `tryLock` and `DistributedSemaphore.acquire` / `tryAcquire`
+  declare `InterruptedException` (`@Throws`), so Java can catch it.
+- A lock-loss event applies only to the hold it belongs to, and hold counts are read
+  safely across threads. A stale event could remove a newer hold of the same thread.
+
 ### Fixed (`LeaderSelector` candidacy)
 
 - `LeaderSelector` now runs every election attempt and its term on one thread (the

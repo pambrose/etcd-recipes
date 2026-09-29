@@ -61,7 +61,12 @@ in a `finally`. See the [Java guide](../java.md).
 
 ### Acquiring with a timeout
 
-Blocking forever is rarely what a service wants. `tryLock` bounds the wait:
+Blocking forever is rarely what a service wants. `tryLock` bounds the wait, and every RPC
+the attempt makes along the way (the lease grant, reads, and transactions), so during an
+etcd brownout it still returns `false` close to its timeout rather than minutes later.
+A failure that retrying can't fix, such as permission denied on the lock path, is thrown
+rather than reported as a timeout. The same goes for `lock()`, which would otherwise
+retry it forever.
 
 === "Kotlin"
 
@@ -237,14 +242,20 @@ holds follow `java.util.concurrent.Semaphore`'s rules rather than a lock's:
 | Ownership | The acquiring thread | The instance |
 | Who may release | Only the holder | Any thread |
 | Reentrant | Yes | **No** |
-| Release order | — | LIFO |
+| Release order | — | The caller's own permit first |
 
 ```kotlin
 --8<-- "kotlin/website/locks/SemaphoreSnippets.kt:multiple"
 ```
 
 Permit loss mirrors lock loss — a listener, `connectionState` → `LOST`, `release()`
-returning `false`, and an opt-in `interruptOnPermitLoss`:
+returning `false`, and an opt-in `interruptOnPermitLoss`. A `release()` gives up a live
+permit the calling thread acquired, else the one it lost (returning `false`), so a thread
+whose permit was lost never gives up another thread's live permit. Only when the releasing
+thread acquired nothing does it fall back to any of the instance's permits.
+
+`close()` aborts acquisitions in flight: one that `close()` lands on throws rather than
+acquiring on a closed recipe. That holds for locks too.
 
 ```kotlin
 --8<-- "kotlin/website/locks/SemaphoreSnippets.kt:permit-lost"
