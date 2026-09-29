@@ -146,7 +146,11 @@ class WorkQueueTests : StringSpec() {
           queue.enqueue("poison-pill")
 
           repeat(2) {
-            queue.receive(10.seconds).shouldNotBeNull()
+            // This consumer's own lease was revoked on the previous pass, and it can claim
+            // again only once it heals, which waits for jetcd's next keep-alive (TTL/3 =
+            // 10s here). A bounded receive returns null at its deadline rather than
+            // retrying the dead lease past it, so allow for the heal.
+            queue.receive(30.seconds).shouldNotBeNull()
             revokeClaimLease(client, path)
             // wait until the claim marker is really gone before reclaiming
             pollUntil(10.seconds) { client.getChildrenKeys("$path/claims").isEmpty() } shouldBe true

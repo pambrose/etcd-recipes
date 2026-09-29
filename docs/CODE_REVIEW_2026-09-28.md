@@ -71,9 +71,9 @@
 - [ ] [#13](#issue-13) `LeaderSelector.start()` can hang forever, uninterruptibly
 - [ ] [#14](#issue-14) Watch-triggered election attempts swallow Phase-1 failures and never retry, so the election can be left leaderless
 - [x] [#15](#issue-15) `DistributedAtomicLong` is permanently broken if first-use initialization fails
-- [ ] [#16](#issue-16) `DistributedWorkQueue.requeue()` bypasses `maxDeliveries`, so poison messages loop forever
-- [ ] [#17](#issue-17) Work-queue `claimHead` lease-not-found retry is unbounded and ignores the deadline and `close()`
-- [ ] [#18](#issue-18) A work-queue `receive()` in flight across `close()` creates a lease after close, and its item can never be acked
+- [x] [#16](#issue-16) `DistributedWorkQueue.requeue()` bypasses `maxDeliveries`, so poison messages loop forever
+- [x] [#17](#issue-17) Work-queue `claimHead` lease-not-found retry is unbounded and ignores the deadline and `close()`
+- [x] [#18](#issue-18) A work-queue `receive()` in flight across `close()` creates a lease after close, and its item can never be acked
 - [x] [#19](#issue-19) `ServiceRegistry.close()` can block about 2 min, then throw part-way through and leave healers running
 - [ ] [#20](#issue-20) `PathChildrenCache` priming start swallows load failures and leaves a dead cache that reports healthy
 - [ ] [#21](#issue-21) Coroutine `withLock` / `withPermit` / `awaitAcquire` leak the hold when cancellation races a successful acquire
@@ -106,10 +106,10 @@
 - [ ] [#46](#issue-46) Semaphore `release()` frees another thread's live permit before consuming a lost one
 - [ ] [#47](#issue-47) Java can't catch `InterruptedException` from the concrete `DistributedMutex` / `DistributedSemaphore` types
 - [ ] [#48](#issue-48) `tryLock`/`tryAcquire` deadlines don't bound the setup and cleanup RPCs
-- [ ] [#49](#issue-49) The work queue's empty-wait watch isn't revision-anchored (the lost wakeup that PR #68 fixed elsewhere)
+- [x] [#49](#issue-49) The work queue's empty-wait watch isn't revision-anchored (the lost wakeup that PR #68 fixed elsewhere)
 - [ ] [#50](#issue-50) An ambiguous take commit loses the item (plain queues) or strands the claim (work queue)
 - [x] [#51](#issue-51) Retried enqueue puts can duplicate an item that was already consumed
-- [ ] [#52](#issue-52) `AbstractQueue` takes don't react to `close()`
+- [x] [#52](#issue-52) `AbstractQueue` takes don't react to `close()`
 - [x] [#53](#issue-53) `enqueue(value, Duration.INFINITE)` writes a poison key that breaks every receive
 - [ ] [#54](#issue-54) The orphan sweep issues one transaction per in-flight claim on every idle wake
 - [ ] [#55](#issue-55) `enqueueAll`'s within-batch order relies on etcd's unstable sort
@@ -148,8 +148,8 @@
 - [x] [#86](#issue-86) `DistributedBarrier.close()` doesn't unpark waiters, and its internal reads are close-checked
 - [ ] [#87](#issue-87) Code-quality leftovers: Java atomics reintroduced, unused fields, stale `ElectionPaths`
 - [ ] [#88](#issue-88) `TransientKeyValue`: retrying `start()` after a failure can leave a published key that can't be removed
-- [ ] [#89](#issue-89) Work-queue sweeper failures are dropped at DEBUG
-- [ ] [#90](#issue-90) `ack()`/`requeue()` are guarded on the instance's `clientId`, not on the specific claim
+- [x] [#89](#issue-89) Work-queue sweeper failures are dropped at DEBUG
+- [x] [#90](#issue-90) `ack()`/`requeue()` are guarded on the instance's `clientId`, not on the specific claim
 - [ ] [#91](#issue-91) Queue metrics and small interop and docs gaps
 - [ ] [#92](#issue-92) Head selection makes etcd read and sort the whole range (O(N²) drain)
 - [ ] [#93](#issue-93) `TypedPathChildrenCache`: one throwing listener stops the event reaching the rest

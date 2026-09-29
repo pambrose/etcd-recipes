@@ -24,6 +24,7 @@ import com.pambrose.common.util.randomId
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
+import io.etcd.jetcd.op.Cmp
 import io.etcd.jetcd.op.CmpTarget
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.jetcd.watch.WatchEvent
@@ -54,11 +55,13 @@ import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.random.Random
 import kotlin.time.ComparableTimeMark
@@ -119,6 +122,16 @@ class DistributedWorkQueue
   private val dlqPath = "$queuePath/dlq"
   private val delayedPath = "$queuePath/delayed"
   private val leaseListeners = CopyOnWriteArrayList<LeaseListener>()
+
+  // The latches of receives parked on an empty queue, so close() can release them.
+  private val parkedReceives: MutableSet<CountDownLatch> = ConcurrentHashMap.newKeySet()
+
+  // Set when the consumer lease's healing is abandoned (cleared if it heals after all):
+  // no claim can succeed then, so a receive fails instead of retrying the dead lease.
+  private val leaseAbandoned = AtomicReference<Throwable?>(null)
+
+  // True while consecutive reclaim sweeps fail, so a persistent failure is recorded once.
+  private val sweepFailing = AtomicBoolean(false)
 
   init {
     require(queuePath.isNotEmpty()) { "Queue path cannot be empty" }
@@ -230,9 +243,9 @@ class DistributedWorkQueue
   fun tryReceive(): WorkItem? {
     checkCloseNotCalled()
     promoteMatured()
-    claimHead()?.let { return it }
+    claimHead(null).item?.let { return it }
     reclaimOrphans()
-    return claimHead()
+    return claimHead(null).item
   }
 
   /** The current dead letters (items that exhausted [WorkQueueConfig.maxDeliveries]). */
@@ -273,7 +286,18 @@ class DistributedWorkQueue
     val id: String,
     val value: ByteSequence,
     val attempt: Int,
+    // The claim marker's create revision: identifies this claim, not just this consumer, so
+    // a stale item can't ack or requeue a later claim of the same id by the same instance.
+    private val claimRevision: Long,
   ) {
+    private fun isStillClaimed(): Array<Cmp> {
+      val claimKey = "$claimsPath/$id"
+      return arrayOf(
+        equalTo(claimKey, CmpTarget.value(clientId.asByteSequence)),
+        equalTo(claimKey, CmpTarget.createRevision(claimRevision)),
+      )
+    }
+
     /**
      * Completes the item: deletes its claim, payload copy, and attempt counter in
      * one transaction, guarded on the claim still being this consumer's. Returns
@@ -283,7 +307,7 @@ class DistributedWorkQueue
     fun ack(): Boolean {
       checkCloseNotCalled()
       return client.transaction(resilience.rpc) {
-        If(equalTo("$claimsPath/$id".asByteSequence, CmpTarget.value(clientId.asByteSequence)))
+        If(*isStillClaimed())
         Then(
           deleteOp("$claimsPath/$id".asByteSequence),
           deleteOp("$claimedPath/$id".asByteSequence),
@@ -292,11 +316,15 @@ class DistributedWorkQueue
       }.isSucceeded
     }
 
-    /** Returns the item to the queue early (attempts preserved). */
+    /**
+     * Returns the item to the queue early (attempts preserved). Once it has been
+     * delivered [WorkQueueConfig.maxDeliveries] times, the next receive dead-letters it
+     * instead of delivering it again.
+     */
     fun requeue(): Boolean {
       checkCloseNotCalled()
       return client.transaction(resilience.rpc) {
-        If(equalTo("$claimsPath/$id".asByteSequence, CmpTarget.value(clientId.asByteSequence)))
+        If(*isStillClaimed())
         Then(
           "$itemsPath/$id" setTo value,
           deleteOp("$claimsPath/$id".asByteSequence),
@@ -314,29 +342,45 @@ class DistributedWorkQueue
 
   @Suppress("ReturnCount")
   private fun receiveWithDeadline(deadline: ComparableTimeMark?): WorkItem? {
-    checkCloseNotCalled()
     while (true) {
+      checkCloseNotCalled()
       promoteMatured()
-      claimHead()?.let { return it }
+      claimHead(deadline).item?.let { return it }
       reclaimOrphans()
-      claimHead()?.let { return it }
+      val attempt = claimHead(deadline)
+      attempt.item?.let { return it }
       if (deadline != null && deadline.hasPassedNow()) return null
-      awaitItem(deadline)
+      awaitItem(deadline, attempt.emptyAtRevision)
     }
   }
+
+  // A claimed head, or the revision at which items/ was seen empty (0 when unknown).
+  private class ClaimAttempt(
+    val item: WorkItem?,
+    val emptyAtRevision: Long,
+  )
 
   // Claims the queue head atomically: guarded on the item's mod-revision, one
   // transaction deletes it from items/, copies it to claimed/, puts the leased
   // claim marker, and bumps the attempt counter. Reading the prior attempt count
   // outside the transaction is safe: only the claim winner writes it, and the
   // items/ guard picks exactly one winner per queue generation.
+  //
+  // An item already delivered maxDeliveries times (it came back through requeue()) is
+  // dead-lettered here instead of delivered again; reclaimOrphans covers the crash path.
   @Suppress("ReturnCount", "TooGenericExceptionCaught", "LoopWithTooManyJumpStatements")
-  private fun claimHead(): WorkItem? {
+  private fun claimHead(deadline: ComparableTimeMark?): ClaimAttempt {
     while (true) {
-      val head = client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc).kvs.firstOrNull() ?: return null
+      val response = client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc)
+      val head = response.kvs.firstOrNull() ?: return ClaimAttempt(null, response.header.revision)
       val id = head.key.asString.substringAfterLast('/')
-      val attempt = client.getValue("$attemptsPath/$id", 0, resilience.rpc) + 1
-      val leaseId = consumerLease.currentLeaseId
+      val delivered = client.getValue("$attemptsPath/$id", 0, resilience.rpc)
+      if (delivered >= config.maxDeliveries) {
+        deadLetterExhausted(head, id, delivered)
+        continue
+      }
+      val attempt = delivered + 1
+      val leaseId = consumerLeaseId()
       val txn =
         try {
           client.transaction(resilience.rpc) {
@@ -351,15 +395,55 @@ class DistributedWorkQueue
         } catch (e: Exception) {
           // The consumer lease can die between reading its id and committing; the
           // healer re-grants it shortly (its keep-alive stream reports NOT_FOUND on
-          // the next renewal), so pace briefly and retry with the fresh lease.
-          if (e.isLeaseNotFound()) {
-            Thread.sleep(LEASE_HEAL_PAUSE_MS)
-            continue
-          }
-          throw e
+          // the next renewal), so pace briefly and retry with the fresh lease — unless
+          // this queue is closed, the healer gave up, or the receive's deadline passed.
+          if (!e.isLeaseNotFound()) throw e
+          if (!shouldRetryAfterLeaseLoss(e, deadline)) return ClaimAttempt(null, 0L)
+          Thread.sleep(LEASE_HEAL_PAUSE_MS)
+          continue
         }
-      if (txn.isSucceeded) return WorkItem(id, head.value, attempt)
+      if (txn.isSucceeded) return ClaimAttempt(WorkItem(id, head.value, attempt, txn.header.revision), 0L)
       // Lost the head to a concurrent consumer; retry with the new head
+    }
+  }
+
+  // Whether to retry a claim that failed because the consumer lease is gone. Throws when
+  // no retry can succeed (this queue is closed, or the healer gave up); false once the
+  // receive's deadline has passed.
+  private fun shouldRetryAfterLeaseLoss(
+    e: Exception,
+    deadline: ComparableTimeMark?,
+  ): Boolean {
+    if (closeCalled.load()) throw EtcdRecipeRuntimeException("Work queue $queuePath closed while claiming", e)
+    leaseAbandoned.load()?.let { cause ->
+      throw EtcdRecipeRuntimeException("Consumer lease healing abandoned; $queuePath can't claim items", cause)
+    }
+    return deadline == null || !deadline.hasPassedNow()
+  }
+
+  // The consumer lease's current id, creating the lease (and sweeper) on first use. A
+  // close() that raced that creation skipped the half-built lease, so it is released here
+  // rather than claiming under a lease created after close.
+  private fun consumerLeaseId(): Long {
+    checkCloseNotCalled()
+    val lease = consumerLease
+    if (closeCalled.load()) {
+      lease.close()
+      if (sweeperDelegate.isInitialized()) sweeper.shutdownNow()
+      throw EtcdRecipeRuntimeException("Work queue $queuePath closed while creating its consumer lease")
+    }
+    return lease.currentLeaseId
+  }
+
+  private fun deadLetterExhausted(
+    head: KeyValue,
+    id: String,
+    delivered: Int,
+  ) {
+    logger.warn { "Dead-lettering $id after $delivered deliveries" }
+    client.transaction(resilience.rpc) {
+      If(equalTo(head.key, CmpTarget.modRevision(head.modRevision)))
+      Then(deleteOp(head.key), "$dlqPath/$id" setTo head.value)
     }
   }
 
@@ -391,6 +475,8 @@ class DistributedWorkQueue
     }
   }
 
+  // A failure is recorded once per failing streak (the first failed sweep after a
+  // successful one), so a persistent failure doesn't grow exceptions every interval.
   @Suppress("TooGenericExceptionCaught")
   private fun sweepSafely() {
     try {
@@ -398,8 +484,14 @@ class DistributedWorkQueue
         promoteMatured()
         reclaimOrphans()
       }
+      sweepFailing.store(false)
     } catch (e: Throwable) {
-      logger.debug(e) { "Reclaim sweep failed; next interval will retry" }
+      if (sweepFailing.compareAndSet(false, true)) {
+        logger.warn(e) { "Reclaim sweep failed; retrying every ${config.sweepInterval}" }
+        recordException(e)
+      } else {
+        logger.debug(e) { "Reclaim sweep still failing" }
+      }
     }
   }
 
@@ -458,38 +550,35 @@ class DistributedWorkQueue
   // Parks until an item lands in items/ (or the deadline passes), on the resilient
   // watcher. Also wakes at least every sweepInterval so a parked consumer keeps
   // reclaiming even when nothing is enqueued.
-  private fun awaitItem(deadline: ComparableTimeMark?) {
+  private fun awaitItem(
+    deadline: ComparableTimeMark?,
+    emptyAtRevision: Long,
+  ) {
     val latch = CountDownLatch(1)
+    parkedReceives += latch
+    try {
+      // A close() that ran before this receive registered found nothing to release
+      if (closeCalled.load()) latch.countDown()
+      awaitItem(latch, deadline, emptyAtRevision)
+    } finally {
+      parkedReceives -= latch
+    }
+  }
+
+  private fun awaitItem(
+    latch: CountDownLatch,
+    deadline: ComparableTimeMark?,
+    emptyAtRevision: Long,
+  ) {
     val watchFailure = AtomicReference<Throwable?>(null)
-    val recoveryListener =
-      WatchRecoveryListener { event ->
-        withRecipeLoggingContext {
-          reportRecoveryEvent(event)
-          when (event) {
-            is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-              if (client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc).kvs.isNotEmpty()) {
-                latch.countDown()
-              }
-            }
-
-            is WatchRecoveryEvent.Failed -> {
-              val cause = event.cause
-                ?: EtcdRecipeRuntimeException("Watch on $itemsPath abandoned while waiting for work")
-              watchFailure.store(cause)
-              recordException(cause)
-              latch.countDown()
-            }
-
-            is WatchRecoveryEvent.Suspended -> {
-              // jetcd (transient) or the recovery loop (fatal) is already on it
-            }
-          }
-        }
-      }
+    val recoveryListener = itemWaiterRecoveryListener(latch, watchFailure)
 
     client.withWatcher(
       "$itemsPath/",
+      // Anchored at the revision items/ was seen empty, so a PUT that lands while the
+      // watch is being established is still delivered.
       watchOption {
+        if (emptyAtRevision > 0L) withRevision(emptyAtRevision + 1)
         isPrefix(true)
         withNoDelete(true)
       },
@@ -513,29 +602,69 @@ class DistributedWorkQueue
       if (wait > Duration.ZERO) {
         latch.await(wait.inWholeMilliseconds, TimeUnit.MILLISECONDS)
       }
+      if (closeCalled.load()) throw EtcdRecipeRuntimeException("Work queue $queuePath closed while waiting for work")
       watchFailure.load()?.let { cause ->
         throw EtcdRecipeRuntimeException("Work-queue watch on $itemsPath failed while waiting", cause)
       }
     }
   }
 
+  // After a watch recovery, polls items/ in case a PUT landed while the stream was dead;
+  // an abandoned recovery unparks the waiter with the failure recorded.
+  private fun itemWaiterRecoveryListener(
+    latch: CountDownLatch,
+    watchFailure: AtomicReference<Throwable?>,
+  ): WatchRecoveryListener =
+    WatchRecoveryListener { event ->
+      withRecipeLoggingContext {
+        reportRecoveryEvent(event)
+        when (event) {
+          is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+            if (client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc).kvs.isNotEmpty()) {
+              latch.countDown()
+            }
+          }
+
+          is WatchRecoveryEvent.Failed -> {
+            val cause = event.cause
+              ?: EtcdRecipeRuntimeException("Watch on $itemsPath abandoned while waiting for work")
+            watchFailure.store(cause)
+            recordException(cause)
+            latch.countDown()
+          }
+
+          is WatchRecoveryEvent.Suspended -> {
+            // jetcd (transient) or the recovery loop (fatal) is already on it
+          }
+        }
+      }
+    }
+
   @Suppress("TooGenericExceptionCaught")
   private fun onLeaseEvent(event: LeaseEvent) {
     withRecipeLoggingContext {
       reportLeaseEvent(event)
       when (event) {
-        is LeaseEvent.Suspended -> recordException(event.cause)
+        is LeaseEvent.Suspended -> {
+          recordException(event.cause)
+        }
 
-        is LeaseEvent.Expired -> recordException(
+        is LeaseEvent.Expired -> {
+          recordException(
           event.cause ?: EtcdRecipeRuntimeException("Consumer lease expired; outstanding claims are reclaimable"),
         )
+        }
 
-        is LeaseEvent.Failed -> recordException(
-          event.cause ?: EtcdRecipeRuntimeException("Consumer lease healing abandoned; claims will not renew"),
-        )
+        is LeaseEvent.Failed -> {
+          val cause =
+            event.cause ?: EtcdRecipeRuntimeException("Consumer lease healing abandoned; claims will not renew")
+          leaseAbandoned.store(cause)
+          recordException(cause)
+        }
 
-        is LeaseEvent.Restored -> logger.info {
-          "Consumer lease healed: ${event.oldLeaseId} -> ${event.newLeaseId}"
+        is LeaseEvent.Restored -> {
+          leaseAbandoned.store(null)
+          logger.info { "Consumer lease healed: ${event.oldLeaseId} -> ${event.newLeaseId}" }
         }
       }
       leaseListeners.forEach { listener ->
@@ -550,6 +679,8 @@ class DistributedWorkQueue
   }
 
   override fun doClose() {
+    // Release parked receives; each then fails instead of claiming for a closed instance
+    parkedReceives.forEach { it.countDown() }
     if (sweeperDelegate.isInitialized()) {
       sweeper.shutdownNow()
     }

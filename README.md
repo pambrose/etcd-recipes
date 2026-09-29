@@ -339,6 +339,8 @@ partitioned longer than `visibilityTimeoutSecs`), the marker expires and any
 consumer's reclaim sweep returns the item to its original FIFO position — with
 `attempt` incremented — or moves it to the dead-letter space once `maxDeliveries`
 is exhausted (`deadLetters()` / `requeueDeadLetter(id)` / `purgeDeadLetter(id)`).
+An item handed back with `requeue()` counts the same way: once it has been
+delivered `maxDeliveries` times, the next receive dead-letters it.
 A live consumer renews its lease, so processing may take longer than the
 visibility timeout — it bounds crash detection, not processing time.
 

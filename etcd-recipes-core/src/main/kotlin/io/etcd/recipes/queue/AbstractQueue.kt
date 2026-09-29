@@ -39,6 +39,7 @@ import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicReference
@@ -57,6 +58,9 @@ abstract class AbstractQueue(
   }
 
   override val exceptionContext get() = "AbstractQueue[$queuePath]"
+
+  // The latches of takes parked on an empty queue, so close() can release them.
+  private val parkedTakes: MutableSet<CountDownLatch> = ConcurrentHashMap.newKeySet()
 
   fun dequeue(): ByteSequence = checkNotNull(takeWithDeadline(null)) { "unbounded take returned empty" }
 
@@ -100,6 +104,8 @@ abstract class AbstractQueue(
     // retry could allocate a new watcher (with its own dispatcher executor).
     // Under high contention the resulting churn was unbounded.
     while (true) {
+      // An item found after close() must not be deleted and handed to a closed instance
+      checkCloseNotCalled()
       val firstChild = client.getFirstChild(queuePath, target, resilience.rpc)
       val childList = firstChild.kvs
       if (childList.isNotEmpty()) {
@@ -133,6 +139,21 @@ abstract class AbstractQueue(
     observedRevision: Long,
   ): KeyValue? {
     val watchLatch = CountDownLatch(1)
+    parkedTakes += watchLatch
+    try {
+      // A close() that ran before this take registered found nothing to release
+      if (closeCalled.load()) watchLatch.countDown()
+      return awaitFirstChild(watchLatch, deadline, observedRevision)
+    } finally {
+      parkedTakes -= watchLatch
+    }
+  }
+
+  private fun awaitFirstChild(
+    watchLatch: CountDownLatch,
+    deadline: ComparableTimeMark?,
+    observedRevision: Long,
+  ): KeyValue? {
     val watchOption =
       watchOption {
         if (observedRevision > 0L) withRevision(observedRevision + 1)
@@ -168,6 +189,7 @@ abstract class AbstractQueue(
           watchLatch.await(remaining.inWholeMilliseconds, TimeUnit.MILLISECONDS)
         }
       }
+      if (closeCalled.load()) throw EtcdRecipeRuntimeException("Queue $queuePath closed while waiting for an item")
 
       // STRICT ORDERING: whichever PUT woke the watcher is not necessarily the head by
       // sort order — a lower-priority key can be committed just before a higher-priority
@@ -219,6 +241,11 @@ abstract class AbstractQueue(
         }
       }
     }
+
+  // Releases takes parked on an empty queue; each then fails instead of waiting for an item.
+  override fun doClose() {
+    parkedTakes.forEach { it.countDown() }
+  }
 
   private fun deleteRevKey(kv: KeyValue): Boolean =
     client.transaction(resilience.rpc) {
