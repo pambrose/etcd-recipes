@@ -21,12 +21,15 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
+import io.etcd.jetcd.common.exception.ClosedClientException
 import io.etcd.jetcd.common.exception.CompactedException
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchEvent.EventType
 import io.etcd.jetcd.watch.WatchResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.grpc.Status
+import io.grpc.StatusRuntimeException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -60,13 +63,16 @@ fun Client.watcher(
  *
  * jetcd transparently retries *transient* stream errors itself; what it abandons — and
  * this watcher recovers per [resilience] — are *fatal* deaths (compaction of the watched
- * revision, halt-error statuses, "etcdserver: no leader"). Recovery re-subscribes from
- * the revision just past the last observed event, so no events are lost or duplicated
- * across a recovery, except after compaction: there [resyncWith] is invoked so the
- * caller can re-read its world (GET + rebuild derived state) and return the new anchor
- * revision (typically the GET's `header.revision + 1`). Without [resyncWith] the watch
- * resumes just past the compacted revision and the gap is reported via
- * [WatchRecoveryEvent.Resynced] — callers with derived state should supply [resyncWith].
+ * revision, halt-error statuses, "etcdserver: no leader"). Recovery re-subscribes from the
+ * revision just past the last observed event, or, before any event, from where the watch
+ * started (for an un-anchored watch, the revision at which it was created), so events
+ * committed during a recovery are replayed rather than lost. The exception is
+ * compaction: there [resyncWith] is invoked so the caller can re-read its world (GET +
+ * rebuild derived state) and return the new anchor revision (typically the GET's
+ * `header.revision + 1`); a failed resync is retried. Without [resyncWith] the watch
+ * resumes at the compacted revision (the oldest etcd still serves) and the gap is
+ * reported via [WatchRecoveryEvent.Resynced] — callers with derived state should supply
+ * [resyncWith]. Closing the [Client] ends recovery with [WatchRecoveryEvent.Failed].
  */
 fun Client.watcher(
   keyName: String,
@@ -123,17 +129,33 @@ private class ResilientWatcher(
   private var attempt = 0
   private var recoveryStart: TimeMark? = null
 
+  // A compaction that still needs a successful resync; kept across failed attempts
+  private var pendingCompactRevision: Long? = null
+
+  // Whether the stream from the last recovery delivered anything. Until it does, a new
+  // death continues that recovery's retry budget instead of starting a fresh one.
+  private var recoveryConfirmed = true
+
   private val listener =
     object : Watch.Listener {
       override fun onNext(response: WatchResponse) {
         dispatch {
-          advanceRevision(response)
+          if (response.isCreatedNotify) {
+            // Its header is the store's current revision, not where the watch starts: only an
+            // un-anchored watch that has seen nothing takes it as its resume point.
+            if (resumeRevision == 0L) resumeRevision = response.header.revision + 1
+          } else {
+            advanceRevision(response)
+          }
+          recoveryConfirmed = true
           // A response after a transient error means jetcd recovered the stream by itself;
           // report it, or listeners (and connectionState) would stay SUSPENDED for good.
           if (suspendedReported) {
             suspendedReported = false
             emit(WatchRecoveryEvent.Resubscribed(keyName, resumeRevision))
           }
+          // The created notification is always requested internally; pass it on only if asked
+          if (response.isCreatedNotify && !baseOption.isCreatedNotify) return@dispatch
           runCatching { block(response) }
             .onFailure { e -> logger.error(e) { "Watch block for $keyName threw" } }
         }
@@ -226,7 +248,8 @@ private class ResilientWatcher(
       baseOption.endKey.ifPresent { withRange(it) }
       withPrevKV(baseOption.isPrevKV)
       withProgressNotify(baseOption.isProgressNotify || resilience.progressNotify)
-      withCreateNotify(baseOption.isCreatedNotify)
+      // Always: it confirms each subscription is live and anchors an un-anchored watch
+      withCreateNotify(true)
       withNoPut(baseOption.isNoPut)
       withNoDelete(baseOption.isNoDelete)
       withRequireLeader(baseOption.withRequireLeader())
@@ -242,8 +265,12 @@ private class ResilientWatcher(
         ),
       )
     }
-    attempt = 0
-    recoveryStart = TimeSource.Monotonic.markNow()
+    // A new stream that died before delivering anything didn't recover: keep that budget
+    if (recoveryConfirmed) {
+      attempt = 0
+      recoveryStart = TimeSource.Monotonic.markNow()
+      recoveryConfirmed = false
+    }
     scheduleNextAttempt()
   }
 
@@ -266,11 +293,14 @@ private class ResilientWatcher(
   private fun runAttempt() {
     if (closed.load()) return
     try {
-      val compactRevision = compactedRevisionOf(lastCause)
+      // The marker survives a failed resync, so the next attempt resyncs instead of skipping it
+      val compactRevision =
+        pendingCompactRevision ?: compactedRevisionOf(lastCause)?.also { pendingCompactRevision = it }
       if (compactRevision != null) {
         // Events between compactRevision and the new anchor are unrecoverable; the
         // resync hook re-reads the world so derived state converges despite the gap.
-        resumeRevision = resyncWith?.invoke() ?: (compactRevision + 1)
+        // compactRevision itself is the oldest revision etcd still serves.
+        resumeRevision = resyncWith?.invoke() ?: compactRevision
       }
       val watcher = client.watchClient.watch(keyName.asByteSequence, buildOption(), listener)
       synchronized(lock) {
@@ -281,6 +311,7 @@ private class ResilientWatcher(
         delegate = watcher
       }
       lastCause = null
+      pendingCompactRevision = null
       suspendedReported = false
       emit(
         if (compactRevision != null) {
@@ -292,9 +323,20 @@ private class ResilientWatcher(
       logger.info { "Watch on $keyName re-established (attempt $attempt, resume revision $resumeRevision)" }
     } catch (e: Throwable) {
       lastCause = e
-      scheduleNextAttempt()
+      if (isClientClosed(e)) {
+        // Retrying can't help: the client is gone. End recovery rather than retry forever.
+        logger.warn(e) { "Abandoning watch on $keyName: its client is closed" }
+        emit(WatchRecoveryEvent.Failed(keyName, e))
+      } else {
+        logger.debug(e) { "Watch recovery attempt $attempt on $keyName failed" }
+        scheduleNextAttempt()
+      }
     }
   }
+
+  private fun isClientClosed(cause: Throwable): Boolean =
+    generateSequence(cause) { it.cause.takeIf { c -> c !== it } }
+      .any { it is ClosedClientException || (it is StatusRuntimeException && it.status.code == Status.Code.CANCELLED) }
 
   private fun compactedRevisionOf(cause: Throwable?): Long? =
     generateSequence(cause) { it.cause.takeIf { c -> c !== it } }
