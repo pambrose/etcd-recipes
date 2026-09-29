@@ -181,8 +181,9 @@ class BugFixesTests : StringSpec() {
     // ============================================================
     "fix #4: LeaderSelector source revokes the lease when CAS fails" {
       val src = readSource("src/main/kotlin/io/etcd/recipes/election/LeaderSelector.kt")
-      // The fix introduces a leaseRevoke() call on the failure branch.
-      src.contains("client.leaseRevoke(lease)") shouldBe true
+      // The fix introduces a leaseRevoke() call on the failure branch (the lease granted
+      // for the lost CAS).
+      src.contains("client.leaseRevoke(granted") shouldBe true
     }
 
     "fix #5: DistributedBarrier source revokes the lease when CAS fails" {
@@ -229,8 +230,8 @@ class BugFixesTests : StringSpec() {
     // ============================================================
     "fix #6: putValuesWithKeepAlive source revokes lease on put failure" {
       val src = readSource("src/main/kotlin/io/etcd/recipes/common/KeepAliveExtensions.kt")
-      // The fixed body wraps the put loop in try/catch and calls leaseRevoke.
-      src.contains("leaseRevoke(lease)") shouldBe true
+      // The fixed body wraps the puts in a try whose cleanup calls leaseRevoke.
+      src.contains("leaseRevoke(lease, rpc)") shouldBe true
       src.contains("try {") shouldBe true
     }
 

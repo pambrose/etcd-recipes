@@ -86,7 +86,7 @@ constructor(
 
   fun serviceCache(name: String): ServiceCache {
     checkCloseNotCalled()
-    val cache = ServiceCache(client, namesPath, name)
+    val cache = ServiceCache(client, namesPath, name, resilienceConfig)
     serviceCacheList += cache
     return cache
   }
@@ -122,13 +122,13 @@ constructor(
   @Synchronized
   fun queryForNames(): List<String> {
     checkCloseNotCalled()
-    return client.getChildrenKeys(namesPath)
+    return client.getChildrenKeys(namesPath, rpc = resilience.rpc)
   }
 
   @Synchronized
   fun queryForInstances(name: String): List<ServiceInstance> {
     checkCloseNotCalled()
-    return client.getChildrenValues(namesPath.appendToPath(name)).map {
+    return client.getChildrenValues(namesPath.appendToPath(name), rpc = resilience.rpc).map {
       ServiceInstance.toObject(it.asString)
     }
   }

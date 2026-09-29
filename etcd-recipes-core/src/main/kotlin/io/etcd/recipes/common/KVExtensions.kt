@@ -68,7 +68,11 @@ fun Client.putValue(
 ): PutResponse = putValue(keyName, keyval.asByteSequence, option, rpc)
 
 // Delete keys
-fun Client.deleteKeys(vararg keyNames: String) = keyNames.forEach { deleteKey(it) }
+@JvmOverloads
+fun Client.deleteKeys(
+  vararg keyNames: String,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
+) = keyNames.forEach { deleteKey(it, rpc) }
 
 @JvmOverloads
 fun Client.deleteKey(

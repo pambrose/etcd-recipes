@@ -17,6 +17,7 @@
 package io.etcd.recipes.micrometer
 
 import io.etcd.recipes.cache.PathChildrenCache
+import io.etcd.recipes.common.RpcResilience
 import io.etcd.recipes.discovery.ServiceCache
 import io.etcd.recipes.election.LeaderLatch
 import io.etcd.recipes.lock.DistributedSemaphore
@@ -35,11 +36,15 @@ import io.micrometer.core.instrument.Tags
 /**
  * A gauge of [queue]'s current item count. NOTE: [AbstractQueue.size] issues a range-count RPC,
  * so this gauge polls etcd on **every scrape** — mind the load on a hot queue / frequent scrape.
+ * The RPC runs under [rpc], by default one attempt bounded at 2 seconds, so during an etcd outage
+ * the gauge reports NaN promptly instead of holding the scrape past its timeout.
  */
+@JvmOverloads
 fun MeterRegistry.bindQueueDepth(
   queue: AbstractQueue,
   tags: Tags = Tags.empty(),
-): Gauge = Gauge.builder("etcd.queue.depth", queue) { it.size.toDouble() }.tags(tags).register(this)
+  rpc: RpcResilience = RpcResilience.PROBE,
+): Gauge = Gauge.builder("etcd.queue.depth", queue) { it.size(rpc).toDouble() }.tags(tags).register(this)
 
 /** A gauge of [cache]'s live entry count (an in-memory read; no RPC). */
 fun MeterRegistry.bindCacheSize(
@@ -55,13 +60,18 @@ fun MeterRegistry.bindServiceCacheSize(
 
 /**
  * A gauge of [semaphore]'s available permits. NOTE: [DistributedSemaphore.availablePermits] issues
- * a range-count RPC, so this gauge polls etcd on **every scrape**.
+ * a range-count RPC, so this gauge polls etcd on **every scrape**. As with [bindQueueDepth], the
+ * RPC runs under [rpc] (by default one attempt bounded at 2 seconds).
  */
+@JvmOverloads
 fun MeterRegistry.bindAvailablePermits(
   semaphore: DistributedSemaphore,
   tags: Tags = Tags.empty(),
+  rpc: RpcResilience = RpcResilience.PROBE,
 ): Gauge =
-  Gauge.builder("etcd.semaphore.available", semaphore) { it.availablePermits().toDouble() }.tags(tags).register(this)
+  Gauge.builder("etcd.semaphore.available", semaphore) { it.availablePermits(rpc).toDouble() }
+    .tags(tags)
+    .register(this)
 
 /** A gauge that is 1.0 while [latch] holds leadership and 0.0 otherwise (an in-memory read; no RPC). */
 fun MeterRegistry.bindLeadership(

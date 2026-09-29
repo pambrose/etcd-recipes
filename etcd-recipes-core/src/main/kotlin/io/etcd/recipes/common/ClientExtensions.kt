@@ -21,6 +21,7 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.ClientBuilder
+import io.grpc.Status
 import java.io.File
 import java.time.Duration
 
@@ -104,10 +105,29 @@ fun <T> connectToEtcd(
 ): T = connectToEtcd(config, initReceiver).use { block(it) }
 
 /**
- * Active reachability probe on a bare [Client]: a bounded, non-mutating count-only GET through the
- * RPC retry/timeout funnel. Returns false instead of throwing when etcd cannot be reached (or the
- * client is closed) — the [Client]-level counterpart to [EtcdConnector.ping].
+ * Active reachability probe on a bare [Client]: a non-mutating count-only GET, by default one
+ * attempt bounded at 2 seconds ([RpcResilience.PROBE]), so it answers promptly during an outage.
+ * Returns false instead of throwing when etcd cannot be reached (or the client is closed). A
+ * definite refusal from the server (such as `PERMISSION_DENIED` on a cluster whose RBAC scopes
+ * this client away from the probe key) still means etcd answered, so it counts as reachable.
+ * The [Client]-level counterpart to [EtcdConnector.ping].
  */
 @JvmOverloads
-fun Client.ping(rpc: RpcResilience = RpcResilience.DEFAULT): Boolean =
-  runCatching { getResponse(PING_PROBE_KEY, getOption { withCountOnly(true) }, rpc) }.isSuccess
+@Suppress("TooGenericExceptionCaught")
+fun Client.ping(rpc: RpcResilience = RpcResilience.PROBE): Boolean =
+  try {
+    getResponse(PING_PROBE_KEY, getOption { withCountOnly(true) }, rpc)
+    true
+  } catch (e: Exception) {
+    Status.fromThrowable(e).code in SERVER_REPLY_STATUSES
+  }
+
+// Statuses only a live etcd returns: it answered, it just refused or rejected this request.
+private val SERVER_REPLY_STATUSES =
+  setOf(
+    Status.Code.PERMISSION_DENIED,
+    Status.Code.NOT_FOUND,
+    Status.Code.INVALID_ARGUMENT,
+    Status.Code.FAILED_PRECONDITION,
+    Status.Code.OUT_OF_RANGE,
+  )

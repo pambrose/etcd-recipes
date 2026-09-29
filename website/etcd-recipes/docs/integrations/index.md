@@ -186,16 +186,21 @@ distinguishing `tags`, or they will collide.
     a 1-second interval, it is real load on the cluster. The other three are in-memory
     reads and cost nothing.
 
+    During an etcd outage, each of those two makes a single attempt bounded at 2 seconds
+    (`RpcResilience.PROBE`, overridable with the binders' `rpc` argument) and reports
+    `NaN`, so a scrape doesn't outlive its timeout and take the app's other metrics down
+    with it.
+
     ```kotlin
     --8<-- "kotlin/website/micrometer/MicrometerSnippets.kt:polling-gauge"
     ```
 
-### Kotlin-only
+### From Java
 
-The binders are Kotlin extension functions on `MeterRegistry` with default arguments and
-no `@JvmOverloads`, so they are awkward from Java (`EtcdGaugesKt.bindQueueDepth(registry,
-queue, Tags.empty())`). `MicrometerEtcdMetrics` itself is an ordinary class and works fine
-from Java.
+The binders are Kotlin extension functions on `MeterRegistry`, so from Java they are
+static calls on `EtcdGaugesKt` (`EtcdGaugesKt.bindQueueDepth(registry, queue,
+Tags.empty())`). `MicrometerEtcdMetrics` itself is an ordinary class and works fine from
+Java.
 
 [Observability](../observability.md) has the full meter catalog — every name, tag, and
 what it means.

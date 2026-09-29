@@ -118,13 +118,13 @@ and jetcd is never hidden from you.
     --8<-- "java/website/gettingstarted/ConnectSnippets.java:ping"
     ```
 
-It takes an optional `RpcResilience` so you can decide whether a health check retries.
-For a liveness endpoint you usually do **not** want retries — you want a fast, honest
-answer:
+By default it makes a single attempt bounded at 2 seconds (`RpcResilience.PROBE`): a
+health check wants a fast, honest answer during the outage it exists to detect, not
+minutes of retries. It takes an optional `RpcResilience` if you want something else.
 
-```kotlin
-client.ping(RpcResilience.DISABLED)
-```
+A definite refusal from etcd, such as `PERMISSION_DENIED` for a user whose RBAC doesn't
+cover the probe key, still counts as reachable, since etcd answered. Only failing to get
+an answer (unreachable, timed out, closed client) returns `false`.
 
 Recipes expose their own `ping()` plus a passive `isHealthy()`. The difference matters:
 `isHealthy()` reports what the recipe already knows from its connection state without a

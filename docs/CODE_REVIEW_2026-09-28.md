@@ -87,9 +87,9 @@
 - [ ] [#27](#issue-27) `connectionState` is last-writer-wins across independent streams, and notifications can arrive out of order
 - [ ] [#28](#issue-28) The compaction marker is lost when a resync attempt fails
 - [ ] [#29](#issue-29) Un-anchored watches lose events across a recovery, and createNotify advances the resume revision early
-- [ ] [#30](#issue-30) `putValuesWithKeepAlive` never revokes its lease, and its multi-key puts aren't atomic
-- [ ] [#31](#issue-31) The RPC budget isn't threaded through several helpers and call sites
-- [ ] [#32](#issue-32) `ping()` and the Spring health indicator can block about 150 s, and RBAC-scoped clusters always report DOWN
+- [x] [#30](#issue-30) `putValuesWithKeepAlive` never revokes its lease, and its multi-key puts aren't atomic
+- [x] [#31](#issue-31) The RPC budget isn't threaded through several helpers and call sites
+- [x] [#32](#issue-32) `ping()` and the Spring health indicator can block about 150 s, and RBAC-scoped clusters always report DOWN
 - [x] [#33](#issue-33) Unit tests mock jetcd using the library's own assumptions, so resilience bugs can't surface
 - [ ] [#34](#issue-34) Leader-key watches are not revision-anchored, so a hand-off during setup is missed
 - [ ] [#35](#issue-35) Step-down leaves `attemptLeadership` set, so a DELETE can start a second concurrent term
@@ -127,7 +127,7 @@
 - [ ] [#67](#issue-67) The suspend RPC engine never records `EtcdMetrics.recordRpc`
 - [x] [#68](#issue-68) Every published artifact forces `logback-classic`, guava, and common-utils onto consumers
 - [ ] [#69](#issue-69) The Ktor plugin closes its client on `ApplicationStopping`, before user teardown runs
-- [ ] [#70](#issue-70) RPC-backed Micrometer gauges can stall the metrics scrape during an outage
+- [x] [#70](#issue-70) RPC-backed Micrometer gauges can stall the metrics scrape during an outage
 - [x] [#71](#issue-71) A deadlocked test can hang CI for 45 min without identifying the test
 
 #### Low

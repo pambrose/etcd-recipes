@@ -19,16 +19,23 @@
 package io.etcd.recipes.micrometer
 
 import io.etcd.recipes.cache.PathChildrenCache
+import io.etcd.recipes.common.RpcResilience
+import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.ServiceCache
 import io.etcd.recipes.election.LeaderLatch
 import io.etcd.recipes.lock.DistributedSemaphore
 import io.etcd.recipes.queue.AbstractQueue
+import io.etcd.recipes.queue.DistributedQueue
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.every
 import io.mockk.mockk
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 /**
  * The live-state gauge binders. Each recipe is mocked so its accessor returns a fixed value,
@@ -37,9 +44,9 @@ import io.mockk.mockk
  */
 class MicrometerGaugesTests : StringSpec() {
   init {
-    "bindQueueDepth reports the queue size" {
+    "bindQueueDepth reports the queue size, read with the probe budget" {
       val registry = SimpleMeterRegistry()
-      registry.bindQueueDepth(mockk<AbstractQueue> { every { size } returns 5 })
+      registry.bindQueueDepth(mockk<AbstractQueue> { every { size(RpcResilience.PROBE) } returns 5 })
       registry.find("etcd.queue.depth").gauge().shouldNotBeNull().value() shouldBe 5.0
     }
 
@@ -59,10 +66,30 @@ class MicrometerGaugesTests : StringSpec() {
       registry.find("etcd.cache.entries").gauge().shouldNotBeNull().value() shouldBe 2.0
     }
 
-    "bindAvailablePermits reports the available permit count" {
+    "bindAvailablePermits reports the available permit count, read with the probe budget" {
       val registry = SimpleMeterRegistry()
-      registry.bindAvailablePermits(mockk<DistributedSemaphore> { every { availablePermits() } returns 4 })
+      registry.bindAvailablePermits(
+        mockk<DistributedSemaphore> { every { availablePermits(RpcResilience.PROBE) } returns 4 },
+      )
       registry.find("etcd.semaphore.available").gauge().shouldNotBeNull().value() shouldBe 4.0
+    }
+
+    "RPC-backed gauges answer promptly while etcd is unreachable" {
+      connectToEtcd(listOf("http://127.0.0.1:1")).use { client ->
+        val registry = SimpleMeterRegistry()
+        val depth = registry.bindQueueDepth(DistributedQueue(client, "/micrometer/queue"))
+        val permits = registry.bindAvailablePermits(DistributedSemaphore(client, "/micrometer/semaphore", 2))
+        for (gauge in listOf(depth, permits)) {
+          var value: Double? = null
+          val done = CountDownLatch(1)
+          thread(isDaemon = true) {
+            value = gauge.value()
+            done.countDown()
+          }
+          withClue("${gauge.id.name} held the scrape") { done.await(10, TimeUnit.SECONDS) shouldBe true }
+          value!!.isNaN() shouldBe true
+        }
+      }
     }
 
     "bindLeadership reports 1 while the latch holds leadership" {

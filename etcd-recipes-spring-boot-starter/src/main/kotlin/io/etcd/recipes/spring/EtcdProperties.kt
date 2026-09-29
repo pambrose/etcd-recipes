@@ -36,7 +36,14 @@ data class EtcdProperties(
   val connectTimeout: Duration = Duration.ofSeconds(5),
   val retryMaxDuration: Duration = Duration.ofSeconds(30),
   val tls: Tls? = null,
+  val health: HealthProbe = HealthProbe(),
 ) {
+  /** `etcd.recipes.health.*`: the Actuator health check's probe. */
+  data class HealthProbe(
+    /** How long one health check waits for etcd before reporting DOWN (a single attempt). */
+    val timeout: Duration = Duration.ofSeconds(2),
+  )
+
   data class Tls(
     val caCertPath: String? = null,
     val clientCertPath: String? = null,

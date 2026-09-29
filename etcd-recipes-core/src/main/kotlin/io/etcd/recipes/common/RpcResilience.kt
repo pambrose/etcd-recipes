@@ -53,5 +53,13 @@ class RpcResilience
 
       @JvmField
       val DISABLED = RpcResilience(RetryPolicy.never, operationTimeout = Duration.INFINITE)
+
+      /**
+       * For reachability probes (`ping`, health checks, RPC-backed gauges): one attempt,
+       * bounded at 2 seconds, so a probe answers quickly during the outage it exists to
+       * detect instead of retrying for minutes.
+       */
+      @JvmField
+      val PROBE = RpcResilience(RetryPolicy.never, operationTimeout = 2.seconds)
     }
   }

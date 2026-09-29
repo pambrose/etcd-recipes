@@ -36,6 +36,7 @@ import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.LeaseEvent
 import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.RpcResilience
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.WatchResilience
@@ -546,7 +547,7 @@ constructor(
     } finally {
       registration.close()
       // Revoke the leadership lease promptly on relinquish (#7) instead of at TTL.
-      client.leaseRevoke(lease)
+      client.leaseRevoke(lease, resilience.rpc)
       leadershipThreadRef.store(null)
       // Reset the election guards under the same lock Phase 1 reads them, so a
       // concurrent candidate never observes a half-updated guard set.
@@ -609,15 +610,17 @@ constructor(
     internal fun defaultClientId() = EtcdConnector.defaultClientId(LeaderSelector::class.simpleName!!)
 
     @JvmStatic
+    @JvmOverloads
     fun getParticipants(
       client: Client,
       electionPath: String,
+      rpc: RpcResilience = RpcResilience.DEFAULT,
     ): List<Participant> {
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 
       val participants: MutableList<Participant> = []
-      val leader = client.getValue(electionPath.withLeaderSuffix)?.asString?.stripUniqueSuffix ?: ""
-      client.getChildrenValues(electionPath.withParticipationSuffix).map { it.asString }
+      val leader = client.getValue(electionPath.withLeaderSuffix, rpc)?.asString?.stripUniqueSuffix ?: ""
+      client.getChildrenValues(electionPath.withParticipationSuffix, rpc = rpc).map { it.asString }
         .forEach { participants += Participant(it, leader == it) }
       return participants
     }

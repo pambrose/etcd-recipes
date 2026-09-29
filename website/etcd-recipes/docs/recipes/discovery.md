@@ -153,11 +153,10 @@ forms:
 
     Every other recipe names it `resilience`. `ServiceDiscovery` names it `resilienceConfig`,
     so a Kotlin caller passing it by name has to spell it differently here. It is the same
-    `ResilienceConfig`, and it is forwarded to the registry and to every provider the façade
-    creates — but **not** to a cache from `serviceCache(name)`, which is built with
-    `ResilienceConfig.DEFAULT`. Construct that `ServiceCache` yourself if it needs a custom
-    config. The scoped `withServiceDiscovery` helper does not take a config at all, so a
-    non-default one means constructing `ServiceDiscovery` directly.
+    `ResilienceConfig`, and it is forwarded to the registry and to every provider and cache
+    the façade creates, and it governs the façade's own queries. The scoped
+    `withServiceDiscovery` helper does not take a config at all, so a non-default one means
+    constructing `ServiceDiscovery` directly.
 
 ## `ServiceRegistry`
 

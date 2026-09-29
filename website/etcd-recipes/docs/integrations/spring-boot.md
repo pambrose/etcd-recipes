@@ -154,8 +154,11 @@ implementation("org.springframework.boot:spring-boot-starter-actuator")
     the thing to change — the types themselves are the same shape. If the indicator does
     not appear, check that `spring-boot-health` actually resolved onto your classpath.
 
-With it present, `EtcdHealthIndicator` maps `Client.ping()` — a bounded, non-mutating,
-count-only GET through the RPC retry funnel — onto Actuator's `UP` / `DOWN`:
+With it present, `EtcdHealthIndicator` maps `Client.ping()` — a non-mutating, count-only
+GET — onto Actuator's `UP` / `DOWN`. The probe is a single attempt bounded by
+`etcd.recipes.health.timeout` (2 seconds by default), so a health check answers promptly
+during an etcd outage instead of holding the endpoint. `management.health.etcd.enabled=false`
+switches it off like any other Actuator health indicator:
 
 ```json
 {
@@ -171,7 +174,9 @@ count-only GET through the RPC retry funnel — onto Actuator's `UP` / `DOWN`:
     `ping()` issues a real RPC, which is what makes it worth having: a client object exists
     and looks fine long after the cluster it points at has gone away. It returns `false`
     rather than throwing when etcd is unreachable or the client is closed, so the
-    indicator reports `DOWN` instead of erroring the health endpoint.
+    indicator reports `DOWN` instead of erroring the health endpoint. A definite refusal
+    from etcd (`PERMISSION_DENIED` for a prefix-scoped RBAC user) reports `UP`: etcd
+    answered.
 
     Expose it deliberately, though. If your readiness probe includes this indicator, an
     etcd blip will roll your pods out of service — which is correct for a service that

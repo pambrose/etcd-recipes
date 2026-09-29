@@ -27,6 +27,7 @@ import io.mockk.mockk
 import org.springframework.boot.autoconfigure.AutoConfigurations
 import org.springframework.boot.health.contributor.HealthIndicator
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import java.time.Duration
 import java.util.function.Supplier
 
 /**
@@ -47,6 +48,20 @@ class EtcdAutoConfigurationTests : StringSpec() {
           context.getBeansOfType(Client::class.java).size shouldBe 1
           context.getBeansOfType(EtcdRecipes::class.java).size shouldBe 1
           context.getBeansOfType(HealthIndicator::class.java).size shouldBe 1
+        }
+    }
+
+    "management.health.etcd.enabled=false turns the health indicator off" {
+      runner
+        .withPropertyValues("etcd.recipes.endpoints=http://localhost:2379", "management.health.etcd.enabled=false")
+        .run { context -> context.getBeansOfType(HealthIndicator::class.java).size shouldBe 0 }
+    }
+
+    "etcd.recipes.health.timeout binds the health probe's timeout" {
+      runner
+        .withPropertyValues("etcd.recipes.endpoints=http://localhost:2379", "etcd.recipes.health.timeout=500ms")
+        .run { context ->
+          context.getBean(EtcdProperties::class.java).health.timeout shouldBe Duration.ofMillis(500)
         }
     }
 
