@@ -35,6 +35,7 @@ import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 @JvmOverloads
@@ -42,9 +43,21 @@ fun <T> withDistributedAtomicLong(
   client: Client,
   counterPath: String,
   default: Long = 0L,
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
   receiver: DistributedAtomicLong.() -> T,
-): T = DistributedAtomicLong(client, counterPath, default).use { it.receiver() }
+): T = DistributedAtomicLong(client, counterPath, default, resilience).use { it.receiver() }
 
+/**
+ * A `Long` in etcd that any number of clients can update atomically, through a
+ * compare-and-set loop on the key's `modRevision`.
+ *
+ * An absent key reads as [default], and the next update creates it from [default]. That
+ * covers a counter never created and one deleted by another process ([delete]).
+ *
+ * If an update throws, for example because an RPC failed or timed out, the outcome is
+ * unknown: the last transaction may still have been applied. Retrying the same update
+ * after an exception can count it twice. Read [get] to reconcile.
+ */
 class DistributedAtomicLong
 @JvmOverloads
 constructor(
@@ -72,9 +85,10 @@ constructor(
     return this
   }
 
+  /** The current value, or [default] when the counter key is absent. */
   fun get(): Long {
     ensureStarted()
-    return client.getValue(counterPath, -1L, resilience.rpc)
+    return client.getValue(counterPath, default, resilience.rpc)
   }
 
   fun increment(): Long = modifyCounterValue(1L)
@@ -94,9 +108,14 @@ constructor(
   private fun ensureStarted() {
     checkCloseNotCalled()
     if (startCalled.compareAndSet(false, true)) {
+      var created = false
       try {
         createCounterIfNotPresent()
+        created = true
       } finally {
+        // A failed create must not stick: the next call tries again. (Callers released
+        // meanwhile are safe, because get() and the update loop handle an absent key.)
+        if (!created) startCalled.store(false)
         startThreadComplete.set(true)
       }
     } else {
@@ -106,9 +125,9 @@ constructor(
 
   private fun modifyCounterValue(value: Long): Long {
     ensureStarted()
-    checkCloseNotCalled()
     var count = 1
     while (true) {
+      checkCloseNotCalled()
       val (txnResponse, committedValue) = applyCounterTransaction(value)
       if (txnResponse.isSucceeded) {
         // Return the value we just wrote — not a separate GET. The previous
@@ -117,8 +136,7 @@ constructor(
         // and the GET, so callers received a value they did not commit.
         return committedValue
       }
-      // Crude backoff for retry
-      sleep((count * 100).random().milliseconds)
+      sleep(retryBackoff(count))
       count++
     }
   }
@@ -128,19 +146,22 @@ constructor(
   // Returns true if this call created the counter, false if it already existed.
   private fun createCounterIfNotPresent(): Boolean =
     client
-      .transaction {
+      .transaction(resilience.rpc) {
         If(counterPath.doesNotExist)
         Then(counterPath setTo default)
       }.isSucceeded
 
+  // Self-initializing: an absent key (never created, or deleted by another process)
+  // starts from default, and its create is the compare-and-set.
   private fun applyCounterTransaction(amount: Long): Pair<TxnResponse, Long> {
-    val kvList: List<KeyValue> = client.getResponse(counterPath, rpc = resilience.rpc).kvs
-    check(kvList.isNotEmpty()) { "Empty KeyValue list" }
-    val kv = kvList.first()
-    val newValue = kv.value.asLong + amount
+    val kv: KeyValue? = client.getResponse(counterPath, rpc = resilience.rpc).kvs.firstOrNull()
+    val newValue = (kv?.value?.asLong ?: default) + amount
     val txn =
       client.transaction(resilience.rpc) {
-        If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
+        if (kv == null)
+          If(counterPath.doesNotExist)
+        else
+          If(equalTo(counterPath, CmpTarget.modRevision(kv.modRevision)))
         Then(counterPath setTo newValue)
       }
     return txn to newValue
@@ -148,6 +169,13 @@ constructor(
 
   companion object {
     private val logger = KotlinLogging.logger {}
+
+    private const val BACKOFF_STEP_MS = 100
+    private const val MAX_BACKOFF_STEPS = 10
+
+    // A random sleep from a window that widens by BACKOFF_STEP_MS per lost attempt, up to 1s.
+    internal fun retryBackoff(attempt: Int): Duration =
+      (attempt.coerceIn(1, MAX_BACKOFF_STEPS) * BACKOFF_STEP_MS).random().milliseconds
 
     @JvmStatic
     fun delete(

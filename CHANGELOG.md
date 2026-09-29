@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (`DistributedAtomicLong` recovery)
+
+- A failed first-use initialization no longer breaks the instance for good. A transient
+  failure of the create-if-absent transaction (during an etcd leader change, say) used
+  to leave `get()` returning `-1`, a legitimate counter value, and every update throwing
+  `IllegalStateException("Empty KeyValue list")`. The next call now tries again.
+- An absent counter key, whether never created or deleted by another process through
+  `DistributedAtomicLong.delete`, now reads as `default`, and the next update re-creates
+  it from `default` inside its compare-and-set. Live instances used to break the same
+  way after a delete.
+- `close()` now ends an update's compare-and-set loop, which never checked it, and the
+  loop's random backoff is capped at one second instead of widening without limit.
+- The create-if-absent transaction now runs under the recipe's RPC budget.
+
+### Added (`DistributedAtomicLong`)
+
+- `withDistributedAtomicLong` takes a `resilience` parameter, like the constructor.
+- `DistributedAtomicLong`'s KDoc now states that an update that throws has an unknown
+  outcome (its transaction may have been applied), so blindly retrying it can count
+  twice.
+
 ### Fixed (election lifecycle)
 
 - `LeaderSelector.waitOnLeadershipComplete(timeout)` now honors its timeout. It first

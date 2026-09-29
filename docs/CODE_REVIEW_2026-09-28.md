@@ -70,7 +70,7 @@
 - [x] [#12](#issue-12) `LeaderSelector.close()` from inside `takeLeadership` self-deadlocks
 - [ ] [#13](#issue-13) `LeaderSelector.start()` can hang forever, uninterruptibly
 - [ ] [#14](#issue-14) Watch-triggered election attempts swallow Phase-1 failures and never retry, so the election can be left leaderless
-- [ ] [#15](#issue-15) `DistributedAtomicLong` is permanently broken if first-use initialization fails
+- [x] [#15](#issue-15) `DistributedAtomicLong` is permanently broken if first-use initialization fails
 - [ ] [#16](#issue-16) `DistributedWorkQueue.requeue()` bypasses `maxDeliveries`, so poison messages loop forever
 - [ ] [#17](#issue-17) Work-queue `claimHead` lease-not-found retry is unbounded and ignores the deadline and `close()`
 - [ ] [#18](#issue-18) A work-queue `receive()` in flight across `close()` creates a lease after close, and its item can never be acked
@@ -139,7 +139,7 @@
 - [ ] [#77](#issue-77) `Duration`-typed APIs hidden from Java (`EtcdRecipes.distributedPriorityQueue`, `LeaderLatch` `closeJoinTimeout`)
 - [ ] [#78](#issue-78) Passwords appear in `toString()`, and half-configured mTLS is silently ignored
 - [ ] [#79](#issue-79) Gaps in background logging context (MDC)
-- [ ] [#80](#issue-80) `DistributedAtomicLong` resilience gaps (no close check, uncapped backoff, undocumented ambiguous commits)
+- [x] [#80](#issue-80) `DistributedAtomicLong` resilience gaps (no close check, uncapped backoff, undocumented ambiguous commits)
 - [ ] [#81](#issue-81) Read-write lock and semaphore releases rely on a single, un-retried revoke
 - [ ] [#82](#issue-82) Lock-loss bookkeeping is keyed by thread, and `holdCount` is read cross-thread without synchronization
 - [ ] [#83](#issue-83) Locks expose no fencing token, and the default lease TTL is 2 s
