@@ -76,7 +76,8 @@ class PathChildrenCache
   // strips by trailingPath.length). One field keeps all three sites in lockstep.
   private val trailingPath = cachePath.ensureSuffix("/")
 
-  // Plain var: all reads/writes are inside @Synchronized methods on this instance.
+  // Written by the start worker (primed modes) or start() itself, read by doClose().
+  @Volatile
   private var watcher: Watch.Watcher? = null
   private val cacheMap: ConcurrentMap<String, ByteSequence> = newConcurrentMap()
   private val listeners: MutableList<PathChildrenCacheListener> = CopyOnWriteArrayList()
@@ -84,6 +85,21 @@ class PathChildrenCache
 
   // Use a single-threaded executor to maintain order
   private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
+
+  // Serializes applying watch events with applying a snapshot, and tracks the newest etcd
+  // revision the map reflects, so a snapshot older than an event the watch already
+  // applied is never applied over it (which could resurrect a deleted child for good).
+  private val applyLock = Any()
+  private var lastAppliedRevision = 0L // guarded by applyLock
+
+  // Why a primed start failed to load; surfaced by waitOnStartComplete() and start().
+  @Volatile
+  private var startFailure: Throwable? = null
+
+  // The primed start's worker thread while it runs, so a close() from an INITIALIZED
+  // listener (which runs on it) doesn't wait on itself.
+  @Volatile
+  private var loaderThread: Thread? = null
 
   override val exceptionContext get() = "PathChildrenCache[$cachePath]"
 
@@ -114,53 +130,35 @@ class PathChildrenCache
   ): PathChildrenCache =
     start(if (buildInitial) StartMode.BUILD_INITIAL_CACHE else StartMode.NORMAL, waitOnStartComplete)
 
-  @Suppress("TooGenericExceptionCaught")
+  /**
+   * Starts the cache. In a primed mode ([StartMode.BUILD_INITIAL_CACHE] or
+   * [StartMode.POST_INITIALIZED_EVENT]) the snapshot loads on the executor; when it can't
+   * load, the cache never watches, reports [io.etcd.recipes.common.ConnectionState.LOST],
+   * and fires no INITIALIZED. With [waitOnStartComplete], that failure is thrown here.
+   */
   @JvmOverloads
-  @Synchronized
   fun start(
     mode: StartMode,
     waitOnStartComplete: Boolean = true,
   ): PathChildrenCache {
-    if (startCalled.load())
-      throw EtcdRecipeRuntimeException("start() already called")
-    checkCloseNotCalled()
+    synchronized(this) {
+      if (startCalled.load())
+        throw EtcdRecipeRuntimeException("start() already called")
+      checkCloseNotCalled()
+      startCalled.store(true)
 
-    if (mode == StartMode.BUILD_INITIAL_CACHE || mode == StartMode.POST_INITIALIZED_EVENT) {
-      executor.execute {
-        withRecipeLoggingContext {
-          try {
-            // Snapshot then watch with the snapshot's revision as the watch
-            // anchor: the watcher receives every event that occurred after the
-            // snapshot revision, with no overlap and no gap. Without anchoring
-            // a PUT could land between watch-registration and snapshot-load,
-            // and the snapshot would silently overwrite the newer value.
-            loadDataAndStartWatcher()
-          } finally {
-            if (mode == StartMode.POST_INITIALIZED_EVENT)
-              listeners.forEach { listener ->
-                try {
-                  val cacheEvent =
-                    PathChildrenCacheEvent("", PathChildrenCacheEvent.Type.INITIALIZED, null).apply {
-                      initialDataVal = currentData
-                    }
-                  listener.childEvent(cacheEvent)
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in cacheChanged()" }
-                  recordException(e)
-                }
-              }
-            startThreadComplete.set(true)
-          }
+      if (mode == StartMode.BUILD_INITIAL_CACHE || mode == StartMode.POST_INITIALIZED_EVENT) {
+        executor.execute {
+          withRecipeLoggingContext { loadDataAndStartWatcher(mode == StartMode.POST_INITIALIZED_EVENT) }
         }
+      } else {
+        // NORMAL mode: no snapshot, just start watching from now.
+        setupWatcher(0L)
+        startThreadComplete.set(true)
       }
-    } else {
-      // NORMAL mode: no snapshot, just start watching from now.
-      setupWatcher(0L)
-      startThreadComplete.set(true)
     }
 
-    startCalled.store(true)
-
+    // Wait outside the monitor: an INITIALIZED listener may call rebuild(), clear(), or close()
     if (waitOnStartComplete)
       waitOnStartComplete()
 
@@ -189,32 +187,62 @@ class PathChildrenCache
 
   fun clearListeners() = listeners.clear()
 
+  // Snapshot, then watch anchored just past the snapshot's revision: the watcher receives
+  // every event after the snapshot, with no overlap and no gap. INITIALIZED fires between
+  // the two, carrying the snapshot, so it precedes every event the watch delivers.
   @Suppress("TooGenericExceptionCaught")
-  private fun loadDataAndStartWatcher() {
+  private fun loadDataAndStartWatcher(postInitialized: Boolean) {
+    loaderThread = Thread.currentThread()
     try {
       val start = TimeSource.Monotonic.markNow()
-      val getOption = getOption {
-        isPrefix(true)
-        withSortField(GetOption.SortTarget.KEY)
+      val resp = client.getResponse(trailingPath, childrenOption(), resilience.rpc)
+      val initial = resp.kvs.map { kv -> ChildData(kv.key.asString.substring(trailingPath.length), kv.value) }
+      synchronized(applyLock) {
+        initial.forEach { child -> cacheMap[child.key] = child.value }
+        lastAppliedRevision = resp.header.revision
       }
-      val resp = client.getResponse(trailingPath, getOption, resilience.rpc)
-      val anchorRevision = resp.header.revision + 1
+      resilience.metrics.recordCacheSync(cachePath, start.elapsedNow(), initial.size)
 
-      for (kv in resp.kvs) {
-        val k = kv.key.asString
-        val s = k.substring(trailingPath.length)
-        cacheMap[s] = kv.value
-      }
-
-      resilience.metrics.recordCacheSync(cachePath, start.elapsedNow(), cacheMap.size)
-      setupWatcher(anchorRevision)
+      if (postInitialized) fireInitialized(initial)
+      // A close() from an INITIALIZED listener (or another thread) means no watch at all
+      if (!closeCalled.load()) setupWatcher(resp.header.revision + 1)
     } catch (e: Throwable) {
-      logger.error(e) { "Exception in loadDataAndStartWatcher()" }
+      logger.error(e) { "Priming $cachePath failed; the cache will not update" }
+      startFailure = e
       recordException(e)
+      reportConnectionLost()
+    } finally {
+      loaderThread = null
+      startThreadComplete.set(true)
     }
   }
 
+  // One immutable snapshot, shared by every listener's INITIALIZED event.
+  private fun fireInitialized(initial: List<ChildData>) {
+    val event = PathChildrenCacheEvent("", PathChildrenCacheEvent.Type.INITIALIZED, null).apply {
+      initialDataVal = initial
+    }
+    fireChildEvent(event)
+  }
+
   @Suppress("TooGenericExceptionCaught")
+  private fun fireChildEvent(event: PathChildrenCacheEvent) {
+    listeners.forEach { listener ->
+      try {
+        listener.childEvent(event)
+      } catch (e: Throwable) {
+        logger.error(e) { "Exception in cacheChanged()" }
+        recordException(e)
+      }
+    }
+  }
+
+  private fun childrenOption() =
+    getOption {
+      isPrefix(true)
+      withSortField(GetOption.SortTarget.KEY)
+    }
+
   private fun setupWatcher(startRevision: Long) {
     logger.debug { "Setting up watch for $trailingPath at rev $startRevision" }
     val watchOption = watchOption {
@@ -225,7 +253,7 @@ class PathChildrenCache
       watchOption,
       resilience.watch,
       recoveryListener = { event -> onRecoveryEvent(event) },
-      resyncWith = { reconcile() },
+      resyncWith = { reconcile(emitEvents = true) },
     ) { watchResponse ->
       watchResponse.events
         .forEach { event ->
@@ -233,34 +261,23 @@ class PathChildrenCache
           val stripped = k.substring(trailingPath.length)
           when (event.eventType) {
             PUT -> {
-              val isAdd = !cacheMap.containsKey(stripped)
-              logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
-              cacheMap[stripped] = v
-
-              val cacheEvent =
-                PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v)
-              listeners.forEach { listener ->
-                try {
-                  listener.childEvent(cacheEvent)
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in cacheChanged()" }
-                  recordException(e)
+              val isAdd =
+                synchronized(applyLock) {
+                  lastAppliedRevision = maxOf(lastAppliedRevision, event.keyValue.modRevision)
+                  cacheMap.put(stripped, v) == null
                 }
-              }
+              logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
+              fireChildEvent(PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v))
             }
 
             DELETE -> {
               logger.debug { "$stripped deleted" }
-              val prevValue = cacheMap.remove(stripped)
-              val cacheEvent = PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue)
-              listeners.forEach { listener ->
-                try {
-                  listener.childEvent(cacheEvent)
-                } catch (e: Throwable) {
-                  logger.error(e) { "Exception in cacheChanged()" }
-                  recordException(e)
+              val prevValue =
+                synchronized(applyLock) {
+                  lastAppliedRevision = maxOf(lastAppliedRevision, event.keyValue.modRevision)
+                  cacheMap.remove(stripped)
                 }
-              }
+              fireChildEvent(PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue))
             }
 
             UNRECOGNIZED -> {
@@ -284,44 +301,70 @@ class PathChildrenCache
     timeUnit: TimeUnit,
   ): Boolean = waitOnStartComplete(timeUnitToDuration(timeout, timeUnit))
 
+  /**
+   * Waits for a primed start to finish loading. Throws [EtcdRecipeRuntimeException] when
+   * the load failed, since the cache then never updates.
+   */
   @Throws(InterruptedException::class)
   fun waitOnStartComplete(timeout: Duration): Boolean {
     checkStartCalled()
     checkCloseNotCalled()
-    return startThreadComplete.waitUntilTrueWithInterruption(timeout)
+    val completed = startThreadComplete.waitUntilTrueWithInterruption(timeout)
+    startFailure?.let { cause -> throw EtcdRecipeRuntimeException("Priming $cachePath failed", cause) }
+    return completed
   }
 
-  // Re-sync the cache to etcd's current children. Build the fresh view first, then
-  // reconcile the live map in place (drop keys no longer present, upsert the rest)
-  // rather than clear()-then-refill, which left an empty/partial window where
-  // currentData reported no children. @Synchronized restores the class invariant by
-  // serializing against start()/doClose(). This is a coarse, manual re-sync: a live
-  // watch event on the same key can race the snapshot (last-writer-wins); rely on the
-  // watcher, not rebuild(), for strict event ordering.
-  @Synchronized
+  /**
+   * Re-syncs the cache to etcd's current children without firing events. The live map is
+   * reconciled in place (drop keys no longer present, upsert the rest), so `currentData`
+   * never passes through an empty or partial state. A snapshot older than a watch event
+   * already applied is re-read rather than applied, so a concurrent event is never undone.
+   */
   fun rebuild() {
-    reconcile()
+    reconcile(emitEvents = false)
   }
 
-  // Snapshot etcd's current children, reconcile the live map in place, and return
-  // the next watch anchor (snapshot revision + 1). Deliberately NOT synchronized:
-  // the compaction-resync path invokes this on the watch dispatcher thread, where
-  // taking the cache monitor could stall against a concurrent close(); map
-  // reconciliation is safe on the ConcurrentMap, and watch events are serialized on
-  // the same dispatcher thread anyway.
-  private fun reconcile(): Long {
-    val start = TimeSource.Monotonic.markNow()
-    val getOption = getOption {
-      isPrefix(true)
-      withSortField(GetOption.SortTarget.KEY)
+  // Snapshot etcd's current children, reconcile the live map in place, and return the
+  // next watch anchor (snapshot revision + 1). Runs on the caller's thread for rebuild()
+  // and on the watch dispatcher for a compaction resync, so it takes applyLock rather than
+  // the cache monitor (which a concurrent close() may hold). A resync emits the gap's
+  // changes as events, since no watch event will ever report them.
+  private fun reconcile(emitEvents: Boolean): Long {
+    repeat(MAX_SNAPSHOT_ATTEMPTS) {
+      val start = TimeSource.Monotonic.markNow()
+      val resp = client.getResponse(trailingPath, childrenOption(), resilience.rpc)
+      val snapshotRevision = resp.header.revision
+      val fresh = resp.kvs.associate { kv -> kv.key.asString.substring(trailingPath.length) to kv.value }
+      val changes =
+        synchronized(applyLock) {
+          // A watch event newer than this snapshot was applied meanwhile: re-read
+          if (lastAppliedRevision > snapshotRevision) return@repeat
+          val diff = if (emitEvents) changesTo(fresh) else emptyList()
+          cacheMap.keys.retainAll(fresh.keys)
+          cacheMap.putAll(fresh)
+          lastAppliedRevision = snapshotRevision
+          diff
+        }
+      resilience.metrics.recordCacheSync(cachePath, start.elapsedNow(), fresh.size)
+      changes.forEach { fireChildEvent(it) }
+      return snapshotRevision + 1
     }
-    val resp = client.getResponse(trailingPath, getOption, resilience.rpc)
-    val fresh = resp.kvs.associate { kv -> kv.key.asString.substring(trailingPath.length) to kv.value }
-    cacheMap.keys.retainAll(fresh.keys)
-    cacheMap.putAll(fresh)
-    resilience.metrics.recordCacheSync(cachePath, start.elapsedNow(), cacheMap.size)
-    return resp.header.revision + 1
+    throw EtcdRecipeRuntimeException("Could not snapshot $cachePath at or past its applied watch events")
   }
+
+  // The events that turn the current map into [fresh]: removals, then additions and updates.
+  private fun changesTo(fresh: Map<String, ByteSequence>): List<PathChildrenCacheEvent> =
+    cacheMap.filterKeys { it !in fresh }.toSortedMap().map { (k, v) -> PathChildrenCacheEvent(k, CHILD_REMOVED, v) } +
+      fresh.mapNotNull { (k, v) ->
+        when (cacheMap[k]) {
+          null -> PathChildrenCacheEvent(k, CHILD_ADDED, v)
+
+          v -> null
+
+          // unchanged
+          else -> PathChildrenCacheEvent(k, CHILD_UPDATED, v)
+        }
+      }
 
   @Suppress("TooGenericExceptionCaught")
   private fun onRecoveryEvent(event: WatchRecoveryEvent) {
@@ -356,8 +399,7 @@ class PathChildrenCache
 
   val currentDataAsMap: Map<String, ByteSequence> get() = cacheMap.toMap()
 
-  @Synchronized
-  fun clear() = cacheMap.clear()
+  fun clear() = synchronized(applyLock) { cacheMap.clear() }
 
   @Synchronized
   override fun doClose() {
@@ -368,8 +410,10 @@ class PathChildrenCache
     // assigned inside loadDataAndStartWatcher() running on `executor`. If
     // close() runs before that task assigns `watcher`, closing here first
     // would no-op on a null reference and the later-assigned watcher (and
-    // its dispatcher executor) would leak.
-    startThreadComplete.waitUntilTrue()
+    // its dispatcher executor) would leak. A close() from an INITIALIZED
+    // listener runs on the loader itself, which then skips the watch.
+    if (Thread.currentThread() !== loaderThread)
+      startThreadComplete.waitUntilTrue()
 
     watcher?.close()
     watcher = null
@@ -381,5 +425,6 @@ class PathChildrenCache
 
   companion object {
     private val logger = KotlinLogging.logger {}
+    private const val MAX_SNAPSHOT_ATTEMPTS = 10
   }
 }

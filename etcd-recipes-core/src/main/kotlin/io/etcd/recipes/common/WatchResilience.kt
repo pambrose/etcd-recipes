@@ -74,7 +74,8 @@ sealed interface WatchRecoveryEvent {
   /**
    * The watched revision was compacted away ([compactRevision]); the watch was
    * re-anchored at [anchorRevision]. Events between the two were lost — a caller
-   * maintaining derived state must have reconciled it in the resync hook.
+   * maintaining derived state must have reconciled it in the resync hook. (The caches
+   * do: they report the gap's changes to their listeners as ordinary events.)
    */
   data class Resynced(
     override val watchedKey: String,

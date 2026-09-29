@@ -154,6 +154,12 @@ open class EtcdConnector(
    */
   protected fun resetConnectionState() = transitionTo(ConnectionState.CONNECTED)
 
+  /**
+   * Reports [ConnectionState.LOST] for a recipe that can no longer track etcd for a reason
+   * no watch or lease event carries, such as a start that failed before its watch existed.
+   */
+  protected fun reportConnectionLost() = transitionTo(ConnectionState.LOST)
+
   /** Recipes feed their lease events here to drive [connectionState]. */
   protected fun reportLeaseEvent(event: LeaseEvent) {
     when (event) {

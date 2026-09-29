@@ -30,6 +30,7 @@ import io.etcd.recipes.common.StringCodec
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.pollUntil
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -94,6 +95,8 @@ class NodeCacheResyncTests : StringSpec() {
       val recovery = CopyOnWriteArrayList<WatchRecoveryEvent>()
 
       NodeCache(mocks.client, mocks.key, StringCodec).use { cache ->
+        val events = CopyOnWriteArrayList<NodeCacheEvent<String>>()
+        cache.addListener { events += it }
         cache.addRecoveryListener { recovery += it }
         cache.start()
 
@@ -111,6 +114,9 @@ class NodeCacheResyncTests : StringSpec() {
 
         pollUntil(10.seconds) { mocks.options.size == 2 && mocks.options[1].revision == 21L } shouldBe true
         cache.current shouldBe "2"
+        withClue("the resync changed the value without telling its listeners") {
+          events shouldBe listOf(NodeCacheEvent(NodeCacheEvent.Type.UPDATED, "2"))
+        }
       }
     }
   }

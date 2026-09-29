@@ -26,9 +26,11 @@ import io.etcd.jetcd.Watch
 import io.etcd.jetcd.common.exception.EtcdExceptionFactory
 import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.options.WatchOption
+import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.pollUntil
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -52,6 +54,7 @@ class ServiceCacheResyncTests : StringSpec() {
   private val v1 = ServiceInstance(serviceName, "payload-1")
   private val v1Updated = v1.copy(jsonPayload = "payload-1-updated")
   private val v2 = ServiceInstance(serviceName, "payload-2")
+  private val v3 = ServiceInstance(serviceName, "payload-3")
 
   private inner class CacheMocks {
     val listeners = CopyOnWriteArrayList<Watch.Listener>()
@@ -67,14 +70,14 @@ class ServiceCacheResyncTests : StringSpec() {
         every { value } returns json.asByteSequence
       }
 
-    // GET #1 (initial snapshot): {v1} at revision 10. Every later GET (resync
-    // snapshot): {v1Updated, v2} at revision 20.
+    // GET #1 (initial snapshot): {v1, v3} at revision 10. Every later GET (resync
+    // snapshot): {v1Updated, v2} at revision 20 — v3 removed, v1 updated, v2 added.
     private fun getResponse(): GetResponse {
       val first = getCount.incrementAndFetch() == 1
       return mockk {
         every { kvs } returns
           if (first) {
-            [kv(v1.id, v1.toJson())]
+            [kv(v1.id, v1.toJson()), kv(v3.id, v3.toJson())]
           } else {
             [kv(v1.id, v1Updated.toJson()), kv(v2.id, v2.toJson())]
           }
@@ -108,10 +111,12 @@ class ServiceCacheResyncTests : StringSpec() {
       val recovery = CopyOnWriteArrayList<WatchRecoveryEvent>()
 
       ServiceCache(mocks.client, namesPath, serviceName).use { cache ->
+        val events = CopyOnWriteArrayList<Triple<WatchEvent.EventType, Boolean, String?>>()
+        cache.addListenerForChanges { type, isAdd, _, instance -> events += Triple(type, isAdd, instance?.jsonPayload) }
         cache.addRecoveryListener { recovery += it }
         cache.start()
 
-        cache.instances.map { it.jsonPayload } shouldBe ["payload-1"]
+        cache.instances.map { it.jsonPayload }.sorted() shouldBe ["payload-1", "payload-3"]
         mocks.options.first().revision shouldBe 11 // snapshot revision + 1
 
         // etcd compacted away the watch anchor: jetcd reports a fatal death
@@ -123,6 +128,15 @@ class ServiceCacheResyncTests : StringSpec() {
           mocks.options.size == 2 && mocks.options[1].revision == 21L
         } shouldBe true
         cache.instances.map { it.jsonPayload }.sorted() shouldBe ["payload-1-updated", "payload-2"]
+        withClue("the resync changed the instances without telling its listeners") {
+          events.toSet() shouldBe
+            setOf(
+              Triple(WatchEvent.EventType.DELETE, false, "payload-3"),
+              Triple(WatchEvent.EventType.PUT, false, "payload-1-updated"),
+              Triple(WatchEvent.EventType.PUT, true, "payload-2"),
+            )
+          events.size shouldBe 3
+        }
       }
     }
   }

@@ -82,7 +82,7 @@ class NodeCache<T>
       if (startCalled.load()) throw EtcdRecipeRuntimeException("start() already called")
       checkCloseNotCalled()
 
-      val anchorRevision = reconcile()
+      val anchorRevision = reconcile(emitEvents = false)
 
       // Single-key watch (no isPrefix), anchored just past the snapshot revision.
       val watchOption = watchOption { withRevision(anchorRevision) }
@@ -93,7 +93,7 @@ class NodeCache<T>
           watchOption,
           resilience.watch,
           recoveryListener = { event -> onRecoveryEvent(event) },
-          resyncWith = { reconcile() },
+          resyncWith = { reconcile(emitEvents = true) },
         ) { watchResponse ->
           withRecipeLoggingContext {
             watchResponse.events.forEach { event ->
@@ -151,12 +151,22 @@ class NodeCache<T>
     }
 
     // Snapshot the key, capturing the revision so the watch can anchor at revision + 1. Reused as
-    // the compaction resync hook (deliberately not synchronized — runs on the watch dispatcher).
-    private fun reconcile(): Long {
+    // the compaction resync hook (deliberately not synchronized — runs on the watch dispatcher),
+    // where it reports the gap's change as an event, since no watch event ever will.
+    private fun reconcile(emitEvents: Boolean): Long {
       val start = TimeSource.Monotonic.markNow()
       val resp = client.getResponse(key, rpc = resilience.rpc)
-      latestBytes = resp.kvs.firstOrNull()?.value
-      resilience.metrics.recordCacheSync(key, start.elapsedNow(), if (latestBytes == null) 0 else 1)
+      val previous = latestBytes
+      val current = resp.kvs.firstOrNull()?.value
+      latestBytes = current
+      resilience.metrics.recordCacheSync(key, start.elapsedNow(), if (current == null) 0 else 1)
+      if (emitEvents && previous != current) {
+        when {
+          previous == null -> fire(NodeCacheEvent.Type.CREATED, current)
+          current == null -> fire(NodeCacheEvent.Type.DELETED, null)
+          else -> fire(NodeCacheEvent.Type.UPDATED, current)
+        }
+      }
       return resp.header.revision + 1
     }
 
