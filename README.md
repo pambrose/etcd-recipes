@@ -613,6 +613,10 @@ make site               # serve the documentation site locally
 make docs-check         # compile the doc snippets + build the site strictly
 ```
 
+GitHub CI compiles and lints pull requests but does not run the test suite, which takes 30+
+minutes on a hosted runner. Run `make tests-tc` and confirm it passes before a PR merges;
+pushes to `master` still run the full suite.
+
 `make tests` and the examples expect a local etcd at `http://localhost:2379`. Start one with:
 
 ```

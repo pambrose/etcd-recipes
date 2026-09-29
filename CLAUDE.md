@@ -25,6 +25,8 @@ JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17
 - `make refresh` — refresh dependencies
 - `make upgrade-wrapper` — bumps the Gradle wrapper
 
+GitHub CI does not run the test suite on pull requests — it only compiles every source set and lints (the Testcontainers suite takes 30+ minutes on a hosted runner). Run `make tests-tc` locally and confirm it passes before a PR merges. Pushes to `master` still run the full suite and upload coverage.
+
 Run a single test class:
 ```
 ./gradlew :etcd-recipes-core:test --tests "io.etcd.recipes.barrier.DistributedBarrierTests"

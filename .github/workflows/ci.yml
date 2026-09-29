@@ -9,6 +9,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Pull requests compile and lint only: the Testcontainers suite takes 30+ minutes on a
+# hosted runner, so it is run locally (make tests-tc) before a PR merges. Pushes to
+# master still run the full suite and upload coverage, as a check after the merge.
 jobs:
   test:
     name: build & test
@@ -34,7 +37,13 @@ jobs:
       - name: Detekt
         run: ./gradlew detekt
 
+      - name: Compile + lint (pull requests)
+        # Every main and test source set, including the website's snippet sources
+        if: github.event_name == 'pull_request'
+        run: ./gradlew classes testClasses lintKotlin
+
       - name: Test + Kover XML (Testcontainers)
+        if: github.event_name != 'pull_request'
         # Run check + koverXmlReport in one Gradle invocation so the test
         # task's inputs (notably -PuseTestcontainers) match between the
         # two; running them separately invalidates the test cache and
@@ -43,7 +52,7 @@ jobs:
         run: ./gradlew check koverXmlReport -PuseTestcontainers
 
       - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
         uses: codecov/codecov-action@v5
         with:
           # Use the library subproject's report directly. The root aggregate
