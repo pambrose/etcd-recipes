@@ -51,6 +51,7 @@ import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
@@ -88,17 +89,10 @@ constructor(
   private val readyPath = barrierPath.appendToPath("ready")
   private val waitingPath = barrierPath.appendToPath("waiting")
 
-  // Cancellation hook stashed by an in-flight waitOnBarrier so that close()
-  // can unblock a waiting thread instead of leaving it parked indefinitely.
-  // Holds the keep-alive client and the waiting key path so close() can
-  // release them on behalf of the waiter.
-  private val activeWaiter = AtomicReference<ActiveWait?>(null)
-
-  private class ActiveWait(
-    val keepAliveClosed: BooleanMonitor,
-    val cancelled: BooleanMonitor,
-    val onCancel: () -> Unit,
-  )
+  // Cancellation hooks of the in-flight waitOnBarrier calls, so close() can unblock
+  // every waiting thread (not just the latest) instead of leaving them parked. Each
+  // hook marks its wait cancelled and releases that waiter's keep-alive and key.
+  private val activeWaiters = ConcurrentHashMap.newKeySet<() -> Unit>()
 
   init {
     require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
@@ -107,16 +101,20 @@ constructor(
 
   override val exceptionContext get() = "DistributedBarrierWithCount[$barrierPath]"
 
-  private val isReadySet: Boolean
-    get() {
-      checkCloseNotCalled()
-      return client.isKeyPresent(readyPath, resilience.rpc)
-    }
+  // Raw reads, deliberately without checkCloseNotCalled(). These run on the waiter and
+  // watch-dispatcher threads, where a concurrent close() must cancel the wait rather than
+  // blow it up: the waiter is between its establish CAS and the park for several RPCs, and
+  // a throw there escapes waitOnBarrier instead of unparking it with a cancellation (on the
+  // dispatcher thread it would kill the callback outright). close() does not close the
+  // client, so these stay valid afterward. The public getters below keep the check.
+  private val readyKeyPresent: Boolean get() = client.isKeyPresent(readyPath, resilience.rpc)
+
+  private val currentWaiterCount: Long get() = client.getChildCount(waitingPath, resilience.rpc)
 
   val waiterCount: Long
     get() {
       checkCloseNotCalled()
-      return client.getChildCount(waitingPath, resilience.rpc)
+      return currentWaiterCount
     }
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
@@ -156,10 +154,10 @@ constructor(
 
     fun checkWaiterCount() {
       // First see if /ready is missing
-      if (!isReadySet) {
+      if (!readyKeyPresent) {
         closeKeepAlive()
       } else {
-        if (waiterCount >= memberCount) {
+        if (currentWaiterCount >= memberCount) {
           closeKeepAlive()
 
           // Delete /ready key
@@ -172,11 +170,14 @@ constructor(
     }
 
     // Register a cancellation hook so close() can unblock this waiter.
-    val active = ActiveWait(keepAliveClosed, cancelled) {
+    val cancelWait: () -> Unit = {
       cancelled.set(true)
       closeKeepAlive()
     }
-    activeWaiter.store(active)
+    activeWaiters += cancelWait
+    // close() sets closeCalled before doClose() runs the registered hooks, so a close()
+    // that slipped in after the check above but before this registration is seen here.
+    if (closeCalled.load()) cancelWait()
 
     try {
       // Do a CAS on the /ready name. If it is not found, then set it
@@ -208,9 +209,12 @@ constructor(
             }
           }
         } catch (e: EtcdRecipeRuntimeException) {
-          // Initial CAS lost (the healer already revoked its lease).
+          // A close() that lands before the establish hook runs (during the ready CAS
+          // or the lease grant) makes the hook decline: that is a cancellation, not a
+          // lost CAS. The healer has already revoked its lease either way.
+          if (cancelled.get()) return false
           logger.debug(e) { "Waiting-path CAS lost for $myWaitingPath" }
-          throw EtcdRecipeException("Failed to set waitingPath")
+          throw EtcdRecipeException("Failed to set waitingPath", e)
         }
 
       // No getValue re-read: the establish CAS already proves this client set the
@@ -249,7 +253,7 @@ constructor(
                 if (observedRevision > 0L) withRevision(observedRevision + 1)
                 isPrefix(true)
               }
-            val watchFailure = java.util.concurrent.atomic.AtomicReference<Throwable?>()
+            val watchFailure = AtomicReference<Throwable?>(null)
 
             // A ready-key DELETE or waiter PUT can be lost while the watch stream is
             // fatally dead. After each recovery, checkWaiterCount() re-probes both
@@ -268,7 +272,7 @@ constructor(
                     is WatchRecoveryEvent.Failed -> {
                       val cause = event.cause
                         ?: EtcdRecipeRuntimeException("Watch on $barrierPath abandoned while waiting on barrier")
-                      watchFailure.set(cause)
+                      watchFailure.store(cause)
                       recordException(cause)
                       closeKeepAlive()
                     }
@@ -308,7 +312,7 @@ constructor(
                 client.deleteKey(myWaitingPath, resilience.rpc)
               }
 
-              watchFailure.get()?.let { cause ->
+              watchFailure.load()?.let { cause ->
                 throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
               }
 
@@ -317,7 +321,7 @@ constructor(
             }
           }
     } finally {
-      activeWaiter.compareAndSet(active, null)
+      activeWaiters -= cancelWait
       // Stop counting toward the barrier on ANY exit path — normal trip, timeout,
       // or an exception (e.g. a coroutine bridge cancelled the wait, interrupting a
       // blocking RPC). closeKeepAlive() is idempotent and halts the healer, so the
@@ -329,7 +333,7 @@ constructor(
   }
 
   override fun doClose() {
-    activeWaiter.exchange(null)?.onCancel?.invoke()
+    activeWaiters.forEach { cancelWait -> cancelWait() }
   }
 
   // Record lease trouble on the exceptions list, drive connection state, and log

@@ -41,6 +41,7 @@ import io.etcd.recipes.common.transaction
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicBoolean
@@ -73,15 +74,25 @@ constructor(
   private var keepAliveLease: SelfHealingKeepAlive? = null
   private val barrierRemoved = AtomicBoolean(false)
 
+  // Cancellation hooks of the in-flight waitOnBarrier calls, so close() can release
+  // every parked waiter (reporting not-released) instead of leaving it to its timeout.
+  private val activeWaiters = ConcurrentHashMap.newKeySet<() -> Unit>()
+
   init {
     require(barrierPath.isNotEmpty()) { "Barrier path cannot be empty" }
   }
 
   override val exceptionContext get() = "DistributedBarrier[$barrierPath]"
 
+  // Raw read, deliberately without checkCloseNotCalled(). It runs on the waiter and
+  // watch-dispatcher threads, where a concurrent close() must cancel the wait rather
+  // than blow it up. close() does not close the client, so it stays valid afterward.
+  // The public isBarrierSet() keeps the check.
+  private val barrierKeyPresent: Boolean get() = client.isKeyPresent(barrierPath, resilience.rpc)
+
   fun isBarrierSet(): Boolean {
     checkCloseNotCalled()
-    return client.isKeyPresent(barrierPath, resilience.rpc)
+    return barrierKeyPresent
   }
 
   @Synchronized
@@ -179,7 +190,7 @@ constructor(
     checkCloseNotCalled()
 
     // Check if barrier is present before using watcher
-    return if (!waitOnMissingBarriers && !isBarrierSet()) {
+    return if (!waitOnMissingBarriers && !barrierKeyPresent) {
       true
     } else {
       // Presence at wait start bounds the recovery recheck below: with
@@ -200,29 +211,45 @@ constructor(
       val watchFailure = AtomicReference<Throwable?>(null)
       val recoveryListener = waiterRecoveryListener(barrierPresentAtStart, waitLatch, watchFailure)
 
-      client.withWatcher(
-        barrierPath,
-        watchOption,
-        resilience.watch,
-        recoveryListener,
-        resyncWith = null,
-        { watchResponse ->
-          for (event in watchResponse.events) {
-            if (event.eventType == DELETE) {
-              waitLatch.countDown()
-            }
-          }
-        },
-      ) {
-        // Check one more time in case watch missed the delete just after last check
-        if (!waitOnMissingBarriers && !isBarrierSet())
-          waitLatch.countDown()
+      // Register a cancellation hook so close() can release this waiter.
+      val cancelled = AtomicBoolean(false)
+      val cancelWait: () -> Unit = {
+        cancelled.store(true)
+        waitLatch.countDown()
+      }
+      activeWaiters += cancelWait
+      // close() sets closeCalled before doClose() runs the registered hooks, so a close()
+      // that slipped in before this registration is seen here.
+      if (closeCalled.load()) cancelWait()
 
-        val released = waitLatch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-        watchFailure.load()?.let { cause ->
-          throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
+      try {
+        client.withWatcher(
+          barrierPath,
+          watchOption,
+          resilience.watch,
+          recoveryListener,
+          resyncWith = null,
+          { watchResponse ->
+            for (event in watchResponse.events) {
+              if (event.eventType == DELETE) {
+                waitLatch.countDown()
+              }
+            }
+          },
+        ) {
+          // Check one more time in case watch missed the delete just after last check
+          if (!waitOnMissingBarriers && !barrierKeyPresent)
+            waitLatch.countDown()
+
+          val released = waitLatch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+          watchFailure.load()?.let { cause ->
+            throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
+          }
+          // A wait cancelled by close() reports not-released.
+          released && !cancelled.load()
         }
-        released
+      } finally {
+        activeWaiters -= cancelWait
       }
     }
   }
@@ -242,7 +269,7 @@ constructor(
         reportRecoveryEvent(event)
         when (event) {
           is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-            if (!isBarrierSet() && (barrierPresentAtStart || !waitOnMissingBarriers))
+            if (!barrierKeyPresent && (barrierPresentAtStart || !waitOnMissingBarriers))
               waitLatch.countDown()
           }
 
@@ -265,6 +292,7 @@ constructor(
   override fun doClose() {
     keepAliveLease?.close()
     keepAliveLease = null
+    activeWaiters.forEach { cancelWait -> cancelWait() }
   }
 
   companion object {

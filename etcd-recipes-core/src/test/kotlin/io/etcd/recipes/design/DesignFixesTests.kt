@@ -40,6 +40,7 @@ import io.etcd.recipes.queue.DistributedQueue
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
 import java.util.concurrent.CountDownLatch
@@ -97,27 +98,35 @@ class DesignFixesTests : StringSpec() {
         val started = CountDownLatch(1)
         val finished = CountDownLatch(1)
         var result: Boolean? = null
+        var thrown: Throwable? = null
 
         executor.execute {
           started.countDown()
-          // 30s is plenty; if close() doesn't unblock us, the test will time out
-          // here long before the assertion below.
-          result = barrier.waitOnBarrier(30, TimeUnit.SECONDS)
-          finished.countDown()
+          try {
+            // 30s is plenty; if close() doesn't unblock us, the test will time out
+            // here long before the assertion below.
+            result = barrier.waitOnBarrier(30, TimeUnit.SECONDS)
+          } catch (e: Throwable) {
+            thrown = e
+          } finally {
+            // Count down on every exit path. Without this a throw out of
+            // waitOnBarrier never reaches the latch and reads as a 10s timeout
+            // below, hiding the actual failure.
+            finished.countDown()
+          }
         }
 
         started.await()
-        // Wait until the waiter has actually registered before closing. A fixed
-        // sleep races with slow etcd setup under CI load: close() could fire
-        // while the waiter is still in leaseGrant/CAS, where checkCloseNotCalled
-        // would throw instead of the waiter parking and being cancelled cleanly.
+        // Close as soon as the waiting key appears — no settle sleep. The waiter is
+        // still several RPCs short of the park at this point, and close() must cancel
+        // it cleanly from anywhere in that window.
         pollUntil(15.seconds) { barrier.waiterCount >= 1 } shouldBe true
-        Thread.sleep(500) // brief settle so the waiter reaches the park
 
         // close() must wake the waiter; without the fix this would hang.
         barrier.close()
 
         finished.await(10, TimeUnit.SECONDS) shouldBe true
+        thrown.shouldBeNull()
         // A cancelled wait should report not-satisfied (false), not satisfied (true).
         result shouldBe false
         executor.shutdown()
@@ -134,17 +143,25 @@ class DesignFixesTests : StringSpec() {
         val started = CountDownLatch(1)
         val finished = CountDownLatch(1)
 
+        var thrown: Throwable? = null
+
         executor.execute {
           started.countDown()
-          doubleBarrier.enter(30, TimeUnit.SECONDS)
-          finished.countDown()
+          try {
+            doubleBarrier.enter(30, TimeUnit.SECONDS)
+          } catch (e: Throwable) {
+            thrown = e
+          } finally {
+            // As above: a throw must surface as a throw, not as a phantom timeout.
+            finished.countDown()
+          }
         }
         started.await()
-        // Wait for the waiter to register rather than racing a fixed sleep.
+        // Close from inside the pre-park window rather than sleeping past it.
         pollUntil(15.seconds) { doubleBarrier.enterWaiterCount >= 1 } shouldBe true
-        Thread.sleep(500)
         doubleBarrier.close()
         finished.await(10, TimeUnit.SECONDS) shouldBe true
+        thrown.shouldBeNull()
         executor.shutdown()
         client.deleteChildren(path)
       }
