@@ -44,10 +44,11 @@ class EtcdTestContainerTests : StringSpec() {
     "a host port already taken on 127.0.0.1 is skipped, and the endpoint reaches etcd" {
       assumeTrue(System.getProperty("etcd.recipes.testcontainers") == "true", "needs -PuseTestcontainers")
 
-      // A loopback-only listener, like the ones IDEs and the Gradle daemon keep
+      // An IPv4 loopback-only listener, like the ones IDEs and the Gradle daemon keep.
+      // Explicitly 127.0.0.1: getLoopbackAddress() is ::1 when IPv6 is preferred.
       ServerSocket().use { squatter ->
         squatter.reuseAddress = true
-        squatter.bind(InetSocketAddress(InetAddress.getLoopbackAddress(), 0))
+        squatter.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0))
         val takenPort = squatter.localPort
         val ports = ArrayDeque(listOf(takenPort, ServerSocket(0).use { it.localPort }))
 

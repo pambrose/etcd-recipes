@@ -177,6 +177,17 @@ subprojects {
                 // stop()/close() shutdown hooks in the fixtures remain as
                 // belt-and-suspenders cleanup.
                 environment("TESTCONTAINERS_RYUK_DISABLED", "false")
+                // -PtcPreferIpv6 (set by the Makefile's local Testcontainers targets):
+                // resolve "localhost" to ::1 first. Testcontainers dials its Ryuk sidecar
+                // at localhost:<port>, a port Docker picks; when an IDE or the Gradle
+                // daemon already listens on 127.0.0.1 at that port, Docker Desktop still
+                // publishes it on 0.0.0.0/[::], and an IPv4-first "localhost" reaches that
+                // other process instead ("Could not connect to Ryuk"). Docker's [::] side
+                // can't be intercepted that way. The etcd endpoints name 127.0.0.1
+                // explicitly, so they are unaffected.
+                if (providers.gradleProperty("tcPreferIpv6").isPresent) {
+                    systemProperty("java.net.preferIPv6Addresses", "true")
+                }
             }
 
             // The container-based tests (etcd-recipes-core/src/test/.../container) need
