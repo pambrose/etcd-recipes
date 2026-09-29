@@ -147,7 +147,7 @@ same way as any other sink — `ResilienceConfig.withMetrics(MicrometerEtcdMetri
 | `etcd.lock.wait` | Timer | `outcome` (`acquired` / `timeout`) |
 | `etcd.lock.hold` | Timer | — |
 | `etcd.election.transitions` | Counter | `transition` (`acquired` / `relinquished`) |
-| `etcd.queue` | Timer | `op` (`enqueue` / `dequeue`) |
+| `etcd.queue` | Timer | `op` (`enqueue` / `dequeue`; the work queue's `enqueue` / `receive` / `ack` / `dead-letter`) |
 | `etcd.cache.sync` | Timer | — |
 | `etcd.cache.size` | DistributionSummary | — |
 

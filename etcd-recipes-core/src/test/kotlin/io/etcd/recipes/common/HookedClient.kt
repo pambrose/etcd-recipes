@@ -25,9 +25,12 @@ import io.etcd.jetcd.Txn
 import io.etcd.jetcd.Watch
 import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.kv.GetResponse
+import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lease.LeaseRevokeResponse
 import io.etcd.jetcd.lock.LockResponse
+import io.etcd.jetcd.op.Cmp
+import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.WatchOption
 import io.grpc.Status
@@ -38,6 +41,7 @@ import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.fetchAndDecrement
+import kotlin.concurrent.atomics.incrementAndFetch
 
 /**
  * A real [Client] that runs a one-shot hook at a chosen jetcd call, so a test can land
@@ -50,6 +54,18 @@ class HookedClient(
 ) : Client by delegate {
   /** Runs before the next `kvClient.txn()`. */
   val beforeTxn = AtomicReference<(() -> Unit)?>(null)
+
+  /** How many transactions have been committed through this client. */
+  val txnCount = AtomicInt(0)
+
+  /**
+   * When set, the next transaction commits in etcd but its response is replaced by a failure,
+   * as when a response is lost after the commit (an ambiguous outcome). Then it clears.
+   */
+  val loseNextTxnResponse = AtomicBoolean(false)
+
+  /** Every `kvClient.get(key, option)` call's key and option, in order. */
+  val getOptions = CopyOnWriteArrayList<Pair<String, GetOption>>()
 
   /** Runs before the next `kvClient.get(key, option)`. */
   val beforeGet = AtomicReference<(() -> Unit)?>(null)
@@ -85,7 +101,7 @@ class HookedClient(
     object : KV by delegate.kvClient {
       override fun txn(): Txn {
         beforeTxn.exchange(null)?.invoke()
-        return delegate.kvClient.txn()
+        return CountingTxn(delegate.kvClient.txn())
       }
 
       override fun get(
@@ -93,6 +109,7 @@ class HookedClient(
         option: GetOption,
       ): CompletableFuture<GetResponse> {
         beforeGet.exchange(null)?.invoke()
+        getOptions += key.asString to option
         val after = afterGet.exchange(null) ?: return delegate.kvClient.get(key, option)
         val response = delegate.kvClient.get(key, option).get()
         after()
@@ -134,6 +151,26 @@ class HookedClient(
     }
 
   override fun getKVClient(): KV = kv
+
+  // Returns itself from the builder calls, so commit() comes back through here.
+  private inner class CountingTxn(
+    private val real: Txn,
+  ) : Txn {
+    override fun If(vararg cmps: Cmp): Txn = also { real.If(*cmps) }
+
+    override fun Then(vararg ops: Op): Txn = also { real.Then(*ops) }
+
+    override fun Else(vararg ops: Op): Txn = also { real.Else(*ops) }
+
+    override fun commit(): CompletableFuture<TxnResponse> {
+      txnCount.incrementAndFetch()
+      val committed = real.commit()
+      if (!loseNextTxnResponse.compareAndSet(true, false)) return committed
+      return committed.thenCompose {
+        CompletableFuture.failedFuture(StatusRuntimeException(Status.UNAVAILABLE.withDescription("response lost")))
+      }
+    }
+  }
 
   override fun getLeaseClient(): Lease = lease
 

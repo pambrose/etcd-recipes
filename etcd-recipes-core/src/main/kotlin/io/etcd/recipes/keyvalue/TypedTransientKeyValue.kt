@@ -74,7 +74,11 @@ class TypedTransientKeyValue<T>
         resilience,
       )
 
-    /** Starts publishing (for `autoStart = false`); a no-op-safe delegate to the underlying recipe. */
+    /**
+     * Starts publishing, for `autoStart = false`, by delegating to the underlying recipe. Like it,
+     * this throws when the recipe was already started, which with the default `autoStart = true`
+     * it was at construction.
+     */
     fun start(): TypedTransientKeyValue<T> {
       untyped.start()
       return this

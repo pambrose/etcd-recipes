@@ -72,8 +72,12 @@ private fun Client.getSingleChild(
   val getOption =
     getOption {
       isPrefix(true)
-      withSortField(target)
-      withSortOrder(order)
+      // A range comes back in ascending key order already. Asking etcd to sort makes it read
+      // the whole prefix before applying the limit, so the key-ascending case asks for nothing.
+      if (target != GetOption.SortTarget.KEY || order != SortOrder.ASCEND) {
+        withSortField(target)
+        withSortOrder(order)
+      }
       withLimit(1)
     }
   return getResponse(trailingKey, getOption, rpc)

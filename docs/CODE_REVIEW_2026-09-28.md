@@ -107,12 +107,12 @@
 - [x] [#47](#issue-47) Java can't catch `InterruptedException` from the concrete `DistributedMutex` / `DistributedSemaphore` types
 - [x] [#48](#issue-48) `tryLock`/`tryAcquire` deadlines don't bound the setup and cleanup RPCs
 - [x] [#49](#issue-49) The work queue's empty-wait watch isn't revision-anchored (the lost wakeup that PR #68 fixed elsewhere)
-- [ ] [#50](#issue-50) An ambiguous take commit loses the item (plain queues) or strands the claim (work queue)
+- [x] [#50](#issue-50) An ambiguous take commit loses the item (plain queues) or strands the claim (work queue)
 - [x] [#51](#issue-51) Retried enqueue puts can duplicate an item that was already consumed
 - [x] [#52](#issue-52) `AbstractQueue` takes don't react to `close()`
 - [x] [#53](#issue-53) `enqueue(value, Duration.INFINITE)` writes a poison key that breaks every receive
-- [ ] [#54](#issue-54) The orphan sweep issues one transaction per in-flight claim on every idle wake
-- [ ] [#55](#issue-55) `enqueueAll`'s within-batch order relies on etcd's unstable sort
+- [x] [#54](#issue-54) The orphan sweep issues one transaction per in-flight claim on every idle wake
+- [x] [#55](#issue-55) `enqueueAll`'s within-batch order relies on etcd's unstable sort
 - [ ] [#56](#issue-56) `TransientKeyValue` parks an executor thread for its whole lifetime, and `start()` waits with no timeout
 - [x] [#57](#issue-57) `PathChildrenCache` fires INITIALIZED after the watch is live: out of order, a snapshot per listener, and a deadlock
 - [x] [#58](#issue-58) A compaction resync updates caches silently, so listeners and flows never see the gap's changes
@@ -150,8 +150,8 @@
 - [ ] [#88](#issue-88) `TransientKeyValue`: retrying `start()` after a failure can leave a published key that can't be removed
 - [x] [#89](#issue-89) Work-queue sweeper failures are dropped at DEBUG
 - [x] [#90](#issue-90) `ack()`/`requeue()` are guarded on the instance's `clientId`, not on the specific claim
-- [ ] [#91](#issue-91) Queue metrics and small interop and docs gaps
-- [ ] [#92](#issue-92) Head selection makes etcd read and sort the whole range (O(N²) drain)
+- [x] [#91](#issue-91) Queue metrics and small interop and docs gaps
+- [x] [#92](#issue-92) Head selection makes etcd read and sort the whole range (O(N²) drain)
 - [x] [#93](#issue-93) `TypedPathChildrenCache`: one throwing listener stops the event reaching the rest
 - [ ] [#94](#issue-94) Discovery lifecycle and naming traps
 - [ ] [#95](#issue-95) `eventsAsFlow().onStart { }` doesn't guarantee the cache listener is registered

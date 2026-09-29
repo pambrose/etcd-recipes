@@ -136,7 +136,7 @@ class RecipeMetricsTests : StringSpec() {
       }
     }
 
-    "a queue dequeue records a dequeue op" {
+    "a queue enqueue and dequeue record their ops" {
       connectToEtcd(urls) { client ->
         client.deleteChildren(base)
         val metrics = RecordingMetrics()
@@ -145,7 +145,7 @@ class RecipeMetricsTests : StringSpec() {
             queue.enqueue("hello")
             queue.dequeue()
           }
-        metrics.queueOps shouldBe ["dequeue"]
+        metrics.queueOps shouldBe ["enqueue", "dequeue"]
       }
     }
 

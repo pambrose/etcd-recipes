@@ -96,8 +96,10 @@ class DistributedPriorityQueue
     priority: UShort,
   ) {
     checkCloseNotCalled()
+    val start = TimeSource.Monotonic.markNow()
     val prefix = "%s/%05d".format(queuePath, priority.toInt())
     newSequentialKV(prefix, value)
+    resilience.metrics.recordQueue("enqueue", queuePath, start.elapsedNow())
   }
 
   // Validate Int priorities rather than silently truncating them. priority.toUShort()

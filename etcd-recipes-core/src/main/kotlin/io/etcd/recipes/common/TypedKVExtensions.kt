@@ -29,6 +29,7 @@ import io.etcd.jetcd.options.PutOption
  *
  * `client.putValue("cfg", config, jsonCodec<Config>())`
  */
+@JvmOverloads
 fun <T> Client.putValue(
   keyName: String,
   value: T,
@@ -43,6 +44,7 @@ fun <T> Client.putValue(
  *
  * `client.getValue("cfg", jsonCodec<Config>())`
  */
+@JvmOverloads
 fun <T> Client.getValue(
   keyName: String,
   codec: EtcdCodec<T>,
