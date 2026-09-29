@@ -63,16 +63,22 @@ sealed interface LeaseEvent {
   ) : LeaseEvent
 
   /**
-   * The lease expired (renewal stopped past its TTL, or etcd reported it gone).
-   * Ownership of the bound keys may have been lost to another party; healing
-   * follows unless the retry policy forbids it.
+   * Renewal stopped: jetcd's deadline passed without a renewal, or etcd reported the lease
+   * gone. Usually the lease and its bound keys are gone, and ownership may have been lost
+   * to another party; healing follows unless the retry policy forbids it. Healing first
+   * asks etcd, though: a lease that is in fact still alive (renewals lost across an etcd
+   * leader change) is simply renewed again, reported as [Restored] with the same id.
    */
   data class Expired(
     val leaseId: Long,
     val cause: Throwable?,
   ) : LeaseEvent
 
-  /** A replacement lease was granted and the owned keys were re-established. */
+  /**
+   * Renewal resumed. When [oldLeaseId] == [newLeaseId] the lease was still alive in etcd and
+   * the keys never went away; otherwise a replacement lease was granted and the owned keys
+   * were re-established under it.
+   */
   data class Restored(
     val oldLeaseId: Long,
     val newLeaseId: Long,

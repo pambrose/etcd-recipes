@@ -29,6 +29,7 @@ import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.LeaseEvent
 import io.etcd.recipes.common.LeaseListener
 import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.RpcResilience
 import io.etcd.recipes.common.SelfHealingKeepAlive
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.deleteKey
@@ -80,6 +81,7 @@ constructor(
     val service: ServiceInstance,
     val client: Client,
     val instancePath: String,
+    private val rpc: RpcResilience,
   ) : Closeable {
     // The JSON re-put on every heal; updateService refreshes it so a heal that
     // races an update never resurrects a stale payload.
@@ -91,9 +93,11 @@ constructor(
       // Closing the healer stops any healing and revokes the current lease, so the
       // instance key is released promptly on unregister/close instead of lingering
       // until TTL (#7). Revoking already deletes the lease-bound key; deleteKey is
-      // kept as belt-and-suspenders.
+      // belt-and-suspenders, so a failure there (etcd unreachable at shutdown) must not
+      // escape: the key goes with the revoked lease, or at the lease's TTL.
       healer.close()
-      client.deleteKey(instancePath)  // best-effort; healer already revoked the lease
+      runCatching { client.deleteKey(instancePath, rpc) }
+        .onFailure { e -> logger.debug(e) { "Best-effort delete of $instancePath failed" } }
     }
   }
 
@@ -103,7 +107,7 @@ constructor(
     checkCloseNotCalled()
 
     val instancePath = getNamesPath(service)
-    val context = ServiceInstanceContext(service, client, instancePath)
+    val context = ServiceInstanceContext(service, client, instancePath, resilience.rpc)
 
     // Self-healing: if the instance lease expires (partition longer than the TTL),
     // the healer re-grants it and re-runs this CAS, re-registering the instance.
@@ -134,7 +138,12 @@ constructor(
     }
 
     // Only publish a fully-built context (healer set) into the map.
-    serviceContextMap[service.id] = context
+    // Re-registering the same instance (its key vanished, or healing gave up) replaces
+    // the old context: close its healer so its keep-alive stops, but not the whole
+    // context, whose delete would remove the fresh registration's key.
+    serviceContextMap.put(service.id, context)?.let { replaced ->
+      runCatching { replaced.healer.close() }.onFailure { e -> recordException(e) }
+    }
   }
 
   @Synchronized
@@ -212,7 +221,11 @@ constructor(
 
   @Synchronized
   override fun doClose() {
-    serviceContextMap.forEach { (_, v) -> internalUnregisterService(v.service) }
+    // Close every instance even if one fails, so none is left renewing its lease
+    // inside a closed registry.
+    serviceContextMap.values.toList().forEach { context ->
+      runCatching { internalUnregisterService(context.service) }.onFailure { e -> recordException(e) }
+    }
   }
 
   internal val namesBasePath: String get() = namesPath

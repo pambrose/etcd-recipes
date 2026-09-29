@@ -24,6 +24,7 @@ import io.etcd.jetcd.common.exception.ErrorCode
 import io.etcd.jetcd.common.exception.EtcdExceptionFactory
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lease.LeaseKeepAliveResponse
+import io.etcd.jetcd.lease.LeaseTimeToLiveResponse
 import io.etcd.jetcd.support.CloseableClient
 import io.grpc.stub.StreamObserver
 import io.kotest.assertions.throwables.shouldThrow
@@ -252,6 +253,50 @@ class SelfHealingKeepAliveTests : StringSpec() {
       mocks.client.selfHealingKeepAlive(2.seconds, quickHeals(), null) { true }.close()
       verify { mocks.lease.revoke(100L) }
       verify { mocks.registrations.first().close() }
+    }
+
+    // start() revokes the lease when the hook throws; the heal path did not, so a CAS
+    // that committed but timed out left its key bound to a lease nobody renews, which
+    // then expired and took the key with it.
+    "a heal whose establish hook throws revokes the lease it granted" {
+      val mocks = HealMocks()
+      val establishCalls = AtomicInt(0)
+      mocks.client.selfHealingKeepAlive(2.seconds, quickHeals(), null) {
+        if (establishCalls.incrementAndFetch() == 1) true else error("establish txn timed out")
+      }.use {
+        mocks.observers.first().onCompleted()
+        pollUntil(10.seconds) { establishCalls.load() >= 2 } shouldBe true
+        pollUntil(10.seconds) {
+          runCatching { verify { mocks.lease.revoke(101L) } }.isSuccess
+        } shouldBe true
+      }
+    }
+
+    // jetcd's onCompleted comes from its own client-side deadline, not from etcd: after
+    // an etcd leader change the new leader extends every lease, so the lease and its keys
+    // can still be alive. Re-granting then made the establish CAS lose to the instance's
+    // own key, and the old lease lapsed unrenewed; the lease must simply be renewed again.
+    "a lease jetcd gave up on but etcd still holds is renewed again, not re-granted" {
+      val mocks = HealMocks()
+      every { mocks.lease.timeToLive(100L, any()) } returns
+        CompletableFuture.completedFuture(mockk<LeaseTimeToLiveResponse> { every { ttl } returns 5L })
+      val events = CopyOnWriteArrayList<LeaseEvent>()
+      val establishCalls = AtomicInt(0)
+      mocks.client.selfHealingKeepAlive(2.seconds, quickHeals(), { events += it }) {
+        establishCalls.incrementAndFetch()
+        true
+      }.use { healer ->
+        mocks.observers.first().onCompleted()
+        pollUntil(10.seconds) { events.any { it is LeaseEvent.Restored } } shouldBe true
+        val restored = events.filterIsInstance<LeaseEvent.Restored>().first()
+        restored.oldLeaseId shouldBe 100L
+        restored.newLeaseId shouldBe 100L
+        healer.currentLeaseId shouldBe 100L
+        healer.isHealthy shouldBe true
+        establishCalls.load() shouldBe 1
+        mocks.registrations.size shouldBe 2
+        verify(exactly = 0) { mocks.lease.grant(any(), any(), any()) }
+      }
     }
   }
 }

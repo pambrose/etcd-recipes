@@ -23,6 +23,7 @@ import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.recipes.barrier.DistributedBarrier.Companion.defaultClientId
+import io.etcd.recipes.common.EstablishDeclinedException
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.LeaseEvent
@@ -129,9 +130,11 @@ constructor(
           }
         }
         true
-      } catch (e: EtcdRecipeRuntimeException) {
+      } catch (e: EstablishDeclinedException) {
         // Initial CAS lost: another client set the barrier between the presence
-        // check and the txn. The healer already revoked the lease it granted.
+        // check and the txn. The healer already revoked the lease it granted. Any
+        // other failure (an unreachable etcd, a refused grant) is not a lost CAS and
+        // propagates with its cause.
         logger.debug(e) { "setBarrier lost the CAS for $barrierPath" }
         false
       }

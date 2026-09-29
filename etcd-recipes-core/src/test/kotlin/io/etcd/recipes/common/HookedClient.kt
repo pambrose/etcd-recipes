@@ -22,6 +22,7 @@ import io.etcd.jetcd.KV
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.Watch
+import io.etcd.jetcd.kv.DeleteResponse
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.options.WatchOption
 import java.util.concurrent.CompletableFuture
@@ -39,6 +40,9 @@ class HookedClient(
   /** Runs before the next `kvClient.txn()`. */
   val beforeTxn = AtomicReference<(() -> Unit)?>(null)
 
+  /** Runs before the next single-key `kvClient.delete(key)`. */
+  val beforeDelete = AtomicReference<(() -> Unit)?>(null)
+
   /** Runs before the next single-argument `leaseClient.grant(ttl)`. */
   val beforeLeaseGrant = AtomicReference<(() -> Unit)?>(null)
 
@@ -50,6 +54,11 @@ class HookedClient(
       override fun txn(): Txn {
         beforeTxn.exchange(null)?.invoke()
         return delegate.kvClient.txn()
+      }
+
+      override fun delete(key: ByteSequence): CompletableFuture<DeleteResponse> {
+        beforeDelete.exchange(null)?.invoke()
+        return delegate.kvClient.delete(key)
       }
     }
 

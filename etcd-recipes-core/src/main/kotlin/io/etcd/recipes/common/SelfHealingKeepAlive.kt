@@ -23,6 +23,7 @@ import io.etcd.jetcd.common.exception.ErrorCode
 import io.etcd.jetcd.common.exception.EtcdException
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lease.LeaseKeepAliveResponse
+import io.etcd.jetcd.options.LeaseOption
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.support.Observers
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -206,6 +207,7 @@ class SelfHealingKeepAlive internal constructor(
   private fun runAttempt(expiredLeaseId: Long) {
     if (closed.load()) return
     try {
+      if (resumeIfStillAlive(expiredLeaseId)) return
       val granted =
         client.leaseClient
           .grant(
@@ -233,13 +235,62 @@ class SelfHealingKeepAlive internal constructor(
     }
   }
 
+  // jetcd reports a lease "gone" from its own client-side deadline (last renewal + TTL),
+  // not from etcd. After an etcd leader change the new leader extends every lease, so the
+  // lease — and the keys bound to it — can still be alive. Re-granting then makes the
+  // establish CAS lose to this recipe's own still-live key, and the old lease lapses
+  // unrenewed a few seconds later. So ask etcd first: if the lease is alive, resume
+  // renewing it. An unknown answer falls back to re-granting, the pre-existing behavior.
+  @Suppress("ReturnCount")
+  private fun resumeIfStillAlive(expiredLeaseId: Long): Boolean {
+    val current = lease?.takeIf { it.id == expiredLeaseId } ?: return false
+    val remaining = remainingTtlSecs(expiredLeaseId)
+    if (remaining <= 0) return false
+    synchronized(lock) {
+      if (closed.load()) return true
+      registration?.close()
+      registration = register(current)
+    }
+    healing = false
+    healthy = true
+    logger.info { "Lease $expiredLeaseId was still alive in etcd (${remaining}s left); resumed renewing it" }
+    emit(LeaseEvent.Restored(expiredLeaseId, expiredLeaseId))
+    return true
+  }
+
+  // The lease's remaining TTL in etcd, or -1 when it is gone or the answer is unknown.
+  @Suppress("TooGenericExceptionCaught")
+  private fun remainingTtlSecs(leaseId: Long): Long =
+    try {
+      client.leaseClient
+        .timeToLive(leaseId, LeaseOption.DEFAULT)
+        .get(resilience.healOperationTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        .ttl
+    } catch (e: InterruptedException) {
+      Thread.currentThread().interrupt()
+      -1L
+    } catch (e: Exception) {
+      logger.debug(e) { "timeToLive($leaseId) failed; re-granting" }
+      -1L
+    }
+
   // Returns false (after emitting Failed) when the establish hook declines the new
-  // lease — ownership is gone and must not be reclaimed.
+  // lease — ownership is gone and must not be reclaimed. A hook that throws revokes the
+  // new lease first, as start() does: nothing holds it, and a CAS that committed before
+  // the throw would otherwise leave its key bound to a lease nobody renews.
+  @Suppress("TooGenericExceptionCaught")
   private fun runEstablishForHeal(
     granted: LeaseGrantResponse,
     expiredLeaseId: Long,
   ): Boolean {
-    if (establish(granted)) return true
+    val established =
+      try {
+        establish(granted)
+      } catch (e: Throwable) {
+        client.leaseRevoke(granted, rpc)
+        throw e
+      }
+    if (established) return true
     client.leaseRevoke(granted, rpc)
     logger.warn { "Establish hook declined healed lease ${granted.id}; abandoning heal of $expiredLeaseId" }
     emit(LeaseEvent.Failed(expiredLeaseId, lastCause))
