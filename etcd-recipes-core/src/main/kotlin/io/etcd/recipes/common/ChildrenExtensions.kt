@@ -120,6 +120,6 @@ fun Client.deleteChildren(
       isPrefix(true)
       withPrevKV(true)
     }
-  return retryRpc(rpc, "deleteChildren($keyName)") { kvClient.delete(trailingKey.asByteSequence, deleteOption) }
+  return awaitRpc(rpc, "deleteChildren($keyName)", kvClient.delete(trailingKey.asByteSequence, deleteOption))
     .prevKvs.map { it.key.asString }
 }

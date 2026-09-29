@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (RPC engine: real jetcd failures, reads-only retries)
+
+- The retry check only recognized jetcd's `EtcdException`, but jetcd's KV, lease, and
+  lock calls fail with raw gRPC `StatusRuntimeException`s — so status-based retries never
+  fired; only attempt timeouts were retried. gRPC statuses (`UNAVAILABLE`, `INTERNAL`,
+  `DEADLINE_EXCEEDED`) now count.
+- **Only calls that are safe to repeat are retried**: reads, plus `unlock` and
+  `leaseGrant`, whose duplicates are harmless. Plain writes — `putValue`, `deleteKey`,
+  `deleteChildren`, `compact` (and their suspending twins) — now make one attempt bounded
+  by `operationTimeout`, like transactions: a write that failed or timed out may still
+  have been applied, and a retried attempt could land after a newer write and revert it.
+  Previously a timed-out write was retried.
+- **Every RPC failure now surfaces as `EtcdRecipeRuntimeException`** with the original
+  failure (gRPC status, timeout, or interrupt) as its cause. Non-retriable failures used
+  to escape as a raw checked `ExecutionException` — undeclared, and uncatchable as such
+  from Java.
+- Interrupts are handled consistently: one arriving during a retry backoff or while
+  awaiting a transaction now surfaces as `EtcdRecipeRuntimeException` with the thread's
+  interrupt flag restored (it used to escape as a raw `InterruptedException` with the
+  flag cleared), and `leaseRevoke` no longer clears the interrupt flag of an interrupted
+  caller.
+
 ### Fixed (packaging: dependency scopes)
 
 - The published `etcd-recipes-core` POM declared jetcd and kotlinx-serialization at

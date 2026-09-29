@@ -46,7 +46,7 @@ suspend fun Client.awaitPutValue(
   keyval: ByteSequence,
   option: PutOption = PutOption.DEFAULT,
   rpc: RpcResilience = RpcResilience.DEFAULT,
-): PutResponse = suspendRetryRpc(rpc, "putValue($keyName)") { kvClient.put(keyName.asByteSequence, keyval, option) }
+): PutResponse = suspendAwaitRpc(rpc, "putValue($keyName)", kvClient.put(keyName.asByteSequence, keyval, option))
 
 /** Suspending twin of `putValue` for String values. */
 suspend fun Client.awaitPutValue(
@@ -81,7 +81,7 @@ suspend fun Client.awaitDeleteKeys(vararg keyNames: String) {
 suspend fun Client.awaitDeleteKey(
   keyName: String,
   rpc: RpcResilience = RpcResilience.DEFAULT,
-): DeleteResponse = suspendRetryRpc(rpc, "deleteKey($keyName)") { kvClient.delete(keyName.asByteSequence) }
+): DeleteResponse = suspendAwaitRpc(rpc, "deleteKey($keyName)", kvClient.delete(keyName.asByteSequence))
 
 // Mirrors the blocking internal getResponse: re-fetches while etcd reports more
 // data pending but returns no kvs.
@@ -153,7 +153,7 @@ suspend fun Client.awaitCompact(
   revision: Long,
   option: CompactOption = CompactOption.DEFAULT,
   rpc: RpcResilience = RpcResilience.DEFAULT,
-): CompactResponse = suspendRetryRpc(rpc, "compact($revision)") { kvClient.compact(revision, option) }
+): CompactResponse = suspendAwaitRpc(rpc, "compact($revision)", kvClient.compact(revision, option))
 
 /** Suspending twin of `isKeyPresent`. */
 suspend fun Client.awaitIsKeyPresent(

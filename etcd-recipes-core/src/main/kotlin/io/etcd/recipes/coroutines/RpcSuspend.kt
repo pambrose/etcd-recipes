@@ -38,7 +38,9 @@ private class Boxed<T>(
  * Suspending twin of the blocking retry engine in `common/RpcRetry.kt`: awaits the
  * future produced by [op], bounding each attempt with [RpcResilience.operationTimeout]
  * and retrying retriable failures under [RpcResilience.retryPolicy], backing off with
- * `delay` instead of `Thread.sleep`. External cancellation is never retried: it cancels
+ * `delay` instead of `Thread.sleep`. As there, only for calls that are safe to repeat;
+ * plain writes use [suspendAwaitRpc]. Failures surface as [EtcdRecipeRuntimeException]
+ * with the original failure as cause. External cancellation is never retried: it cancels
  * the in-flight future and propagates immediately.
  */
 @Suppress("TooGenericExceptionCaught", "ThrowsCount")
@@ -69,8 +71,8 @@ internal suspend fun <T> suspendRetryRpc(
     } catch (e: CancellationException) {
       future.cancel(true)
       throw e
-    } catch (e: Throwable) {
-      if (!e.isRetriableRpcFailure()) throw e
+    } catch (e: Exception) {
+      if (!e.isRetriableRpcFailure()) throw EtcdRecipeRuntimeException("$opName failed: ${e.message}", e)
       lastFailure = e
     }
     val delay = rpc.retryPolicy.nextDelay(attempt, start.elapsedNow())
@@ -81,9 +83,11 @@ internal suspend fun <T> suspendRetryRpc(
 
 /**
  * Suspending twin of `awaitRpc`: awaits [future] with the operation timeout applied but
- * NO retry — for transactions, whose failed commits are ambiguous and whose retry
- * decisions belong to the recipes' own CAS loops.
+ * NO retry — for transactions and plain writes, whose failed or timed-out attempts may
+ * still have been applied; retry decisions belong to the recipes' own loops. Failures
+ * surface as [EtcdRecipeRuntimeException] with the original failure as cause.
  */
+@Suppress("TooGenericExceptionCaught")
 internal suspend fun <T> suspendAwaitRpc(
   rpc: RpcResilience,
   opName: String,
@@ -103,4 +107,8 @@ internal suspend fun <T> suspendAwaitRpc(
   } catch (e: CancellationException) {
     future.cancel(true)
     throw e
+  } catch (e: EtcdRecipeRuntimeException) {
+    throw e
+  } catch (e: Exception) {
+    throw EtcdRecipeRuntimeException("$opName failed: ${e.message}", e)
   }

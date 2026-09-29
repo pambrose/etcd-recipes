@@ -59,7 +59,7 @@
 - [x] [#3](#issue-3) Colliding enqueue keys (millis + 3 random chars, blind put) silently overwrite queued items
 
 #### High
-- [ ] [#4](#issue-4) RPC retry predicate never matches real jetcd failures, so configured status-based retries are inert
+- [x] [#4](#issue-4) RPC retry predicate never matches real jetcd failures, so configured status-based retries are inert
 - [x] [#5](#issue-5) Published core POM scopes jetcd and kotlinx-serialization as runtime-only although both are in the public API
 - [x] [#6](#issue-6) `DistributedReadWriteLock` conflict scan bleeds into sibling lock paths (missing trailing `/`)
 - [x] [#7](#issue-7) `DistributedReadWriteLock`: a `clientId` containing `/` lets a reader and a writer hold at once
@@ -80,9 +80,9 @@
 - [ ] [#22](#issue-22) Coroutine queue twins lose or strand items when cancellation races a successful take
 
 #### Medium
-- [ ] [#23](#issue-23) Non-retriable RPC failures escape as a raw checked `ExecutionException`
-- [ ] [#24](#issue-24) A per-attempt timeout doesn't cancel the gRPC call, so timed-out writes can land after later ones
-- [ ] [#25](#issue-25) Interrupts are handled inconsistently by the RPC engine and swallowed by `leaseRevoke`
+- [x] [#23](#issue-23) Non-retriable RPC failures escape as a raw checked `ExecutionException`
+- [x] [#24](#issue-24) A per-attempt timeout doesn't cancel the gRPC call, so timed-out writes can land after later ones
+- [x] [#25](#issue-25) Interrupts are handled inconsistently by the RPC engine and swallowed by `leaseRevoke`
 - [ ] [#26](#issue-26) `connectionState` never leaves `SUSPENDED` after jetcd recovers a stream on its own
 - [ ] [#27](#issue-27) `connectionState` is last-writer-wins across independent streams, and notifications can arrive out of order
 - [ ] [#28](#issue-28) The compaction marker is lost when a resync attempt fails
@@ -90,7 +90,7 @@
 - [ ] [#30](#issue-30) `putValuesWithKeepAlive` never revokes its lease, and its multi-key puts aren't atomic
 - [ ] [#31](#issue-31) The RPC budget isn't threaded through several helpers and call sites
 - [ ] [#32](#issue-32) `ping()` and the Spring health indicator can block about 150 s, and RBAC-scoped clusters always report DOWN
-- [ ] [#33](#issue-33) Unit tests mock jetcd using the library's own assumptions, so resilience bugs can't surface
+- [x] [#33](#issue-33) Unit tests mock jetcd using the library's own assumptions, so resilience bugs can't surface
 - [ ] [#34](#issue-34) Leader-key watches are not revision-anchored, so a hand-off during setup is missed
 - [ ] [#35](#issue-35) Step-down leaves `attemptLeadership` set, so a DELETE can start a second concurrent term
 - [ ] [#36](#issue-36) A term won via the watch runs on the watch dispatcher, so `close()` can return while it still holds the key

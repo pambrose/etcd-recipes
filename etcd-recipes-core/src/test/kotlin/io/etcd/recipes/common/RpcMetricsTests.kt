@@ -93,12 +93,14 @@ class RpcMetricsTests : StringSpec() {
       m.rpcs.first() shouldBe RecordingMetrics.Rpc("getResponse(k)", attempts = 1, failed = false)
     }
 
-    "a non-retriable RPC failure records recordRpc with failed=true and rethrows" {
+    "a non-retriable RPC failure records recordRpc with failed=true and surfaces the cause" {
       val m = RecordingMetrics()
-      shouldThrow<IllegalStateException> {
-        clientThatGets(succeeds = false)
-          .getResponse("k", getOption { withCountOnly(true) }, RpcResilience.DEFAULT.withMetrics(m))
-      }
+      val e =
+        shouldThrow<EtcdRecipeRuntimeException> {
+          clientThatGets(succeeds = false)
+            .getResponse("k", getOption { withCountOnly(true) }, RpcResilience.DEFAULT.withMetrics(m))
+        }
+      (e.cause is IllegalStateException) shouldBe true
       m.rpcs.size shouldBe 1
       m.rpcs.first().failed shouldBe true
     }
