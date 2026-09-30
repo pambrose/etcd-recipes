@@ -21,6 +21,7 @@ package io.etcd.recipes.barrier
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
+import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.Watch
@@ -32,6 +33,7 @@ import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.ResilienceConfig
+import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.pollUntil
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -56,40 +58,48 @@ import kotlin.time.Duration.Companion.seconds
  */
 class BarrierWithCountWatchRecoveryTests : StringSpec() {
   /**
-   * Transactions arrive in order: #1 ready-CAS (result unused), #2 waiting-path CAS
-   * (must win), then presence probes for the ready key. Probes up to
-   * [readyPresentProbes] report the ready key present; later ones report it absent.
+   * Every transaction succeeds: #1 starts round [ROUND] (its ready CAS), #2 is the
+   * waiting-path CAS. Reads of the ready key up to [readyPresentProbes] find round
+   * [ROUND]; later ones find it gone. The waiter count stays below memberCount.
    */
   private class CountBarrierMocks(
     private val readyPresentProbes: Int,
   ) {
     val listeners = CopyOnWriteArrayList<Watch.Listener>()
     val options = CopyOnWriteArrayList<WatchOption>()
-    private val txnCount = AtomicInt(0)
+    private val readyProbes = AtomicInt(0)
 
     val client: Client =
       mockk {
         every { kvClient } returns
           mockk<KV> {
             every { txn() } answers {
-              val n = txnCount.incrementAndFetch()
-              val succeeded = if (n <= 2) true else (n - 2) <= readyPresentProbes
               mockk<Txn> {
                 every { If(*anyVararg()) } returns this
                 every { Then(*anyVararg()) } returns this
+                every { Else(*anyVararg()) } returns this
                 every { commit() } returns
-                  CompletableFuture.completedFuture(mockk<TxnResponse> { every { isSucceeded } returns succeeded })
+                  CompletableFuture.completedFuture(
+                    mockk<TxnResponse> {
+                      every { isSucceeded } returns true
+                      every { header } returns mockk { every { revision } returns ROUND }
+                    },
+                  )
               }
             }
-            every { get(any<ByteSequence>(), any()) } returns
+            every { get(any<ByteSequence>(), any()) } answers {
+              val present = firstArg<ByteSequence>().asString == READY_KEY &&
+                readyProbes.incrementAndFetch() <= readyPresentProbes
+              val round = if (present) [mockk<KeyValue> { every { createRevision } returns ROUND }] else emptyList()
               CompletableFuture.completedFuture(
                 mockk<GetResponse> {
                   every { count } returns 1L // waiter count stays below memberCount
-                  every { kvs } returns emptyList()
+                  every { kvs } returns round
                   every { isMore } returns false
                   every { header } returns mockk { every { revision } returns OBSERVED_REV }
                 },
               )
+            }
             every { delete(any<ByteSequence>()) } returns
               CompletableFuture.completedFuture(mockk<DeleteResponse>())
           }
@@ -113,6 +123,11 @@ class BarrierWithCountWatchRecoveryTests : StringSpec() {
     companion object {
       /** Revision the pre-subscribe read observes; the prefix watch must anchor at +1. */
       const val OBSERVED_REV = 100L
+
+      /** The round the waiter joins: its ready key's createRevision. */
+      const val ROUND = 50L
+
+      const val READY_KEY = "/barrier/count/ready"
     }
   }
 
@@ -136,8 +151,8 @@ class BarrierWithCountWatchRecoveryTests : StringSpec() {
     }
 
     "counted waiter releases after recovery when the ready DELETE happened during the outage" {
-      // Ready-key probes: 2 present (initial checkWaiterCount + pre-park recheck),
-      // then absent (deleted during the dead-stream window).
+      // Ready-key reads: 2 find the round (initial checkWaiterCount + pre-park recheck),
+      // then it's gone (deleted during the dead-stream window).
       val mocks = CountBarrierMocks(readyPresentProbes = 2)
       val released = AtomicReference<Boolean?>(null)
       val error = AtomicReference<Throwable?>(null)
