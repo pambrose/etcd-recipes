@@ -76,3 +76,16 @@ suspend fun DistributedWorkQueue.WorkItem.awaitAck(): Boolean = etcdInterruptibl
 
 /** Suspending twin of [DistributedWorkQueue.WorkItem.requeue]. */
 suspend fun DistributedWorkQueue.WorkItem.awaitRequeue(): Boolean = etcdInterruptible { requeue() }
+
+/** Suspending twin of [DistributedWorkQueue.deadLetters]. */
+suspend fun DistributedWorkQueue.awaitDeadLetters(): List<DistributedWorkQueue.DeadLetter> =
+  etcdInterruptible {
+  deadLetters()
+}
+
+/** Suspending twin of [DistributedWorkQueue.requeueDeadLetter]. */
+suspend fun DistributedWorkQueue.awaitRequeueDeadLetter(id: String): Boolean =
+  etcdInterruptible { requeueDeadLetter(id) }
+
+/** Suspending twin of [DistributedWorkQueue.purgeDeadLetter]. */
+suspend fun DistributedWorkQueue.awaitPurgeDeadLetter(id: String): Boolean = etcdInterruptible { purgeDeadLetter(id) }

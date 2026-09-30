@@ -19,6 +19,7 @@ package io.etcd.recipes.coroutines
 import io.etcd.recipes.discovery.ServiceCache
 import io.etcd.recipes.discovery.ServiceDiscovery
 import io.etcd.recipes.discovery.ServiceInstance
+import io.etcd.recipes.discovery.ServiceProvider
 
 /** Suspending twin of [ServiceDiscovery.registerService]. */
 suspend fun ServiceDiscovery.awaitRegisterService(service: ServiceInstance): Unit =
@@ -47,3 +48,12 @@ suspend fun ServiceDiscovery.awaitQueryForInstance(
 
 /** Suspending twin of [ServiceCache.start]. */
 suspend fun ServiceCache.awaitStart(): ServiceCache = etcdInterruptible { start() }
+
+/** Suspending twin of [ServiceProvider.start]. */
+suspend fun ServiceProvider.awaitStart(): ServiceProvider = etcdInterruptible { start() }
+
+/** Suspending twin of [ServiceProvider.getInstance]. */
+suspend fun ServiceProvider.awaitGetInstance(): ServiceInstance = etcdInterruptible { getInstance() }
+
+/** Suspending twin of [ServiceProvider.getAllInstances]. */
+suspend fun ServiceProvider.awaitGetAllInstances(): List<ServiceInstance> = etcdInterruptible { getAllInstances() }

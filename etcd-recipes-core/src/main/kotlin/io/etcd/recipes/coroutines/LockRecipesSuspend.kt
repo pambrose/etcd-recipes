@@ -80,9 +80,10 @@ suspend fun <T> EtcdLock.withLock(action: suspend () -> T): T {
 /**
  * Bounded variant of [withLock]: runs [action] if the lock is acquired within
  * [timeout], else returns null without queuing anything (the waiter's lease is
- * revoked). A null return always means "not acquired".
+ * revoked). [action] can't return null (`T : Any`), so a null return always means
+ * "not acquired". Wrap a nullable result if you need one.
  */
-suspend fun <T> EtcdLock.withLock(
+suspend fun <T : Any> EtcdLock.withLock(
   timeout: Duration,
   action: suspend () -> T,
 ): T? {

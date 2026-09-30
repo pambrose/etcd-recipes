@@ -51,33 +51,41 @@ internal suspend fun <T> suspendRetryRpc(
 ): T {
   val start = TimeSource.Monotonic.markNow()
   var attempt = 0
-  var lastFailure: Throwable
-  while (true) {
-    attempt += 1
-    val future = op()
-    try {
-      val boxed =
-        if (rpc.operationTimeout.isFinite()) {
-          // withTimeoutOrNull instead of withTimeout: an enclosing withTimeout's
-          // TimeoutCancellationException must never be mistaken for our attempt
-          // timeout — here any CancellationException reaching the catch is external.
-          withTimeoutOrNull(rpc.operationTimeout) { Boxed(future.await()) }
-        } else {
-          Boxed(future.await())
+  var failed = true // a cancellation counts as a failure, as an interrupt does on the blocking side
+  try {
+    var lastFailure: Throwable
+    while (true) {
+      attempt += 1
+      val future = op()
+      try {
+        val boxed =
+          if (rpc.operationTimeout.isFinite()) {
+            // withTimeoutOrNull instead of withTimeout: an enclosing withTimeout's
+            // TimeoutCancellationException must never be mistaken for our attempt
+            // timeout — here any CancellationException reaching the catch is external.
+            withTimeoutOrNull(rpc.operationTimeout) { Boxed(future.await()) }
+          } else {
+            Boxed(future.await())
+          }
+        if (boxed != null) {
+          failed = false
+          return boxed.value
         }
-      if (boxed != null) return boxed.value
-      future.cancel(true)
-      lastFailure = TimeoutException("$opName attempt timed out after ${rpc.operationTimeout}")
-    } catch (e: CancellationException) {
-      future.cancel(true)
-      throw e
-    } catch (e: Exception) {
-      if (!e.isRetriableRpcFailure()) throw EtcdRecipeRuntimeException("$opName failed: ${e.message}", e)
-      lastFailure = e
+        future.cancel(true)
+        lastFailure = TimeoutException("$opName attempt timed out after ${rpc.operationTimeout}")
+      } catch (e: CancellationException) {
+        future.cancel(true)
+        throw e
+      } catch (e: Exception) {
+        if (!e.isRetriableRpcFailure()) throw EtcdRecipeRuntimeException("$opName failed: ${e.message}", e)
+        lastFailure = e
+      }
+      val delay = rpc.retryPolicy.nextDelay(attempt, start.elapsedNow())
+        ?: throw EtcdRecipeRuntimeException("$opName failed after $attempt attempts", lastFailure)
+      if (delay > Duration.ZERO) delay(delay)
     }
-    val delay = rpc.retryPolicy.nextDelay(attempt, start.elapsedNow())
-      ?: throw EtcdRecipeRuntimeException("$opName failed after $attempt attempts", lastFailure)
-    if (delay > Duration.ZERO) delay(delay)
+  } finally {
+    rpc.metrics.recordRpc(opName, start.elapsedNow(), attempt, failed)
   }
 }
 
@@ -87,23 +95,29 @@ internal suspend fun <T> suspendRetryRpc(
  * still have been applied; retry decisions belong to the recipes' own loops. Failures
  * surface as [EtcdRecipeRuntimeException] with the original failure as cause.
  */
-@Suppress("TooGenericExceptionCaught")
+@Suppress("TooGenericExceptionCaught", "ThrowsCount")
 internal suspend fun <T> suspendAwaitRpc(
   rpc: RpcResilience,
   opName: String,
   future: CompletableFuture<T>,
-): T =
+): T {
+  val start = TimeSource.Monotonic.markNow()
+  var failed = true
   try {
-    if (rpc.operationTimeout.isFinite()) {
-      val boxed = withTimeoutOrNull(rpc.operationTimeout) { Boxed(future.await()) }
-      if (boxed == null) {
-        future.cancel(true)
-        throw EtcdRecipeRuntimeException("$opName timed out after ${rpc.operationTimeout}")
+    val result =
+      if (rpc.operationTimeout.isFinite()) {
+        val boxed = withTimeoutOrNull(rpc.operationTimeout) { Boxed(future.await()) }
+        if (boxed == null) {
+          future.cancel(true)
+          val timeout = TimeoutException("$opName attempt timed out after ${rpc.operationTimeout}")
+          throw EtcdRecipeRuntimeException("$opName timed out after ${rpc.operationTimeout}", timeout)
+        }
+        boxed.value
+      } else {
+        future.await()
       }
-      boxed.value
-    } else {
-      future.await()
-    }
+    failed = false
+    return result
   } catch (e: CancellationException) {
     future.cancel(true)
     throw e
@@ -111,4 +125,7 @@ internal suspend fun <T> suspendAwaitRpc(
     throw e
   } catch (e: Exception) {
     throw EtcdRecipeRuntimeException("$opName failed: ${e.message}", e)
+  } finally {
+    rpc.metrics.recordRpc(opName, start.elapsedNow(), 1, failed)
   }
+}

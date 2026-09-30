@@ -20,6 +20,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchResponse
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.WatchResilience
@@ -79,7 +80,12 @@ fun Client.watchAsFlow(
         keyName,
         option,
         resilience,
-        recoveryListener = WatchRecoveryListener { event -> trySendBlocking(WatchFlowEvent.Recovery(event)) },
+        recoveryListener =
+          WatchRecoveryListener { event ->
+            trySendBlocking(WatchFlowEvent.Recovery(event))
+            // The watcher has stopped for good: complete the flow rather than leave it suspended
+            if (event is WatchRecoveryEvent.Failed) channel.close()
+          },
         resyncWith = resyncWith,
       ) { response -> trySendBlocking(WatchFlowEvent.Response(response)) }
     awaitClose { watcher.close() }
@@ -98,7 +104,17 @@ fun Client.watchEventsAsFlow(
 ): Flow<WatchEvent> =
   watchAsFlow(keyName, option, resilience, resyncWith = null, capacity = capacity)
     .transform { element ->
-      if (element is WatchFlowEvent.Response) {
-        element.response.events.forEach { emit(it) }
+      when (element) {
+        is WatchFlowEvent.Response -> {
+          element.response.events.forEach { emit(it) }
+        }
+
+        is WatchFlowEvent.Recovery -> {
+          // No more events will ever come: fail the flow rather than leave it suspended
+          val event = element.event
+          if (event is WatchRecoveryEvent.Failed) {
+            throw EtcdRecipeRuntimeException("Watch on $keyName abandoned", event.cause)
+          }
+        }
       }
     }

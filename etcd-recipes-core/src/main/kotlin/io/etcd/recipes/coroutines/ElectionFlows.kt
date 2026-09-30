@@ -23,6 +23,7 @@ import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
+import io.etcd.recipes.common.RpcResilience
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.WatchResilience
@@ -32,6 +33,7 @@ import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.watcher
 import io.etcd.recipes.election.ElectionPaths
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
@@ -68,42 +70,15 @@ fun Client.leadershipAsFlow(
   electionPath: String,
   resilience: WatchResilience = WatchResilience.DEFAULT,
   capacity: Int = Channel.UNLIMITED,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
 ): Flow<LeadershipEvent> =
   callbackFlow {
     val leaderKey = ElectionPaths.leaderKey(electionPath)
 
-    fun leadershipOf(response: GetResponse): LeadershipEvent =
-      response.kvs.firstOrNull()?.value?.asString
-        ?.let { LeadershipEvent.Elected(ElectionPaths.stripLeaderClientId(it)) }
-        ?: LeadershipEvent.Vacated
-
     // Read the current leader, then watch from just past that read, so a hand-off during
     // setup is still delivered.
-    val seed = awaitGetResponse(leaderKey)
-
-    val recoveryListener =
-      WatchRecoveryListener { event ->
-        when (event) {
-          // A hand-off may have been missed only when the stream couldn't resume where it
-          // left off (a resync, or a resume from "now"): re-read then.
-          is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-            val gapPossible = event !is WatchRecoveryEvent.Resubscribed || event.resumeRevision == 0L
-            if (gapPossible) trySendBlocking(leadershipOf(getResponse(leaderKey)))
-          }
-
-          is WatchRecoveryEvent.Failed -> {
-            trySendBlocking(
-              LeadershipEvent.WatchFailed(
-                event.cause ?: EtcdRecipeRuntimeException("Leadership watch on $electionPath abandoned"),
-              ),
-            )
-          }
-
-          is WatchRecoveryEvent.Suspended -> {
-            Unit
-          }
-        }
-      }
+    val seed = awaitGetResponse(leaderKey, rpc = rpc)
+    val recoveryListener = leadershipRecovery(this@leadershipAsFlow, electionPath, leaderKey, rpc)
 
     val watcher =
       watcher(
@@ -133,3 +108,47 @@ fun Client.leadershipAsFlow(
     send(leadershipOf(seed))
     awaitClose { watcher.close() }
   }.buffer(capacity)
+
+private fun leadershipOf(response: GetResponse): LeadershipEvent =
+  response.kvs.firstOrNull()?.value?.asString
+    ?.let { LeadershipEvent.Elected(ElectionPaths.stripLeaderClientId(it)) }
+    ?: LeadershipEvent.Vacated
+
+// Re-reads the leader after a recovery that could have missed a hand-off (a resync, or a
+// resume from "now"), and reports an abandoned watch. Either failure ends the flow: the
+// observation can't be trusted any more, and no further event will come.
+@Suppress("TooGenericExceptionCaught") // any failed re-read ends the observation
+private fun ProducerScope<LeadershipEvent>.leadershipRecovery(
+  client: Client,
+  electionPath: String,
+  leaderKey: String,
+  rpc: RpcResilience,
+): WatchRecoveryListener =
+  WatchRecoveryListener { event ->
+    when (event) {
+      is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+        val gapPossible = event !is WatchRecoveryEvent.Resubscribed || event.resumeRevision == 0L
+        if (gapPossible) {
+          try {
+            trySendBlocking(leadershipOf(client.getResponse(leaderKey, rpc = rpc)))
+          } catch (e: Exception) {
+            trySendBlocking(LeadershipEvent.WatchFailed(e))
+            channel.close()
+          }
+        }
+      }
+
+      is WatchRecoveryEvent.Failed -> {
+        trySendBlocking(
+          LeadershipEvent.WatchFailed(
+            event.cause ?: EtcdRecipeRuntimeException("Leadership watch on $electionPath abandoned"),
+          ),
+        )
+        channel.close()
+      }
+
+      is WatchRecoveryEvent.Suspended -> {
+        Unit
+      }
+    }
+  }

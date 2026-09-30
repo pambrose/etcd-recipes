@@ -48,6 +48,13 @@ Starting a recipe is itself a set of round trips, so it suspends too.
 | `LeaderSelector.awaitStart()` | `start()` |
 | `LeaderSelector.awaitLeadershipComplete()` / `(timeout)` | `waitOnLeadershipComplete(...)` |
 | `LeaderSelector.awaitFinished()` / `(timeout)` | `waitUntilFinished(...)` |
+| `LeaderLatch.awaitStart()` | `start()` |
+| `LeaderLatch.awaitLeadership()` / `(timeout)` | `await(...)` |
+| `LeaderObserver.awaitStart()` | `start()` |
+| `NodeCache.awaitStart()` | `start()` |
+| `TypedPathChildrenCache.awaitStart(buildInitial)` / `awaitStart(mode)` | `start(...)` |
+| `TypedPathChildrenCache.awaitStartComplete()` / `awaitStartComplete(timeout)` | `waitOnStartComplete(...)` |
+| `TypedTransientKeyValue.awaitStart()` | `start()` |
 
 ```kotlin
 --8<-- "kotlin/website/coroutines/SuspendSnippets.kt:lifecycle"
@@ -92,6 +99,10 @@ See [Barriers](../recipes/barriers.md).
 | `DistributedQueue.awaitEnqueue(value)` | `enqueue(value)` |
 | `DistributedQueue.awaitEnqueueAll(values)` | `enqueueAll(values)` |
 | `DistributedPriorityQueue.awaitEnqueue(value, priority)` | `enqueue(value, priority)` |
+| `TypedDistributedQueue.receive()` / `receive(timeout)` / `awaitTryDequeue()` | `dequeue()` / `poll(timeout)` / `tryDequeue()` |
+| `TypedDistributedQueue.awaitEnqueue(value)` / `awaitEnqueueAll(values)` | `enqueue(value)` / `enqueueAll(values)` |
+| `TypedDistributedPriorityQueue.receive()` / `receive(timeout)` / `awaitTryDequeue()` | `dequeue()` / `poll(timeout)` / `tryDequeue()` |
+| `TypedDistributedPriorityQueue.awaitEnqueue(value, priority)` | `enqueue(value, priority)` |
 
 ```kotlin
 --8<-- "kotlin/website/coroutines/SuspendSnippets.kt:queue"
@@ -112,6 +123,8 @@ for the codec-backed variants.
 | `DistributedWorkQueue.awaitTryReceive()` | `tryReceive()` |
 | `WorkItem.awaitAck()` | `ack()` |
 | `WorkItem.awaitRequeue()` | `requeue()` |
+| `DistributedWorkQueue.awaitDeadLetters()` | `deadLetters()` |
+| `DistributedWorkQueue.awaitRequeueDeadLetter(id)` / `awaitPurgeDeadLetter(id)` | `requeueDeadLetter(id)` / `purgeDeadLetter(id)` |
 
 ### Service discovery — `DiscoverySuspend.kt`
 
@@ -124,6 +137,8 @@ for the codec-backed variants.
 | `ServiceDiscovery.awaitQueryForInstances(name)` | `queryForInstances(name)` |
 | `ServiceDiscovery.awaitQueryForInstance(name, id)` | `queryForInstance(name, id)` |
 | `ServiceCache.awaitStart()` | `start()` |
+| `ServiceProvider.awaitStart()` | `start()` |
+| `ServiceProvider.awaitGetInstance()` / `awaitGetAllInstances()` | `getInstance()` / `getAllInstances()` |
 
 ### Key/value — `KVSuspend.kt`
 
@@ -319,7 +334,8 @@ caller's coroutine, where it may suspend freely.
 
 The release leg runs under `NonCancellable`, so cancelling the body still releases the
 lock rather than leaking the hold until lease expiry. There is a bounded variant, and
-a `null` return always means "not acquired" — nothing was left queued:
+a `null` return always means "not acquired" — nothing was left queued. The body can't
+return `null` itself (its type is bounded by `Any`); wrap a nullable result if you need one:
 
 ```kotlin
 --8<-- "kotlin/website/coroutines/SuspendSnippets.kt:with-lock-timeout"
