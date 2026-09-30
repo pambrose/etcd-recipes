@@ -58,7 +58,9 @@ class RoundRobinStrategy : ProviderStrategy {
 /**
  * Session affinity: returns the previously-selected instance while it is still present
  * (by value-equality, id-independent), otherwise [delegate]s to pick a new one and
- * remembers it.
+ * remembers it. Concurrent callers that find no usable choice agree on one: a pick replaces
+ * only the choice its caller saw, so one made meanwhile by another caller is kept (and may
+ * cost [delegate] another call).
  *
  * STATEFUL — use a fresh instance per [ServiceProvider].
  */
@@ -73,10 +75,11 @@ class StickyStrategy(
       last.store(null)
       return null
     }
-    val current = last.load()
-    if (current != null && current in instances) return current
-    val picked = delegate.select(instances)
-    last.store(picked)
-    return picked
+    while (true) {
+      val current = last.load()
+      if (current != null && current in instances) return current
+      val picked = delegate.select(instances)
+      if (last.compareAndSet(current, picked)) return picked
+    }
   }
 }
