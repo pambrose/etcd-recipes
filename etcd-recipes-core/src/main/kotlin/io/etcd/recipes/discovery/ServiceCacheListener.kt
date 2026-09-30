@@ -21,10 +21,15 @@ package io.etcd.recipes.discovery
 import io.etcd.jetcd.watch.WatchEvent
 
 fun interface ServiceCacheListener {
+  /**
+   * Called for each change to the cached instances. [instanceKey] is the instance's key
+   * below the names path — `<serviceName>/<id>`, not just the service name. [serviceInstance]
+   * is the new value on a PUT (an add when [isAdd]), or the removed value on a DELETE.
+   */
   fun cacheChanged(
     eventType: WatchEvent.EventType,
     isAdd: Boolean,
-    serviceName: String,
+    instanceKey: String,
     serviceInstance: ServiceInstance?,
   )
 }

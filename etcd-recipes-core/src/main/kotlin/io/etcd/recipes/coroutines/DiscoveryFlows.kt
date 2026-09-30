@@ -31,13 +31,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 
-/** A service-cache change, as delivered to [ServiceCacheListener]. */
+/**
+ * A service-cache change, as delivered to [ServiceCacheListener]. [instanceKey] is the
+ * instance's key below the names path — `<serviceName>/<id>`.
+ */
 data class ServiceCacheEvent(
   val eventType: WatchEvent.EventType,
   val isAdd: Boolean,
-  val serviceName: String,
+  val instanceKey: String,
   val serviceInstance: ServiceInstance?,
-)
+) {
+  @Deprecated("Holds <serviceName>/<id>, not the service name", ReplaceWith("instanceKey"))
+  val serviceName: String get() = instanceKey
+}
 
 /**
  * The service cache's change events as a [Flow]. Collection registers a listener and
@@ -47,8 +53,8 @@ data class ServiceCacheEvent(
 fun ServiceCache.eventsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<ServiceCacheEvent> =
   callbackFlow {
     val listener =
-      ServiceCacheListener { eventType, isAdd, serviceName, serviceInstance ->
-        trySendBlocking(ServiceCacheEvent(eventType, isAdd, serviceName, serviceInstance))
+      ServiceCacheListener { eventType, isAdd, instanceKey, serviceInstance ->
+        trySendBlocking(ServiceCacheEvent(eventType, isAdd, instanceKey, serviceInstance))
       }
     addListenerForChanges(listener)
     awaitClose { removeListenerForChanges(listener) }

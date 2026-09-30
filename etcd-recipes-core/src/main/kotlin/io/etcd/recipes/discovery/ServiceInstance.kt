@@ -20,7 +20,9 @@ package io.etcd.recipes.discovery
 
 import com.pambrose.common.util.randomId
 import io.etcd.recipes.common.EtcdConnector.Companion.TOKEN_LENGTH
+import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.discovery.ServiceInstance.Companion.ServiceInstanceBuilder
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -52,7 +54,13 @@ data class ServiceInstance(
     // fresh (different) timestamp, corrupting the round-trip. Encoding defaults
     // makes the wire format stable regardless of serialization timing; readers of
     // the old format are unaffected (fields only become more complete).
-    private val wireFormat = Json { encodeDefaults = true }
+    // ignoreUnknownKeys: an instance written by a newer library version, with a field
+    // this one doesn't know, still decodes instead of failing discovery.
+    private val wireFormat =
+      Json {
+        encodeDefaults = true
+        ignoreUnknownKeys = true
+      }
 
     @JvmStatic
     fun toObject(json: String) = wireFormat.decodeFromString(serializer(), json)
@@ -97,3 +105,22 @@ fun serviceInstance(
   jsonPayload: String,
   initReceiver: ServiceInstanceBuilder.() -> ServiceInstanceBuilder = { this },
 ): ServiceInstance = ServiceInstance.newBuilder(name, jsonPayload).initReceiver().build()
+
+private val logger = KotlinLogging.logger {}
+
+// Decodes the instance stored at [key], or reports why it can't and returns null: one bad
+// entry (another tool's write, a corrupt value) costs only itself, never reads of the whole
+// service.
+internal fun decodeInstanceOrNull(
+  key: String,
+  json: String,
+  report: (Throwable) -> Unit,
+): ServiceInstance? =
+  try {
+    ServiceInstance.toObject(json)
+  } catch (e: IllegalArgumentException) {
+    // A SerializationException, or a failed init check
+    logger.warn(e) { "Skipping malformed service instance $key" }
+    report(EtcdRecipeRuntimeException("Skipping malformed service instance $key", e))
+    null
+  }

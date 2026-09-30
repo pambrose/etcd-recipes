@@ -120,8 +120,9 @@ public class DiscoverySnippets {
     try (ServiceCache cache = new ServiceCache(client, "/services/orders/names", "worker")) {
       // Register listeners BEFORE start(): the snapshot taken by start() does not
       // replay through them, and instances registered after it do.
-      cache.addListenerForChanges((eventType, isAdd, serviceName, serviceInstance) ->
-        System.out.println(eventType + " isAdd=" + isAdd + " " + serviceName + " -> " + serviceInstance));
+      // instanceKey is <serviceName>/<id>
+      cache.addListenerForChanges((eventType, isAdd, instanceKey, serviceInstance) ->
+        System.out.println(eventType + " isAdd=" + isAdd + " " + instanceKey + " -> " + serviceInstance));
 
       cache.addRecoveryListener(event ->
         System.out.println("Watch recovery: " + event));

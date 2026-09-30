@@ -116,9 +116,9 @@
 - [x] [#56](#issue-56) `TransientKeyValue` parks an executor thread for its whole lifetime, and `start()` waits with no timeout
 - [x] [#57](#issue-57) `PathChildrenCache` fires INITIALIZED after the watch is live: out of order, a snapshot per listener, and a deadlock
 - [x] [#58](#issue-58) A compaction resync updates caches silently, so listeners and flows never see the gap's changes
-- [ ] [#59](#issue-59) One malformed or newer-schema service instance breaks discovery for the whole service
+- [x] [#59](#issue-59) One malformed or newer-schema service instance breaks discovery for the whole service
 - [x] [#60](#issue-60) `PathChildrenCache.rebuild()` can permanently undo a watch event
-- [ ] [#61](#issue-61) `ServiceProvider` error counts never reset, and down-entries accumulate
+- [x] [#61](#issue-61) `ServiceProvider` error counts never reset, and down-entries accumulate
 - [x] [#62](#issue-62) Re-registering after `LeaseEvent.Failed` leaks the old healer
 - [x] [#63](#issue-63) `interruptibleOn` misses re-wrapped interrupts, so some cancellations surface as `EtcdRecipeException`
 - [x] [#64](#issue-64) `interruptOnPermitLoss` / `interruptOnLockLoss` misfire under the suspend surface
@@ -153,7 +153,7 @@
 - [x] [#91](#issue-91) Queue metrics and small interop and docs gaps
 - [x] [#92](#issue-92) Head selection makes etcd read and sort the whole range (O(N²) drain)
 - [x] [#93](#issue-93) `TypedPathChildrenCache`: one throwing listener stops the event reaching the rest
-- [ ] [#94](#issue-94) Discovery lifecycle and naming traps
+- [x] [#94](#issue-94) Discovery lifecycle and naming traps
 - [x] [#95](#issue-95) `eventsAsFlow().onStart { }` doesn't guarantee the cache listener is registered
 - [x] [#96](#issue-96) The docs claim every blocking call has a suspending twin, but several don't
 - [x] [#97](#issue-97) `withLock(timeout)`'s "null means not acquired" is false for a nullable `T`

@@ -142,6 +142,10 @@ The direct queries are one-shot reads — no cache, no watch, a range GET per ca
     --8<-- "java/website/discovery/DiscoverySnippets.java:query"
     ```
 
+`queryForNames()` returns each service name that has at least one registered instance, once,
+in key order. `queryForInstances(name)` skips an entry that doesn't decode (see
+[Malformed entries](#malformed-entries-are-skipped)).
+
 `withServiceDiscovery`, `withServiceCache`, and `withServiceProvider` are the scoped Kotlin
 forms:
 
@@ -214,10 +218,14 @@ an in-memory read.
     --8<-- "java/website/discovery/DiscoverySnippets.java:cache"
     ```
 
-`start()` is one-shot: calling it twice throws `EtcdRecipeRuntimeException`. Register
+`start()` is one-shot: calling it twice throws `EtcdRecipeRuntimeException`, and `close()` on
+an un-started cache is a no-op. Register
 listeners first — the initial snapshot does not replay through `addListenerForChanges`, so
 a listener added afterwards only sees changes from that point on. Read `instances` for the
 current set; use the listener for the deltas.
+
+The listener's third argument is the instance's key below the names path —
+`<serviceName>/<id>`, not the bare service name.
 
 `addRecoveryListener` reports the watch's own health: resubscribes after a stream death,
 resyncs after compaction (the cache reconciles itself against a fresh snapshot), and the
@@ -235,6 +243,19 @@ lying to you.
     you. Handing it the bare service path compiles fine and then watches a prefix nothing
     is ever written to, so the cache stays empty forever. The same applies to a directly
     constructed `ServiceProvider`.
+
+### Malformed entries are skipped
+
+Anything under `names/<serviceName>/` is read as an instance, and not everything written
+there is one: a value put by `etcdctl` or another tool, or one truncated by a buggy writer.
+Such an entry is skipped, logged, and recorded in the recipe's `exceptions` (and pushed to
+its background-exception listeners); every other instance is still served. This holds for
+the cache, for `queryForInstances`, and for a provider in either read mode. An entry the
+cache already held that is overwritten with something unreadable is dropped, and listeners
+get a `DELETE` for it.
+
+Fields this version doesn't know are ignored, so an instance registered by a newer library
+version still decodes.
 
 ## `ServiceProvider`
 
@@ -280,8 +301,10 @@ to prevent. `start()` is one-shot, and `close()` on an un-started provider is a 
 ### Ejecting failing instances
 
 `noteError(instance)` is how a provider learns that an instance it handed you did not work.
-After `errorThreshold` errors (default 3) the instance drops out of selection for
-`downPeriod` (default 30 seconds), then rejoins automatically:
+After `errorThreshold` errors (default 3) within `downPeriod` of the first, the instance drops
+out of selection for `downPeriod` (default 30 seconds), then rejoins automatically. Errors
+further apart than `downPeriod` never add up, and the provider forgets an instance once it is
+no longer registered or its window has lapsed:
 
 === "Kotlin"
 

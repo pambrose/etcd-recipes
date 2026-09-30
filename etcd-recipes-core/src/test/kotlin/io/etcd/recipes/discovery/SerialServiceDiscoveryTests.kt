@@ -26,7 +26,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldEndWith
 import kotlin.time.Duration.Companion.seconds
 
 class SerialServiceDiscoveryTests : StringSpec() {
@@ -57,7 +56,7 @@ class SerialServiceDiscoveryTests : StringSpec() {
                     queryForInstances(service.name) shouldBe [service]
 
                     logger.debug { "Retrieved names: ${queryForNames()}" }
-                    queryForNames().first() shouldEndWith service.id
+                    queryForNames() shouldBe [service.name]
 
                     logger.debug { "Updating payload" }
                     payload.testval = -888
@@ -71,7 +70,7 @@ class SerialServiceDiscoveryTests : StringSpec() {
                     queryForInstances(service.name) shouldBe [service]
 
                     logger.debug { "Retrieved names: ${queryForNames()}" }
-                    queryForNames().first() shouldEndWith service.id
+                    queryForNames() shouldBe [service.name]
 
                     logger.debug { "Unregistering" }
                     unregisterService(service)

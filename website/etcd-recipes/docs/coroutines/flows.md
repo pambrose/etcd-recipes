@@ -221,7 +221,7 @@ one data class:
 data class ServiceCacheEvent(
   val eventType: WatchEvent.EventType,
   val isAdd: Boolean,
-  val serviceName: String,
+  val instanceKey: String, // <serviceName>/<id>
   val serviceInstance: ServiceInstance?,
 )
 ```

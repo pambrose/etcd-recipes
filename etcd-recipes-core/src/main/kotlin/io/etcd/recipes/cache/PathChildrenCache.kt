@@ -83,8 +83,10 @@ class PathChildrenCache
   private val listeners: MutableList<PathChildrenCacheListener> = CopyOnWriteArrayList()
   private val recoveryListeners: MutableList<WatchRecoveryListener> = CopyOnWriteArrayList()
 
-  // Use a single-threaded executor to maintain order
-  private val executor = userExecutor ?: Executors.newSingleThreadExecutor()
+  // Runs a primed start's load. A daemon thread: an unclosed cache mustn't keep the JVM alive.
+  private val executor =
+    userExecutor
+      ?: Executors.newSingleThreadExecutor { r -> Thread(r, "path-children-cache-start").apply { isDaemon = true } }
 
   // Serializes applying watch events with applying a snapshot, and tracks the newest etcd
   // revision the map reflects, so a snapshot older than an event the watch already

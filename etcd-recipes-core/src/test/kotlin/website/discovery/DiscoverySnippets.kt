@@ -134,8 +134,9 @@ fun watchCache(client: Client) {
     discovery.withServiceCache("worker") {
       // Register listeners BEFORE start(): the snapshot taken by start() does not
       // replay through them, and instances registered after it do.
-      addListenerForChanges { eventType, isAdd, serviceName, serviceInstance ->
-        logger.info { "$eventType isAdd=$isAdd $serviceName -> $serviceInstance" }
+      // instanceKey is <serviceName>/<id>
+      addListenerForChanges { eventType, isAdd, instanceKey, serviceInstance ->
+        logger.info { "$eventType isAdd=$isAdd $instanceKey -> $serviceInstance" }
       }
 
       // One-shot: a second start() throws.

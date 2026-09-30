@@ -25,10 +25,8 @@ import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
-import io.etcd.recipes.common.getChildrenValues
+import io.etcd.recipes.common.getChildren
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -68,6 +66,9 @@ class ServiceProvider
     // Ejected instances, keyed by ServiceInstance value-equality (id is not stable).
     private val down = ConcurrentHashMap<ServiceInstance, DownEntry>()
 
+    // How many instances have a down entry (tests).
+    internal val downEntryCount: Int get() = down.size
+
     init {
       require(serviceName.isNotEmpty()) { "ServiceProvider service name cannot be empty" }
       require(errorThreshold > 0) { "errorThreshold must be > 0" }
@@ -86,12 +87,17 @@ class ServiceProvider
       return this
     }
 
-    /** All registered instances: cache-backed once [start]ed, a direct GET otherwise. */
+    /**
+     * All registered instances: cache-backed once [start]ed, a direct GET otherwise. Either
+     * way, an entry that doesn't decode is skipped and recorded in [exceptions].
+     */
     fun getAllInstances(): List<ServiceInstance> =
       if (startCalled.load())
         cache?.instances ?: emptyList()
       else
-        client.getChildrenValues(instancesPath, rpc = resilience.rpc).map { ServiceInstance.toObject(it.asString) }
+        client.getChildren(instancesPath, rpc = resilience.rpc).mapNotNull { (key, value) ->
+          decodeInstanceOrNull(key, value.asString) { recordException(it) }
+        }
 
     /**
      * Selects one available instance via the configured [strategy]. Throws the typed
@@ -106,32 +112,43 @@ class ServiceProvider
     // getAllInstances() minus instances still inside their down window.
     private fun availableInstances(): List<ServiceInstance> {
       val all = getAllInstances()
-      return if (down.isEmpty()) all else all.filterNot { isDown(it) }
+      if (down.isEmpty()) return all
+      // Forget instances that are gone or whose entry has lapsed. computeIfPresent keeps each
+      // decision atomic with a noteError() on the same instance, so a fresh ejection survives.
+      val present = all.toHashSet()
+      down.keys.forEach { instance ->
+        down.computeIfPresent(instance) { _, entry -> entry.takeUnless { instance !in present || it.isLapsed() } }
+      }
+      return all.filterNot { isDown(it) }
     }
 
     /**
-     * Records a failed request against [instance]. After [errorThreshold] errors it is
-     * ejected from selection for [downPeriod], then automatically becomes eligible again.
+     * Records a failed request against [instance]. After [errorThreshold] errors within
+     * [downPeriod] of the first, it is ejected from selection for [downPeriod], then
+     * automatically becomes eligible again; errors further apart than that never add up.
      * Pass the instance returned by [getInstance] unmodified — ejection keys on its value.
      */
     fun noteError(instance: ServiceInstance) {
-      val entry = down.computeIfAbsent(instance) { DownEntry() }
-      if (entry.errors.incrementAndFetch() >= errorThreshold) {
-        entry.downUntil = TimeSource.Monotonic.markNow() + downPeriod
-        entry.errors.store(0)
-      }
+      down.compute(instance) { _, entry -> withError(entry) }
     }
 
-    @Suppress("ReturnCount")
-    private fun isDown(instance: ServiceInstance): Boolean {
-      val entry = down[instance] ?: return false
-      val until = entry.downUntil ?: return false
-      if (until.hasPassedNow()) {
-        down.remove(instance) // lazy cleanup on auto-recovery
-        return false
-      }
-      return true
+    // [entry] after one more error.
+    private fun withError(entry: DownEntry?): DownEntry {
+      val now = TimeSource.Monotonic.markNow()
+      val open = entry?.takeIf { it.firstErrorAt != null && !(it.firstErrorAt + downPeriod).hasPassedNow() }
+      val errors = (open?.errors ?: 0) + 1
+      return if (errors >= errorThreshold)
+        DownEntry(errors = 0, firstErrorAt = null, downUntil = now + downPeriod)
+      else
+        DownEntry(errors, open?.firstErrorAt ?: now, entry?.downUntil)
     }
+
+    private fun isDown(instance: ServiceInstance): Boolean = down[instance]?.downUntil?.hasPassedNow() == false
+
+    // Neither ejected nor counting errors: the entry no longer means anything.
+    private fun DownEntry.isLapsed(): Boolean =
+      (downUntil == null || downUntil.hasPassedNow()) &&
+        (firstErrorAt == null || (firstErrorAt + downPeriod).hasPassedNow())
 
     @Synchronized
     override fun doClose() {
@@ -141,12 +158,12 @@ class ServiceProvider
       down.clear()
     }
 
-    private class DownEntry {
-      val errors = AtomicInt(0)
-
-      @Volatile
-      var downUntil: TimeSource.Monotonic.ValueTimeMark? = null
-    }
+    // Immutable: replaced whole, through the map's per-key compute functions.
+    private class DownEntry(
+      val errors: Int,
+      val firstErrorAt: TimeSource.Monotonic.ValueTimeMark?,
+      val downUntil: TimeSource.Monotonic.ValueTimeMark?,
+    )
 
     companion object {
       const val DEFAULT_ERROR_THRESHOLD = 3
