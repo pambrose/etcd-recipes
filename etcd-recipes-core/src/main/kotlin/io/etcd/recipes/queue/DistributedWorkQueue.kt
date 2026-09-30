@@ -154,24 +154,31 @@ class DistributedWorkQueue
   private val consumerLeaseDelegate =
     lazy {
       sweeper // consumers also sweep
-      client.selfHealingKeepAlive(
-        config.visibilityTimeoutSecs.seconds,
-        resilience.lease,
-        leaseListener = { event -> onLeaseEvent(event) },
-        rpc = resilience.rpc,
-      ) { true }
+      withRecipeLoggingContext {
+        client.selfHealingKeepAlive(
+          config.visibilityTimeoutSecs.seconds,
+          resilience.lease,
+          leaseListener = { event -> onLeaseEvent(event) },
+          rpc = resilience.rpc,
+        ) { true }
+      }
     }
   private val consumerLease: SelfHealingKeepAlive by consumerLeaseDelegate
 
   private val sweeperDelegate =
     lazy {
       Executors.newSingleThreadScheduledExecutor { runnable ->
-        Thread(runnable, "workqueue-sweeper").apply { isDaemon = true }
+        Thread(runnable, "workqueue-sweeper[$queuePath]").apply { isDaemon = true }
       }.also { executor ->
         val period = config.sweepInterval.inWholeMilliseconds
         // Jitter the start so a fleet of consumers doesn't sweep in lockstep
         val initial = period + Random.nextLong(period / 2 + 1)
-        executor.scheduleWithFixedDelay(::sweepSafely, initial, period, TimeUnit.MILLISECONDS)
+        executor.scheduleWithFixedDelay(
+          { withRecipeLoggingContext { sweepSafely() } },
+          initial,
+          period,
+          TimeUnit.MILLISECONDS,
+        )
       }
     }
   private val sweeper: ScheduledExecutorService by sweeperDelegate
@@ -667,39 +674,41 @@ class DistributedWorkQueue
     val watchFailure = AtomicReference<Throwable?>(null)
     val recoveryListener = itemWaiterRecoveryListener(latch, watchFailure)
 
-    client.withWatcher(
-      "$itemsPath/",
-      // Anchored at the revision items/ was seen empty, so a PUT that lands while the
-      // watch is being established is still delivered.
-      watchOption {
-        if (emptyAtRevision > 0L) withRevision(emptyAtRevision + 1)
-        isPrefix(true)
-        withNoDelete(true)
-      },
-      resilience.watch,
-      recoveryListener,
-      resyncWith = null,
-      { watchResponse ->
-        if (watchResponse.events.any { it.eventType == WatchEvent.EventType.PUT }) latch.countDown()
-      },
-    ) {
-      // Pre-live gap poll: an item may have landed before the watch went live
-      if (latch.count > 0 && client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc).kvs.isNotEmpty()) {
-        latch.countDown()
-      }
-      // Wake when the deadline passes, the sweep interval elapses, the earliest delayed
-      // item matures, or a skipped empty-queue sweep is due — whichever comes first.
-      var cap = config.sweepInterval
-      delayedHeadRemaining()?.let { cap = minOf(cap, it) }
-      sweepDueIn?.let { cap = minOf(cap, it.coerceAtLeast(MIN_SWEEP_WAIT)) }
-      val wait =
-        if (deadline == null) cap else minOf(cap, -deadline.elapsedNow())
-      if (wait > Duration.ZERO) {
-        latch.await(wait.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-      }
-      if (closeCalled.load()) throw EtcdRecipeRuntimeException("Work queue $queuePath closed while waiting for work")
-      watchFailure.load()?.let { cause ->
-        throw EtcdRecipeRuntimeException("Work-queue watch on $itemsPath failed while waiting", cause)
+    withRecipeLoggingContext {
+      client.withWatcher(
+        "$itemsPath/",
+        // Anchored at the revision items/ was seen empty, so a PUT that lands while the
+        // watch is being established is still delivered.
+        watchOption {
+          if (emptyAtRevision > 0L) withRevision(emptyAtRevision + 1)
+          isPrefix(true)
+          withNoDelete(true)
+        },
+        resilience.watch,
+        recoveryListener,
+        resyncWith = null,
+        { watchResponse ->
+          if (watchResponse.events.any { it.eventType == WatchEvent.EventType.PUT }) latch.countDown()
+        },
+      ) {
+        // Pre-live gap poll: an item may have landed before the watch went live
+        if (latch.count > 0 && client.getFirstChild(itemsPath, SortTarget.KEY, resilience.rpc).kvs.isNotEmpty()) {
+          latch.countDown()
+        }
+        // Wake when the deadline passes, the sweep interval elapses, the earliest delayed
+        // item matures, or a skipped empty-queue sweep is due — whichever comes first.
+        var cap = config.sweepInterval
+        delayedHeadRemaining()?.let { cap = minOf(cap, it) }
+        sweepDueIn?.let { cap = minOf(cap, it.coerceAtLeast(MIN_SWEEP_WAIT)) }
+        val wait =
+          if (deadline == null) cap else minOf(cap, -deadline.elapsedNow())
+        if (wait > Duration.ZERO) {
+          latch.await(wait.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        }
+        if (closeCalled.load()) throw EtcdRecipeRuntimeException("Work queue $queuePath closed while waiting for work")
+        watchFailure.load()?.let { cause ->
+          throw EtcdRecipeRuntimeException("Work-queue watch on $itemsPath failed while waiting", cause)
+        }
       }
     }
   }

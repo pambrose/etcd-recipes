@@ -30,6 +30,7 @@ import io.etcd.jetcd.watch.WatchResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.Status
 import io.grpc.StatusRuntimeException
+import org.slf4j.MDC
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -109,6 +110,9 @@ private class ResilientWatcher(
   // The dispatcher's thread, so close() from a callback running on it doesn't wait on itself
   @Volatile
   private var dispatcherThread: Thread? = null
+
+  // The creator's logging context, applied to every callback and recovery attempt
+  private val mdc: Map<String, String>? = MDC.getCopyOfContextMap()
 
   private val dispatcher: ScheduledExecutorService =
     Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -223,7 +227,9 @@ private class ResilientWatcher(
     try {
       dispatcher.execute {
         if (closed.load()) return@execute
-        runCatching(task).onFailure { e -> logger.error(e) { "Watch dispatch for $keyName threw" } }
+        withMdc(mdc) {
+          runCatching(task).onFailure { e -> logger.error(e) { "Watch dispatch for $keyName threw" } }
+        }
       }
     } catch (_: RejectedExecutionException) {
       // closed concurrently; nothing left to deliver to
@@ -285,7 +291,8 @@ private class ResilientWatcher(
     }
     synchronized(lock) {
       if (closed.load()) return
-      pendingAttempt = dispatcher.schedule(::runAttempt, delay.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+      pendingAttempt =
+        dispatcher.schedule({ withMdc(mdc) { runAttempt() } }, delay.inWholeMilliseconds, TimeUnit.MILLISECONDS)
     }
   }
 

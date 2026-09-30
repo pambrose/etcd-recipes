@@ -20,7 +20,6 @@ package io.etcd.recipes.election
 
 import com.pambrose.common.concurrent.BooleanMonitor
 import com.pambrose.common.time.timeUnitToDuration
-import com.pambrose.common.util.randomId
 import com.pambrose.common.util.sleep
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.lease.LeaseGrantResponse
@@ -41,7 +40,6 @@ import io.etcd.recipes.common.RpcResilience
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.WatchResilience
-import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.doesNotExist
@@ -168,7 +166,7 @@ constructor(
   private val electedLeader = AtomicBoolean(false)
   private val startCallLock = Any()
   private val startCallAllowed = AtomicBoolean(true)
-  private val leaderPath = electionPath.withLeaderSuffix
+  private val leaderPath = ElectionPaths.leaderKey(electionPath)
 
   // Wakes the candidacy loop to run for leader: the leader key was deleted, a watch recovery
   // may have missed that, or the selector is finishing. The watch only ever signals here, so
@@ -480,7 +478,7 @@ constructor(
   @Throws(EtcdRecipeException::class)
   // internal (not private) so lease-cleanup behavior can be unit-tested directly.
   internal fun advertiseParticipation() {
-    val path = electionPath.withParticipationSuffix.appendToPath(clientId)
+    val path = ElectionPaths.participantKey(electionPath, clientId)
 
     // Wait until key goes away when previous keep alive finishes
     val attemptCount = leaseTtlSecs * 2
@@ -565,7 +563,7 @@ constructor(
   @Suppress("TooGenericExceptionCaught")
   private fun casForLeadership(): LeaseGrantResponse? {
     // Create unique token to avoid collision from clients with same id
-    val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
+    val uniqueToken = ElectionPaths.leaderToken(clientId)
     val granted = client.leaseGrant(leaseTtlSecs.seconds, resilience.rpc)
     val won =
       try {
@@ -686,12 +684,13 @@ constructor(
     // How long a finishing candidacy waits for its watch and participation threads to end
     private const val HELPER_JOIN_MILLIS = 10_000L
 
-    private val String.withParticipationSuffix get() = appendToPath("participants")
-    private val String.withLeaderSuffix get() = appendToPath("LEADER")
-
-    internal val String.stripUniqueSuffix get() = dropLast(TOKEN_LENGTH + 1)
-
     internal fun defaultClientId() = EtcdConnector.defaultClientId(LeaderSelector::class.simpleName!!)
+
+    // The clientId of the election's current leader, or null when there is none
+    private fun Client.currentLeaderId(
+      electionPath: String,
+      rpc: RpcResilience = RpcResilience.DEFAULT,
+    ): String? = getValue(ElectionPaths.leaderKey(electionPath), rpc)?.asString?.let(ElectionPaths::stripLeaderClientId)
 
     @JvmStatic
     @JvmOverloads
@@ -703,8 +702,8 @@ constructor(
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
 
       val participants: MutableList<Participant> = []
-      val leader = client.getValue(electionPath.withLeaderSuffix, rpc)?.asString?.stripUniqueSuffix ?: ""
-      client.getChildrenValues(electionPath.withParticipationSuffix, rpc = rpc).map { it.asString }
+      val leader = client.currentLeaderId(electionPath, rpc) ?: ""
+      client.getChildrenValues(ElectionPaths.participantsPath(electionPath), rpc = rpc).map { it.asString }
         .forEach { participants += Participant(it, leader == it) }
       return participants
     }
@@ -728,7 +727,7 @@ constructor(
             -> {
               val gapPossible = event !is WatchRecoveryEvent.Resubscribed || event.resumeRevision == 0L
               if (gapPossible) {
-                val leader = client.getValue(electionPath.withLeaderSuffix)?.asString?.stripUniqueSuffix
+                val leader = client.currentLeaderId(electionPath)
                 if (leader != null) listener.takeLeadership(leader) else listener.relinquishLeadership()
               }
             }
@@ -766,7 +765,7 @@ constructor(
           val recoveryListener = reportLeaderRecoveryListener(client, electionPath, listener)
 
           client.withWatcher(
-            electionPath.withLeaderSuffix,
+            ElectionPaths.leaderKey(electionPath),
             WatchOption.DEFAULT,
             WatchResilience.DEFAULT,
             recoveryListener,
@@ -775,7 +774,7 @@ constructor(
               for (event in watchResponse.events) {
                 try {
                   when (event.eventType) {
-                    PUT -> listener.takeLeadership(event.keyValue.value.asString.stripUniqueSuffix)
+                    PUT -> listener.takeLeadership(ElectionPaths.stripLeaderClientId(event.keyValue.value.asString))
                     DELETE -> listener.relinquishLeadership()
                     UNRECOGNIZED -> logger.error { "Unrecognized error with $electionPath watch" }
                     else -> logger.error { "Unknown error with $electionPath watch" }

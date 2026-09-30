@@ -18,6 +18,7 @@ package website.queue;
 
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Client;
+import io.etcd.recipes.queue.DistributedPriorityQueue;
 import io.etcd.recipes.queue.DistributedQueue;
 
 import java.util.List;
@@ -70,5 +71,18 @@ public class QueueSnippets {
       System.out.println("Depth: " + queue.getSize());
     }
     // --8<-- [end:enqueue-all]
+  }
+
+  public void priorityQueue(Client client) {
+    // --8<-- [start:priority-java]
+    // The (long, TimeUnit) constructor: the minimumWaitTime one takes a Kotlin Duration,
+    // which Java can't call.
+    try (DistributedPriorityQueue queue =
+           new DistributedPriorityQueue(client, "/queues/jobs", 50, TimeUnit.MILLISECONDS)) {
+      queue.enqueue("rebuild-index", 10);
+      queue.enqueue("send-report", 1); // lower number, higher priority
+      System.out.println("Next: " + getAsString(queue.dequeue()));
+    }
+    // --8<-- [end:priority-java]
   }
 }

@@ -85,42 +85,44 @@ class ServiceCache
       withRevision(anchorRevision)
     }
 
-    watcher = client.watcher(
-      trailingServicePath,
-      watchOption,
-      resilience.watch,
-      recoveryListener = { event -> onRecoveryEvent(event) },
-      resyncWith = { reconcile(emitEvents = true) },
-    ) { watchResponse ->
-      watchResponse.events
-        .forEach { event ->
-          val (k, v) = event.keyValue.asPair.asString
-          val stripped = k.substring(trailingNamesPath.length)
-          when (event.eventType) {
-            WatchEvent.EventType.PUT -> {
-              val instance = decodeInstanceOrNull(k, v) { recordException(it) }
-              if (instance == null) {
-                // No longer a usable instance: whatever the key held is gone, as on a delete
+    watcher = withRecipeLoggingContext {
+      client.watcher(
+        trailingServicePath,
+        watchOption,
+        resilience.watch,
+        recoveryListener = { event -> onRecoveryEvent(event) },
+        resyncWith = { reconcile(emitEvents = true) },
+      ) { watchResponse ->
+        watchResponse.events
+          .forEach { event ->
+            val (k, v) = event.keyValue.asPair.asString
+            val stripped = k.substring(trailingNamesPath.length)
+            when (event.eventType) {
+              WatchEvent.EventType.PUT -> {
+                val instance = decodeInstanceOrNull(k, v) { recordException(it) }
+                if (instance == null) {
+                  // No longer a usable instance: whatever the key held is gone, as on a delete
+                  removeInstance(stripped)
+                } else {
+                  val isAdd = serviceMap.put(stripped, instance) == null
+                  notifyListeners(WatchEvent.EventType.PUT, isAdd, stripped, instance)
+                }
+              }
+
+              WatchEvent.EventType.DELETE -> {
                 removeInstance(stripped)
-              } else {
-                val isAdd = serviceMap.put(stripped, instance) == null
-                notifyListeners(WatchEvent.EventType.PUT, isAdd, stripped, instance)
+              }
+
+              WatchEvent.EventType.UNRECOGNIZED -> {
+                logger.error { "Unrecognized error with $servicePath watch" }
+              }
+
+              else -> {
+                logger.error { "Unknown error with $servicePath watch" }
               }
             }
-
-            WatchEvent.EventType.DELETE -> {
-              removeInstance(stripped)
-            }
-
-            WatchEvent.EventType.UNRECOGNIZED -> {
-              logger.error { "Unrecognized error with $servicePath watch" }
-            }
-
-            else -> {
-              logger.error { "Unknown error with $servicePath watch" }
-            }
           }
-        }
+      }
     }
 
     startCalled.store(true)

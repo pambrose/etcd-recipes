@@ -105,7 +105,7 @@ constructor(
     val entryKey: String,
   ) {
     val phase = AtomicReference(Phase.WAITING)
-    val wake = java.util.concurrent.atomic.AtomicReference<CountDownLatch?>(null)
+    val wake = AtomicReference<CountDownLatch?>(null)
   }
 
   private val readHolds = ConcurrentHashMap<Thread, EntryData>()
@@ -339,19 +339,21 @@ constructor(
             }
 
           val latch = CountDownLatch(1)
-          attempt.wake.set(latch)
+          attempt.wake.store(latch)
           if (attempt.phase.load() == Phase.DEAD) latch.countDown() // fatal raced the install
-          WaiterSupport.awaitKeyDeletion(
-            client,
-            conflict.key,
-            bounded,
-            latch,
-            deadline,
-            observedRevision = conflict.observedRevision,
-            reportRecovery = { event -> reportRecoveryEvent(event) },
-            recordException = { e -> recordException(e) },
-          )
-          attempt.wake.set(null)
+          withRecipeLoggingContext {
+            WaiterSupport.awaitKeyDeletion(
+              client,
+              conflict.key,
+              bounded,
+              latch,
+              deadline,
+              observedRevision = conflict.observedRevision,
+              reportRecovery = { event -> reportRecoveryEvent(event) },
+              recordException = { e -> recordException(e) },
+            )
+          }
+          attempt.wake.store(null)
           // Loop: re-evaluate the conflict set (it only shrinks)
         }
       } catch (e: EtcdRecipeRuntimeException) {
@@ -433,7 +435,7 @@ constructor(
       recordException(
         cause ?: EtcdRecipeRuntimeException("Lock entry lease expired while waiting on $lockPath"),
       )
-      attempt.wake.get()?.countDown()
+      attempt.wake.load()?.countDown()
     } else if (attempt.phase.load() == Phase.HOLDING) {
       lockLost(side, attempt, cause)
     }
@@ -475,7 +477,7 @@ constructor(
     // the holds below are drained.
     attempts.toList().forEach { attempt ->
       if (attempt.phase.compareAndSet(Phase.WAITING, Phase.DEAD)) {
-        attempt.wake.get()?.countDown()
+        attempt.wake.load()?.countDown()
       }
     }
     [Side.READ, Side.WRITE].forEach { side ->

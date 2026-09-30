@@ -72,6 +72,26 @@ class LeaderLatch
     private val interruptOnLeaseLoss: Boolean = true,
     private val closeJoinTimeout: Duration = 30.seconds,
   ) : EtcdConnector(client, resilience) {
+    /** [closeJoinTimeout] in [closeJoinTimeoutUnit]: the form Java can call (a Kotlin `Duration` hides the other). */
+    constructor(
+      client: Client,
+      electionPath: String,
+      leaseTtlSecs: Long,
+      clientId: String,
+      resilience: ResilienceConfig,
+      interruptOnLeaseLoss: Boolean,
+      closeJoinTimeout: Long,
+      closeJoinTimeoutUnit: TimeUnit,
+    ) : this(
+      client,
+      electionPath,
+      leaseTtlSecs,
+      clientId,
+      resilience,
+      interruptOnLeaseLoss,
+      timeUnitToDuration(closeJoinTimeout, closeJoinTimeoutUnit),
+    )
+
     init {
       require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
       require(leaseTtlSecs > 0) { "Lease TTL must be > 0" }

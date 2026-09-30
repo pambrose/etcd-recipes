@@ -117,14 +117,16 @@ constructor(
         // Self-healing: if the lease expires (partition longer than the TTL), the
         // healer re-grants it and re-puts the key, instead of the key silently
         // vanishing while this recipe still looks healthy.
-        client.selfHealingKeepAlive(
-          leaseTtlSecs.seconds,
-          resilience.lease,
-          leaseListener = { event -> onLeaseEvent(event) },
-          rpc = resilience.rpc,
-        ) { lease ->
-          client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) }, resilience.rpc)
-          true
+        withRecipeLoggingContext {
+          client.selfHealingKeepAlive(
+            leaseTtlSecs.seconds,
+            resilience.lease,
+            leaseListener = { event -> onLeaseEvent(event) },
+            rpc = resilience.rpc,
+          ) { lease ->
+            client.putValue(keyPath, keyValue, putOption { withLeaseId(lease.id) }, resilience.rpc)
+            true
+          }
         }
       } catch (e: Exception) {
         // Nothing was left behind (a failed establish revokes its lease), so a retry starts clean

@@ -27,6 +27,7 @@ import io.etcd.jetcd.options.LeaseOption
 import io.etcd.jetcd.support.CloseableClient
 import io.etcd.jetcd.support.Observers
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.slf4j.MDC
 import java.io.Closeable
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -67,6 +68,9 @@ class SelfHealingKeepAlive internal constructor(
   // The healer's thread, so close() from a lease listener running on it doesn't wait on itself
   @Volatile
   private var healerThread: Thread? = null
+
+  // The creator's logging context, applied to every heal task and lease event
+  private val mdc: Map<String, String>? = MDC.getCopyOfContextMap()
 
   private val healer: ScheduledExecutorService =
     Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -183,7 +187,7 @@ class SelfHealingKeepAlive internal constructor(
     try {
       healer.execute {
         if (closed.load()) return@execute
-        runCatching(task).onFailure { e -> logger.error(e) { "Lease healer task threw" } }
+        withMdc(mdc) { runCatching(task).onFailure { e -> logger.error(e) { "Lease healer task threw" } } }
       }
     } catch (_: RejectedExecutionException) {
       // closed concurrently; nothing left to heal
@@ -216,7 +220,12 @@ class SelfHealingKeepAlive internal constructor(
     }
     synchronized(lock) {
       if (closed.load()) return
-      pendingAttempt = healer.schedule({ runAttempt(expiredLeaseId) }, delay.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+      pendingAttempt =
+        healer.schedule(
+          { withMdc(mdc) { runAttempt(expiredLeaseId) } },
+          delay.inWholeMilliseconds,
+          TimeUnit.MILLISECONDS,
+        )
     }
   }
 

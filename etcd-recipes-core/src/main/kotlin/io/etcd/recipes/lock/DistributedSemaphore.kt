@@ -358,20 +358,22 @@ class DistributedSemaphore
           val latch = CountDownLatch(1)
           attempt.wake.store(latch)
           if (attempt.phase.load() == Phase.DEAD) latch.countDown() // fatal raced the install
-          WaiterSupport.awaitPrefixDeletion(
-            client,
-            "$holdersPath/",
-            bounded,
-            latch,
-            deadline,
-            observedRevision = snap.observedRevision,
-            shouldWake = {
-              val now = rankOf(entryKey, bounded.rpc)
-              now == null || now.rank < permits
-            },
-            reportRecovery = { event -> reportRecoveryEvent(event) },
-            recordException = { e -> recordException(e) },
-          )
+          withRecipeLoggingContext {
+            WaiterSupport.awaitPrefixDeletion(
+              client,
+              "$holdersPath/",
+              bounded,
+              latch,
+              deadline,
+              observedRevision = snap.observedRevision,
+              shouldWake = {
+                val now = rankOf(entryKey, bounded.rpc)
+                now == null || now.rank < permits
+              },
+              reportRecovery = { event -> reportRecoveryEvent(event) },
+              recordException = { e -> recordException(e) },
+            )
+          }
           attempt.wake.store(null)
           // Loop: re-evaluate the rank (it only shrinks while the entry lives)
         }
