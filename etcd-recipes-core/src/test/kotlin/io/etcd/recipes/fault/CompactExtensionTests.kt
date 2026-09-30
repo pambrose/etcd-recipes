@@ -53,7 +53,7 @@ class CompactExtensionTests : StringSpec() {
           shouldThrowAny {
             client.getResponse("$path/key", getOption { withRevision(rev1) })
           }
-        generateSequence(thrown as Throwable) { it.cause.takeIf { c -> c !== it } }
+        generateSequence(thrown) { it.cause.takeIf { c -> c !== it } }
           .any { it.message?.contains("compacted") == true } shouldBe true
 
         client.getValue("$path/key", "def") shouldBe "v2"

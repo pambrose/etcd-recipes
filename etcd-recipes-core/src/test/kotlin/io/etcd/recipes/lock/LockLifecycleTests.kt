@@ -219,7 +219,7 @@ class LockLifecycleTests : StringSpec() {
             withClue("tryLock(500 ms) outlived its deadline") {
               finishesWithin(5) { locked = runCatching { mutex.tryLock(500.milliseconds) } } shouldBe true
             }
-            withClue("tryLock threw ${locked!!.exceptionOrNull()}") { locked!!.getOrNull() shouldBe false }
+            withClue("tryLock threw ${locked!!.exceptionOrNull()}") { locked.getOrNull() shouldBe false }
             var acquired: Result<Boolean>? = null
             withClue("tryAcquire(500 ms) outlived its deadline") {
               finishesWithin(5) { acquired = runCatching { semaphore.tryAcquire(500.milliseconds) } } shouldBe true
