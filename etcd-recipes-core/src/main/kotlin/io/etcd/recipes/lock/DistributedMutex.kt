@@ -64,7 +64,7 @@ class DistributedMutex
   constructor(
     client: Client,
     val lockPath: String,
-    val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
+    val leaseTtlSecs: Long = DEFAULT_LOCK_TTL_SECS,
     resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
     val clientId: String = defaultClientId(DistributedMutex::class.simpleName!!),
     internal val interruptOnLockLoss: Boolean = false,
@@ -75,6 +75,8 @@ class DistributedMutex
     val ownershipKey: ByteSequence,
     // The acquisition this hold came from: a loss is applied only to the hold it belongs to
     val attempt: Attempt,
+    // The revision etcd granted the lock at: past the release (or expiry) of every earlier hold
+    val fencingToken: Long,
   ) {
     // Changed by the owner thread; read by a loss on jetcd's lease thread
     @Volatile
@@ -143,6 +145,8 @@ class DistributedMutex
     }
 
   override val holdCount: Int get() = threadData[Thread.currentThread()]?.holdCount ?: 0
+
+  override val fencingToken: Long get() = threadData[Thread.currentThread()]?.fencingToken ?: -1L
 
   override fun addLockLostListener(listener: LockLostListener) {
     lockLostListeners += listener
@@ -255,7 +259,7 @@ class DistributedMutex
         // Publish the hold BEFORE claiming the phase, so a fatal that lands in the
         // win window always finds the hold to dispossess (or the CAS failure below
         // rolls it back) — never a silently-dead "held" lock.
-        val data = LockData(lease, response.key, attempt)
+        val data = LockData(lease, response.key, attempt, response.header.revision)
         threadData[me] = data
         if (attempt.phase.compareAndSet(Phase.WAITING, Phase.HOLDING)) {
           if (closeCalled.load()) {

@@ -95,4 +95,23 @@ public class MutexSnippets {
     }
     // --8<-- [end:interrupt-on-loss]
   }
+
+  /** A downstream store that keeps the largest fencing token it has seen and refuses smaller ones. */
+  interface FencedStore {
+    void write(String value, long fencingToken);
+  }
+
+  public void fencedWrite(Client client, FencedStore store) throws InterruptedException {
+    // --8<-- [start:fencing]
+    try (DistributedMutex mutex = new DistributedMutex(client, "/locks/orders")) {
+      mutex.lock();
+      try {
+        // Send the token with every write; the store refuses one smaller than it has seen.
+        store.write("order-42 shipped", mutex.getFencingToken());
+      } finally {
+        mutex.unlock();
+      }
+    }
+    // --8<-- [end:fencing]
+  }
 }

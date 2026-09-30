@@ -142,7 +142,7 @@
 - [x] [#80](#issue-80) `DistributedAtomicLong` resilience gaps (no close check, uncapped backoff, undocumented ambiguous commits)
 - [x] [#81](#issue-81) Read-write lock and semaphore releases rely on a single, un-retried revoke
 - [x] [#82](#issue-82) Lock-loss bookkeeping is keyed by thread, and `holdCount` is read cross-thread without synchronization
-- [ ] [#83](#issue-83) Locks expose no fencing token, and the default lease TTL is 2 s
+- [x] [#83](#issue-83) Locks expose no fencing token, and the default lease TTL is 2 s
 - [x] [#84](#issue-84) Election and barrier API traps (`close()` before `start()`, unused `clientId`)
 - [x] [#85](#issue-85) `LeaderObserver.onRecovery` replays leadership on every recovery
 - [x] [#86](#issue-86) `DistributedBarrier.close()` doesn't unpark waiters, and its internal reads are close-checked

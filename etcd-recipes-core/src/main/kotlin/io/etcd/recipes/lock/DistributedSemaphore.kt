@@ -99,7 +99,7 @@ class DistributedSemaphore
     client: Client,
     val semaphorePath: String,
     val permits: Int,
-    val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
+    val leaseTtlSecs: Long = DEFAULT_LOCK_TTL_SECS,
     resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
     val clientId: String = defaultClientId(DistributedSemaphore::class.simpleName!!),
     internal val interruptOnPermitLoss: Boolean = false,
@@ -110,6 +110,8 @@ class DistributedSemaphore
     val lease: AcquisitionLease,
     val entryKey: String,
     val owner: Thread,
+    // The entry's create revision: permits are granted in its order
+    val fencingToken: Long,
   ) {
     val acquiredAt: ComparableTimeMark = TimeSource.Monotonic.markNow()
   }
@@ -214,6 +216,13 @@ class DistributedSemaphore
 
   /** Whether a live permit acquired on [owner] is still held (not released or lost). */
   internal fun holdsPermitAcquiredOn(owner: Thread): Boolean = holds.any { it.owner === owner }
+
+  /**
+   * The fencing token of the permit a [release] from the calling thread would give up, or -1
+   * when it holds none: its entry's create revision, which grows with each grant. See
+   * [EtcdLock.fencingToken].
+   */
+  val fencingToken: Long get() = holds.firstOrNull { it.owner === Thread.currentThread() }?.fencingToken ?: -1L
 
   /** Advisory: permits minus live holder/waiter entries, floored at zero. */
   fun availablePermits(): Int = availablePermits(resilience.rpc)
@@ -329,7 +338,7 @@ class DistributedSemaphore
             // Admitted: publish the hold BEFORE claiming the phase (a fatal in
             // the win window must always find the hold — or the CAS failure
             // below rolls it back).
-            val data = PermitData(lease, entryKey, me)
+            val data = PermitData(lease, entryKey, me, txn.header.revision)
             attempt.holdData = data
             holds.addFirst(data)
             if (attempt.phase.compareAndSet(Phase.WAITING, Phase.HOLDING)) {

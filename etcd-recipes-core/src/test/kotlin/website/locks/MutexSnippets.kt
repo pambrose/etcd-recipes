@@ -99,3 +99,27 @@ fun mutexReentrant(client: Client) {
   }
   // --8<-- [end:reentrant]
 }
+
+// A downstream store that keeps the largest fencing token it has seen and refuses smaller ones
+fun interface FencedStore {
+  fun write(
+    value: String,
+    fencingToken: Long,
+  )
+}
+
+fun fencedWrite(
+  client: Client,
+  store: FencedStore,
+) {
+  // --8<-- [start:fencing]
+  DistributedMutex(client, "/locks/orders").use { mutex ->
+    mutex.withLock {
+      // Send the token with every write. If this hold was lost (a pause past the lease) and
+      // another client has the lock now, its larger token already reached the store, which
+      // refuses this stale write.
+      store.write("order-42 shipped", mutex.fencingToken)
+    }
+  }
+  // --8<-- [end:fencing]
+}
