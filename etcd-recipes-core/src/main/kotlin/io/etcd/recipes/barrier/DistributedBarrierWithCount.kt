@@ -23,6 +23,9 @@ import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.ensureSuffix
 import com.pambrose.common.util.randomId
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.op.CmpTarget
+import io.etcd.jetcd.op.Op
+import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.barrier.DistributedBarrierWithCount.Companion.defaultClientId
@@ -36,16 +39,17 @@ import io.etcd.recipes.common.SelfHealingKeepAlive
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.appendToPath
+import io.etcd.recipes.common.asByteSequence
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.deleteOp
-import io.etcd.recipes.common.doesExist
 import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.equalTo
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.common.getOption
 import io.etcd.recipes.common.getResponse
-import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.putOption
+import io.etcd.recipes.common.retryRpc
 import io.etcd.recipes.common.selfHealingKeepAlive
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
@@ -60,11 +64,13 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
 /*
-    First node creates subnode /ready
-    Each node creates its own subnode with keepalive on it
-    Each node creates a watch for DELETE on /ready and PUT on any waiter
-    Query the number of children after each PUT on waiter and DELETE /ready if memberCount seen
-    Leave if DELETE of /ready is seen
+    A round is identified by /ready's createRevision: the first arrival creates /ready, and
+      later ones join the round it names
+    Each node creates its own subnode waiting/<round>/<token> with keepalive on it
+    Each node creates a watch for DELETE on /ready and PUT on any waiter of its round
+    Count the round's waiters after each PUT and, if memberCount is seen, DELETE that round's
+      /ready (guarded on its createRevision) before leaving
+    Leave if DELETE of /ready is seen, or /ready names a later round
 */
 
 @JvmOverloads
@@ -107,15 +113,56 @@ constructor(
   // blow it up: the waiter is between its establish CAS and the park for several RPCs, and
   // a throw there escapes waitOnBarrier instead of unparking it with a cancellation (on the
   // dispatcher thread it would kill the callback outright). close() does not close the
-  // client, so these stay valid afterward. The public getters below keep the check.
-  private val readyKeyPresent: Boolean get() = client.isKeyPresent(readyPath, resilience.rpc)
+  // client, so these stay valid afterward. The public getter below keeps the check.
+  // currentRound() is the round in progress (/ready's createRevision), or null when there is none.
+  private fun currentRound(): Long? =
+    client.getResponse(readyPath, rpc = resilience.rpc).kvs.firstOrNull()?.createRevision
 
-  private val currentWaiterCount: Long get() = client.getChildCount(waitingPath, resilience.rpc)
+  private fun roundPath(round: Long) = waitingPath.appendToPath(round.toString())
 
+  /** The waiters registered in the round in progress; 0 when there is none. */
   val waiterCount: Long
     get() {
       checkCloseNotCalled()
-      return currentWaiterCount
+      val round = currentRound() ?: return 0L
+      return client.getChildCount(roundPath(round), resilience.rpc)
+    }
+
+  // Joins the round in progress, or starts one, and returns it.
+  private fun joinRound(token: String): Long {
+    val response =
+      client.transaction(resilience.rpc) {
+        If(readyPath.doesNotExist)
+        Then(readyPath setTo token)
+        Else(Op.get(readyPath.asByteSequence, GetOption.DEFAULT))
+      }
+    // A started round is the revision that created /ready; a joined one, /ready's createRevision
+    return if (response.isSucceeded)
+      response.header.revision
+    else
+      response.getResponses.first().kvs.first().createRevision
+  }
+
+  // Ends [round] by deleting its /ready. Guarded on /ready's createRevision, the delete is
+  // idempotent — a retry after an ambiguous commit finds it gone and does nothing — so unlike
+  // other transactions it is retried on a transient failure. False, and recorded, when it
+  // can't be committed: the caller stays parked rather than leave a round that still stands.
+  private fun releaseRound(round: Long): Boolean =
+    try {
+      retryRpc(resilience.rpc, "releaseBarrier($readyPath)") {
+        client.kvClient
+          .txn()
+          .If(equalTo(readyPath, CmpTarget.createRevision(round)))
+          .Then(deleteOp(readyPath))
+          .commit()
+      }
+      true
+    } catch (e: EtcdRecipeRuntimeException) {
+      // An interrupted wait (a cancelled coroutine, say) ends as itself, not as a failed release
+      if (Thread.currentThread().isInterrupted) throw e
+      logger.warn(e) { "Couldn't release $barrierPath; its waiters stay parked" }
+      recordException(EtcdRecipeRuntimeException("Couldn't release $barrierPath; its waiters stay parked", e))
+      false
     }
 
   @Throws(InterruptedException::class, EtcdRecipeException::class)
@@ -134,10 +181,14 @@ constructor(
     val keepAliveClosed = BooleanMonitor(false)
     val cancelled = BooleanMonitor(false)
     val uniqueToken = "$clientId:${randomId(TOKEN_LENGTH)}"
-    val myWaitingPath = waitingPath.appendToPath(uniqueToken)
-    val waitingPrefix = waitingPath.ensureSuffix("/")
 
     checkCloseNotCalled()
+
+    // Waiters register, and are counted, under their round: keys an earlier round hasn't
+    // cleaned up yet can't trip this one
+    val round = joinRound(uniqueToken)
+    val myWaitingPath = roundPath(round).appendToPath(uniqueToken)
+    val waitingPrefix = roundPath(round).ensureSuffix("/")
 
     fun closeKeepAlive() {
       // Atomically claim the keep-alive client so it is closed exactly once across the
@@ -154,19 +205,26 @@ constructor(
     }
 
     fun checkWaiterCount() {
-      // First see if /ready is missing
-      if (!readyKeyPresent) {
-        closeKeepAlive()
-      } else {
-        if (currentWaiterCount >= memberCount) {
+      when {
+        // The round already tripped: /ready is gone, or names a later round
+        currentRound() != round -> {
           closeKeepAlive()
-
-          // Delete /ready key
-          client.transaction(resilience.rpc) {
-            If(readyPath.doesExist)
-            Then(deleteOp(readyPath))
-          }
         }
+
+        // Release the round before leaving it: a tripper that left first and then failed to
+        // delete /ready would strand everyone else
+        client.getChildCount(roundPath(round), resilience.rpc) >= memberCount -> {
+          if (releaseRound(round)) closeKeepAlive()
+        }
+      }
+    }
+
+    // checkWaiterCount() off the waiter's thread, where a failed read has no caller to reach
+    fun recheck() {
+      try {
+        checkWaiterCount()
+      } catch (e: EtcdRecipeRuntimeException) {
+        recordException(e)
       }
     }
 
@@ -181,12 +239,6 @@ constructor(
     if (closeCalled.load()) cancelWait()
 
     try {
-      // Do a CAS on the /ready name. If it is not found, then set it
-      client.transaction(resilience.rpc) {
-        If(readyPath.doesNotExist)
-        Then(readyPath setTo uniqueToken)
-      }
-
       // The waiting key is bound to a self-healing lease: if it expires while the
       // waiter is parked (partition longer than the TTL), the healer re-registers
       // it so the barrier can still trip. Healing stops once the barrier lifted or
@@ -270,7 +322,7 @@ constructor(
                   reportRecoveryEvent(event)
                   when (event) {
                     is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-                      checkWaiterCount()
+                      recheck()
                     }
 
                     is WatchRecoveryEvent.Failed -> {
@@ -299,7 +351,7 @@ constructor(
                   .forEach { watchEvent ->
                     val key = watchEvent.keyValue.key.asString
                     when {
-                      key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> checkWaiterCount()
+                      key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> recheck()
                       key == readyPath && watchEvent.eventType == DELETE -> closeKeepAlive()
                     }
                   }

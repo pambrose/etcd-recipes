@@ -97,9 +97,9 @@
 - [x] [#37](#issue-37) A `LeaderSelector` closed without ever winning can't be restarted
 - [x] [#38](#issue-38) Composite recipes (`LeaderLatch`, `ServiceProvider`) hide the health of the recipes they wrap
 - [x] [#39](#issue-39) The uncommitted `DistributedBarrierWithCount` close-race fix leaves a pre-park window open
-- [ ] [#40](#issue-40) The count-barrier trip releases the tripper before the global release is committed
-- [ ] [#41](#issue-41) Count-barrier waiting keys aren't scoped to a generation
-- [ ] [#42](#issue-42) `DistributedBarrier.setBarrier()` after `removeBarrier()` on the same instance silently fails
+- [x] [#40](#issue-40) The count-barrier trip releases the tripper before the global release is committed
+- [x] [#41](#issue-41) Count-barrier waiting keys aren't scoped to a generation
+- [x] [#42](#issue-42) `DistributedBarrier.setBarrier()` after `removeBarrier()` on the same instance silently fails
 - [x] [#43](#issue-43) A broad `catch (EtcdRecipeRuntimeException)` reports infrastructure failures as a lost CAS
 - [x] [#44](#issue-44) `close()` races in-flight lock and permit acquisitions
 - [x] [#45](#issue-45) `DistributedMutex` retries non-retriable lock failures forever, and `tryLock` reports them as a timeout

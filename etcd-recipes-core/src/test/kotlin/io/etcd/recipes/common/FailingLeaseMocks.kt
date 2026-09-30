@@ -20,8 +20,10 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
+import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.Txn
+import io.etcd.jetcd.kv.GetResponse
 import io.etcd.jetcd.kv.TxnResponse
 import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lease.LeaseRevokeResponse
@@ -33,7 +35,8 @@ import java.util.concurrent.CompletableFuture
  * MockK fixture for a [Client] whose every transaction reports failure and whose
  * lease grant returns [leaseId]. Drives a recipe's "lease granted, then CAS fails"
  * path so a test can assert the lease is revoked. Expose [lease] so the caller can
- * `verify { lease.revoke(leaseId) }`.
+ * `verify { lease.revoke(leaseId) }`. A failed transaction's `Else` read finds a key
+ * created at revision 1.
  */
 internal class FailingLeaseMocks(
   val leaseId: Long,
@@ -43,9 +46,16 @@ internal class FailingLeaseMocks(
 
     init {
         val txn = mockk<Txn>()
-        val failedTxn = mockk<TxnResponse> { every { isSucceeded } returns false }
+        val createdAtOne = mockk<KeyValue> { every { createRevision } returns 1L }
+        val existing = mockk<GetResponse> { every { kvs } returns [createdAtOne] }
+        val failedTxn =
+            mockk<TxnResponse> {
+                every { isSucceeded } returns false
+                every { getResponses } returns [existing]
+            }
         every { txn.If(*anyVararg()) } returns txn
         every { txn.Then(*anyVararg()) } returns txn
+        every { txn.Else(*anyVararg()) } returns txn
         every { txn.commit() } returns CompletableFuture.completedFuture(failedTxn)
 
         val kv = mockk<KV> { every { txn() } returns txn }

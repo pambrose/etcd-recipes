@@ -22,6 +22,7 @@ import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.deleteKey
+import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.leaseGrant
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
@@ -77,7 +78,9 @@ class DistributedBarrierWithCountWatcherTests : StringSpec() {
         // with the bug, that branch never fires for peer keys, so the
         // barrier's own client never re-runs checkWaiterCount() and /ready
         // is never deleted -> the lone waiter hangs until its inner timeout.
-        val peerKey = path.appendToPath("waiting").appendToPath("manualPeer:abc")
+        // Waiters register under their round: /ready's createRevision
+        val round = client.getResponse(path.appendToPath("ready")).kvs.single().createRevision
+        val peerKey = path.appendToPath("waiting").appendToPath("$round").appendToPath("manualPeer:abc")
         val lease = client.leaseGrant(30.seconds)
         client.transaction {
           Then(peerKey.setTo("manualPeer", putOption { withLeaseId(lease.id) }))
@@ -118,7 +121,9 @@ class DistributedBarrierWithCountWatcherTests : StringSpec() {
         // Let the lone client register its waiter and start the watcher.
         Thread.sleep(2_000)
 
-        val peerKey = path.appendToPath("waiting").appendToPath("manualPeer:xyz")
+        // Waiters register under their round: /ready's createRevision
+        val round = client.getResponse(path.appendToPath("ready")).kvs.single().createRevision
+        val peerKey = path.appendToPath("waiting").appendToPath("$round").appendToPath("manualPeer:xyz")
         val lease = client.leaseGrant(30.seconds)
         client.transaction {
           Then(peerKey.setTo("manualPeer", putOption { withLeaseId(lease.id) }))

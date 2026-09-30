@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (barriers)
+
+- `DistributedBarrierWithCount` releases nobody until the round's release is committed.
+  Before, the member that saw the count reached removed its own waiting key and left
+  first, then deleted `/ready` in a single, un-retried transaction. If that delete failed
+  during an etcd blip, the tripper had already gone (or threw), and every other waiter saw
+  `/ready` still standing and parked until its timeout, forever for `waitOnBarrier()`. Now
+  `/ready` is deleted first, guarded on the round and retried on a transient failure. A
+  delete that still can't be committed is recorded in `exceptions`, and the member stays
+  parked with the rest. A failed read on the watch thread is recorded too, instead of only
+  logged.
+- `DistributedBarrierWithCount` counts one round at a time. Before, every key under
+  `waiting/` counted, so a member that looped straight back into `waitOnBarrier()` (or
+  arrived just after a trip) could trip the next round alone on keys the last round hadn't
+  cleaned up yet. `waiterCount` likewise counts only the round in progress.
+- `DistributedBarrier.setBarrier()` after `removeBarrier()` on the same instance sets the
+  barrier again. Before, the removal flag was permanent, so the second `setBarrier()`
+  returned `false` (read as "another client holds it") and left no barrier. The flag is now
+  per `setBarrier()`, and is set before the healer closes, so a heal racing a removal can't
+  re-arm the barrier. A new `setBarrier()` also retires the previous one's healer instead of
+  leaking it.
+
+### Changed (barriers: wire layout)
+
+- **Wire-layout change:** a counted barrier's waiters register under
+  `<path>/waiting/<round>/`, where the round is `/ready`'s create revision, instead of
+  directly under `<path>/waiting/`. The two layouts don't count each other's waiters, so
+  every member meeting at one path, including `DistributedDoubleBarrier` members, must run
+  the same version.
+
 ### Fixed (discovery robustness)
 
 - One malformed or newer-schema instance entry no longer breaks discovery for a whole

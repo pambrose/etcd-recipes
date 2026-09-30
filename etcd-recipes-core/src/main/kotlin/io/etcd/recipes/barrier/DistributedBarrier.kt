@@ -71,9 +71,14 @@ constructor(
   val clientId: String = defaultClientId(),
   resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
 ) : EtcdConnector(client, resilience) {
-  // Plain var: all reads/writes are inside @Synchronized methods on this instance.
+  // Plain vars: all reads/writes are inside @Synchronized methods on this instance.
   private var keepAliveLease: SelfHealingKeepAlive? = null
-  private val barrierRemoved = AtomicBoolean(false)
+
+  // The latest setBarrier()'s own "removed" flag, which its healer reads before every re-arm
+  private var healerRetired: AtomicBoolean? = null
+
+  // Whether removeBarrier() has run since the last successful setBarrier()
+  private var barrierRemoved = false
 
   // Cancellation hooks of the in-flight waitOnBarrier calls, so close() can release
   // every parked waiter (reporting not-released) instead of leaving it to its timeout.
@@ -113,6 +118,9 @@ constructor(
       // holds the barrier; the healer revokes its own lease before throwing). On a
       // heal-time loss another client re-set the barrier meanwhile — the barrier
       // stays armed, just not maintained by this instance (a Failed event says so).
+      // A previous set's healer (its key since removed by someone else) is retired, not leaked
+      retireHealer()
+      val retired = AtomicBoolean(false)
       try {
         keepAliveLease = client.selfHealingKeepAlive(
           leaseTtlSecs.seconds,
@@ -120,7 +128,7 @@ constructor(
           leaseListener = { event -> onBarrierLeaseEvent(event) },
           rpc = resilience.rpc,
         ) { lease ->
-          if (barrierRemoved.load()) {
+          if (retired.load()) {
             false // explicitly removed: do not re-arm
           } else {
             client.transaction(resilience.rpc) {
@@ -129,6 +137,8 @@ constructor(
             }.isSucceeded
           }
         }
+        healerRetired = retired
+        barrierRemoved = false
         true
       } catch (e: EstablishDeclinedException) {
         // Initial CAS lost: another client set the barrier between the presence
@@ -165,18 +175,23 @@ constructor(
   @Synchronized
   fun removeBarrier(): Boolean {
     checkCloseNotCalled()
-    return if (barrierRemoved.load()) {
+    return if (barrierRemoved) {
       false
     } else {
-      keepAliveLease?.close()
-      keepAliveLease = null
-
+      retireHealer()
       client.deleteKey(barrierPath, resilience.rpc)
-
-      barrierRemoved.store(true)
-
+      barrierRemoved = true
       true
     }
+  }
+
+  // Stops this instance's healer. Its flag is set before the close, so a heal racing this
+  // can't re-arm the barrier.
+  private fun retireHealer() {
+    healerRetired?.store(true)
+    healerRetired = null
+    keepAliveLease?.close()
+    keepAliveLease = null
   }
 
   @Throws(InterruptedException::class)
@@ -293,8 +308,7 @@ constructor(
 
   @Synchronized
   override fun doClose() {
-    keepAliveLease?.close()
-    keepAliveLease = null
+    retireHealer()
     activeWaiters.forEach { cancelWait -> cancelWait() }
   }
 

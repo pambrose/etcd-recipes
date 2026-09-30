@@ -38,7 +38,8 @@ One client arms the barrier, does whatever the others must not race, and removes
 `setBarrier()` returning `false` is not a failure — it means another client got there
 first and the barrier is already armed by somebody else. That distinction matters: the
 client that armed it is the one that should remove it. `removeBarrier()` returns `false`
-if this instance already removed it.
+if this instance already removed it and hasn't set it again since. One instance can set,
+remove, and set the barrier again.
 
 Everyone else waits:
 
@@ -171,11 +172,26 @@ No gatekeeper: every party calls the same `waitOnBarrier()`, and the barrier tri
     --8<-- "java/website/barrier/BarrierSnippets.java:with-count"
     ```
 
-Each waiter registers a lease-bound key under `<path>/waiting`, and the first arrival
-CAS-creates `<path>/ready`. Every waiter watches the prefix; when the waiter count reaches
-`memberCount`, `<path>/ready` is deleted and everyone leaves together. `waiterCount` is a
-live count of the registered waiters — advisory, like every count read over a network, and
-useful mostly for logging a stuck rendezvous.
+The first arrival CAS-creates `<path>/ready`, which starts a round; `/ready`'s create
+revision names it. Each waiter registers a lease-bound key under
+`<path>/waiting/<round>/`, and counts only its own round's keys, so the leftovers of an
+earlier round (a member slow to clean up, or one that loops straight back into
+`waitOnBarrier`) can't trip the next one. Every waiter watches the prefix; when the round's
+count reaches `memberCount`, that round's `<path>/ready` is deleted and everyone leaves
+together. `waiterCount` is a live count of the current round's waiters (0 when no round is
+in progress) — advisory, like every count read over a network, and useful mostly for
+logging a stuck rendezvous.
+
+The member that sees the count reached deletes `/ready` *before* it leaves. The delete is
+guarded on the round, so it is retried on a transient failure. If it can't be committed,
+the failure is recorded in `exceptions` and that member stays parked with the rest, rather
+than leaving a round that everyone else still sees standing.
+
+!!! warning "The key layout changed"
+
+    Before this version, waiters registered directly under `<path>/waiting/`. The two
+    layouts don't count each other's waiters, so every member meeting at one path must run
+    the same version.
 
 `waitOnBarrier` throws `InterruptedException` and `EtcdRecipeException` — the latter when
 the waiter's own key cannot be established, which means somebody else is already using that
