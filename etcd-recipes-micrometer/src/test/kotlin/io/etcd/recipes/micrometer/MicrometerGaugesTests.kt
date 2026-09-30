@@ -66,6 +66,22 @@ class MicrometerGaugesTests : StringSpec() {
       registry.find("etcd.cache.entries").gauge().shouldNotBeNull().value() shouldBe 2.0
     }
 
+    "a path-children cache's and a service cache's entry gauges don't collide" {
+      val registry = SimpleMeterRegistry()
+      registry.bindCacheSize(mockk<PathChildrenCache> { every { currentData } returns [mockk(), mockk(), mockk()] })
+      registry.bindServiceCacheSize(mockk<ServiceCache> { every { instances } returns [mockk(), mockk()] })
+      val values = registry.find("etcd.cache.entries").gauges().map { it.value() }
+      withClue("the second binding returned the first one's gauge") { values.sorted() shouldBe [2.0, 3.0] }
+    }
+
+    "removing a gauge lets a recreated recipe bind a fresh one" {
+      val registry = SimpleMeterRegistry()
+      val stale = registry.bindCacheSize(mockk<PathChildrenCache> { every { currentData } returns [mockk()] })
+      registry.remove(stale)
+      registry.bindCacheSize(mockk<PathChildrenCache> { every { currentData } returns [mockk(), mockk()] })
+      registry.find("etcd.cache.entries").gauge().shouldNotBeNull().value() shouldBe 2.0
+    }
+
     "bindAvailablePermits reports the available permit count, read with the probe budget" {
       val registry = SimpleMeterRegistry()
       registry.bindAvailablePermits(

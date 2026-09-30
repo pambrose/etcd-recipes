@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (integrations)
+
+- Ktor: a plugin-owned client closes on `ApplicationStopped` instead of
+  `ApplicationStopping`. Ktor runs handlers in registration order, so every
+  `ApplicationStopping` handler registered after `install(EtcdPlugin)` (typically the app's
+  own teardown) used to get a closed client. Recipes closed there then couldn't revoke their
+  leases, so registrations and leader or lock keys lingered until their TTL.
+- `EtcdConnectionConfig` and the Spring starter's `EtcdProperties` no longer show the
+  password in `toString()`.
+- `EtcdTlsConfig` requires `clientCertPath` and `clientKeyPath` together. Before, setting
+  only one silently connected without a client certificate; now it throws
+  `IllegalArgumentException` (and fails a Spring app's startup).
+- Micrometer: `bindCacheSize` and `bindServiceCacheSize` tag `etcd.cache.entries` with
+  `recipe=PathChildrenCache` / `recipe=ServiceCache`. Before, binding one of each to a
+  registry returned the first gauge for the second, which reported the first recipe's
+  value. The docs now say to `registry.remove(gauge)` when a recipe closes, and the gauge
+  examples no longer bind to recipes they immediately close.
+- The Spring starter depends on `kotlin-reflect` directly. Spring binds the all-defaults
+  `EtcdProperties` through it, and it used to arrive only by way of another library; had
+  that changed, `etcd.recipes.*` would have silently stopped binding. The starter's tests
+  now check the bound values and the Actuator-absent case.
+
 ### Fixed (barriers)
 
 - `DistributedBarrierWithCount` releases nobody until the round's release is committed.

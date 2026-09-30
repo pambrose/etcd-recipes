@@ -170,8 +170,8 @@ a weak reference, so a bound gauge does not keep the recipe alive.
 | Binder | Meter | Cost per scrape |
 | --- | --- | --- |
 | `bindQueueDepth(queue)` | `etcd.queue.depth` | **An RPC** — `size` issues a range count |
-| `bindCacheSize(cache)` | `etcd.cache.entries` | In-memory read |
-| `bindServiceCacheSize(cache)` | `etcd.cache.entries` | In-memory read |
+| `bindCacheSize(cache)` | `etcd.cache.entries{recipe="PathChildrenCache"}` | In-memory read |
+| `bindServiceCacheSize(cache)` | `etcd.cache.entries{recipe="ServiceCache"}` | In-memory read |
 | `bindAvailablePermits(semaphore)` | `etcd.semaphore.available` | **An RPC** — a range count |
 | `bindLeadership(latch)` | `etcd.election.leader` | In-memory read (1.0 while leader) |
 
@@ -184,7 +184,16 @@ a weak reference, so a bound gauge does not keep the recipe alive.
     outage they report `NaN` rather than stalling the scrape.
 
 Binding several instances of the same gauge to one registry needs distinguishing `tags`
-— every binder takes them. See [Integrations](integrations/index.md) for setup,
+— every binder takes them. Without them, Micrometer hands back the gauge already
+registered under that name and those tags, still bound to the first instance.
+
+!!! warning "Remove a gauge when its recipe closes"
+
+    Every binder returns its `Gauge`. Call `registry.remove(gauge)` when you close the
+    recipe: a gauge left behind reads `NaN` once the recipe is garbage-collected, and a
+    later binding for a replacement recipe gets that stale gauge back instead of a new one.
+
+See [Integrations](integrations/index.md) for setup,
 including the Spring Boot starter's auto-configuration.
 
 ## What to watch

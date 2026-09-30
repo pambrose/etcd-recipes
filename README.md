@@ -147,7 +147,7 @@ etcd:
 ```
 
 **Ktor 3.5.x** (`etcd-recipes-ktor`) — install the plugin; `application.etcdClient` and
-`application.etcdRecipes` become available, and a plugin-owned client closes on `ApplicationStopping`:
+`application.etcdRecipes` become available, and a plugin-owned client closes on `ApplicationStopped`:
 
 ```kotlin
 install(EtcdPlugin) {

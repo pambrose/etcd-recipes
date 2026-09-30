@@ -19,12 +19,17 @@
 package io.etcd.recipes.ktor
 
 import io.etcd.jetcd.Client
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.application.install
 import io.ktor.server.testing.testApplication
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicReference
 
 /** [EtcdPlugin] installs the client onto the application and closes only a plugin-owned client on stop. */
 class EtcdPluginTests : StringSpec() {
@@ -39,6 +44,24 @@ class EtcdPluginTests : StringSpec() {
         startApplication()
       }
       verify { client.close() }
+    }
+
+    "a user's ApplicationStopping teardown can still use the plugin-owned client" {
+      val closed = AtomicBoolean(false)
+      val client = mockk<Client>(relaxed = true) { every { close() } answers { closed.store(true) } }
+      val closedDuringTeardown = AtomicReference<Boolean?>(null)
+      testApplication {
+        application {
+          install(EtcdPlugin) { clientFactory = { client } }
+          // Registered after the plugin, as an app's own teardown usually is
+          monitor.subscribe(ApplicationStopping) { closedDuringTeardown.store(closed.load()) }
+        }
+        startApplication()
+      }
+      withClue("the client was closed before the app's ApplicationStopping teardown ran") {
+        closedDuringTeardown.load() shouldBe false
+      }
+      closed.load() shouldBe true
     }
 
     "does not close an injected client on stop" {

@@ -18,13 +18,17 @@
 
 package io.etcd.recipes.common
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import java.time.Duration
 
 /**
  * [EtcdConnectionConfig] maps onto the jetcd builder (auth / namespace / timeouts asserted via the
- * builder's own getters), and a namespaced client round-trips a key beneath its prefix.
+ * builder's own getters), and a namespaced client round-trips a key beneath its prefix. Its
+ * `toString()` never shows the password, and half-configured mutual TLS is refused.
  */
 class EtcdConnectionConfigTests : StringSpec() {
   private val base = "/common/${javaClass.simpleName}"
@@ -46,6 +50,20 @@ class EtcdConnectionConfigTests : StringSpec() {
       builder.namespace().asString shouldBe "/tenant/"
       builder.connectTimeout() shouldBe Duration.ofSeconds(3)
       builder.retryMaxDuration() shouldBe Duration.ofSeconds(7)
+    }
+
+    "toString() doesn't show the password" {
+      val config = EtcdConnectionConfig(endpoints = ["http://localhost:2379"], user = "root", password = "s3cret")
+      val text = config.toString()
+      text shouldNotContain "s3cret"
+      text shouldContain "user=root"
+    }
+
+    "mutual TLS needs both the client certificate and key" {
+      shouldThrow<IllegalArgumentException> { EtcdTlsConfig(clientCertPath = "/tls/client.pem") }
+      shouldThrow<IllegalArgumentException> { EtcdTlsConfig(clientKeyPath = "/tls/client-key.pem") }
+      EtcdTlsConfig(caCertPath = "/tls/ca.pem")
+      EtcdTlsConfig(clientCertPath = "/tls/client.pem", clientKeyPath = "/tls/client-key.pem")
     }
 
     "a namespaced client writes beneath its prefix" {
