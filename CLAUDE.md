@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build, Test, Lint
 
-JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17) }`). Gradle wrapper is pinned to 9.6.1 (the `gradle-wrapper` key in the version catalog). Common entry points are in the `Makefile` (`make help` lists everything):
+JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17) }`). The Gradle wrapper version is pinned by the `gradle-wrapper` key in the version catalog. Common entry points are in the `Makefile` (`make help` lists everything):
 
 - `make build` — `./gradlew clean build -x test` (build without running tests)
 - `make tests` — full test suite against a local etcd at `localhost:2379`
@@ -20,7 +20,7 @@ JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17
 - `make coverage` — Kover HTML + XML reports + summary
 - `make kdocs` — Dokka HTML / Javadoc
 - `make site` — serve the documentation site locally
-- `make docs-check` — compile the website code snippets, then build the site in strict mode (what CI runs)
+- `make docs-check` — compile the website code snippets, then build the site in strict mode (both halves of what CI checks: `ci.yml` compiles the snippets, `docs.yml` builds the site)
 - `make versions` — `./gradlew dependencyUpdates --no-parallel`
 - `make refresh` — refresh dependencies
 - `make upgrade-wrapper` — bumps the Gradle wrapper
@@ -31,7 +31,7 @@ Run a single test class:
 ```
 ./gradlew :etcd-recipes-core:test --tests "io.etcd.recipes.barrier.DistributedBarrierTests"
 ```
-Tests use JUnit 5 (`useJUnitPlatform()`) plus Kotest and Kluent assertions. When adding new Kotlin tests, prefer Kotest with `StringSpec()` and an `init {}` block, plus MockK where appropriate. Coverage is Kover (the project moved off Jacoco in 0.10.0).
+Tests use JUnit 5 (`useJUnitPlatform()`) plus Kotest assertions. When adding new Kotlin tests, prefer Kotest with `StringSpec()` and an `init {}` block, plus MockK where appropriate. Coverage is Kover (the project moved off Jacoco in 0.10.0).
 
 ## Running etcd locally
 

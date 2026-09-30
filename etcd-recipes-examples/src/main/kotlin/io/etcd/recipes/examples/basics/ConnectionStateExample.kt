@@ -26,7 +26,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 /**
  * Demonstrates connection-state listeners: a TransientKeyValue derives
  * CONNECTED / SUSPENDED / RECONNECTED / LOST from its own lease stream. Kill and
- * restart the local etcd (`./etcd.sh`) while this runs — a short outage reports
+ * restart the local etcd (`./etcd-start.sh`) while this runs — a short outage reports
  * SUSPENDED then RECONNECTED; one longer than the TTL reports LOST (the lease
  * expired; the key is healed) then RECONNECTED.
  */

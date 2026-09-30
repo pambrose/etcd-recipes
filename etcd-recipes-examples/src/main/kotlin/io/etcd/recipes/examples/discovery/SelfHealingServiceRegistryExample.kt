@@ -25,7 +25,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 
 /**
  * Demonstrates self-healing service registration: kill and restart the local etcd
- * (`./etcd.sh`) — or stop it for longer than the TTL — while this runs. The
+ * (`./etcd-start.sh`) — or stop it for longer than the TTL — while this runs. The
  * instance registration expires with its lease and is automatically re-registered
  * when the healer re-grants it; every lease event is printed.
  */

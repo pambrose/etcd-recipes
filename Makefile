@@ -50,7 +50,7 @@ build: clean ## Clean and run a full build, skipping tests
 etcd-start: ## Start a local etcd at localhost:2379 (foreground; Ctrl-C to stop)
 	./etcd-start.sh
 
-etcd-stop: ## Gracefully stop the local etcd started by `make etcd`
+etcd-stop: ## Gracefully stop the local etcd started by `make etcd-start`
 	./etcd-stop.sh
 
 tests: ## Run the full test suite against a local etcd at localhost:2379

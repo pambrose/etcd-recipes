@@ -21,7 +21,7 @@ From the repo root:
 
 ```bash
 make site          # serve locally (wipes the previous build first)
-make docs-check    # compile the snippets, then build in strict mode — what CI runs
+make docs-check    # compile the snippets, then build in strict mode — what CI checks
 make clean-site    # remove the generated site/ and .cache/
 make check-site    # report outdated website dependencies (dry run)
 make upgrade-site  # upgrade website dependencies, rewriting uv.lock

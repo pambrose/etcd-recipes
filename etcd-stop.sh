@@ -1,7 +1,7 @@
 #!/bin/sh
-# etcd-stop.sh — gracefully stop the local etcd started by etcd.sh
+# etcd-stop.sh — gracefully stop the local etcd started by etcd-start.sh
 
-# Match the exact etcd we launch in etcd.sh (avoids killing unrelated etcd procs)
+# Match the exact etcd we launch in etcd-start.sh (avoids killing unrelated etcd procs)
 PIDS=$(pgrep -f 'etcd --listen-client-urls=http://localhost:2379')
 
 if [ -z "$PIDS" ]; then

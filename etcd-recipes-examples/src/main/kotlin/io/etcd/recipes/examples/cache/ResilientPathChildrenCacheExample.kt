@@ -26,7 +26,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 
 /**
  * Demonstrates watch recovery: run this, then kill and restart the local etcd
- * (`./etcd.sh`) while it is running. The cache keeps converging — puts made after
+ * (`./etcd-start.sh`) while it is running. The cache keeps converging — puts made after
  * the restart show up, and every recovery event is printed.
  */
 fun main() {

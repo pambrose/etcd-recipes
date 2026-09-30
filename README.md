@@ -594,7 +594,7 @@ is checked in, so no local Gradle install is needed.
 ```
 ./gradlew clean build -x test     # build without running tests
 ./gradlew check                   # run all tests + Kover coverage
-./gradlew lintKotlin              # kotlinter + detekt
+make lint                         # kotlinter + detekt (./gradlew lintKotlin detekt)
 ```
 
 A `Makefile` wraps the most common entry points (`make help` lists everything):
@@ -632,7 +632,8 @@ The documentation site lives under `website/` and is built with [Zensical](https
 see [website/README.md](website/README.md). Its code examples are not written into the Markdown —
 each one is a real source file under a `src/test/.../website/` source set, embedded at build time,
 so `./gradlew compileTestKotlin compileTestJava` type-checks every example on the site. `make
-docs-check` runs that compile and then builds the site in strict mode, which is what CI does.
+docs-check` runs that compile and then builds the site in strict mode: locally, the two checks
+CI splits between `ci.yml` (the compile) and `docs.yml` (the strict build).
 
 To run a single test class:
 
