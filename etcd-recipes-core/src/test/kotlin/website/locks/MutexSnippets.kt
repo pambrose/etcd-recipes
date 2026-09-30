@@ -77,7 +77,6 @@ fun mutexInterruptOnLoss(client: Client) {
   DistributedMutex(
     client = client,
     lockPath = "/locks/orders",
-    leaseTtlSecs = 5L,
     interruptOnLockLoss = true,
   ).use { mutex ->
     mutex.withLock {

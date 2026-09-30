@@ -17,7 +17,7 @@ coroutine-native alternative to registering a listener.
 | --- | --- | --- |
 | `Client.watchAsFlow(keyName, option, resilience, resyncWith, capacity)` | `WatchFlowEvent` | `capacity` |
 | `Client.watchEventsAsFlow(keyName, option, resilience, capacity)` | `WatchEvent` | `capacity` |
-| `Client.leadershipAsFlow(electionPath, resilience, capacity)` | `LeadershipEvent` | `capacity` |
+| `Client.leadershipAsFlow(electionPath, resilience, capacity, rpc)` | `LeadershipEvent` | `capacity` |
 | `PathChildrenCache.eventsAsFlow(capacity)` | `PathChildrenCacheEvent` | `capacity` |
 | `PathChildrenCache.recoveryEventsAsFlow(capacity)` | `WatchRecoveryEvent` | `capacity` |
 | `NodeCache<T>.eventsAsFlow(capacity)` | `NodeCacheEvent<T>` | `capacity` |
@@ -170,10 +170,11 @@ sealed interface LeadershipEvent {
 
 !!! tip "The current leader is emitted immediately on collect"
 
-    `leadershipAsFlow` reads the leader key before subscribing its watcher and emits
-    that first, so a collector that starts long after the election was decided is not
-    left blind until the next hand-off — which might be hours away, or never. You get
-    `Elected(name)` or `Vacated` straight away, then transitions.
+    `leadershipAsFlow` reads the leader key before subscribing its watcher (anchored just
+    past that read) and emits it first, so a collector that starts long after the
+    election was decided is not left blind until the next hand-off — which might be hours
+    away, or never. You get `Elected(name)` or `Vacated` straight away, then transitions.
+    Its reads run under the `rpc` argument.
 
     The same re-read happens after every `Resubscribed` or `Resynced`, because a
     hand-off may have happened while the stream was dead (only when the stream couldn't
@@ -267,9 +268,10 @@ The recipes that own a self-healing lease — `TransientKeyValue`,
 ```
 
 `Suspended` → the keep-alive stream hit a transient error. `Expired` → the lease is
-gone and ownership of its keys may have moved to someone else. `Restored` → a
-replacement lease was granted and the keys re-established. `Failed` → healing was
-abandoned. See [Leases and loss](../resilience/leases.md).
+gone and ownership of its keys may have moved to someone else. `Restored` → renewal
+resumed: with the same old and new id the lease never died, otherwise a replacement
+lease was granted and the keys re-established. `Failed` → healing was abandoned. See
+[Leases and loss](../resilience/leases.md).
 
 ## Connection state and background failures
 

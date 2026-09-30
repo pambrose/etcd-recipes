@@ -78,10 +78,13 @@ however it exits. The lease then expires on its TTL, and the keys bound to it go
 `onKeepAliveError` is the parameter to care about. jetcd's own observer leaves the renewal
 stream's `onError` and `onCompleted` as no-ops, which produces the worst failure this library
 can have: **renewal stops, your keys expire, and your process carries on looking completely
-healthy**. So the layer logs both at error/warn *and* hands them to `onKeepAliveError`, and
-`onCompleted` synthesizes a throwable so a stream that merely stops is reported like one that
-broke. Neither callback fires on your own `close()` — if you hear from it, renewal genuinely
-stopped.
+healthy**. So the layer reports the two ways renewal actually stops — the stream completing
+(the lease outlived its TTL unrenewed) and etcd answering `NOT_FOUND: requested lease not
+found` — to `onKeepAliveError`, logging them too, and synthesizes a throwable for
+`onCompleted` so a stream that merely stops is reported like one that broke. Any other stream
+error is transient: jetcd restarts the stream itself and renewal continues, so it is logged
+at warn and does not fire the callback. Neither fires on your own `close()` — if you hear
+from `onKeepAliveError`, renewal genuinely stopped.
 
 Supply it. A lease whose renewal has died is not a problem you want to learn about from a
 downstream service's error rate.

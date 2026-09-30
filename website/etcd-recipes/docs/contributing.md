@@ -12,6 +12,7 @@ make build      # ./gradlew clean build -x test
 make tests      # full suite against a local etcd at localhost:2379
 make tests-tc   # full suite against an ephemeral Testcontainers etcd (needs Docker)
 make all-tests  # local, Testcontainers and multi-container variants in sequence
+make tla        # model-check the TLA+ protocol specs in specs/ with TLC
 make lint       # ./gradlew lintKotlin detekt
 make coverage   # Kover HTML + XML + summary
 make kdocs      # Dokka API docs
@@ -51,6 +52,20 @@ distributed clients via `blockingThreads(...)` / `nonblockingThreads(...)` from
 **Container-based** (`container/Container*Test.kt`) — each participant runs in its own
 container against a shared etcd container. Gated by `assumeTrue(testcontainers=true)`, so a
 default `./gradlew check` skips them.
+
+**Lincheck** (`*LincheckTests.kt`) — [Lincheck](https://github.com/JetBrains/lincheck)
+model-checks in-memory concurrent state for linearizability: the service provider
+strategies, and `EtcdConnector`'s connection state and recorded exceptions. They run with
+the rest of the suite and need no etcd. Reach for one when a change touches shared
+in-memory state that several threads update at once.
+
+**TLA+ specs** (`specs/`) — the counted barrier's rounds, the read-write lock's admission,
+and the work queue's claims are specified in TLA+, modeling the code one RPC per action with
+leases expiring and responses lost between them. `make tla` runs
+[TLC](https://github.com/tlaplus/tlaplus) over every model (`specs/tlc.sh` fetches a
+pinned, checksum-verified TLC once, and needs only Java), and CI runs them on every pull
+request. A change to one of those protocols should update its spec; `specs/README.md` maps
+each spec to the code and lists what it checks.
 
 Test JVMs fork per class (`forkEvery = 1`) so one spec's background threads and watch
 connections cannot bleed into the next. `maxParallelForks` lets classes run concurrently
@@ -165,14 +180,26 @@ docs — the README download snippets plus several pages on this site. They are 
 version strings, so:
 
 ```bash
-git grep '0\.11\.0'   # find every reference to the outgoing version
+git grep -F '0.13.0'   # find every reference to the outgoing version
 ```
 
 is the reliable way to catch them; do not rely on the list of files staying accurate.
 
 ## CI
 
-`.github/workflows/ci.yml` runs `detekt`, then `check koverXmlReport -PuseTestcontainers`.
+`.github/workflows/ci.yml` has two jobs:
+
+- **TLA+ models** — `./specs/tlc.sh`, on every pull request and every push to `master`.
+- **Build & test** — `detekt`, then, on a pull request, only a compile of every main and
+  test source set (the website's snippet sources included) plus `lintKotlin`. A push to
+  `master` runs the full suite instead: `check koverXmlReport -PuseTestcontainers`, with a
+  coverage upload.
+
+!!! warning "Pull-request CI does not run the tests"
+
+    The Testcontainers suite takes 30+ minutes on a hosted runner, so a pull request is
+    only compiled and linted. Run `make tests-tc` locally and see it pass before the PR
+    merges; the full run on `master` is a check after the fact, not a gate.
 
 !!! note "`check` and `koverXmlReport` must stay in one Gradle invocation"
 
@@ -180,4 +207,6 @@ is the reliable way to catch them; do not rely on the list of files staying accu
     cache and makes the rerun hang against `localhost:2379`. The comments in `ci.yml`
     record this and the codecov report-path quirk — read them before editing.
 
-`.github/workflows/docs.yml` builds the site on every PR and deploys from `master`.
+`.github/workflows/docs.yml` builds the site on every PR. It deploys only after CI passes
+on a push to `master`, building the commit CI verified, so a site whose snippets no longer
+compile never goes out.

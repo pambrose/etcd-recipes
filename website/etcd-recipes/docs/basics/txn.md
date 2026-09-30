@@ -168,8 +168,9 @@ is applied, and you re-read and retry against the new value. No lock, no lease, 
 
 !!! danger "Transactions are never retried for you"
 
-    Every other extension in `common/` retries on retriable statuses. `transaction { }` does
-    not — it gets the operation timeout and nothing else, deliberately.
+    The read extensions in `common/` retry on retriable statuses. `transaction { }` does
+    not — like the plain writes (`putValue`, `deleteKey`, …), it gets the operation timeout
+    and nothing else, deliberately.
 
     A commit that fails in an ambiguous way **may already have applied**. Re-sending it could
     double-apply a non-idempotent change; a CAS that silently retries could increment twice.

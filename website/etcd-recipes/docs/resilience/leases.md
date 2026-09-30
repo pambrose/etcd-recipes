@@ -89,8 +89,9 @@ library declining to lie.
 Since the recipe cannot fix a lost lock, it tells you and lets you decide. Three things
 happen, and none of them is a thrown exception on a background thread:
 
-- every registered listener fires — `LockLostListener` for locks and permits,
-  `LeaseEvent`/step-down for leadership;
+- every registered listener fires — `LockLostListener` for locks, `PermitLostListener`
+  for permits (both on the recipe's notifier thread, never jetcd's), step-down for
+  leadership;
 - `connectionState` moves to `LOST` (see [Connection state](connection-state.md));
 - the matching `unlock()` / `release()` returns `false` instead of throwing.
 
@@ -133,15 +134,27 @@ fun Client.selfHealingKeepAlive(
   ttl: Duration,
   resilience: LeaseResilience = LeaseResilience.DEFAULT,
   leaseListener: LeaseListener? = null,
+  rpc: RpcResilience = RpcResilience.DEFAULT,
   establish: (lease: LeaseGrantResponse) -> Boolean,
 ): SelfHealingKeepAlive
 ```
+
+The initial grant, and every revoke, run under `rpc`; recipes pass their own
+`resilience.rpc`, so a registration against an unreachable etcd fails on the recipe's
+timescale rather than the default's.
 
 `establish` is the contract. It runs synchronously at grant time — a `false` return or a
 throw aborts the whole thing — and then again on **every** heal, with the fresh lease. It
 must put or CAS the keys it owns under the new lease id and return `true`, or return
 `false` to say *ownership is gone and must not be reclaimed*, which emits
 `LeaseEvent.Failed` and stops.
+
+However it aborts, the lease it was handed is revoked, so nothing is left bound to a lease
+nobody renews. At grant time a `false` throws `EstablishDeclinedException` (an
+`EtcdRecipeRuntimeException` carrying the `leaseId`), which a caller can tell apart from a
+failure to reach etcd: "somebody else holds it" versus "couldn't ask". A throw propagates
+as itself. During a heal, a throw is retried under the policy like any other failed
+attempt.
 
 The returned object exposes three things: `currentLeaseId` (`-1L` before the first
 grant), `isHealthy` (false while a heal is in flight, and after `close()`), and
@@ -152,7 +165,8 @@ owned keys go away promptly rather than lingering until the TTL.
 
     jetcd auto-restarts a keep-alive stream after a *transient* error with the observer
     still registered, so renewal resumes by itself — that surfaces as
-    `LeaseEvent.Suspended` and nothing more. What jetcd cannot recover is an *expired*
+    `LeaseEvent.Suspended`, then `LeaseEvent.Restored` with the same old and new id once
+    a renewal arrives, and needs no healing. What jetcd cannot recover is an *expired*
     lease: renewal stopped past the TTL (`onCompleted`), or etcd reports the lease gone
     (`NOT_FOUND: requested lease not found`). Both mean the keys are deleted, and both
     trigger healing.
@@ -174,7 +188,7 @@ fun interface LeaseListener {
 
 | Event | What it tells you |
 | --- | --- |
-| `Suspended` | The stream errored; jetcd is retrying it. The lease is probably fine. |
+| `Suspended` | The stream errored; jetcd is retrying it. The lease is probably fine, and a `Restored` with the same id follows once renewal resumes. |
 | `Expired` | Renewal stopped. Usually the lease is gone and the keys with it — **ownership may already be someone else's**. Healing follows unless the policy forbids it, and first asks etcd: a lease that is in fact still alive (renewals lost across an etcd leader change) is just renewed again. |
 | `Restored` | Renewal resumed. If `oldLeaseId == newLeaseId`, the lease never died in etcd and the keys never went away. Otherwise a new lease was granted and the owned keys were re-established under it. |
 | `Failed` | Healing was abandoned — the policy was exhausted, or the establish hook declined. |

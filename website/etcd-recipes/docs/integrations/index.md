@@ -6,7 +6,7 @@ pull in Jackson only if you want Jackson, and Micrometer only if you want Microm
 
 ## Artifacts
 
-All published to Maven Central under the group `com.pambrose`, at version **0.12.0**.
+All published to Maven Central under the group `com.pambrose`, at version **0.13.0**.
 
 | Artifact | What it gives you |
 | --- | --- |
@@ -20,13 +20,13 @@ All published to Maven Central under the group `com.pambrose`, at version **0.12
 
     ```kotlin
     dependencies {
-      implementation("com.pambrose:etcd-recipes-core:0.12.0")
+      implementation("com.pambrose:etcd-recipes-core:0.13.0")
 
       // Optional, pick what you need:
-      implementation("com.pambrose:etcd-recipes-jackson:0.12.0")
-      implementation("com.pambrose:etcd-recipes-micrometer:0.12.0")
-      implementation("com.pambrose:etcd-recipes-spring-boot-starter:0.12.0")
-      implementation("com.pambrose:etcd-recipes-ktor:0.12.0")
+      implementation("com.pambrose:etcd-recipes-jackson:0.13.0")
+      implementation("com.pambrose:etcd-recipes-micrometer:0.13.0")
+      implementation("com.pambrose:etcd-recipes-spring-boot-starter:0.13.0")
+      implementation("com.pambrose:etcd-recipes-ktor:0.13.0")
     }
     ```
 
@@ -36,13 +36,13 @@ All published to Maven Central under the group `com.pambrose`, at version **0.12
     <dependency>
       <groupId>com.pambrose</groupId>
       <artifactId>etcd-recipes-core</artifactId>
-      <version>0.12.0</version>
+      <version>0.13.0</version>
     </dependency>
     <!-- Optional; each brings etcd-recipes-core transitively. -->
     <dependency>
       <groupId>com.pambrose</groupId>
       <artifactId>etcd-recipes-jackson</artifactId>
-      <version>0.12.0</version>
+      <version>0.13.0</version>
     </dependency>
     ```
 
@@ -56,7 +56,7 @@ The framework versions each satellite is built against:
 | `etcd-recipes-jackson` | Jackson 2.22.x |
 | `etcd-recipes-micrometer` | Micrometer 1.17.x |
 | `etcd-recipes-spring-boot-starter` | Spring Boot 4.1.x |
-| `etcd-recipes-ktor` | Ktor 3.5.x |
+| `etcd-recipes-ktor` | Ktor 3.6.x |
 
 Each is an `api` dependency of its own module only — the core artifact pulls in none of
 them, so a project that wants no Micrometer never sees Micrometer on its classpath.
@@ -88,7 +88,8 @@ data class EtcdTlsConfig(
 
 Pass it to `connectToEtcd(config)`. In `EtcdTlsConfig`, `caCertPath` sets the trust manager
 (server verification) and `clientCertPath` + `clientKeyPath` together enable mutual TLS;
-setting only one of them is refused.
+setting only one of them is refused. `EtcdConnectionConfig.toString()` masks the password,
+so a logged config doesn't leak it.
 
 !!! warning "These are `java.time.Duration`, not `kotlin.time.Duration`"
 
@@ -114,6 +115,7 @@ class EtcdRecipes(client: Client, resilience: ResilienceConfig = ResilienceConfi
   fun semaphore(semaphorePath: String, permits: Int): DistributedSemaphore
   fun distributedQueue(queuePath: String): DistributedQueue
   fun distributedPriorityQueue(queuePath: String, minimumWaitTime: Duration = 0.milliseconds): DistributedPriorityQueue
+  fun distributedPriorityQueue(queuePath: String, minimumWaitTime: Long, unit: TimeUnit): DistributedPriorityQueue
   fun leaderLatch(electionPath: String): LeaderLatch
   fun pathChildrenCache(cachePath: String): PathChildrenCache
   fun <T> nodeCache(key: String, codec: EtcdCodec<T>): NodeCache<T>
@@ -121,6 +123,10 @@ class EtcdRecipes(client: Client, resilience: ResilienceConfig = ResilienceConfi
   fun distributedAtomicLong(counterPath: String): DistributedAtomicLong
 }
 ```
+
+The `(long, TimeUnit)` `distributedPriorityQueue` overload is the one Java calls with a wait,
+since a Kotlin `Duration` parameter hides a method from Java; the one-argument form works
+from Java too.
 
 Every method just constructs the recipe. **The factory does not own what it builds** — it
 does not start it, does not close it, and does not track it. The `start()`/`close()`

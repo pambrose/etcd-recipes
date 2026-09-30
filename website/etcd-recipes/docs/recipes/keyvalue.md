@@ -109,7 +109,7 @@ The `LeaseEvent`s tell you which of those happened:
 | --- | --- |
 | `Suspended` | The keep-alive stream hit a transient error; jetcd is retrying it. The lease is still alive. |
 | `Expired` | The lease is gone and the key with it. Healing starts. |
-| `Restored` | A replacement lease was granted and the key re-published. |
+| `Restored` | Renewal resumed. With the same old and new id, the lease never died (a transient error, or etcd still had it); otherwise a replacement lease was granted and the key re-published. |
 | `Failed` | Healing was abandoned. The key is gone and stays gone. |
 
 All four drive `connectionState`, and the three that mean trouble — `Suspended`, `Expired`,
@@ -181,9 +181,11 @@ argument.
 
 ## Coroutines
 
-`leaseEventsAsFlow()` exposes the lease lifecycle as a `Flow<LeaseEvent>` instead of a
-listener. Collecting registers a listener and cancelling removes it; it never starts or
-closes the recipe. See [Flows](../coroutines/flows.md).
+`awaitStart()` is the suspending twin of `start()`, on both `TransientKeyValue` and
+`TypedTransientKeyValue`. `leaseEventsAsFlow()` exposes the lease lifecycle as a
+`Flow<LeaseEvent>` instead of a listener. Collecting registers a listener and cancelling
+removes it; it never starts or closes the recipe. See [Coroutines](../coroutines/index.md)
+and [Flows](../coroutines/flows.md).
 
 ## Related
 

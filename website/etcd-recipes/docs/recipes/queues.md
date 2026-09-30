@@ -34,6 +34,7 @@ abstract class AbstractQueue : EtcdConnector {
   fun poll(timeout: Duration): ByteSequence?
   fun poll(timeout: Long, timeUnit: TimeUnit): ByteSequence?
   val size: Int
+  fun size(rpc: RpcResilience): Int
 }
 ```
 
@@ -58,8 +59,9 @@ instance should not take. That lets a consumer loop shut down cleanly.
     etcd cannot push a count, so `size` issues a range-count on every read. It is
     true at some recent revision and may be stale by your next line — fine for
     logging and dashboards, useless for deciding whether a take will succeed. Use
-    `tryDequeue`/`poll` for that; they are atomic. The same warning applies to
-    Micrometer's `bindQueueDepth` gauge, which calls `size` on **every scrape**.
+    `tryDequeue`/`poll` for that; they are atomic. `size` runs under the queue's own RPC
+    budget; `size(rpc)` takes a different one. The same warning applies to Micrometer's
+    `bindQueueDepth` gauge, which calls `size(RpcResilience.PROBE)` on **every scrape**.
 
 ## `DistributedQueue`
 
@@ -87,6 +89,12 @@ though the call threw. For at-least-once delivery, use
 `enqueue` is overloaded for `String`, `Int`, `Long`, and `ByteSequence`. The take
 side always hands back a `ByteSequence`; `asString` / `asInt` / `asLong` convert it
 back (Java: the static `ByteSequenceUtils.getAsString(…)` and friends).
+
+Each item gets a fresh key that is created only if absent, so two enqueues can never
+overwrite each other. An enqueue is one transaction that is **not** retried for you: a
+retried write whose first attempt had landed could re-create an item a consumer had
+already taken. So an enqueue that throws may still have landed, and re-sending it can
+duplicate the item.
 
 === "Kotlin"
 
@@ -210,6 +218,9 @@ this item?" — a much stronger question, and the reason this recipe exists.
 
 A received item is not deleted. It moves to `claimed/`, and a separate claim marker
 is written under the consumer's lease. The item is only removed when you `ack()` it.
+The marker's value is `<clientId>:<nonce>`, unique to that claim attempt, so threads
+sharing one queue instance (and so its clientId and lease) never mistake each other's
+claims.
 
 === "Kotlin"
 
@@ -227,6 +238,12 @@ The payload is deliberately **not** bound to the consumer's lease; only the mark
 is. So when a consumer dies, its markers evaporate with its lease while the payloads
 survive, and any consumer's sweep moves the orphans back to the queue — under the
 same key, so they return to their original FIFO position rather than the back.
+
+A claim whose transaction response was lost is not stranded either. The consumer
+re-reads the claim marker, and if the claim committed and is this attempt's, `receive`
+returns the item. If that re-read fails too, the consumer remembers the attempt, and its
+sweeper later gives the item back to the queue if the claim committed, with that delivery
+undone.
 
 `receive()` blocks, `receive(timeout)` bounds the wait, `tryReceive()` does not wait
 at all. Each returns a `WorkItem`:
@@ -331,7 +348,10 @@ make. Alert on the list being non-empty.
 
 An item enqueued with a delay is parked out of sight until it matures, then promoted
 into the queue in ready-time order, interleaving correctly with items enqueued
-immediately. A zero or negative delay enqueues immediately.
+immediately. A zero or negative delay enqueues immediately, and an infinite one is
+rejected with `IllegalArgumentException`. A parked key whose ready time can't be parsed
+(one written by something other than this recipe) is moved to the dead-letter space and
+recorded on `exceptions` rather than breaking receives.
 
 !!! note "Maturity is judged against client clocks"
 
@@ -420,7 +440,10 @@ trade when the wait is unbounded. The suspending twins release it:
 
 `awaitEnqueue`, `receive` (the suspending twin of `dequeue`), `awaitTryDequeue`,
 `awaitReceive`, `awaitTryReceive`, `WorkItem.awaitAck`, and `WorkItem.awaitRequeue`
-all exist. Cancelling a wait consumes nothing and leaves no orphan claim. See
+all exist, as do the typed queues' `receive` / `awaitTryDequeue` / `awaitEnqueue` and
+the work queue's `awaitDeadLetters` / `awaitRequeueDeadLetter` / `awaitPurgeDeadLetter`.
+Cancelling a wait consumes nothing and leaves no orphan claim, and an item taken just as
+its coroutine was cancelled is given back rather than dropped. See
 [Coroutines](../coroutines/index.md).
 
 ## Observability

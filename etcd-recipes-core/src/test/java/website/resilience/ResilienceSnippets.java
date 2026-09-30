@@ -71,7 +71,7 @@ public class ResilienceSnippets {
     // takes a kotlin.time.Duration compiles to a name-mangled JVM signature
     // (bounded-HG0u8IE, exponentialBackoff-LRDsOJo, ...) that Java cannot name.
     RetryPolicy paced = RetryPolicy.exponentialBackoff();  // 250ms -> 15s, x2, +/-25% jitter
-    RetryPolicy quick = RetryPolicy.bounded(4);            // 4 attempts, 500ms apart
+    RetryPolicy quick = RetryPolicy.bounded(4);            // up to 4 retries, 500ms apart
     System.out.println(paced + " / " + quick + " / " + RetryPolicy.forever + " / " + RetryPolicy.never);
     // --8<-- [end:retry-policy]
   }

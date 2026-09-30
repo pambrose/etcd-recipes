@@ -126,7 +126,9 @@ closes all of them when it closes.
 
 `registerService`, `updateService`, and `unregisterService` all throw `EtcdRecipeException`:
 registration is a compare-and-swap that can lose, an update to something never registered is
-a caller bug, and both are worth failing loudly rather than silently no-oping.
+a caller bug, and both are worth failing loudly rather than silently no-oping. A lost
+registration CAS ("the key already exists") and a failure to reach etcd are told apart:
+the message says which, and the underlying failure is the exception's `cause`.
 
 The direct queries are one-shot reads — no cache, no watch, a range GET per call:
 
@@ -143,7 +145,8 @@ The direct queries are one-shot reads — no cache, no watch, a range GET per ca
     ```
 
 `queryForNames()` returns each service name that has at least one registered instance, once,
-in key order. `queryForInstances(name)` skips an entry that doesn't decode (see
+in key order. (Before 0.13.0 it returned the full etcd key of every instance.)
+`queryForInstances(name)` skips an entry that doesn't decode (see
 [Malformed entries](#malformed-entries-are-skipped)).
 
 `withServiceDiscovery`, `withServiceCache`, and `withServiceProvider` are the scoped Kotlin
@@ -224,8 +227,9 @@ listeners first — the initial snapshot does not replay through `addListenerFor
 a listener added afterwards only sees changes from that point on. Read `instances` for the
 current set; use the listener for the deltas.
 
-The listener's third argument is the instance's key below the names path —
-`<serviceName>/<id>`, not the bare service name.
+The listener's third argument, `instanceKey`, is the instance's key below the names path —
+`<serviceName>/<id>`, not the bare service name. (It was named `serviceName` before 0.13.0;
+the flow's `ServiceCacheEvent.serviceName` remains as a deprecated alias for `instanceKey`.)
 
 `addRecoveryListener` reports the watch's own health: resubscribes after a stream death,
 resyncs after compaction (the cache reconciles itself against a fresh snapshot), and the
@@ -297,6 +301,9 @@ Use the direct mode for a one-off lookup in a script or a startup path. Use the 
 mode for anything that selects an instance per request — a GET per outbound call turns etcd
 into a hard dependency of your request path, which is exactly what a discovery cache exists
 to prevent. `start()` is one-shot, and `close()` on an un-started provider is a clean no-op.
+A started provider reports its cache's health as its own: if the cache's watch is
+abandoned, the provider's `connectionState` goes `LOST`, `isHealthy()` turns false, and the
+failure reaches its `exceptions` as it happens.
 
 ### Ejecting failing instances
 
@@ -380,7 +387,8 @@ Strategies see only the *available* instances — the live set minus anything cu
 ejected — so a strategy never has to know about `noteError` at all.
 
 A provider built directly rather than through the façade takes the same `names` path caveat
-as `ServiceCache`:
+as `ServiceCache`. It is Kotlin-only: the constructor's `downPeriod: Duration` parameter
+hides it from Java, which goes through `ServiceDiscovery.serviceProvider(...)` instead.
 
 ```kotlin
 --8<-- "kotlin/website/discovery/ServiceProviderSnippets.kt:standalone"
@@ -390,7 +398,8 @@ as `ServiceCache`:
 
 `ServiceDiscovery`'s blocking calls have suspending twins — `awaitRegisterService`,
 `awaitUpdateService`, `awaitUnregisterService`, `awaitQueryForNames`, `awaitQueryForInstances`,
-`awaitQueryForInstance` — as does `ServiceCache.awaitStart()`. See
+`awaitQueryForInstance` — as do `ServiceCache.awaitStart()` and `ServiceProvider`'s
+`awaitStart()`, `awaitGetInstance()`, and `awaitGetAllInstances()`. See
 [Coroutines](../coroutines/index.md).
 
 The cache is also a natural `Flow` source: `ServiceCache.eventsAsFlow()` and

@@ -334,9 +334,11 @@ They are all on `untyped`, which is a public property and the documented escape 
 
 This matters more than the usual "there's an escape hatch if you need it", because of how
 decode failures surface. A payload the codec cannot read is caught in the re-emit path,
-recorded on `untyped.exceptions`, and its event is skipped. The typed listener simply
-never fires for that child. If you are not reading `untyped.exceptions`, a poison value in
-your prefix looks exactly like a child that never changed.
+recorded on `untyped.exceptions`, and its event is skipped (in an `INITIALIZED` snapshot,
+just that child is left out). The typed listener simply never fires for that child. If you
+are not reading `untyped.exceptions`, a poison value in your prefix looks exactly like a
+child that never changed. A typed listener that throws doesn't stop the others: every
+typed listener still gets each event.
 
 ### Listening
 
@@ -369,6 +371,10 @@ watch dispatcher the way a slow listener does, and collection happens on your di
 rather than the cache's. Collecting registers a listener and cancelling removes it; it
 never starts or closes the cache, so you still own the lifecycle. See
 [Flows](../coroutines/flows.md).
+
+Starting one suspends too: `awaitStart()` on all three, and `awaitStartComplete()` /
+`awaitStartComplete(timeout)` on the two prefix caches. See
+[Coroutines](../coroutines/index.md).
 
 ## Observability
 

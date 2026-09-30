@@ -21,10 +21,8 @@ import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KeyValue;
 import io.etcd.jetcd.kv.GetResponse;
 import io.etcd.jetcd.options.GetOption;
-import io.etcd.jetcd.options.PutOption;
 import io.etcd.recipes.common.KeyValueUtils;
 import io.etcd.recipes.common.PairUtils;
-import io.etcd.recipes.common.RpcResilience;
 import io.etcd.recipes.common.StringCodec;
 import io.etcd.recipes.common.TypedKVUtils;
 import kotlin.Pair;
@@ -185,13 +183,11 @@ public class KvSnippets {
 
   public void codec(Client client) {
     // --8<-- [start:codec]
-    // TypedKVUtils carries no @JvmOverloads, so Java supplies every argument — there is
-    // no shorter form the way Kotlin's default parameters provide one.
-    TypedKVUtils.putValue(client, "/config/greeting", "hello",
-      StringCodec.INSTANCE, PutOption.DEFAULT, RpcResilience.DEFAULT);
+    // TypedKVUtils carries @JvmOverloads, so Java can stop after the codec, as Kotlin's
+    // default parameters do; the trailing PutOption / RpcResilience are optional.
+    TypedKVUtils.putValue(client, "/config/greeting", "hello", StringCodec.INSTANCE);
 
-    String greeting =
-      TypedKVUtils.getValue(client, "/config/greeting", StringCodec.INSTANCE, RpcResilience.DEFAULT);
+    String greeting = TypedKVUtils.getValue(client, "/config/greeting", StringCodec.INSTANCE);
     System.out.println("Greeting: " + (greeting == null ? "unset" : greeting));
     // --8<-- [end:codec]
   }

@@ -42,8 +42,9 @@ fun interface RetryPolicy {
   companion object {
     /**
      * Exponential backoff: `initialDelay * factor^(attempt-1)` capped at [maxDelay],
-     * with ±[jitterRatio] randomization. Gives up after [maxAttempts] attempts or once
-     * [maxElapsed] time has passed since the first failure.
+     * with ±[jitterRatio] randomization. Gives up after [maxAttempts] retries or once
+     * [maxElapsed] time has passed since the first failure. (For an RPC, retries follow its
+     * first try: `maxAttempts = 4` allows five tries in all.)
      */
     @JvmStatic
     @JvmOverloads
@@ -77,7 +78,10 @@ fun interface RetryPolicy {
       }
     }
 
-    /** Fixed [delay] between attempts, giving up after [maxAttempts]. */
+    /**
+     * Fixed [delay] between retries, giving up after [maxAttempts] retries. For an RPC,
+     * retries follow its first try: `bounded(4)` allows five tries in all.
+     */
     @JvmStatic
     @JvmOverloads
     fun bounded(

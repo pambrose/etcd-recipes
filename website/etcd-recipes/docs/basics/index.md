@@ -88,8 +88,11 @@ never pass it, which is the common case.
 Two deliberate exceptions are worth knowing up front, because they encode judgements you
 would otherwise have to make yourself:
 
-- **`transaction { }` is never retried.** A failed commit is ambiguous — it may have applied
-  — so retrying it is a correctness decision that belongs to the caller, not the transport.
+- **Writes and `transaction { }` are never retried.** A failed write or commit is
+  ambiguous — it may have applied — so retrying it is a correctness decision that belongs
+  to the caller, not the transport. `putValue`, `deleteKey`, `deleteChildren`, `compact`,
+  and `transaction { }` each make one attempt, bounded by the operation timeout; reads (and
+  `unlock` and `leaseGrant`, whose duplicates are harmless) retry.
 - **`lock` defaults to `RpcResilience.DISABLED`.** A lock call legitimately waits server-side
   for the current holder, and a 30-second operation timeout would abort valid waits.
 

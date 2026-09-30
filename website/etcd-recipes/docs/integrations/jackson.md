@@ -4,7 +4,7 @@
 [`EtcdCodec<T>`](../typed-values.md) backed by a Jackson `ObjectMapper`.
 
 ```kotlin
-implementation("com.pambrose:etcd-recipes-jackson:0.12.0")
+implementation("com.pambrose:etcd-recipes-jackson:0.13.0")
 ```
 
 ## Why it is a separate artifact
@@ -152,13 +152,12 @@ Or with typed key/value reads and writes:
     --8<-- "java/website/jackson/JacksonSnippets.java:typed-kv"
     ```
 
-!!! note "The typed KV helpers are clumsy from Java"
+!!! note "The typed KV helpers are statics from Java"
 
-    `putValue` / `getValue` are Kotlin extension functions with default arguments and no
-    `@JvmOverloads`, so Java sees statics on `TypedKVUtils` with the client as the first
-    argument and **no** short overload — you must pass `PutOption.DEFAULT` and
-    `RpcResilience.DEFAULT` explicitly. The typed recipes have no such wart; their
-    constructors are `@JvmOverloads`. See the [Java guide](../java.md).
+    `putValue` / `getValue` are Kotlin extension functions, so Java sees statics on
+    `TypedKVUtils` with the client as the first argument. They are `@JvmOverloads`, so the
+    trailing `PutOption` and `RpcResilience` can be left off, as the Java tab does. See the
+    [Java guide](../java.md).
 
 ## Service payloads
 

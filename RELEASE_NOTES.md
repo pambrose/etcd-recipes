@@ -1,5 +1,125 @@
 # Release Notes
 
+## 0.13.0 — 2026-09-30
+
+A reliability release. A full review of the library found 105 issues, from three critical
+bugs (a queue consumer taking another queue's items, enqueues overwriting each other, and a
+read-write-lock downgrade that deadlocked) to documentation drift, and every one is fixed. The recipes' distributed protocols are now model-checked with TLA+ and their
+in-memory concurrent state with Lincheck, which found six more bugs, also fixed. A few
+changes need attention when you upgrade; see *Upgrading*.
+
+### Highlights
+
+**Queues keep their items.** A consumer parked on one `DistributedQueue` could take an item
+from another queue whose path shared its prefix (`/jobs` taking from `/jobs2`), and two
+enqueues in the same millisecond could overwrite each other. Keys are now unique and
+created only if absent, and every wait watches only its own queue. `DistributedWorkQueue`
+caps redelivery through `requeue()` too, reconciles a claim whose commit response was lost,
+guards `ack()` on the specific claim, releases parked receives on `close()`, and reads its
+head and sweeps orphans far more cheaply.
+
+**An RPC engine that matches jetcd.** jetcd fails with raw gRPC statuses, which the retry
+check never recognized, so only timeouts were retried. Retriable statuses now are, but only
+for calls that are safe to repeat: plain writes make one bounded attempt, since a retried
+write could land after a newer one. Every failure surfaces as `EtcdRecipeRuntimeException`
+with its cause, every recipe's `RpcResilience` reaches every call it makes, and probes
+(`ping()`, health checks, gauges) make a single 2-second attempt (`RpcResilience.PROBE`).
+
+**Health you can trust.** Listeners run on a per-recipe notifier thread, in order, instead
+of on jetcd's event loop, where a slow listener stalled every lease on the client. A stream
+that's gone for good reports a `LOST` that a healthy stream can't mask, a stream jetcd
+recovers by itself reports that it resumed, composite recipes (`LeaderLatch`,
+`ServiceProvider`) forward the health of what they wrap, and `exceptions` is capped.
+
+**Leases heal without losing themselves.** After an etcd leader change a lease jetcd
+reported gone can still be alive; re-granting it made recipes lose to their own keys. The
+healer now asks etcd first. Lease grants run under the recipe's RPC budget, an establish
+hook that fails revokes its lease, and a declined establish is reported as
+`EstablishDeclinedException`, distinct from an infrastructure failure.
+
+**Locks.** `close()` no longer races an acquisition in flight, `tryLock` deadlines bound every
+RPC of the attempt, a failure that can't heal (permission denied) is thrown instead of
+retried forever, and a semaphore release gives up the caller's own permit. New:
+**fencing tokens** (`EtcdLock.fencingToken`, `DistributedSemaphore.fencingToken`), numbers
+etcd assigns each hold so a downstream resource can refuse a holder that lost the lock
+without noticing. The lock recipes now default to a **10-second lease**.
+
+**Elections.** Every `LeaderSelector` attempt and term runs on one thread, so `close()` waits
+for every term, a step-down can't start a second term early, a failed attempt is retried
+rather than leaving the election leaderless, and `start()` can't hang. Leader-key watches
+are anchored, so a hand-off during setup isn't missed.
+
+**Barriers.** A counted barrier trips one round at a time, and its tripper deletes `/ready`
+before leaving, so a failed release can't strand the others. `DistributedBarrier` can be
+set again after removal, and `close()` cancels in-flight waits cleanly on every barrier.
+
+**Caches and discovery.** A primed `PathChildrenCache` that can't load fails instead of
+reporting a healthy empty cache, `INITIALIZED` precedes every event, a compaction resync
+tells listeners what changed, and `rebuild()` can't undo a newer event. Service discovery
+skips a malformed or newer-schema instance instead of failing for the whole service,
+`ServiceProvider` counts errors within a window, and `queryForNames()` returns names.
+
+**Coroutines.** A coroutine cancelled just as its call succeeded no longer leaks what it got
+(a lock hold, a permit, a dequeued item, a claim). Holders built to interrupt on loss now
+cancel a suspending `withLock` / `withPermit` body with `HoldLostException`, flows complete
+when their watch is abandoned, suspended RPCs record metrics, and the blocking calls added
+since the coroutine layer have suspending twins.
+
+**Verified by model checking.** `specs/` holds TLA+ specifications of the counted barrier's
+rounds, the read-write lock's admission, and the work queue's claims, checked by TLC with
+`make tla` and in CI. They found five bugs: a downgrade's fencing token that fenced out the
+writer queued behind it, a lock admission on an already-expired entry, and three ways a
+work-queue claim could be misattributed or stranded after a lost response. Lincheck tests
+check the in-memory concurrent state and found a race in `StickyStrategy`.
+
+**Integrations, Java, and logs.** The Ktor plugin closes its client after your teardown, not
+before it. Passwords no longer appear in `toString()`, half-configured mutual TLS is
+refused, the Micrometer cache gauges can't collide, and the Spring starter binds its
+properties without relying on a transitive dependency. Java can now reach the priority
+queue and `LeaderLatch`'s join timeout, guarded by a compile-time check. Background work
+(watch callbacks, lease heals, the work-queue sweeper) logs with the recipe's identity in
+the MDC.
+
+**Build.** Kotlin 2.4.20, Gradle 9.8.0, jetcd 0.8.7, Ktor 3.6.x. The runnable examples use
+only the standard library, CI runs with least privilege, and the documentation site deploys
+only after CI passes.
+
+### Upgrading
+
+- **Add a logging backend** if you relied on the `logback-classic` that `etcd-recipes-core`
+  used to pull in; the published POMs now depend on the SLF4J API alone.
+- **Upgrade barrier and read-write-lock members together.** A counted barrier's waiting keys
+  moved under `<path>/waiting/<round>/`, and the two layouts don't count each other, so every
+  `DistributedBarrierWithCount` and `DistributedDoubleBarrier` member at one path must run
+  the same version. Avoid read-write-lock downgrades while a mixed-version fleet shares a
+  lock.
+- **Lock leases default to 10 seconds** (from 2), so a crashed holder's lock takes up to 10
+  seconds to free. Pass `leaseTtlSecs` to choose.
+- **Plain writes aren't retried**, and every RPC failure is an `EtcdRecipeRuntimeException`
+  with the original failure as its cause. Code that caught `ExecutionException` should catch
+  `EtcdRecipeRuntimeException`.
+- **Listeners run on a notifier thread**, not the reporting thread, and a `LOST` from a stream
+  that's gone for good sticks until the recipe restarts.
+- `ServiceDiscovery.queryForNames()` returns service names, not instance keys.
+- `EtcdTlsConfig` refuses a client certificate without its key, or the reverse.
+- `EtcdLock` gained `fencingToken`; the bounded suspending `withLock(timeout)` requires a
+  non-null result type; `ServiceCacheEvent.serviceName` is deprecated in favor of
+  `instanceKey`.
+
+The [CHANGELOG](CHANGELOG.md) lists every change.
+
+### Maven coordinates
+
+```kotlin
+implementation("com.pambrose:etcd-recipes-core:0.13.0")
+
+// optional
+implementation("com.pambrose:etcd-recipes-jackson:0.13.0")
+implementation("com.pambrose:etcd-recipes-micrometer:0.13.0")
+implementation("com.pambrose:etcd-recipes-spring-boot-starter:0.13.0")
+implementation("com.pambrose:etcd-recipes-ktor:0.13.0")
+```
+
 ## 0.12.0 — 2026-07-26
 
 The largest release since the project began. Recipes now survive the failures that

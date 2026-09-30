@@ -1,10 +1,10 @@
 # Ktor
 
 `etcd-recipes-ktor` is an application plugin that connects to etcd for the server's
-lifetime and hands the connection to your routes. It targets **Ktor 3.5.x**.
+lifetime and hands the connection to your routes. It targets **Ktor 3.6.x**.
 
 ```kotlin
-implementation("com.pambrose:etcd-recipes-ktor:0.12.0")
+implementation("com.pambrose:etcd-recipes-ktor:0.13.0")
 ```
 
 !!! note "Kotlin only"

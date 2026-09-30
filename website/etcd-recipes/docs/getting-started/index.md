@@ -21,7 +21,7 @@ The core library is all you need for every recipe on this site.
     }
 
     dependencies {
-      implementation("com.pambrose:etcd-recipes-core:0.12.0")
+      implementation("com.pambrose:etcd-recipes-core:0.13.0")
     }
     ```
 
@@ -33,7 +33,7 @@ The core library is all you need for every recipe on this site.
     }
 
     dependencies {
-      implementation 'com.pambrose:etcd-recipes-core:0.12.0'
+      implementation 'com.pambrose:etcd-recipes-core:0.13.0'
     }
     ```
 
@@ -41,7 +41,7 @@ The core library is all you need for every recipe on this site.
 
     ```toml
     [versions]
-    etcd-recipes = "0.12.0"
+    etcd-recipes = "0.13.0"
 
     [libraries]
     etcd-recipes-core = { module = "com.pambrose:etcd-recipes-core", version.ref = "etcd-recipes" }
@@ -54,7 +54,7 @@ The core library is all you need for every recipe on this site.
       <dependency>
         <groupId>com.pambrose</groupId>
         <artifactId>etcd-recipes-core</artifactId>
-        <version>0.12.0</version>
+        <version>0.13.0</version>
       </dependency>
     </dependencies>
     ```

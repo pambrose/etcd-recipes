@@ -24,10 +24,14 @@ interface EtcdLock {
   val isHeldByCurrentThread: Boolean
   val isLocked: Boolean
   val holdCount: Int
+  val fencingToken: Long
   fun addLockLostListener(listener: LockLostListener)
   fun removeLockLostListener(listener: LockLostListener)
 }
 ```
+
+`lock()` and both `tryLock`s declare `@Throws(InterruptedException::class)`, so Java can
+catch an interrupted wait.
 
 !!! note "Why not `java.util.concurrent.locks.Lock`?"
 
@@ -114,6 +118,10 @@ Three things happen on loss:
 - `connectionState` moves to `LOST`,
 - the eventual `unlock()` returns `false` rather than throwing.
 
+Listeners run on the lock's notifier thread, never on jetcd's lease callback thread, so a
+listener may block or make an RPC; it delays only the lock's later notifications. A loss
+applies only to the hold whose lease expired, not to a newer hold of the same thread.
+
 If you would rather the holding thread be interrupted the instant the lock is lost —
 so it cannot keep mutating state it no longer owns — opt in with `interruptOnLockLoss`:
 
@@ -160,8 +168,8 @@ hasn't noticed yet:
 
 ### The lease TTL
 
-The lock recipes default to a 10-second lease (`leaseTtlSecs`), where other recipes use 2
-seconds. A lapsed lease loses the lock, so the longer lease rides out a GC pause or network
+The lock recipes default to a 10-second lease (`leaseTtlSecs`), where most other recipes use
+2 seconds. A lapsed lease loses the lock, so the longer lease rides out a GC pause or network
 blip of a few seconds. The trade-off: when a holder's process dies, its lock is freed only
 when the lease runs out, up to 10 seconds later. Set `leaseTtlSecs` for your own balance, and
 use a fencing token where a lost hold must not write.
@@ -223,6 +231,12 @@ supported:
 --8<-- "kotlin/website/locks/ReadWriteLockSnippets.kt:downgrade"
 ```
 
+The downgraded read keeps the write hold's place in line, so it is admitted at once even
+with another process's writer queued behind the write, and that writer keeps waiting until
+the read is released too. Its fencing token is the write hold's. The rank rides in the read
+entry's value, so a `clientId` starting with `rank:` is rejected, and clients from before
+0.13.0 don't honor it: avoid downgrading while a mixed-version fleet shares a lock.
+
 Taking the write lock while holding the read lock (**upgrade**) is not:
 
 ```kotlin
@@ -281,11 +295,12 @@ holds follow `java.util.concurrent.Semaphore`'s rules rather than a lock's:
 --8<-- "kotlin/website/locks/SemaphoreSnippets.kt:multiple"
 ```
 
-Permit loss mirrors lock loss — a listener, `connectionState` → `LOST`, `release()`
-returning `false`, and an opt-in `interruptOnPermitLoss`. A `release()` gives up a live
-permit the calling thread acquired, else the one it lost (returning `false`), so a thread
-whose permit was lost never gives up another thread's live permit. Only when the releasing
-thread acquired nothing does it fall back to any of the instance's permits.
+Permit loss mirrors lock loss — a `PermitLostListener` on the notifier thread,
+`connectionState` → `LOST`, `release()` returning `false`, and an opt-in
+`interruptOnPermitLoss`. A `release()` gives up a live permit the calling thread acquired,
+else the one it lost (returning `false`), so a thread whose permit was lost never gives up
+another thread's live permit. Only when the releasing thread acquired nothing does it fall
+back to any of the instance's permits.
 
 `close()` aborts acquisitions in flight: one that `close()` lands on throws rather than
 acquiring on a closed recipe. That holds for locks too.
@@ -309,7 +324,8 @@ count throws rather than silently reconfiguring the semaphore under everyone els
     So is `isLocked` on a lock. Both are true-at-some-recent-revision, and another
     client may act between your read and your next line. Use them for logging and
     dashboards; never branch on them to decide whether an acquire will succeed. Use
-    `tryAcquire`/`tryLock` for that — they are atomic.
+    `tryAcquire`/`tryLock` for that — they are atomic. `availablePermits()` is also an
+    RPC under the semaphore's own budget; `availablePermits(rpc)` takes a different one.
 
 ## Coroutines
 
@@ -317,7 +333,9 @@ Every lock has suspending twins that release the thread while waiting. Note the
 asymmetry: `withLock` is **scoped-only** for locks (a lock is thread-owned, so the
 suspending version pins a confined dispatcher and releases under `NonCancellable`),
 while the semaphore also exposes split `awaitAcquire`/`awaitRelease` because its holds
-are instance-level. See [Coroutines](../coroutines/index.md).
+are instance-level. With `interruptOnLockLoss` / `interruptOnPermitLoss`, a lost hold
+cancels the suspending `withLock` / `withPermit` body, which then throws
+`HoldLostException`. See [Coroutines](../coroutines/index.md).
 
 ## Observability
 

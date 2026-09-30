@@ -28,12 +28,15 @@ error. The forms taking a default collapse that into a value you choose — conv
 they also make an absent key indistinguishable from a key explicitly set to the default.
 When that distinction carries meaning, take the nullable one.
 
-!!! note "Puts are retried; that is safe here, but not everywhere"
+!!! note "Reads are retried; writes are not"
 
-    `putValue` retries on retriable statuses because these values are last-writer-wins: a
-    duplicate apply from an ambiguous first attempt is harmless. This reasoning does **not**
-    extend to compare-and-swap writes, which is why [`transaction { }`](txn.md) is never
-    retried for you.
+    `getValue` and the other reads retry on retriable statuses. `putValue` makes **one**
+    attempt, bounded by the operation timeout: a put that failed or timed out may still have
+    been applied, and a retried attempt could land after a newer write and silently revert
+    it. The same goes for `deleteKey`, `deleteChildren`, `compact`, and
+    [`transaction { }`](txn.md). If a failed write should be re-sent, that is your call to
+    make, knowing what the write does. See
+    [Which failures are retried](../resilience/index.md#which-failures-are-retried).
 
 ### Numbers are bytes, not text
 
@@ -261,11 +264,11 @@ encoding lives in one place:
 `getValue(key, codec)` returns `T?` — null for an absent key, exactly like the untyped form.
 There is no default-taking overload; use `?: default`.
 
-!!! note "Java must pass every argument here"
+!!! note "Java gets the short forms too"
 
-    `TypedKVExtensions.kt` does not carry `@JvmOverloads`, so Java callers supply
-    `PutOption.DEFAULT` and `RpcResilience.DEFAULT` explicitly rather than getting the short
-    form Kotlin's default parameters provide.
+    The typed `putValue` / `getValue` are `@JvmOverloads`, so Java callers can stop after the
+    codec, as the Java tab does, rather than supplying `PutOption.DEFAULT` and
+    `RpcResilience.DEFAULT` themselves.
 
 Built-in codecs are `StringCodec`, `ByteSequenceCodec`, and `jsonCodec<T>()` for anything
 `@Serializable`. The full picture, including which recipes accept a codec, is on

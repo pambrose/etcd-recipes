@@ -65,7 +65,9 @@ reported anywhere you are likely to be looking, so do not rely on throwing to si
     ```
 
 `watcher` returns a `Watch.Watcher`, which is `Closeable`. It is a live gRPC stream and a live
-thread; if you drop the reference without closing it, you have leaked both.
+thread; if you drop the reference without closing it, you have leaked both. Every callback
+and recovery attempt runs with the SLF4J MDC that was in place where you created the watcher,
+so its log lines carry your context (see [Observability](../observability.md#logging-context)).
 
 The `WatchEvent` extensions — `keyAsString`, `keyAsInt`, `keyAsLong`, `valueAsString`,
 `valueAsInt`, `valueAsLong` — save a trip through `event.keyValue.key` on every event.
@@ -98,7 +100,8 @@ Its close is not a fire-and-forget: it cancels any pending recovery attempt, shu
 dispatcher down, and then waits up to **five seconds** for a callback that is currently running
 to finish. That wait is what makes "the watcher is closed, so nothing is touching my state
 any more" true rather than merely likely. If a callback outruns the wait, you get a warning
-rather than a silent lie.
+rather than a silent lie. A `close()` called from inside one of the watcher's own callbacks
+returns at once instead of waiting on itself; that callback finishes when it returns.
 
 ## Watching a prefix
 
@@ -158,7 +161,9 @@ thread** on the latch until you count it down from elsewhere. It is a convenienc
 
 jetcd already retries *transient* stream errors itself — a dropped connection, an etcd restart
 — and does it with revision continuity, so you lose nothing. Those are not the interesting
-failures.
+failures, though the resilient watcher still reports them: `Suspended` when the error
+arrives, and `Resubscribed` with the first response after jetcd recovers, so nothing that
+listens stays suspended after a blip.
 
 What jetcd **abandons** are *fatal* deaths:
 
@@ -230,9 +235,9 @@ Every transition is reported to the optional `WatchRecoveryListener`:
 | Event | Meaning |
 | --- | --- |
 | `Suspended(key, cause)` | The stream errored; recovery may follow |
-| `Resubscribed(key, resumeRevision)` | A replacement watch is live, no events lost |
+| `Resubscribed(key, resumeRevision)` | The stream is live again — a replacement watch, or jetcd's own recovery of a transient error — with no events lost |
 | `Resynced(key, compactRevision, anchorRevision)` | Compaction — events between the two are **gone** |
-| `Failed(key, cause)` | The retry policy is exhausted; the watcher is **dead** |
+| `Failed(key, cause)` | The retry policy is exhausted, or the `Client` was closed; the watcher is **dead** |
 
 `Failed` deserves an alert. Nothing more will be retried, and nothing further will arrive.
 
@@ -252,9 +257,9 @@ anything running unattended. See [Resilience](../resilience/index.md).
 ## Watches in the recipes
 
 Every reactive recipe here is a watch plus bookkeeping. `PathChildrenCache` is a prefix watch
-over a subtree with a GET at startup; `LeaderSelector` watches the predecessor key rather than
-polling for the crown; `DistributedBarrier` watches for the barrier key's deletion. If a recipe
-already does what you need, use it — it has already made the resync and lifecycle decisions
-described here.
+over a subtree with a GET at startup; `LeaderSelector` watches the leader key, anchored just
+past the read that precedes it, rather than polling for the crown; `DistributedBarrier`
+watches for the barrier key's deletion. If a recipe already does what you need, use it — it
+has already made the resync and lifecycle decisions described here.
 
 For a coroutine-native view of the same streams, see [Flows](../coroutines/index.md).
