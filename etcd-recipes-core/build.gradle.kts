@@ -17,4 +17,7 @@ dependencies {
   // the runners module. The runners module already depends on the library, so this is a
   // test-only one-way dependency, not a cycle.
   testImplementation(project(":etcd-recipes-test-runners"))
+  // Linearizability checks for the recipes' in-memory concurrent state (strategies, the
+  // connector's connection state); etcd round trips are covered by the integration tests.
+  testImplementation(libs.lincheck)
 }

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (`StickyStrategy` under concurrency)
+
+- Concurrent `StickyStrategy` selections agree on one instance. When several callers found
+  no usable choice at once, each picked an instance and the last to store its pick won, so a
+  caller could return an instance another had already replaced, and later callers flipped to
+  a stale choice. A pick now replaces only the choice its caller saw, so one made meanwhile
+  is kept.
+
+### Added (tests)
+
+- Lincheck model-checking tests for in-memory concurrent state: the provider strategies,
+  and `EtcdConnector`'s connection state and recorded exceptions. The strategy test found
+  the `StickyStrategy` race above.
+
 ### Changed (examples and docs)
 
 - The runnable examples use only the standard library, etcd-recipes, and kotlin-logging.
