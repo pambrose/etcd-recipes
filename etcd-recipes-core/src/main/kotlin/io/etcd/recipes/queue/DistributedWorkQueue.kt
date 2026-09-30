@@ -26,6 +26,7 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.KeyValue
 import io.etcd.jetcd.op.Cmp
 import io.etcd.jetcd.op.CmpTarget
+import io.etcd.jetcd.op.Op
 import io.etcd.jetcd.options.GetOption.SortTarget
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.common.EtcdConnector
@@ -133,6 +134,11 @@ class DistributedWorkQueue
 
   // True while consecutive reclaim sweeps fail, so a persistent failure is recorded once.
   private val sweepFailing = AtomicBoolean(false)
+
+  // Claims whose transaction got no answer and couldn't be re-read, by claim marker (not item
+  // id: threads sharing this instance can have several unresolved attempts on one item, and
+  // only one of them may have committed). The sweeper releases any that committed.
+  private val unresolvedClaims = ConcurrentHashMap<String, UnresolvedClaim>()
 
   // When a receive last swept for orphans because the queue looked empty: that sweep runs at
   // most once per emptySweepInterval, since every consumer woken by an enqueue would repeat it.
@@ -309,11 +315,13 @@ class DistributedWorkQueue
     // The claim marker's create revision: identifies this claim, not just this consumer, so
     // a stale item can't ack or requeue a later claim of the same id by the same instance.
     private val claimRevision: Long,
+    // The claim marker's value, <clientId>:<nonce>: unique to this claim attempt
+    private val claimMarker: String,
   ) {
     private fun isStillClaimed(): Array<Cmp> {
       val claimKey = "$claimsPath/$id"
       return arrayOf(
-        equalTo(claimKey, CmpTarget.value(clientId.asByteSequence)),
+        equalTo(claimKey, CmpTarget.value(claimMarker.asByteSequence)),
         equalTo(claimKey, CmpTarget.createRevision(claimRevision)),
       )
     }
@@ -345,12 +353,7 @@ class DistributedWorkQueue
     internal fun unclaim(): Boolean =
       client.transaction(resilience.rpc) {
         If(*isStillClaimed())
-        Then(
-          "$itemsPath/$id" setTo value,
-          deleteOp("$claimsPath/$id".asByteSequence),
-          deleteOp("$claimedPath/$id".asByteSequence),
-          if (attempt > 1) "$attemptsPath/$id" setTo (attempt - 1) else deleteOp("$attemptsPath/$id".asByteSequence),
-        )
+        Then(*givenBack(id, value, attempt))
       }.isSucceeded
 
     /**
@@ -434,6 +437,8 @@ class DistributedWorkQueue
       }
       val attempt = delivered + 1
       val leaseId = consumerLeaseId()
+      // Unique to this attempt: threads sharing this instance share its clientId and lease
+      val marker = "$clientId:${randomId(TOKEN_LENGTH)}"
       val txn =
         try {
           client.transaction(resilience.rpc) {
@@ -441,7 +446,7 @@ class DistributedWorkQueue
             Then(
               deleteOp(head.key),
               "$claimedPath/$id" setTo head.value,
-              "$claimsPath/$id".setTo(clientId, putOption { withLeaseId(leaseId) }),
+              "$claimsPath/$id".setTo(marker, putOption { withLeaseId(leaseId) }),
               "$attemptsPath/$id" setTo attempt,
             )
           }
@@ -449,7 +454,7 @@ class DistributedWorkQueue
           // The commit may have landed even though its response didn't: if the claim marker
           // is ours, the item is ours, and returning it keeps the claim from being stranded.
           if (!e.isLeaseNotFound()) {
-            reconcileClaim(id, head.value, attempt, leaseId)?.let { return ClaimAttempt(it, 0L) }
+            reconcileClaim(id, head.value, attempt, leaseId, marker)?.let { return ClaimAttempt(it, 0L) }
             throw e
           }
           // The consumer lease can die between reading its id and committing; the
@@ -460,13 +465,16 @@ class DistributedWorkQueue
           Thread.sleep(LEASE_HEAL_PAUSE_MS)
           continue
         }
-      if (txn.isSucceeded) return ClaimAttempt(WorkItem(id, head.value, attempt, txn.header.revision), 0L)
+      if (txn.isSucceeded) return ClaimAttempt(WorkItem(id, head.value, attempt, txn.header.revision, marker), 0L)
       // Lost the head to a concurrent consumer; retry with the new head
     }
   }
 
-  // After a claim transaction failed without an answer: the item, if the claim marker shows
-  // this consumer's claim (its clientId, under the lease it claimed with); else null. An
+  // After a claim transaction failed without an answer: the item, if the claim marker is
+  // this attempt's (its unique value, under the lease it claimed with); else null. A marker
+  // from another thread on this instance has the same clientId and lease but not the same
+  // value. When the re-read fails too, the claim may have committed and would hold its item
+  // under a live lease, so the sweeper releases it later (releaseUnresolvedClaims). An
   // interrupted caller's flag is set aside for the re-read and restored afterward.
   @Suppress("TooGenericExceptionCaught")
   private fun reconcileClaim(
@@ -474,6 +482,7 @@ class DistributedWorkQueue
     value: ByteSequence,
     attempt: Int,
     leaseId: Long,
+    claimMarker: String,
   ): WorkItem? {
     val interrupted = Thread.interrupted()
     try {
@@ -482,14 +491,56 @@ class DistributedWorkQueue
           client.getResponse("$claimsPath/$id", rpc = resilience.rpc).kvs.firstOrNull()
         } catch (e: Exception) {
           logger.debug(e) { "Couldn't re-read the claim on $id after an ambiguous commit" }
+          unresolvedClaims[claimMarker] = UnresolvedClaim(id, value, attempt)
           null
         }
-      val ours = marker != null && marker.value.asString == clientId && marker.lease == leaseId
-      return if (ours) WorkItem(id, value, attempt, marker!!.createRevision) else null
+      val ours = marker != null && marker.value.asString == claimMarker && marker.lease == leaseId
+      return if (ours) WorkItem(id, value, attempt, marker!!.createRevision, claimMarker) else null
     } finally {
       if (interrupted) Thread.currentThread().interrupt()
     }
   }
+
+  // A claim attempt that got no answer and couldn't be re-read: it may hold its item
+  private class UnresolvedClaim(
+    val id: String,
+    val value: ByteSequence,
+    val attempt: Int,
+  )
+
+  // Puts back each unresolved claim that turns out to have committed, as unclaim() does:
+  // the item returns to the queue with that delivery given back. One that isn't there (it
+  // never committed, or was reclaimed) is forgotten. A failed read keeps it for the next sweep.
+  private fun releaseUnresolvedClaims() {
+    unresolvedClaims.forEach { (claimMarker, claim) ->
+      val claimKey = "$claimsPath/${claim.id}"
+      val marker = client.getResponse(claimKey, rpc = resilience.rpc).kvs.firstOrNull()
+      if (marker != null && marker.value.asString == claimMarker) {
+        client.transaction(resilience.rpc) {
+          If(
+            equalTo(claimKey, CmpTarget.value(claimMarker.asByteSequence)),
+            equalTo(claimKey, CmpTarget.createRevision(marker.createRevision)),
+          )
+          Then(*givenBack(claim.id, claim.value, claim.attempt))
+        }
+      }
+      unresolvedClaims.remove(claimMarker, claim)
+    }
+  }
+
+  // The operations that return a claimed item to the queue as though its delivery [attempt]
+  // never happened
+  private fun givenBack(
+    id: String,
+    value: ByteSequence,
+    attempt: Int,
+  ): Array<Op> =
+    arrayOf(
+      "$itemsPath/$id" setTo value,
+      deleteOp("$claimsPath/$id".asByteSequence),
+      deleteOp("$claimedPath/$id".asByteSequence),
+      if (attempt > 1) "$attemptsPath/$id" setTo (attempt - 1) else deleteOp("$attemptsPath/$id".asByteSequence),
+    )
 
   // Whether to retry a claim that failed because the consumer lease is gone. Throws when
   // no retry can succeed (this queue is closed, or the healer gave up); false once the
@@ -581,7 +632,9 @@ class DistributedWorkQueue
     try {
       if (!closeCalled.load()) {
         promoteMatured()
+        // Orphans first: a release whose reads keep failing mustn't hold up reclaiming them
         reclaimOrphans()
+        releaseUnresolvedClaims()
       }
       sweepFailing.store(false)
     } catch (e: Throwable) {

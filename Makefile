@@ -1,4 +1,4 @@
-.PHONY: default help clean clean-all stop etcd-start etcd-stop build tests tests-tc tests-container all-tests coverage kdocs \
+.PHONY: default help tla clean clean-all stop etcd-start etcd-stop build tests tests-tc tests-container all-tests coverage kdocs \
         site clean-site check-site upgrade-site docs-check \
         lint detekt detekt-baseline refresh versions publish-local publish-local-snapshot \
         publish-snapshot publish-maven-central upgrade-wrapper \
@@ -102,6 +102,9 @@ clean-site:  ## Remove generated zensical site and cache
 
 site: clean-site  ## Serve the docs site locally with zensical
 	cd $(SITE_DIR) && uv run zensical serve
+
+tla: ## Model-check the TLA+ protocol specs in specs/ with TLC (downloads TLC once)
+	./specs/tlc.sh
 
 lint: ## Run kotlinter and detekt (style + static analysis)
 	./gradlew lintKotlin detekt

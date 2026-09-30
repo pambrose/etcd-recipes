@@ -21,6 +21,7 @@ package io.etcd.recipes.lock
 import io.etcd.recipes.common.EtcdRecipes
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
+import io.etcd.recipes.common.getChildrenKeys
 import io.etcd.recipes.common.getOption
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.pollUntil
@@ -28,7 +29,10 @@ import io.etcd.recipes.common.urls
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.comparables.shouldBeGreaterThan
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -85,6 +89,35 @@ class LockFencingTests : StringSpec() {
           (written > 0L) shouldBe true
           read shouldBeGreaterThan written
           lock.readLock.fencingToken shouldBe -1L
+        }
+        client.deleteChildren(path)
+      }
+    }
+
+    "a downgrade's fencing token doesn't fence out the writer queued behind it" {
+      connectToEtcd(urls) { client ->
+        val path = "$base/downgrade"
+        client.deleteChildren(path)
+        DistributedReadWriteLock(client, path).use { first ->
+          DistributedReadWriteLock(client, path).use { second ->
+            first.writeLock.lock()
+            val queuedToken = AtomicReference<Long?>(null)
+            val queued =
+              thread(isDaemon = true) {
+                second.writeLock.lock()
+                queuedToken.store(second.writeLock.fencingToken)
+                second.writeLock.unlock()
+              }
+            pollUntil(10.seconds) { client.getChildrenKeys(path).size == 2 } shouldBe true // queued behind
+            first.readLock.lock() // a downgrade: keeps the write's place, ahead of the queued writer
+            val downgraded = first.readLock.fencingToken
+            first.writeLock.unlock()
+            first.readLock.unlock()
+            queued.join(10_000)
+            withClue("the queued writer's token is below the downgrade's, so a fenced resource refuses it") {
+              queuedToken.load().shouldNotBeNull() shouldBeGreaterThan downgraded
+            }
+          }
         }
         client.deleteChildren(path)
       }

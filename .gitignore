@@ -14,3 +14,8 @@ default.etcd
 .venv
 website/etcd-recipes/site
 website/etcd-recipes/.cache
+
+# TLA+ (specs/): TLC, downloaded by specs/tlc.sh, and the scratch files TLC writes
+specs/.tools/
+specs/states/
+specs/*_TTrace_*

@@ -28,6 +28,8 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.urls
+import io.grpc.Status
+import io.grpc.StatusRuntimeException
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainAll
@@ -35,6 +37,9 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -47,7 +52,10 @@ import kotlin.time.Duration.Companion.seconds
  *   (priority);
  * - an idle orphan sweep diffs keys instead of a transaction per claim in flight, and
  *   doesn't repeat on every empty receive;
- * - a claim whose commit response was lost is reconciled into the claimed item;
+ * - a claim whose commit response was lost is reconciled into the claimed item, and never
+ *   into another thread's claim on a shared instance;
+ * - a claim that can't be reconciled (the re-read fails too) is released by the sweeper, so
+ *   its item isn't held until the consumer restarts;
  * - enqueues, takes, receives, and acks reach the queue metrics.
  */
 class QueueCostAndAmbiguityTests : StringSpec() {
@@ -143,6 +151,98 @@ class QueueCostAndAmbiguityTests : StringSpec() {
           val item = withClue("the committed claim was reported as a failure") { queue.tryReceive() }
           item.shouldNotBeNull().value.asString shouldBe "job"
           item.ack() shouldBe true
+        }
+        etcd.deleteChildren(path)
+      }
+    }
+
+    "a lost claim response isn't reconciled into another thread's claim on a shared instance" {
+      connectToEtcd(urls) { etcd ->
+        val path = "$base/shared-reconcile"
+        etcd.deleteChildren(path)
+        val client = HookedClient(etcd)
+        DistributedWorkQueue(client, path).use { queue ->
+          queue.enqueue("job")
+          val other = AtomicReference<DistributedWorkQueue.WorkItem?>(null)
+          // This thread's claim transaction fails without an answer; meanwhile another
+          // thread on the same instance (same clientId and lease) claims the item.
+          client.beforeTxn.store {
+            thread { other.store(queue.tryReceive()) }.join()
+            throw StatusRuntimeException(Status.UNAVAILABLE.withDescription("no answer"))
+          }
+          val mine = runCatching { queue.tryReceive() }.getOrNull()
+          other.load().shouldNotBeNull().value.asString shouldBe "job"
+          withClue("reconciled into the other thread's claim: both threads have the one item") {
+            mine.shouldBeNull()
+          }
+        }
+        etcd.deleteChildren(path)
+      }
+    }
+
+    "a claim that can't be reconciled is released by the sweeper" {
+      connectToEtcd(urls) { etcd ->
+        val path = "$base/stranded"
+        etcd.deleteChildren(path)
+        val client = HookedClient(etcd)
+        val config = WorkQueueConfig(visibilityTimeoutSecs = 60, sweepInterval = 1.seconds)
+        DistributedWorkQueue(client, path, config).use { stranded ->
+          stranded.enqueue("job")
+          // The claim commits but its response is lost, and the re-read that would reconcile
+          // it fails too: the item is claimed under this consumer's live lease.
+          client.loseNextTxnResponse.store(true)
+          client.beforeTxn.store {
+            client.beforeGet.store { throw StatusRuntimeException(Status.PERMISSION_DENIED.withDescription("no read")) }
+          }
+          runCatching { stranded.tryReceive() }.isFailure shouldBe true
+          DistributedWorkQueue(etcd, path).use { other ->
+            withClue("the stranded claim held the item under a live lease") {
+              val item = other.receive(10.seconds).shouldNotBeNull()
+              item.value.asString shouldBe "job"
+              item.attempt shouldBe 1 // the stranded delivery was given back
+              item.ack() shouldBe true
+            }
+          }
+        }
+        etcd.deleteChildren(path)
+      }
+    }
+
+    "an unresolved claim isn't overwritten by another thread's unresolved attempt on the same item" {
+      connectToEtcd(urls) { etcd ->
+        val path = "$base/unresolved-overwrite"
+        etcd.deleteChildren(path)
+        val client = HookedClient(etcd)
+        val config = WorkQueueConfig(visibilityTimeoutSecs = 60, sweepInterval = 2.seconds)
+        DistributedWorkQueue(client, path, config).use { queue ->
+          queue.enqueue("job")
+          val noRead = { throw StatusRuntimeException(Status.PERMISSION_DENIED.withDescription("no read")) }
+          val secondAtTxn = CountDownLatch(1)
+          val secondGo = CountDownLatch(1)
+          var second: Thread? = null
+          // Both threads on this instance read the head. The first claims it: the commit lands
+          // but its response is lost and its re-read fails. Then the second's claim (which
+          // can't commit, the item is gone) loses its response and its re-read fails too.
+          client.beforeTxn.store {
+            client.beforeTxn.store {
+              secondAtTxn.countDown()
+              secondGo.await()
+            }
+            second = thread { runCatching { queue.tryReceive() } }
+            secondAtTxn.await()
+            client.loseNextTxnResponse.store(true)
+            client.beforeGet.store(noRead)
+          }
+          runCatching { queue.tryReceive() }.isFailure shouldBe true
+          client.loseNextTxnResponse.store(true)
+          client.beforeGet.store(noRead)
+          secondGo.countDown()
+          second!!.join(10_000)
+          DistributedWorkQueue(etcd, path).use { other ->
+            withClue("the second attempt's record replaced the first's, stranding the committed claim") {
+              other.receive(10.seconds).shouldNotBeNull().value.asString shouldBe "job"
+            }
+          }
         }
         etcd.deleteChildren(path)
       }

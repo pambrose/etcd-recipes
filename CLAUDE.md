@@ -17,6 +17,7 @@ JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17
 - `make all-tests` — all three variants in sequence
 - `make etcd-start` / `make etcd-stop` — start / gracefully stop a local etcd
 - `make lint` — `./gradlew lintKotlin detekt`
+- `make tla` — model-check the TLA+ protocol specs in `specs/` with TLC (downloads a pinned TLC once; runs in CI)
 - `make coverage` — Kover HTML + XML reports + summary
 - `make kdocs` — Dokka HTML / Javadoc
 - `make site` — serve the documentation site locally
@@ -66,6 +67,7 @@ Multi-module Gradle build (`settings.gradle.kts`):
   - **`etcd-recipes-spring-boot-starter/`** — auto-configures `Client` / `EtcdRecipes` beans from `etcd.recipes.*` properties, plus an optional Actuator health indicator. Spring Boot 4.1.x.
   - **`etcd-recipes-ktor/`** — a Ktor `Application` plugin exposing `Application.etcdClient` / `etcdRecipes`. Ktor 3.5.x.
 - **`etcd-recipes-test-runners/`** — test-only module. A runnable shadow JAR with a dispatcher `main()` that routes on `--recipe`/`--role` to per-recipe runners (barrier waiter, election participant, queue consumer, counter incrementer, service registration). Used by the container-based tests under `etcd-recipes-core/src/test/kotlin/io/etcd/recipes/container/`; each participant runs as its own Testcontainers container against a shared etcd container. Wired into the library's test task only when `-PuseTestcontainers` is set.
+- **`specs/`** — TLA+ specifications of the recipes' distributed protocols (the counted barrier's rounds, the read-write lock's admission, the work queue's claims), model-checked by TLC via `specs/tlc.sh`. Each `<Module>.tla` models the Kotlin code as written, one action per RPC, with leases expiring between them; each `<Module>[<Variant>].cfg` is a model. See `specs/README.md`, including how to check that a spec can fail. When changing one of these protocols, update its spec and run `make tla`.
 - **`website/`** — the [Zensical](https://zensical.org) documentation site published to <https://pambrose.github.io/etcd-recipes/>. No code example is written into the Markdown: each is a real source file under a `src/test/.../website/` source set in the module whose API it documents, embedded at build time via `pymdownx.snippets`, so `./gradlew compileTestKotlin compileTestJava` type-checks every example on the site. Snippet files are plain uninvoked functions — they contribute zero tests. `make docs-check` compiles them and builds the site strictly (a dangling snippet reference fails the build).
 
 ## Architecture notes
