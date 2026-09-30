@@ -36,9 +36,9 @@ jobs:
           java-version: 17
 
       - name: Set up Gradle
-        # v5, not v6: v6 moves caching into a proprietary component with its own Terms of
-        # Use, which upgrading would accept. Bump deliberately.
-        uses: gradle/actions/setup-gradle@v5
+        # v6's caching is a proprietary component under Gradle's Terms of Use
+        # (https://gradle.com/legal/terms-of-use/), accepted by using it.
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Detekt
         run: ./gradlew detekt

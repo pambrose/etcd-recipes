@@ -34,7 +34,7 @@ ben-manes-versions = "0.64.0"
 detekt = "2.0.0-alpha.6"
 dokka = "2.2.0"
 kotlinter = "5.7.0"
-kover = "0.9.10"
+kover = "0.9.11"
 maven-publish = "0.37.0"
 shadow = "9.6.1"
 
