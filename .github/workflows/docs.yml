@@ -1,9 +1,13 @@
 name: Documentation
 
 on:
-  push:
-    branches:
-      - master
+  # Deploy only what CI passed: a push to master runs CI (which compiles every snippet
+  # source set and runs the full suite), and CI's success on that push runs this. A
+  # site whose snippets no longer compile never deploys.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
   # Build (but don't deploy) on PRs. The docs embed code snippets from the Gradle
   # test source sets via pymdownx.snippets with check_paths = true, so this job
   # catches a doc that points at a snippet section someone renamed or deleted.
@@ -22,6 +26,10 @@ concurrency:
 
 jobs:
   build:
+    # A CI run that failed or was cancelled, or wasn't a push, builds and deploys nothing
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -33,6 +41,9 @@ jobs:
         working-directory: website/etcd-recipes
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The commit CI verified, not whatever master has moved on to since
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       # NOTE: deliberately no actions/configure-pages here. It exists to enable
       # Pages and to expose base_url/origin outputs for generators that need
@@ -59,7 +70,8 @@ jobs:
           path: website/etcd-recipes/site
 
   deploy:
-    # Only master deploys; PRs stop after the build job above.
+    # Only master deploys (after CI passed there, or when run by hand); PRs stop after
+    # the build job above.
     if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     needs: build
     permissions:

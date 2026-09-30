@@ -19,15 +19,27 @@
 package io.etcd.recipes.runners
 
 import io.etcd.jetcd.Client
+import io.etcd.jetcd.op.CmpTarget
+import io.etcd.recipes.common.asByteSequence
+import io.etcd.recipes.common.deleteOp
+import io.etcd.recipes.common.doesNotExist
+import io.etcd.recipes.common.equalTo
+import io.etcd.recipes.common.setTo
+import io.etcd.recipes.common.transaction
 import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.election.withLeaderSelector
 import kotlinx.serialization.Serializable
 
+/**
+ * One candidate's election outcome. [overlapped] is true when its term began while another
+ * candidate's term was still running: two leaders at once.
+ */
 @Serializable
 data class ElectionParticipantPayload(
   val tookLeadership: Boolean,
   val relinquished: Boolean,
   val clientId: String,
+  val overlapped: Boolean = false,
 )
 
 object ElectionParticipantRunner : RecipeRunner {
@@ -43,13 +55,32 @@ object ElectionParticipantRunner : RecipeRunner {
     val electionPath = args.require("election-path")
     val clientId = "participant-$participantId"
 
+    // Each term claims this marker for its duration, so a term that starts while another is
+    // still running finds it taken. A sibling of the election path, not one of its keys.
+    val activeLeaderKey = "$electionPath-active"
     var tookLeadership = false
     var relinquished = false
+    var overlapped = false
 
     withLeaderSelector(
       client = client,
       electionPath = electionPath,
-      takeLeadershipBlock = { _: LeaderSelector -> tookLeadership = true },
+      takeLeadershipBlock = { _: LeaderSelector ->
+        tookLeadership = true
+        val claimed =
+          client.transaction {
+            If(activeLeaderKey.doesNotExist)
+            Then(activeLeaderKey setTo clientId)
+          }.isSucceeded
+        overlapped = !claimed
+        // A term long enough that another leader's overlapping it would be seen
+        Thread.sleep(TERM_MILLIS)
+        if (claimed)
+          client.transaction {
+            If(equalTo(activeLeaderKey, CmpTarget.value(clientId.asByteSequence)))
+            Then(deleteOp(activeLeaderKey))
+          }
+      },
       relinquishLeadershipBlock = { _: LeaderSelector -> relinquished = true },
       clientId = clientId,
     ) {
@@ -66,7 +97,10 @@ object ElectionParticipantRunner : RecipeRunner {
           tookLeadership = tookLeadership,
           relinquished = relinquished,
           clientId = clientId,
+          overlapped = overlapped,
         ),
     )
   }
+
+  private const val TERM_MILLIS = 300L
 }

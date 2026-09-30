@@ -24,6 +24,7 @@ import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.leaseGrant
+import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
@@ -43,6 +44,10 @@ import kotlin.time.Duration.Companion.seconds
 // barrier could hang when peer joins were the event that brought waiter count
 // up to memberCount.
 class DistributedBarrierWithCountWatcherTests : StringSpec() {
+  // True once this waiter is parked on the barrier: past its setup and its pre-park recheck,
+  // so only the watcher can react to what happens next.
+  private fun Thread.parkedOnBarrier() = stackTrace.any { it.methodName.contains("waitUntilTrueWithInterruption") }
+
   init {
     "watcherDetectsPeerJoinsUnderWaitingPrefix" {
       val path = "/barriers/DistributedBarrierWithCountWatcherTests"
@@ -54,40 +59,42 @@ class DistributedBarrierWithCountWatcherTests : StringSpec() {
         val finished = CountDownLatch(1)
 
         // memberCount = 2: the lone client below + a manually-injected peer.
-        val barrier = DistributedBarrierWithCount(client, path, memberCount = 2)
+        DistributedBarrierWithCount(client, path, memberCount = 2).use { barrier ->
+          // Use a daemon thread so a hung waitOnBarrier (bug present) does not
+          // keep the test JVM alive. The inner timeout (8s) is shorter than the
+          // outer await (12s) so we can distinguish a real release from a
+          // timeout: only a real release sets `released = true`.
+          val waiter =
+            thread(isDaemon = true, name = "barrier-waiter") {
+              try {
+                if (barrier.waitOnBarrier(8.seconds)) released.store(true)
+              } finally {
+                finished.countDown()
+              }
+            }
 
-        // Use a daemon thread so a hung waitOnBarrier (bug present) does not
-        // keep the test JVM alive. The inner timeout (8s) is shorter than the
-        // outer await (12s) so we can distinguish a real release from a
-        // timeout: only a real release sets `released = true`.
-        thread(isDaemon = true, name = "barrier-waiter") {
-          try {
-            if (barrier.waitOnBarrier(8.seconds)) released.store(true)
-          } finally {
-            finished.countDown()
+          // Wait for the barrier client to set up (create /ready and its own waiter, start
+          // the watcher) and park. Injecting sooner could let its pre-park recheck see the
+          // peer, and the watcher branch under test would never run.
+          pollUntil(10.seconds) { waiter.parkedOnBarrier() } shouldBe true
+
+          // Manually inject a peer waiter directly via etcd, bypassing the
+          // recipe. This makes total waiterCount = 2 == memberCount. Only the
+          // watcher's PUT-on-waiting-prefix branch can react to this event;
+          // with the bug, that branch never fires for peer keys, so the
+          // barrier's own client never re-runs checkWaiterCount() and /ready
+          // is never deleted -> the lone waiter hangs until its inner timeout.
+          // Waiters register under their round: /ready's createRevision
+          val round = client.getResponse(path.appendToPath("ready")).kvs.single().createRevision
+          val peerKey = path.appendToPath("waiting").appendToPath("$round").appendToPath("manualPeer:abc")
+          val lease = client.leaseGrant(30.seconds)
+          client.transaction {
+            Then(peerKey.setTo("manualPeer", putOption { withLeaseId(lease.id) }))
           }
+
+          finished.await(12, TimeUnit.SECONDS) shouldBe true
+          released.load() shouldBe true
         }
-
-        // Let the barrier client set up: create /ready, its own waiter,
-        // observe waiterCount=1, and start the watcher.
-        Thread.sleep(2_000)
-
-        // Manually inject a peer waiter directly via etcd, bypassing the
-        // recipe. This makes total waiterCount = 2 == memberCount. Only the
-        // watcher's PUT-on-waiting-prefix branch can react to this event;
-        // with the bug, that branch never fires for peer keys, so the
-        // barrier's own client never re-runs checkWaiterCount() and /ready
-        // is never deleted -> the lone waiter hangs until its inner timeout.
-        // Waiters register under their round: /ready's createRevision
-        val round = client.getResponse(path.appendToPath("ready")).kvs.single().createRevision
-        val peerKey = path.appendToPath("waiting").appendToPath("$round").appendToPath("manualPeer:abc")
-        val lease = client.leaseGrant(30.seconds)
-        client.transaction {
-          Then(peerKey.setTo("manualPeer", putOption { withLeaseId(lease.id) }))
-        }
-
-        finished.await(12, TimeUnit.SECONDS) shouldBe true
-        released.load() shouldBe true
 
         client.deleteChildren(path)
       }
@@ -108,39 +115,39 @@ class DistributedBarrierWithCountWatcherTests : StringSpec() {
         val released = AtomicBoolean(false)
         val finished = CountDownLatch(1)
 
-        val barrier = DistributedBarrierWithCount(client, path, memberCount = 3)
+        DistributedBarrierWithCount(client, path, memberCount = 3).use { barrier ->
+          val waiter =
+            thread(isDaemon = true, name = "barrier-waiter-peerLeave") {
+              try {
+                if (barrier.waitOnBarrier(6.seconds)) released.store(true)
+              } finally {
+                finished.countDown()
+              }
+            }
 
-        thread(isDaemon = true, name = "barrier-waiter-peerLeave") {
-          try {
-            if (barrier.waitOnBarrier(6.seconds)) released.store(true)
-          } finally {
-            finished.countDown()
+          // Let the lone client register its waiter, start the watcher, and park.
+          pollUntil(10.seconds) { waiter.parkedOnBarrier() } shouldBe true
+
+          // Waiters register under their round: /ready's createRevision
+          val round = client.getResponse(path.appendToPath("ready")).kvs.single().createRevision
+          val peerKey = path.appendToPath("waiting").appendToPath("$round").appendToPath("manualPeer:xyz")
+          val lease = client.leaseGrant(30.seconds)
+          client.transaction {
+            Then(peerKey.setTo("manualPeer", putOption { withLeaseId(lease.id) }))
           }
+
+          // The peer is registered (the watcher's checkWaiterCount sees 2 < 3 and does
+          // nothing); now remove it. The watcher will see a DELETE under waiting/*; the
+          // fixed branch logic must ignore it.
+          pollUntil(10.seconds) { barrier.waiterCount == 2L } shouldBe true
+          client.deleteKey(peerKey)
+
+          // Inner timeout is 6s; outer await is 10s. A real release would set
+          // released=true before the outer await wakes; a timeout-driven
+          // finish leaves released=false.
+          finished.await(10, TimeUnit.SECONDS) shouldBe true
+          released.load() shouldBe false
         }
-
-        // Let the lone client register its waiter and start the watcher.
-        Thread.sleep(2_000)
-
-        // Waiters register under their round: /ready's createRevision
-        val round = client.getResponse(path.appendToPath("ready")).kvs.single().createRevision
-        val peerKey = path.appendToPath("waiting").appendToPath("$round").appendToPath("manualPeer:xyz")
-        val lease = client.leaseGrant(30.seconds)
-        client.transaction {
-          Then(peerKey.setTo("manualPeer", putOption { withLeaseId(lease.id) }))
-        }
-
-        // Give the watcher time to observe the peer PUT (and run
-        // checkWaiterCount, which sees 2 < 3 and does nothing), then remove
-        // the peer. The watcher will see a DELETE under waiting/*; the fixed
-        // branch logic must ignore it.
-        Thread.sleep(1_000)
-        client.deleteKey(peerKey)
-
-        // Inner timeout is 6s; outer await is 10s. A real release would set
-        // released=true before the outer await wakes; a timeout-driven
-        // finish leaves released=false.
-        finished.await(10, TimeUnit.SECONDS) shouldBe true
-        released.load() shouldBe false
 
         client.deleteChildren(path)
       }

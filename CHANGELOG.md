@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (tests and CI)
+
+- The counted barrier's watcher tests wait until the waiter is parked before injecting a
+  peer, instead of sleeping 2 seconds. On a slow runner the sleep could let the pre-park
+  recheck see the peer first, so the watcher branch the test targets never ran; with that
+  branch disabled, the test now fails. The barriers are closed with `use`.
+- The multi-container election test detects overlapping terms. Each term claims an
+  "active leader" key in etcd for its duration and reports whether it found the key taken;
+  before, the test checked only that every candidate took and released leadership.
+- CI: `ci.yml` runs with `permissions: contents: read`, and its actions move to the Node 24
+  generation (`checkout@v7`, `setup-java@v6`, `setup-gradle@v5`, `codecov-action@v7`,
+  `upload-artifact@v7`). `setup-gradle` stays on v5 on purpose: v6 puts caching under
+  separate Terms of Use.
+- The documentation site deploys only after CI passes on a master push (a `workflow_run`
+  trigger building the commit CI verified). Before, every push to master deployed, even
+  when the snippets it embeds no longer compiled.
+
 ### Fixed (integrations)
 
 - Ktor: a plugin-owned client closes on `ApplicationStopped` instead of
