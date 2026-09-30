@@ -159,15 +159,14 @@ Note that `minimumWaitTime` has no default on the constructor — pass
 --8<-- "kotlin/website/queue/PriorityQueueSnippets.kt:scoped"
 ```
 
-!!! warning "Java cannot construct `DistributedPriorityQueue`"
+From Java, construct it with `minimumWaitTime` as a `(long, TimeUnit)` pair. The
+`kotlin.time.Duration` constructor is hidden from Java, as every signature with a Kotlin
+`Duration` is. `EtcdRecipes.distributedPriorityQueue(path)` and
+`distributedPriorityQueue(path, wait, unit)` work from Java too.
 
-    `minimumWaitTime` is a `kotlin.time.Duration`, and it has no default — so every
-    generated constructor carries a `Duration` parameter, and the Kotlin compiler
-    marks constructors with inline-class parameters synthetic. There is no
-    Java-visible constructor left. The `enqueue(value, priority: Int)` overloads are
-    perfectly callable; it is only the construction that Java cannot express.
-    Instantiate it from Kotlin, or use `DistributedQueue` / `DistributedWorkQueue`,
-    both of which Java constructs normally.
+```java
+--8<-- "java/website/queue/QueueSnippets.java:priority-java"
+```
 
 ### Priorities are `0..65535`
 

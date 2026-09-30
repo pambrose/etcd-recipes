@@ -114,16 +114,18 @@ constructor(
     // Re-registration is safe because instance ids are unique to this process; a
     // CAS loss means the key unexpectedly exists, so ownership is not reclaimed.
     try {
-      context.healer = client.selfHealingKeepAlive(
-        leaseTtlSecs.seconds,
-        resilience.lease,
-        leaseListener = { event -> onLeaseEvent(instancePath, event) },
-        rpc = resilience.rpc,
-      ) { lease ->
-        client.transaction(resilience.rpc) {
-          If(instancePath.doesNotExist)
-          Then(instancePath.setTo(context.currentJson, putOption { withLeaseId(lease.id) }))
-        }.isSucceeded
+      context.healer = withRecipeLoggingContext {
+        client.selfHealingKeepAlive(
+          leaseTtlSecs.seconds,
+          resilience.lease,
+          leaseListener = { event -> onLeaseEvent(instancePath, event) },
+          rpc = resilience.rpc,
+        ) { lease ->
+          client.transaction(resilience.rpc) {
+            If(instancePath.doesNotExist)
+            Then(instancePath.setTo(context.currentJson, putOption { withLeaseId(lease.id) }))
+          }.isSucceeded
+        }
       }
     } catch (e: EstablishDeclinedException) {
       // Initial CAS lost (key already present); the healer already revoked its lease.

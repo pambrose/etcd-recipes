@@ -122,19 +122,21 @@ constructor(
       retireHealer()
       val retired = AtomicBoolean(false)
       try {
-        keepAliveLease = client.selfHealingKeepAlive(
-          leaseTtlSecs.seconds,
-          resilience.lease,
-          leaseListener = { event -> onBarrierLeaseEvent(event) },
-          rpc = resilience.rpc,
-        ) { lease ->
-          if (retired.load()) {
-            false // explicitly removed: do not re-arm
-          } else {
-            client.transaction(resilience.rpc) {
-              If(barrierPath.doesNotExist)
-              Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
-            }.isSucceeded
+        keepAliveLease = withRecipeLoggingContext {
+          client.selfHealingKeepAlive(
+            leaseTtlSecs.seconds,
+            resilience.lease,
+            leaseListener = { event -> onBarrierLeaseEvent(event) },
+            rpc = resilience.rpc,
+          ) { lease ->
+            if (retired.load()) {
+              false // explicitly removed: do not re-arm
+            } else {
+              client.transaction(resilience.rpc) {
+                If(barrierPath.doesNotExist)
+                Then(barrierPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+              }.isSucceeded
+            }
           }
         }
         healerRetired = retired
@@ -241,30 +243,32 @@ constructor(
       if (closeCalled.load()) cancelWait()
 
       try {
-        client.withWatcher(
-          barrierPath,
-          watchOption,
-          resilience.watch,
-          recoveryListener,
-          resyncWith = null,
-          { watchResponse ->
-            for (event in watchResponse.events) {
-              if (event.eventType == DELETE) {
-                waitLatch.countDown()
+        withRecipeLoggingContext {
+          client.withWatcher(
+            barrierPath,
+            watchOption,
+            resilience.watch,
+            recoveryListener,
+            resyncWith = null,
+            { watchResponse ->
+              for (event in watchResponse.events) {
+                if (event.eventType == DELETE) {
+                  waitLatch.countDown()
+                }
               }
-            }
-          },
-        ) {
-          // Check one more time in case watch missed the delete just after last check
-          if (!waitOnMissingBarriers && !barrierKeyPresent)
-            waitLatch.countDown()
+            },
+          ) {
+            // Check one more time in case watch missed the delete just after last check
+            if (!waitOnMissingBarriers && !barrierKeyPresent)
+              waitLatch.countDown()
 
-          val released = waitLatch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-          watchFailure.load()?.let { cause ->
-            throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
+            val released = waitLatch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+            watchFailure.load()?.let { cause ->
+              throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
+            }
+            // A wait cancelled by close() reports not-released.
+            released && !cancelled.load()
           }
-          // A wait cancelled by close() reports not-released.
-          released && !cancelled.load()
         }
       } finally {
         activeWaiters -= cancelWait

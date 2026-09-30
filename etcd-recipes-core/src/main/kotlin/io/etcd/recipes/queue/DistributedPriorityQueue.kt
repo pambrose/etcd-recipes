@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.queue
 
+import com.pambrose.common.time.timeUnitToDuration
 import com.pambrose.common.util.sleep
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
@@ -33,6 +34,7 @@ import io.etcd.recipes.common.lessThan
 import io.etcd.recipes.common.setTo
 import io.etcd.recipes.common.transaction
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -52,6 +54,16 @@ class DistributedPriorityQueue
     val minimumWaitTime: Duration,
     resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
   ) : AbstractQueue(client, queuePath, SortTarget.KEY, resilience) {
+  /** [minimumWaitTime] in [unit]: the constructor Java can call (a Kotlin `Duration` hides the other). */
+  @JvmOverloads
+  constructor(
+    client: Client,
+    queuePath: String,
+    minimumWaitTime: Long,
+    unit: TimeUnit,
+    resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+  ) : this(client, queuePath, timeUnitToDuration(minimumWaitTime, unit), resilience)
+
   override val exceptionContext get() = "DistributedPriorityQueue[$queuePath]"
 
   private var lastWriteTime = TimeSource.Monotonic.markNow()

@@ -97,18 +97,20 @@ class LeaderObserver
       val seed = client.getResponse(leaderKey, rpc = resilience.rpc)
       currentLeaderRef.store(seed.kvs.firstOrNull()?.value?.asString?.let { ElectionPaths.stripLeaderClientId(it) })
       watcher =
-        client.watcher(
-          leaderKey,
-          watchOption { withRevision(seed.header.revision + 1) },
-          resilience.watch,
-          recoveryListener = WatchRecoveryListener { event -> onRecovery(event) },
-          resyncWith = null,
-        ) { response ->
-          response.events.forEach { event ->
-            when (event.eventType) {
-              PUT -> setLeader(ElectionPaths.stripLeaderClientId(event.keyValue.value.asString))
-              DELETE -> clearLeader()
-              else -> logger.error { "Unrecognized event on $leaderKey" }
+        withRecipeLoggingContext {
+          client.watcher(
+            leaderKey,
+            watchOption { withRevision(seed.header.revision + 1) },
+            resilience.watch,
+            recoveryListener = WatchRecoveryListener { event -> onRecovery(event) },
+            resyncWith = null,
+          ) { response ->
+            response.events.forEach { event ->
+              when (event.eventType) {
+                PUT -> setLeader(ElectionPaths.stripLeaderClientId(event.keyValue.value.asString))
+                DELETE -> clearLeader()
+                else -> logger.error { "Unrecognized event on $leaderKey" }
+              }
             }
           }
         }

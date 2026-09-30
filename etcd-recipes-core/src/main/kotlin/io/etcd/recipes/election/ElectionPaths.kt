@@ -21,11 +21,8 @@ import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.appendToPath
 
 /**
- * The etcd key scheme shared by every election participant. This MUST stay in
- * lockstep with `LeaderSelector`'s private `withLeaderSuffix` /
- * `withParticipationSuffix` / `stripUniqueSuffix` (that file is source-frozen, so
- * the scheme cannot be extracted from it) so that latches, selectors, and observers
- * interoperate in one election.
+ * The etcd key scheme shared by every election participant — selectors, latches, observers,
+ * and the leadership flow — so they interoperate in one election.
  */
 internal object ElectionPaths {
   const val LEADER_KEY = "LEADER"

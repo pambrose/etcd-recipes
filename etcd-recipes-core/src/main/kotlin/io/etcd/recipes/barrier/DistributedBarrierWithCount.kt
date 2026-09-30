@@ -246,19 +246,21 @@ constructor(
       // key unexpectedly exists — ownership is not reclaimed.
       val healer =
         try {
-          client.selfHealingKeepAlive(
-            leaseTtlSecs.seconds,
-            resilience.lease,
-            leaseListener = { event -> onWaiterLeaseEvent(event) },
-            rpc = resilience.rpc,
-          ) { lease ->
-            if (keepAliveClosed.get()) {
-              false
-            } else {
-              client.transaction(resilience.rpc) {
-                If(myWaitingPath.doesNotExist)
-                Then(myWaitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
-              }.isSucceeded
+          withRecipeLoggingContext {
+            client.selfHealingKeepAlive(
+              leaseTtlSecs.seconds,
+              resilience.lease,
+              leaseListener = { event -> onWaiterLeaseEvent(event) },
+              rpc = resilience.rpc,
+            ) { lease ->
+              if (keepAliveClosed.get()) {
+                false
+              } else {
+                client.transaction(resilience.rpc) {
+                  If(myWaitingPath.doesNotExist)
+                  Then(myWaitingPath.setTo(uniqueToken, putOption { withLeaseId(lease.id) }))
+                }.isSucceeded
+              }
             }
           }
         } catch (e: EtcdRecipeRuntimeException) {
@@ -340,40 +342,38 @@ constructor(
                 }
               }
 
-            client.withWatcher(
-              trailingKey,
-              watchOption,
-              resilience.watch,
-              recoveryListener,
-              resyncWith = null,
-              { watchResponse ->
-                watchResponse.events
-                  .forEach { watchEvent ->
-                    val key = watchEvent.keyValue.key.asString
-                    when {
-                      key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> recheck()
-                      key == readyPath && watchEvent.eventType == DELETE -> closeKeepAlive()
+            withRecipeLoggingContext {
+              client.withWatcher(
+                trailingKey,
+                watchOption,
+                resilience.watch,
+                recoveryListener,
+                resyncWith = null,
+                { watchResponse ->
+                  watchResponse.events
+                    .forEach { watchEvent ->
+                      val key = watchEvent.keyValue.key.asString
+                      when {
+                        key.startsWith(waitingPrefix) && watchEvent.eventType == PUT -> recheck()
+                        key == readyPath && watchEvent.eventType == DELETE -> closeKeepAlive()
+                      }
                     }
-                  }
-              },
-            ) {
-              // Check one more time in case watch missed the delete just after last check
-              checkWaiterCount()
+                },
+              ) {
+                // Check one more time in case watch missed the delete just after last check
+                checkWaiterCount()
 
-              val signalled = keepAliveClosed.waitUntilTrueWithInterruption(timeout)
-              // Cleanup if a time-out occurred
-              if (!signalled) {
-                closeKeepAlive()
-                // Redundant, but waiting for the keep-alive to stop is slower
-                client.deleteKey(myWaitingPath, resilience.rpc)
+                val signalled = keepAliveClosed.waitUntilTrueWithInterruption(timeout)
+                // A timeout stops counting this waiter: closeKeepAlive() deletes its key
+                if (!signalled) closeKeepAlive()
+
+                watchFailure.load()?.let { cause ->
+                  throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
+                }
+
+                // Distinguish natural completion from cancellation.
+                signalled && !cancelled.get()
               }
-
-              watchFailure.load()?.let { cause ->
-                throw EtcdRecipeRuntimeException("Barrier watch on $barrierPath failed while waiting", cause)
-              }
-
-              // Distinguish natural completion from cancellation.
-              signalled && !cancelled.get()
             }
           }
     } finally {

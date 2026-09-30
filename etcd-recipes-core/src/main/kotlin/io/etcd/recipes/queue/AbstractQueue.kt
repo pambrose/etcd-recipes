@@ -231,48 +231,50 @@ abstract class AbstractQueue(
 
     // Watch this queue's children only. A bare-path prefix watch would also match a
     // sibling path that merely shares the string prefix (/jobs vs /jobs2/...).
-    return client.withWatcher(
-      queuePath.ensureSuffix("/"),
-      watchOption,
-      resilience.watch,
-      recoveryListener,
-      resyncWith = null,
-      { watchResponse ->
-        if (watchResponse.events.any { it.eventType == WatchEvent.EventType.PUT }) watchLatch.countDown()
-      },
-    ) {
-      // Poll once to UNBLOCK: a value may have arrived between watcher.use { } and the
-      // watch going live in jetcd, and the watcher never delivers such a pre-live PUT,
-      // so a poll is needed to count the latch down.
-      if (watchLatch.count > 0 && readHead().entry != null)
-        watchLatch.countDown()
+    return withRecipeLoggingContext {
+      client.withWatcher(
+        queuePath.ensureSuffix("/"),
+        watchOption,
+        resilience.watch,
+        recoveryListener,
+        resyncWith = null,
+        { watchResponse ->
+          if (watchResponse.events.any { it.eventType == WatchEvent.EventType.PUT }) watchLatch.countDown()
+        },
+      ) {
+        // Poll once to UNBLOCK: a value may have arrived between watcher.use { } and the
+        // watch going live in jetcd, and the watcher never delivers such a pre-live PUT,
+        // so a poll is needed to count the latch down.
+        if (watchLatch.count > 0 && readHead().entry != null)
+          watchLatch.countDown()
 
-      if (deadline == null) {
-        watchLatch.await()
-      } else {
-        val remaining = -deadline.elapsedNow() // negative elapsed = time still left
-        if (remaining > Duration.ZERO) {
-          watchLatch.await(remaining.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        if (deadline == null) {
+          watchLatch.await()
+        } else {
+          val remaining = -deadline.elapsedNow() // negative elapsed = time still left
+          if (remaining > Duration.ZERO) {
+            watchLatch.await(remaining.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+          }
         }
-      }
-      if (closeCalled.load()) throw EtcdRecipeRuntimeException("Queue $queuePath closed while waiting for an item")
+        if (closeCalled.load()) throw EtcdRecipeRuntimeException("Queue $queuePath closed while waiting for an item")
 
-      // STRICT ORDERING: whichever PUT woke the watcher is not necessarily the head by
-      // sort order — a lower-priority key can be committed just before a higher-priority
-      // one. So after waking, re-query the actual first child by `target`; this routes
-      // the wake-up path through the SAME head-selection as the non-empty fast path
-      // above, guaranteeing the highest-priority (KEY) / oldest (MOD) item. An empty
-      // re-query means a concurrent consumer already took the head: return null and
-      // the outer loop re-reads. (Never fall back to the key the watcher saw — the
-      // re-query is a linearizable read taken after the event, so a key it misses is
-      // already gone.)
-      val head = readHead().entry
-      if (head == null) {
-        watchFailure.load()?.let { cause ->
-          throw EtcdRecipeRuntimeException("Queue watch on $queuePath failed while waiting for an item", cause)
+        // STRICT ORDERING: whichever PUT woke the watcher is not necessarily the head by
+        // sort order — a lower-priority key can be committed just before a higher-priority
+        // one. So after waking, re-query the actual first child by `target`; this routes
+        // the wake-up path through the SAME head-selection as the non-empty fast path
+        // above, guaranteeing the highest-priority (KEY) / oldest (MOD) item. An empty
+        // re-query means a concurrent consumer already took the head: return null and
+        // the outer loop re-reads. (Never fall back to the key the watcher saw — the
+        // re-query is a linearizable read taken after the event, so a key it misses is
+        // already gone.)
+        val head = readHead().entry
+        if (head == null) {
+          watchFailure.load()?.let { cause ->
+            throw EtcdRecipeRuntimeException("Queue watch on $queuePath failed while waiting for an item", cause)
+          }
         }
+        head
       }
-      head
     }
   }
 

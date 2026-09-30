@@ -16,6 +16,7 @@
 
 package io.etcd.recipes.common
 
+import com.pambrose.common.time.timeUnitToDuration
 import io.etcd.jetcd.Client
 import io.etcd.recipes.cache.NodeCache
 import io.etcd.recipes.cache.PathChildrenCache
@@ -27,6 +28,7 @@ import io.etcd.recipes.lock.DistributedReadWriteLock
 import io.etcd.recipes.lock.DistributedSemaphore
 import io.etcd.recipes.queue.DistributedPriorityQueue
 import io.etcd.recipes.queue.DistributedQueue
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -54,10 +56,19 @@ class EtcdRecipes
 
     fun distributedQueue(queuePath: String): DistributedQueue = DistributedQueue(client, queuePath, resilience)
 
+    // @JvmOverloads: the Duration parameter hides this from Java; the overload without it doesn't
+    @JvmOverloads
     fun distributedPriorityQueue(
       queuePath: String,
       minimumWaitTime: Duration = 0.milliseconds,
     ): DistributedPriorityQueue = DistributedPriorityQueue(client, queuePath, minimumWaitTime, resilience)
+
+    /** [minimumWaitTime] in [unit]: the form Java can call. */
+    fun distributedPriorityQueue(
+      queuePath: String,
+      minimumWaitTime: Long,
+      unit: TimeUnit,
+    ): DistributedPriorityQueue = distributedPriorityQueue(queuePath, timeUnitToDuration(minimumWaitTime, unit))
 
     fun leaderLatch(electionPath: String): LeaderLatch = LeaderLatch(client, electionPath, resilience = resilience)
 

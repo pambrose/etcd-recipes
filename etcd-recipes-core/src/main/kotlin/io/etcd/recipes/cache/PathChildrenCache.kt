@@ -250,47 +250,49 @@ class PathChildrenCache
     val watchOption = watchOption {
       isPrefix(true).also { if (startRevision > 0L) it.withRevision(startRevision) }
     }
-    watcher = client.watcher(
-      trailingPath,
-      watchOption,
-      resilience.watch,
-      recoveryListener = { event -> onRecoveryEvent(event) },
-      resyncWith = { reconcile(emitEvents = true) },
-    ) { watchResponse ->
-      watchResponse.events
-        .forEach { event ->
-          val (k, v) = event.keyValue.asPair
-          val stripped = k.substring(trailingPath.length)
-          when (event.eventType) {
-            PUT -> {
-              val isAdd =
-                synchronized(applyLock) {
-                  lastAppliedRevision = maxOf(lastAppliedRevision, event.keyValue.modRevision)
-                  cacheMap.put(stripped, v) == null
-                }
-              logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
-              fireChildEvent(PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v))
-            }
+    watcher = withRecipeLoggingContext {
+      client.watcher(
+        trailingPath,
+        watchOption,
+        resilience.watch,
+        recoveryListener = { event -> onRecoveryEvent(event) },
+        resyncWith = { reconcile(emitEvents = true) },
+      ) { watchResponse ->
+        watchResponse.events
+          .forEach { event ->
+            val (k, v) = event.keyValue.asPair
+            val stripped = k.substring(trailingPath.length)
+            when (event.eventType) {
+              PUT -> {
+                val isAdd =
+                  synchronized(applyLock) {
+                    lastAppliedRevision = maxOf(lastAppliedRevision, event.keyValue.modRevision)
+                    cacheMap.put(stripped, v) == null
+                  }
+                logger.debug { "$stripped ${if (isAdd) "added" else "updated"}" }
+                fireChildEvent(PathChildrenCacheEvent(stripped, if (isAdd) CHILD_ADDED else CHILD_UPDATED, v))
+              }
 
-            DELETE -> {
-              logger.debug { "$stripped deleted" }
-              val prevValue =
-                synchronized(applyLock) {
-                  lastAppliedRevision = maxOf(lastAppliedRevision, event.keyValue.modRevision)
-                  cacheMap.remove(stripped)
-                }
-              fireChildEvent(PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue))
-            }
+              DELETE -> {
+                logger.debug { "$stripped deleted" }
+                val prevValue =
+                  synchronized(applyLock) {
+                    lastAppliedRevision = maxOf(lastAppliedRevision, event.keyValue.modRevision)
+                    cacheMap.remove(stripped)
+                  }
+                fireChildEvent(PathChildrenCacheEvent(stripped, CHILD_REMOVED, prevValue))
+              }
 
-            UNRECOGNIZED -> {
-              logger.error { "Unrecognized error with $cachePath watch" }
-            }
+              UNRECOGNIZED -> {
+                logger.error { "Unrecognized error with $cachePath watch" }
+              }
 
-            else -> {
-              logger.error { "Unknown error with $cachePath watch" }
+              else -> {
+                logger.error { "Unknown error with $cachePath watch" }
+              }
             }
           }
-        }
+      }
     }
   }
 

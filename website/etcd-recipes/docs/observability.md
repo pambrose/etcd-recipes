@@ -131,6 +131,12 @@ Without it, that line arrives from a thread named `etcd-lease-healer` with no cl
 of your recipes owns it — and the healer threads of every recipe in the process share
 that name.
 
+That covers watch callbacks and recovery handling (the `etcd-watch-dispatcher` threads),
+lease heals, and the listeners a recipe calls from them. A watcher or lease healer runs its
+work with the MDC of the code that created it, so one you create yourself with
+`client.watcher(...)` or `client.selfHealingKeepAlive(...)` keeps whatever MDC you had set.
+The work queue's sweeper thread is named `workqueue-sweeper[<queue path>]`.
+
 ## The Micrometer meter catalog
 
 The [`etcd-recipes-micrometer`](integrations/index.md) module supplies

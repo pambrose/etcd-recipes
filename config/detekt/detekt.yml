@@ -10,6 +10,14 @@ complexity:
     active: false
 
 style:
+  ForbiddenImport:
+    # The repo standardized on kotlin.concurrent.atomics; Java's atomics crept back more
+    # than once, so an import of them now fails the build.
+    active: true
+    forbiddenImports:
+      - value: 'java.util.concurrent.atomic.*'
+        reason: 'Use kotlin.concurrent.atomics (AtomicInt, AtomicLong, AtomicBoolean, AtomicReference).'
+
   MagicNumber:
     # Numeric literals are pervasive and self-explanatory in this codebase
     # (lease TTLs, retry counts, byte offsets, timeouts). Hoisting every one

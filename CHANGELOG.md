@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (Java interop, logging context, and leftovers)
+
+- Java can construct a `DistributedPriorityQueue` and set `LeaderLatch`'s
+  `closeJoinTimeout`. A Kotlin `Duration` parameter hides a member from Java, and those were
+  the only forms. New `(long, TimeUnit)` overloads:
+  `DistributedPriorityQueue(client, path, wait, unit[, resilience])`,
+  `EtcdRecipes.distributedPriorityQueue(path, wait, unit)`, and a `LeaderLatch` constructor
+  ending in `closeJoinTimeout, unit`. `EtcdRecipes.distributedPriorityQueue(path)` is now
+  callable from Java too. A Java source file in the test source set references each of
+  them, so CI's compile catches a Java-hidden API.
+- Background logs are attributable. A watcher (`Client.watcher` / `withWatcher`) and a lease
+  healer (`selfHealingKeepAlive`) now run every callback, recovery attempt, and heal with the
+  MDC of the code that created them. Every recipe creates them under its
+  `etcd.recipe` identity, so the watch blocks and recovery handlers of the caches, service
+  cache, observer, barriers, queues, locks, registry, and `TransientKeyValue` now log with it.
+  So do the listeners they call. The work queue's sweeper runs under it too, and its thread
+  is named `workqueue-sweeper[<queue path>]`.
+- `DistributedReadWriteLock` no longer uses a fully qualified
+  `java.util.concurrent.atomic.AtomicReference`. A detekt `ForbiddenImport` rule now rejects
+  `java.util.concurrent.atomic` imports.
+- A counted-barrier wait that times out no longer makes a second, un-guarded delete of its
+  waiting key; an etcd error there used to turn the timeout (`false`) into a throw.
+- `LeaderSelector` uses the shared `ElectionPaths` key scheme instead of its own copy.
+
 ### Changed (tests and CI)
 
 - The counted barrier's watcher tests wait until the waiter is parked before injecting a
