@@ -18,16 +18,14 @@
 
 package io.etcd.recipes.examples.discovery
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.ServiceInstance
 import io.etcd.recipes.discovery.ServiceRegistry
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Demonstrates self-healing service registration: kill and restart the local etcd
- * (`./etcd.sh`) — or stop it for longer than the TTL — while this runs. The
+ * (`./etcd-start.sh`) — or stop it for longer than the TTL — while this runs. The
  * instance registration expires with its lease and is automatically re-registered
  * when the healer re-grants it; every lease event is printed.
  */
@@ -46,7 +44,7 @@ fun main() {
       logger.info { "Registered ${instance.name}/${instance.id}" }
 
       repeat(120) {
-        sleep(2.seconds)
+        Thread.sleep(2_000)
         logger.info { "Still running; exceptions so far: ${registry.exceptions.size}" }
       }
     }

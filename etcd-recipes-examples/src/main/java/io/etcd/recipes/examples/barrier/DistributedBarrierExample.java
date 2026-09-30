@@ -16,7 +16,6 @@
 
 package io.etcd.recipes.examples.barrier;
 
-import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.recipes.barrier.DistributedBarrier;
 
@@ -26,13 +25,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 
 public class DistributedBarrierExample {
 
   public static void main(String[] args) throws InterruptedException {
-    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    List<String> urls = List.of("http://localhost:2379");
     String path = "/barriers/DistributedBarrierExample";
     int threadCount = 5;
     CountDownLatch waitLatch = new CountDownLatch(threadCount);
@@ -46,11 +44,13 @@ public class DistributedBarrierExample {
         barrier.setBarrier();
 
         goLatch.countDown();
-        sleepSecs(6);
+        TimeUnit.SECONDS.sleep(6);
 
         System.out.println("Removing Barrier");
         barrier.removeBarrier();
-        sleepSecs(3);
+        TimeUnit.SECONDS.sleep(3);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       }
     });
 

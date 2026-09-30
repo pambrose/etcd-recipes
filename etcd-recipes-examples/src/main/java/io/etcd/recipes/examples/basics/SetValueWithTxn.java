@@ -16,7 +16,6 @@
 
 package io.etcd.recipes.examples.basics;
 
-import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 
 import java.util.List;
@@ -27,7 +26,7 @@ import static io.etcd.recipes.common.TxnUtils.*;
 import static java.lang.String.format;
 
 public class SetValueWithTxn {
-  private static final List<String> urls = Lists.newArrayList("http://localhost:2379");
+  private static final List<String> urls = List.of("http://localhost:2379");
   private static final String path = "/txnexample";
   private static final String keyval = "foobar";
 

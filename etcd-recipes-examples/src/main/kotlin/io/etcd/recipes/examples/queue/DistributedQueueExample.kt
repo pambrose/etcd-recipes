@@ -18,15 +18,13 @@
 
 package io.etcd.recipes.examples.queue
 
-import com.pambrose.common.concurrent.thread
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
 import io.etcd.recipes.queue.withDistributedQueue
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
-import kotlin.time.Duration.Companion.seconds
+import kotlin.concurrent.thread
 
 fun main() {
   val logger = KotlinLogging.logger {}
@@ -46,16 +44,20 @@ fun main() {
 
     val latch = CountDownLatch(threadCount)
     repeat(threadCount) { sub ->
-      thread(latch) {
-        connectToEtcd(urls) { client ->
-          withDistributedQueue(client, queuePath) {
-            repeat((iterCount / threadCount) * 2) { logger.info {"Thread#: $sub Value: ${dequeue().asString}"} }
+      thread {
+        try {
+          connectToEtcd(urls) { client ->
+            withDistributedQueue(client, queuePath) {
+              repeat((iterCount / threadCount) * 2) { logger.info {"Thread#: $sub Value: ${dequeue().asString}"} }
+            }
           }
+        } finally {
+          latch.countDown()
         }
       }
     }
 
-    sleep(2.seconds)
+    Thread.sleep(2_000)
 
     // Now enqueue some data with dequeues waiting
     withDistributedQueue(client, queuePath) {

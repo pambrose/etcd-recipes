@@ -18,8 +18,6 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.pambrose.common.concurrent.thread
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.keyAsString
 import io.etcd.recipes.common.putValueWithKeepAlive
@@ -48,18 +46,22 @@ fun main() {
     }
   }
 
-  thread(latch) {
-    connectToEtcd(urls) { client ->
-      logger.info { "Assigning $path = $keyval" }
-      client.putValueWithKeepAlive(path, keyval, 2.seconds) {
-        logger.info { "Starting sleep" }
-        sleep(5.seconds)
-        logger.info { "Finished sleep" }
+  thread {
+    try {
+      connectToEtcd(urls) { client ->
+        logger.info { "Assigning $path = $keyval" }
+        client.putValueWithKeepAlive(path, keyval, 2.seconds) {
+          logger.info { "Starting sleep" }
+          Thread.sleep(5_000)
+          logger.info { "Finished sleep" }
+        }
+        logger.info { "Keep-alive is now terminated" }
+        Thread.sleep(5_000)
       }
-      logger.info { "Keep-alive is now terminated" }
-      sleep(5.seconds)
+      logger.info { "Releasing latch" }
+    } finally {
+      latch.countDown()
     }
-    logger.info { "Releasing latch" }
   }
 
   latch.await()

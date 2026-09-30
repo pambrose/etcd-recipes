@@ -62,9 +62,11 @@ Published to Maven Central under the group `com.pambrose`. The core artifact was
 
 ## Examples
 
-Every recipe has runnable `main()` demos under `etcd-recipes-examples/` in both
-[Kotlin](etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples/) and
-[Java](etcd-recipes-examples/src/main/java/io/etcd/recipes/examples/).
+Runnable `main()` demos live under `etcd-recipes-examples/`:
+[Kotlin](etcd-recipes-examples/src/main/kotlin/io/etcd/recipes/examples/) for every recipe
+area except `TransientKeyValue`, and
+[Java](etcd-recipes-examples/src/main/java/io/etcd/recipes/examples/) for the barriers, basics,
+counters, discovery, and election.
 
 The documentation site's code examples are separate: real source files under
 `src/test/.../website/` source sets, embedded into the Markdown at build time and

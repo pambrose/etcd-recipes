@@ -16,28 +16,27 @@
 
 package io.etcd.recipes.examples.discovery;
 
-import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.recipes.common.EtcdRecipeException;
 import io.etcd.recipes.discovery.ServiceDiscovery;
 import io.etcd.recipes.discovery.ServiceInstance;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
-import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 
 public class ServiceDiscoveryExample {
 
-  public static final List<String> urls = Lists.newArrayList("http://localhost:2379");
+  public static final List<String> urls = List.of("http://localhost:2379");
   public static final String path = "/services/ServiceDiscoveryExample";
   public static final String serviceName = "ExampleService";
 
-  public static void main(String[] args) throws EtcdRecipeException {
+  public static void main(String[] args) throws EtcdRecipeException, InterruptedException {
     serviceExample(true);
   }
 
-  public static void serviceExample(boolean verbose) throws EtcdRecipeException {
+  public static void serviceExample(boolean verbose) throws EtcdRecipeException, InterruptedException {
 
     try (Client client = connectToEtcd(urls);
          ServiceDiscovery sd = new ServiceDiscovery(client, path)) {
@@ -55,7 +54,7 @@ public class ServiceDiscoveryExample {
         System.out.println("Retrieved names: " + sd.queryForNames());
       }
 
-      sleepSecs(2);
+      TimeUnit.SECONDS.sleep(2);
       System.out.println("Updating service");
       payload.setIntval(-888);
       service.setJsonPayload(payload.toJson());
@@ -66,10 +65,10 @@ public class ServiceDiscoveryExample {
         System.out.println("Retrieved names: " + sd.queryForNames());
       }
 
-      sleepSecs(2);
+      TimeUnit.SECONDS.sleep(2);
       System.out.println("Unregistering service");
       sd.unregisterService(service);
-      sleepSecs(3);
+      TimeUnit.SECONDS.sleep(3);
 
       try {
         System.out.println("Retrieved value: " + sd.queryForInstance(service.getName(), service.getId()));

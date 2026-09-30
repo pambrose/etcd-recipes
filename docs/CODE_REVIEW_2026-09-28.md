@@ -162,8 +162,8 @@
 - [x] [#100](#issue-100) `TransientKeyValueTest` counts every key under `/keyvalue`, which other test classes write to in parallel
 - [x] [#101](#issue-101) Some regression tests can't fail for the bug they target
 - [x] [#102](#issue-102) The minimum Kotlin version for consumers (2.3+) is undocumented
-- [ ] [#103](#issue-103) Documentation drift (`CLAUDE.md`, README, `llms.txt`, CHANGELOG, version string)
-- [ ] [#104](#issue-104) Most examples depend on helper libraries that consumers won't have
+- [x] [#103](#issue-103) Documentation drift (`CLAUDE.md`, README, `llms.txt`, CHANGELOG, version string)
+- [x] [#104](#issue-104) Most examples depend on helper libraries that consumers won't have
 - [x] [#105](#issue-105) CI hygiene (token permissions, action versions, ungated docs deploy)
 
 ## Remediation plan

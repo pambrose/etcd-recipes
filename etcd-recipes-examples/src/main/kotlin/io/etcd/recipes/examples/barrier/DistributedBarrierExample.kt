@@ -18,8 +18,6 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.pambrose.common.concurrent.thread
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.barrier.withDistributedBarrier
 import io.etcd.recipes.common.connectToEtcd
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -41,27 +39,31 @@ fun main() {
         logger.info { "Setting Barrier" }
         setBarrier()
         goLatch.countDown()
-        sleep(6.seconds)
+        Thread.sleep(6_000)
         logger.info { "Removing Barrier" }
         removeBarrier()
-        sleep(3.seconds)
+        Thread.sleep(3_000)
       }
     }
   }
 
   repeat(count) { i ->
-    thread(waitLatch) {
-      goLatch.await()
-      connectToEtcd(urls) { client ->
-        withDistributedBarrier(client, barrierPath) {
-          logger.info { "$i Waiting on Barrier" }
-          waitOnBarrier(1.seconds)
+    thread {
+      try {
+        goLatch.await()
+        connectToEtcd(urls) { client ->
+          withDistributedBarrier(client, barrierPath) {
+            logger.info { "$i Waiting on Barrier" }
+            waitOnBarrier(1.seconds)
 
-          logger.info { "$i Timed out waiting on barrier, waiting again" }
-          waitOnBarrier()
+            logger.info { "$i Timed out waiting on barrier, waiting again" }
+            waitOnBarrier()
 
-          logger.info { "$i Done Waiting on Barrier" }
+            logger.info { "$i Done Waiting on Barrier" }
+          }
         }
+      } finally {
+        waitLatch.countDown()
       }
     }
   }

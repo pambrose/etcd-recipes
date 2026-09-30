@@ -16,7 +16,6 @@
 
 package io.etcd.recipes.examples.cache
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.cache.withPathChildrenCache
 import io.etcd.recipes.common.asString
@@ -24,7 +23,6 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.putValue
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val logger = KotlinLogging.logger {}
@@ -36,7 +34,7 @@ fun main() {
     client.putValue("$cachePath/child1", "a child 1 value")
     client.putValue("$cachePath/child2", "a child 2 value")
 
-    sleep(1.seconds)
+    Thread.sleep(1_000)
 
     withPathChildrenCache(client, cachePath) {
       addListener { event: PathChildrenCacheEvent ->
@@ -50,7 +48,7 @@ fun main() {
 
       logger.info { "Deleted: ${client.deleteChildren(cachePath)}" }
 
-      sleep(1.seconds)
+      Thread.sleep(1_000)
     }
   }
 }

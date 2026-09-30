@@ -18,16 +18,13 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.pambrose.common.concurrent.thread
-import com.pambrose.common.util.repeatWithSleep
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.common.putValue
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
-import kotlin.time.Duration.Companion.seconds
+import kotlin.concurrent.thread
 
 fun main() {
   val logger = KotlinLogging.logger {}
@@ -36,23 +33,33 @@ fun main() {
   val keyval = "foobar"
   val latch = CountDownLatch(2)
 
-  thread(latch) {
-    sleep(3.seconds)
-    connectToEtcd(urls) { client ->
-      logger.info {"Assigning $path = $keyval"}
-      client.putValue(path, keyval)
-      sleep(5.seconds)
-      logger.info {"Deleting $path"}
-      client.deleteKey(path)
+  thread {
+    try {
+      Thread.sleep(3_000)
+      connectToEtcd(urls) { client ->
+        logger.info {"Assigning $path = $keyval"}
+        client.putValue(path, keyval)
+        Thread.sleep(5_000)
+        logger.info {"Deleting $path"}
+        client.deleteKey(path)
+      }
+    } finally {
+      latch.countDown()
     }
   }
 
-  thread(latch) {
-    connectToEtcd(urls) { client ->
-      repeatWithSleep(12) { _, start ->
-        val elapsed = System.currentTimeMillis() - start
-        logger.info {"Key $path = ${client.getValue(path, "unset")} after ${elapsed}ms"}
+  thread {
+    try {
+      connectToEtcd(urls) { client ->
+        val start = System.currentTimeMillis()
+        repeat(12) { i ->
+          if (i > 0) Thread.sleep(1_000)
+          val elapsed = System.currentTimeMillis() - start
+          logger.info {"Key $path = ${client.getValue(path, "unset")} after ${elapsed}ms"}
+        }
       }
+    } finally {
+      latch.countDown()
     }
   }
 

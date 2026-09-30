@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (examples and docs)
+
+- The runnable examples use only the standard library, etcd-recipes, and kotlin-logging.
+  They used to import sleep, thread, and random helpers from Guava and common-utils, which a
+  project copying an example doesn't have. The examples module no longer depends on either
+  library.
+- Documentation drift fixed:
+  - CLAUDE.md no longer pins a stale Gradle version or claims Kluent assertions.
+  - `make docs-check` is described as what CI *checks*: `ci.yml` compiles the snippets and
+    `docs.yml` builds the site.
+  - The README's lint command runs detekt too.
+  - `llms.txt` says which recipe areas have Java examples.
+  - References to a nonexistent `./etcd.sh` / `make etcd` now name `etcd-start.sh` /
+    `make etcd-start`.
+
 ### Added (fencing tokens)
 
 - `EtcdLock.fencingToken` (on `DistributedMutex` and both of `DistributedReadWriteLock`'s

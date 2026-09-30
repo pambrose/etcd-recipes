@@ -16,21 +16,21 @@
 
 package io.etcd.recipes.examples.election;
 
-import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.recipes.election.LeaderSelector;
 import io.etcd.recipes.election.LeaderSelectorListener;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
-import static com.pambrose.common.util.MiscJavaFuncs.random;
-import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 
 public class LeaderSelectorExample {
 
   public static void main(String[] args) throws InterruptedException {
-    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    List<String> urls = List.of("http://localhost:2379");
     String electionPath = "/election/LeaderSelectorExample";
     int count = 5;
 
@@ -39,8 +39,12 @@ public class LeaderSelectorExample {
         @Override
         public void takeLeadership(LeaderSelector selector) {
           System.out.println(selector.getClientId() + " elected leader");
-          long pause = random(5);
-          sleepSecs(pause);
+          long pause = ThreadLocalRandom.current().nextLong(5);
+          try {
+            TimeUnit.SECONDS.sleep(pause);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
           System.out.printf("%s surrendering after %s seconds%n", selector.getClientId(), pause);
         }
 
@@ -61,7 +65,7 @@ public class LeaderSelectorExample {
       }
 
       System.out.println("\nMultiple leaders are created and each runs for election once");
-      List<LeaderSelector> selectors = Lists.newArrayList();
+      List<LeaderSelector> selectors = new ArrayList<>();
       for (int i = 0; i < count; i++)
         selectors.add(new LeaderSelector(client, electionPath, listener));
 

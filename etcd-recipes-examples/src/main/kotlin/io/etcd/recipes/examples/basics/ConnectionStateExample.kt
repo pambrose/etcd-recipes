@@ -18,17 +18,15 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.ConnectionState
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.keyvalue.TransientKeyValue
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Demonstrates connection-state listeners: a TransientKeyValue derives
  * CONNECTED / SUSPENDED / RECONNECTED / LOST from its own lease stream. Kill and
- * restart the local etcd (`./etcd.sh`) while this runs — a short outage reports
+ * restart the local etcd (`./etcd-start.sh`) while this runs — a short outage reports
  * SUSPENDED then RECONNECTED; one longer than the TTL reports LOST (the lease
  * expired; the key is healed) then RECONNECTED.
  */
@@ -43,7 +41,7 @@ fun main() {
         if (new == ConnectionState.LOST) logger.warn { "Ownership may have been lost during the outage" }
       }
       repeat(120) {
-        sleep(2.seconds)
+        Thread.sleep(2_000)
         logger.info { "state=${tkv.connectionState}" }
       }
     }

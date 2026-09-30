@@ -18,8 +18,6 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.pambrose.common.util.random
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.barrier.DistributedBarrierWithCount
 import io.etcd.recipes.barrier.withDistributedBarrierWithCount
 import io.etcd.recipes.common.connectToEtcd
@@ -27,6 +25,7 @@ import io.etcd.recipes.common.deleteChildren
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
+import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
@@ -42,7 +41,7 @@ fun main() {
     barrier: DistributedBarrierWithCount,
     retryCount: Int = 0,
   ) {
-    sleep(10.random().seconds)
+    Thread.sleep(Random.nextInt(10) * 1_000L)
     logger.info { "#$id Waiting on barrier" }
 
     repeat(retryCount) {
@@ -70,7 +69,7 @@ fun main() {
     }
 
     retryLatch.await()
-    sleep(2.seconds)
+    Thread.sleep(2_000)
 
     withDistributedBarrierWithCount(client, barrierPath, count) {
       waiter(99, this)

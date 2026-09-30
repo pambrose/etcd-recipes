@@ -18,8 +18,6 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.pambrose.common.util.random
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.barrier.DistributedDoubleBarrier
 import io.etcd.recipes.barrier.withDistributedDoubleBarrier
 import io.etcd.recipes.common.connectToEtcd
@@ -27,6 +25,7 @@ import io.etcd.recipes.common.deleteChildren
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
+import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
@@ -43,7 +42,7 @@ fun main() {
     barrier: DistributedDoubleBarrier,
     retryCount: Int = 0,
   ) {
-    sleep(10.random().seconds)
+    Thread.sleep(Random.nextInt(10) * 1_000L)
 
     repeat(retryCount) {
       logger.info {"#$id Waiting to enter barrier"}
@@ -63,7 +62,7 @@ fun main() {
     barrier: DistributedDoubleBarrier,
     retryCount: Int = 0,
   ) {
-    sleep(10.random().seconds)
+    Thread.sleep(Random.nextInt(10) * 1_000L)
 
     repeat(retryCount) {
       println("#$id Waiting to leave barrier")
@@ -88,7 +87,7 @@ fun main() {
       connectToEtcd(urls) { client ->
         withDistributedDoubleBarrier(client, barrierPath, count) {
           enterBarrier(i, this, 2)
-          sleep(5.random().seconds)
+          Thread.sleep(Random.nextInt(5) * 1_000L)
           leaveBarrier(i, this, 2)
         }
       }
@@ -98,11 +97,11 @@ fun main() {
   connectToEtcd(urls) { client ->
     withDistributedDoubleBarrier(client, barrierPath, count) {
       enterLatch.await()
-      sleep(2.seconds)
+      Thread.sleep(2_000)
       enterBarrier(99, this)
 
       leaveLatch.await()
-      sleep(2.seconds)
+      Thread.sleep(2_000)
       leaveBarrier(99, this)
     }
   }

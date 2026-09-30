@@ -16,7 +16,6 @@
 
 package io.etcd.recipes.examples.basics;
 
-import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KeyValue;
 import io.etcd.jetcd.Watch.Watcher;
@@ -27,8 +26,8 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.ByteSequenceUtils.getAsString;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static io.etcd.recipes.common.KVUtils.putValue;
@@ -37,7 +36,7 @@ import static io.etcd.recipes.common.WatchUtils.watcher;
 public class SetValueAndWatch {
 
   public static void main(String[] args) throws InterruptedException {
-    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    List<String> urls = List.of("http://localhost:2379");
     String path = "/foo";
     String keyval = "foobar";
     ExecutorService executor = Executors.newCachedThreadPool();
@@ -49,11 +48,13 @@ public class SetValueAndWatch {
           String kv = keyval + i;
           System.out.printf("Assigning %s = %s%n", path, kv);
           putValue(client, path, kv);
-          sleepSecs(2);
+          TimeUnit.SECONDS.sleep(2);
           System.out.printf("Deleting %s%n", path);
           KVUtils.deleteKey(client, path);
-          sleepSecs(1);
+          TimeUnit.SECONDS.sleep(1);
         }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       } finally {
         latch.countDown();
       }
@@ -76,10 +77,12 @@ public class SetValueAndWatch {
                })) {
         {
           System.out.println("Started watch");
-          sleepSecs(10);
+          TimeUnit.SECONDS.sleep(10);
           System.out.println("Closing watch");
         }
         System.out.println("Closed watch");
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       } finally {
         latch.countDown();
       }

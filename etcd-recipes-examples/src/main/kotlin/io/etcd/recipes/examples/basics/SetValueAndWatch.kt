@@ -18,9 +18,6 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.pambrose.common.concurrent.thread
-import com.pambrose.common.util.repeatWithSleep
-import com.pambrose.common.util.sleep
 import io.etcd.jetcd.watch.WatchResponse
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
@@ -29,7 +26,7 @@ import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
-import kotlin.time.Duration.Companion.seconds
+import kotlin.concurrent.thread
 
 fun main() {
   val logger = KotlinLogging.logger {}
@@ -38,35 +35,44 @@ fun main() {
   val keyval = "foobar"
   val latch = CountDownLatch(2)
 
-  thread(latch) {
-    sleep(3.seconds)
-    connectToEtcd(urls) { client ->
-      repeatWithSleep(10) { i, _ ->
-        val kv = keyval + i
-        logger.info { "Assigning $path = $kv" }
-        client.putValue(path, kv)
-        sleep(2.seconds)
-        logger.info { "Deleting $path" }
-        client.deleteKey(path)
+  thread {
+    try {
+      Thread.sleep(3_000)
+      connectToEtcd(urls) { client ->
+        repeat(10) { i ->
+          if (i > 0) Thread.sleep(1_000)
+          val kv = keyval + i
+          logger.info { "Assigning $path = $kv" }
+          client.putValue(path, kv)
+          Thread.sleep(2_000)
+          logger.info { "Deleting $path" }
+          client.deleteKey(path)
+        }
       }
+    } finally {
+      latch.countDown()
     }
   }
 
-  thread(latch) {
-    connectToEtcd(urls) { client ->
-      client.withWatcher(
-        path,
-        block = { watchResponse: WatchResponse ->
-          for (event in watchResponse.events) {
-            logger.info { "Watch event: ${event.eventType} ${event.keyValue.asString}" }
-          }
-        },
-      ) {
-        logger.info { "Started watch" }
-        sleep(10.seconds)
-        logger.info { "Closing watch" }
+  thread {
+    try {
+      connectToEtcd(urls) { client ->
+        client.withWatcher(
+          path,
+          block = { watchResponse: WatchResponse ->
+            for (event in watchResponse.events) {
+              logger.info { "Watch event: ${event.eventType} ${event.keyValue.asString}" }
+            }
+          },
+        ) {
+          logger.info { "Started watch" }
+          Thread.sleep(10_000)
+          logger.info { "Closing watch" }
+        }
+        logger.info { "Closed watch" }
       }
-      logger.info { "Closed watch" }
+    } finally {
+      latch.countDown()
     }
   }
 

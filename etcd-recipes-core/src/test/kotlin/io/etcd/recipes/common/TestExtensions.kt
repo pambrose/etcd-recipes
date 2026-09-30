@@ -63,7 +63,7 @@ private fun assertLocalEtcdReachable(
     error(
       """
       No etcd reachable at $host:$port (${e.message}).
-      Start a local etcd with ./etcd.sh, or run the suite under Testcontainers:
+      Start a local etcd with ./etcd-start.sh (make etcd-start), or run the suite under Testcontainers:
         make tests-tc      (./gradlew check -PuseTestcontainers)
       """.trimIndent(),
     )

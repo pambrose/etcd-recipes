@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.examples.discovery
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.withServiceDiscovery
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -46,7 +45,7 @@ fun main() {
         }
 
         start()
-        sleep(1.days)
+        Thread.sleep(1.days.inWholeMilliseconds)
       }
     }
   }

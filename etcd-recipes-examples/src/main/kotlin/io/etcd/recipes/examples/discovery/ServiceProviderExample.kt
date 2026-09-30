@@ -18,13 +18,11 @@
 
 package io.etcd.recipes.examples.discovery
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.RoundRobinStrategy
 import io.etcd.recipes.discovery.ServiceInstance
 import io.etcd.recipes.discovery.withServiceDiscovery
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -45,7 +43,7 @@ fun main() {
       // errorThreshold=1 so a single noteError ejects; short down window for the demo.
       withServiceProvider(serviceName, RoundRobinStrategy(), errorThreshold = 1, downPeriod = 5.seconds) {
         start()
-        while (getAllInstances().size < 3) sleep(200.milliseconds)
+        while (getAllInstances().size < 3) Thread.sleep(200)
 
         logger.info { "Round-robin across all three instances:" }
         repeat(6) { logger.info { "  -> ${getInstance().jsonPayload}" } }
@@ -57,7 +55,7 @@ fun main() {
         logger.info { "It is now skipped:" }
         repeat(6) { logger.info { "  -> ${getInstance().jsonPayload}" } }
 
-        sleep(6.seconds)
+        Thread.sleep(6_000)
         logger.info { "After the down window it is back in rotation:" }
         repeat(6) { logger.info { "  -> ${getInstance().jsonPayload}" } }
       }

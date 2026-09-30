@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.examples.election
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderSelector
 import io.etcd.recipes.election.withLeaderSelector
@@ -33,7 +32,7 @@ fun main() {
   val leadershipAction = { selector: LeaderSelector ->
     logger.info {"${selector.clientId} elected leader"}
     val pause = 0.seconds // Random.nextInt(1, 3).seconds
-    sleep(pause)
+    Thread.sleep(pause.inWholeMilliseconds)
     logger.info {"${selector.clientId} surrendering after $pause"}
   }
 

@@ -18,12 +18,12 @@
 
 package io.etcd.recipes.examples.counter
 
-import com.pambrose.common.concurrent.thread
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.counter.DistributedAtomicLong
 import io.etcd.recipes.counter.withDistributedAtomicLong
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 import kotlin.time.measureTimedValue
 
 fun main() {
@@ -41,13 +41,17 @@ fun main() {
     val (_, dur) =
       measureTimedValue {
         repeat(threadCount) { i ->
-          thread(latch) {
-            logger.info {"Creating counter #$i"}
-            withDistributedAtomicLong(client, path) {
-              repeat(repeatCount) { increment() }
-              repeat(repeatCount) { decrement() }
-              repeat(repeatCount) { add(5) }
-              repeat(repeatCount) { subtract(5) }
+          thread {
+            try {
+              logger.info {"Creating counter #$i"}
+              withDistributedAtomicLong(client, path) {
+                repeat(repeatCount) { increment() }
+                repeat(repeatCount) { decrement() }
+                repeat(repeatCount) { add(5) }
+                repeat(repeatCount) { subtract(5) }
+              }
+            } finally {
+              latch.countDown()
             }
           }
         }
