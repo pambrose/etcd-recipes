@@ -40,7 +40,8 @@ fun <T, R> withTypedDistributedQueue(
  */
 class TypedDistributedQueue<T>(
   val untyped: DistributedQueue,
-  private val codec: EtcdCodec<T>,
+  // internal: the suspending twins in io.etcd.recipes.coroutines decode with it
+  internal val codec: EtcdCodec<T>,
 ) : Closeable {
   @JvmOverloads
   constructor(

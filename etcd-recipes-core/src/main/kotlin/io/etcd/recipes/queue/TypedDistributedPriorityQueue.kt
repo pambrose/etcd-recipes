@@ -42,7 +42,8 @@ fun <T, R> withTypedDistributedPriorityQueue(
  */
 class TypedDistributedPriorityQueue<T>(
   val untyped: DistributedPriorityQueue,
-  private val codec: EtcdCodec<T>,
+  // internal: the suspending twins in io.etcd.recipes.coroutines decode with it
+  internal val codec: EtcdCodec<T>,
 ) : Closeable {
   @JvmOverloads
   constructor(

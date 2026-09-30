@@ -140,8 +140,10 @@ fun cacheFlow(
 ) {
   // --8<-- [start:cache-flow]
   PathChildrenCache(client, "/services").use { cache ->
-    // Subscribe BEFORE starting the cache: events fired while nothing collects are
-    // not buffered, so a late collector misses INITIALIZED.
+    // Take the initial state from the snapshot rather than waiting for INITIALIZED on the
+    // flow: a flow registers its listener asynchronously, so it can miss an early event.
+    cache.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE)
+    logger.info { "Initially: ${cache.currentData.map { it.key }}" }
     scope.launch {
       cache.eventsAsFlow().collect { event ->
         logger.info { "${event.type} ${event.childName}" }
@@ -152,7 +154,6 @@ fun cacheFlow(
         logger.warn { "Cache watch recovery: $event" }
       }
     }
-    cache.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT)
   }
   // --8<-- [end:cache-flow]
 }

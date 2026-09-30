@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (coroutine flows and parity)
+
+- A watch abandoned for good no longer leaves its flow suspended forever. `watchAsFlow`
+  completes after its `Recovery(Failed)` element, `watchEventsAsFlow` fails with
+  `EtcdRecipeRuntimeException`, and `leadershipAsFlow` completes after `WatchFailed`.
+- `leadershipAsFlow` takes an `rpc` parameter. A failed re-read after a recovery now ends
+  the flow with `WatchFailed` instead of being logged and leaving the flow silently stale.
+- The suspending RPC engine records `EtcdMetrics.recordRpc`, as the blocking one does
+  (cancellation counts as a failure). Coroutine users' `etcd.rpc` timers and retry
+  counters were always zero. A suspended single-attempt call that times out now carries
+  the `TimeoutException` as its cause.
+- Cache flows: the docs no longer suggest `onStart` as a sign that a flow is subscribed.
+  A flow registers its listener asynchronously, so the example now starts with
+  `BUILD_INITIAL_CACHE` and reads `currentData` instead of waiting for `INITIALIZED`.
+
+### Added (suspending twins)
+
+- Suspending twins for the blocking calls added after the coroutine layer:
+  - `LeaderLatch.awaitStart` / `awaitLeadership`
+  - `awaitStart` for `LeaderObserver`, `NodeCache`, and `TypedTransientKeyValue`
+  - `TypedPathChildrenCache.awaitStart` / `awaitStartComplete`
+  - the typed queues' `receive` / `awaitTryDequeue` / `awaitEnqueue`
+  - `ServiceProvider.awaitStart` / `awaitGetInstance` / `awaitGetAllInstances`
+  - the work queue's `awaitDeadLetters` / `awaitRequeueDeadLetter` /
+    `awaitPurgeDeadLetter`
+
+### Changed (coroutines)
+
+- **Source-incompatible:** the bounded suspending `withLock(timeout) { … }` now requires
+  its body to return a non-null type (`<T : Any>`), so a `null` result always means "not
+  acquired". Before, a body that returned `null` was indistinguishable from a timeout.
+  Wrap a nullable result if you need one.
+
 ### Fixed (`TransientKeyValue` lifecycle)
 
 - `TransientKeyValue` no longer parks an executor thread for its whole life. `start()`

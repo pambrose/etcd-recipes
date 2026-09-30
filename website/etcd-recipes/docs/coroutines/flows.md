@@ -132,8 +132,13 @@ back.
 --8<-- "kotlin/website/coroutines/FlowSnippets.kt:watch-flow-resync"
 ```
 
+A watch that is abandoned for good (the recovery policy ran out, or the `Client` was
+closed) completes `watchAsFlow` right after its `Recovery(Failed)` element, so a
+`collect` returns instead of suspending forever.
+
 `watchEventsAsFlow` is the convenience form — it flattens responses into their
-`WatchEvent`s and **drops recovery transitions entirely**:
+`WatchEvent`s and **drops recovery transitions**, except that an abandoned watch fails
+the flow with `EtcdRecipeRuntimeException`, since no event will ever come again:
 
 ```kotlin
 --8<-- "kotlin/website/coroutines/FlowSnippets.kt:watch-events-flow"
@@ -171,8 +176,10 @@ sealed interface LeadershipEvent {
     `Elected(name)` or `Vacated` straight away, then transitions.
 
     The same re-read happens after every `Resubscribed` or `Resynced`, because a
-    hand-off may have happened while the stream was dead. `WatchFailed` means
-    observation has stopped for good — the recovery policy was exhausted.
+    hand-off may have happened while the stream was dead (only when the stream couldn't
+    resume where it left off). `WatchFailed` means observation has stopped for good —
+    the recovery policy was exhausted, or a re-read failed — and the flow completes
+    right after it.
 
 This flow **observes**; it does not participate. To run for election, use
 `LeaderSelector` with `awaitStart()` / `awaitLeadershipComplete()` — see
@@ -186,14 +193,15 @@ Each cache exposes its events and its watch-recovery transitions as separate flo
 --8<-- "kotlin/website/coroutines/FlowSnippets.kt:cache-flow"
 ```
 
-!!! danger "Subscribe before you start the cache"
+!!! danger "Don't wait for `INITIALIZED` through a flow"
 
-    Events fired while nothing is collecting are **not** buffered — `callbackFlow`
-    only registers the listener when collection begins. If you call
-    `start(POST_INITIALIZED_EVENT)` and *then* subscribe, the `INITIALIZED` event is
-    already gone and you will wait forever for an event that has been and passed.
-    Launch the collector first (and give it a moment, or signal from `onStart`), then
-    start the cache.
+    Events fired while nothing is listening are **not** buffered, and a flow registers
+    its listener only after collection has begun, asynchronously — even an `onStart`
+    block runs before the listener exists. So there's no reliable way to be subscribed
+    before a `POST_INITIALIZED_EVENT` start fires `INITIALIZED`, and a collector waiting
+    for it may wait forever. Start the cache with `BUILD_INITIAL_CACHE` instead:
+    `start` (or `awaitStart`) returns once the snapshot is loaded, `currentData` holds
+    the initial state, and the flow carries the changes.
 
 `NodeCache<T>` and `TypedPathChildrenCache<T>` decode through their codec, so their
 flows carry typed elements:

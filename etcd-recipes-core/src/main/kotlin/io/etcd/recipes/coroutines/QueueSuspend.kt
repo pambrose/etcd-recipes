@@ -21,6 +21,8 @@ import io.etcd.jetcd.KeyValue
 import io.etcd.recipes.queue.AbstractQueue
 import io.etcd.recipes.queue.DistributedPriorityQueue
 import io.etcd.recipes.queue.DistributedQueue
+import io.etcd.recipes.queue.TypedDistributedPriorityQueue
+import io.etcd.recipes.queue.TypedDistributedQueue
 import kotlinx.coroutines.Dispatchers
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -114,3 +116,41 @@ suspend fun DistributedPriorityQueue.awaitEnqueue(
   value: Long,
   priority: Int,
 ): Unit = etcdInterruptible { enqueue(value, priority) }
+
+/** Suspending twin of [TypedDistributedQueue.dequeue]; see the untyped [receive] for cancellation. */
+suspend fun <T> TypedDistributedQueue<T>.receive(): T = codec.decode(untyped.receive())
+
+/** Suspending twin of [TypedDistributedQueue.poll]: an item, or null once [timeout] elapses. */
+suspend fun <T> TypedDistributedQueue<T>.receive(timeout: Duration): T? = untyped.receive(timeout)?.let(codec::decode)
+
+/** Suspending twin of [TypedDistributedQueue.tryDequeue]. */
+suspend fun <T> TypedDistributedQueue<T>.awaitTryDequeue(): T? = untyped.awaitTryDequeue()?.let(codec::decode)
+
+/** Suspending twin of [TypedDistributedQueue.enqueue]. */
+suspend fun <T> TypedDistributedQueue<T>.awaitEnqueue(value: T): Unit = untyped.awaitEnqueue(codec.encode(value))
+
+/** Suspending twin of [TypedDistributedQueue.enqueueAll] (one all-or-nothing transaction). */
+suspend fun <T> TypedDistributedQueue<T>.awaitEnqueueAll(values: Collection<T>): Unit =
+  untyped.awaitEnqueueAll(values.map(codec::encode))
+
+/** Suspending twin of [TypedDistributedPriorityQueue.dequeue]; see the untyped [receive] for cancellation. */
+suspend fun <T> TypedDistributedPriorityQueue<T>.receive(): T = codec.decode(untyped.receive())
+
+/** Suspending twin of [TypedDistributedPriorityQueue.poll]: an item, or null once [timeout] elapses. */
+suspend fun <T> TypedDistributedPriorityQueue<T>.receive(timeout: Duration): T? =
+  untyped.receive(timeout)?.let(codec::decode)
+
+/** Suspending twin of [TypedDistributedPriorityQueue.tryDequeue]. */
+suspend fun <T> TypedDistributedPriorityQueue<T>.awaitTryDequeue(): T? = untyped.awaitTryDequeue()?.let(codec::decode)
+
+/** Suspending twin of [TypedDistributedPriorityQueue.enqueue]. */
+suspend fun <T> TypedDistributedPriorityQueue<T>.awaitEnqueue(
+  value: T,
+  priority: UShort,
+): Unit = untyped.awaitEnqueue(codec.encode(value), priority)
+
+/** Suspending twin of [TypedDistributedPriorityQueue.enqueue] with an Int priority (range-checked). */
+suspend fun <T> TypedDistributedPriorityQueue<T>.awaitEnqueue(
+  value: T,
+  priority: Int,
+): Unit = untyped.awaitEnqueue(codec.encode(value), priority)

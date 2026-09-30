@@ -122,9 +122,9 @@
 - [x] [#62](#issue-62) Re-registering after `LeaseEvent.Failed` leaks the old healer
 - [x] [#63](#issue-63) `interruptibleOn` misses re-wrapped interrupts, so some cancellations surface as `EtcdRecipeException`
 - [x] [#64](#issue-64) `interruptOnPermitLoss` / `interruptOnLockLoss` misfire under the suspend surface
-- [ ] [#65](#issue-65) `leadershipAsFlow`: a blocking uncancellable GET, swallowed re-read failures, and a fixed RPC budget
-- [ ] [#66](#issue-66) A terminal watch failure never completes the watch and leadership flows
-- [ ] [#67](#issue-67) The suspend RPC engine never records `EtcdMetrics.recordRpc`
+- [x] [#65](#issue-65) `leadershipAsFlow`: a blocking uncancellable GET, swallowed re-read failures, and a fixed RPC budget
+- [x] [#66](#issue-66) A terminal watch failure never completes the watch and leadership flows
+- [x] [#67](#issue-67) The suspend RPC engine never records `EtcdMetrics.recordRpc`
 - [x] [#68](#issue-68) Every published artifact forces `logback-classic`, guava, and common-utils onto consumers
 - [ ] [#69](#issue-69) The Ktor plugin closes its client on `ApplicationStopping`, before user teardown runs
 - [x] [#70](#issue-70) RPC-backed Micrometer gauges can stall the metrics scrape during an outage
@@ -154,9 +154,9 @@
 - [x] [#92](#issue-92) Head selection makes etcd read and sort the whole range (O(N²) drain)
 - [x] [#93](#issue-93) `TypedPathChildrenCache`: one throwing listener stops the event reaching the rest
 - [ ] [#94](#issue-94) Discovery lifecycle and naming traps
-- [ ] [#95](#issue-95) `eventsAsFlow().onStart { }` doesn't guarantee the cache listener is registered
-- [ ] [#96](#issue-96) The docs claim every blocking call has a suspending twin, but several don't
-- [ ] [#97](#issue-97) `withLock(timeout)`'s "null means not acquired" is false for a nullable `T`
+- [x] [#95](#issue-95) `eventsAsFlow().onStart { }` doesn't guarantee the cache listener is registered
+- [x] [#96](#issue-96) The docs claim every blocking call has a suspending twin, but several don't
+- [x] [#97](#issue-97) `withLock(timeout)`'s "null means not acquired" is false for a nullable `T`
 - [ ] [#98](#issue-98) Micrometer gauge binders can report the wrong recipe, and the documented example binds to recipes it then closes
 - [ ] [#99](#issue-99) `EtcdProperties` binding depends on a transitive `kotlin-reflect`, and the starter's tests don't check binding
 - [x] [#100](#issue-100) `TransientKeyValueTest` counts every key under `/keyvalue`, which other test classes write to in parallel

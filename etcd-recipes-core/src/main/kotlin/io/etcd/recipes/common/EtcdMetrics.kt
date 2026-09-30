@@ -35,7 +35,11 @@ import kotlin.time.Duration
  * (lock wait/hold, queue, election, cache) are added as they are instrumented.
  */
 interface EtcdMetrics {
-  /** One completed blocking RPC: total [duration], number of [attempts], and whether it ultimately [failed]. */
+  /**
+   * One completed RPC, blocking or suspending: total [duration], number of [attempts], and whether
+   * it ultimately [failed]. [opName] has the form `op(key)`, e.g. `getResponse(/a/b)`; a metrics
+   * binding keeps only `op`, since a key would make an unbounded tag.
+   */
   fun recordRpc(
     opName: String,
     duration: Duration,
