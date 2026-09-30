@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (read-write lock, found by its TLA+ spec)
+
+- A downgraded read's fencing token no longer fences out the writer queued behind it. It
+  was the read entry's own, newer revision, so the writer admitted after the downgrade got a
+  smaller token than one already issued, and a resource keeping the largest token refused a
+  legitimate writer. A hold's token is now its rank: a downgrade's is the write hold's.
+- An acquisition whose entry's lease had just expired (not yet noticed) is no longer
+  admitted. The conflict scan never checked for the attempt's own entry, so such a client
+  could be admitted with no place in line, alongside a writer admitted after the expiry. It
+  now starts over at the tail, as the semaphore already did.
+
+### Fixed (work queue claims, found by its TLA+ spec)
+
+- A claim whose transaction got no answer is no longer reconciled into another thread's
+  claim. Threads sharing one `DistributedWorkQueue` share its clientId and lease, and
+  `reconcileClaim` recognized its own claim by exactly those, so a thread could be handed
+  the item another thread had just claimed: both processed it under one claim, and the
+  second `ack()` returned false for a claim that was never lost. Each claim marker's value
+  is now `<clientId>:<nonce>`, unique to its attempt, and the item's guards and the
+  reconciliation compare against it.
+- A claim whose response was lost and whose re-read failed too no longer holds its item
+  until the consumer restarts or its lease lapses (possibly never, under a healthy lease).
+  The consumer remembers it, per claim attempt (so another thread's unresolved attempt on
+  the same item can't displace it), and its sweeper releases it if it committed, giving the
+  item back to the queue with that delivery undone, as `unclaim()` does.
+
+### Added (TLA+ specifications)
+
+- `specs/` holds TLA+ specifications of the counted barrier's round protocol, the
+  read-write lock's admission, and the work queue's claims, model-checked by TLC with
+  `make tla` and in CI. Each models the code one RPC per action, with leases expiring
+  between them, and was checked against the bugs it's meant to catch.
+
 ### Fixed (`StickyStrategy` under concurrency)
 
 - Concurrent `StickyStrategy` selections agree on one instance. When several callers found

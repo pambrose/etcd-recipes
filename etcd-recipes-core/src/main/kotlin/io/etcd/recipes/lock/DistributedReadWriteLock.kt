@@ -58,7 +58,8 @@ import kotlin.time.TimeSource
  * lock path and waits on the DELETE of its *nearest conflicting predecessor* —
  * herd-free, and correct because the conflict predicate is set-emptiness over
  * earlier entries: the watched key is always in the set, so the set cannot empty
- * without a wakeup, and new arrivals always rank later.
+ * without a wakeup. New arrivals rank later, except a downgrade's read entry, which takes
+ * its write entry's place; a waiter re-scans after every wakeup, so it sees one.
  *
  * Thread-per-acquisition holds, per-side reentrancy, cooperative lock-lost, and
  * write→read downgrade are as in [DistributedMutex]; read→write upgrade throws
@@ -91,9 +92,12 @@ constructor(
     val rank: Long, // place in line: the entry's create revision, or an inherited one
     // The acquisition this hold came from: a loss is applied only to the hold it belongs to
     val attempt: Attempt,
-    // The entry's own create revision: later than every conflicting hold granted before it
-    val fencingToken: Long,
   ) {
+    // The hold's place in line, later than every conflicting hold granted before it. A
+    // downgrade's is the write hold's it inherited: its entry's own, newer revision would
+    // outrank a writer queued behind the downgrade and fence that writer out.
+    val fencingToken: Long get() = rank
+
     // Changed by the owner thread; read by a loss on jetcd's lease thread
     @Volatile
     var holdCount = 1
@@ -310,7 +314,14 @@ constructor(
           }
           if (deadline.hasPassed()) return false
 
-          val conflict = nearestConflict(side, me, entryKey, ownRank, bounded.rpc)
+          val scan = nearestConflict(side, me, entryKey, ownRank, bounded.rpc)
+          if (!scan.ownEntryPresent) {
+            // This attempt's entry is gone (its lease expired, not yet noticed here): with
+            // no place in line, admitting it could let it hold alongside a later writer
+            pauseWithin(LEASE_HEAL_PAUSE_MS.milliseconds, deadline)
+            continue@outer // fresh entry at the tail
+          }
+          val conflict = scan.conflict
             ?: run {
               // A downgrade may only keep the write entry's place while that entry
               // still exists: once it is gone (a lease expiry not yet noticed here), a
@@ -324,7 +335,7 @@ constructor(
               // Admitted: publish the hold BEFORE claiming the phase (a fatal in
               // the win window must always find the hold — or the CAS failure
               // below rolls it back).
-              val data = EntryData(lease, entryKey, ownRank, attempt, ownCreateRevision)
+              val data = EntryData(lease, entryKey, ownRank, attempt)
               holdsFor(side)[me] = data
               if (attempt.phase.compareAndSet(Phase.WAITING, Phase.HOLDING)) {
                 if (closeCalled.load()) {
@@ -358,7 +369,7 @@ constructor(
             )
           }
           attempt.wake.store(null)
-          // Loop: re-evaluate the conflict set (it only shrinks)
+          // Loop: re-scan the conflict set (a downgrade's read entry may have joined it)
         }
       } catch (e: EtcdRecipeRuntimeException) {
         // An RPC that failed once the deadline passed (bounded by it, it timed out): time ran out
@@ -381,14 +392,15 @@ constructor(
   // nearest EARLIER-ranked conflicting entry is the wait target; the calling thread's
   // own write entry is excluded so write→read downgrade admits. The snapshot's revision
   // rides along so the wait can anchor its DELETE-watch at the point the conflict was
-  // observed present (see WaiterSupport).
+  // observed present (see WaiterSupport). The snapshot also says whether this attempt's
+  // own entry is still there.
   private fun nearestConflict(
     side: Side,
     thread: Thread,
     ownEntryKey: String,
     ownRank: Long,
     rpc: RpcResilience,
-  ): Conflict? {
+  ): Scan {
     val snapshot = client.getResponse(entryParent, getOption { isPrefix(true) }, rpc)
     val ownWriteEntry = writeHolds[thread]?.entryKey
     val conflict =
@@ -399,9 +411,18 @@ constructor(
         // any earlier entry conflicts with a writer; only earlier writers with a reader
         .filter { (key, _) -> side == Side.WRITE || isEntryOf(key, Side.WRITE) }
         .maxByOrNull { (_, rank) -> rank }
-        ?: return null
-    return Conflict(conflict.first, snapshot.header.revision)
+    return Scan(
+      ownEntryPresent = snapshot.kvs.any { it.key.asString == ownEntryKey },
+      conflict = conflict?.let { (key, _) -> Conflict(key, snapshot.header.revision) },
+    )
   }
+
+  // What a conflict scan found: whether this attempt's own entry is still in etcd, and the
+  // nearest earlier conflicting entry, if any.
+  private data class Scan(
+    val ownEntryPresent: Boolean,
+    val conflict: Conflict?,
+  )
 
   // An entry's side, judged by its name under the lock path. Not by the last path
   // segment: a clientId may itself contain '/'.

@@ -24,6 +24,7 @@ import io.etcd.recipes.common.HookedClient
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getChildrenKeys
+import io.etcd.recipes.common.getOption
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.urls
@@ -52,7 +53,8 @@ import kotlin.time.Duration.Companion.seconds
  *   another thread's live permit;
  * - `lock`/`acquire` declare `InterruptedException` for Java;
  * - a `tryLock`/`tryAcquire` deadline bounds its RPCs too;
- * - a release survives one failed revoke.
+ * - a release survives one failed revoke;
+ * - a read-write lock never admits an acquisition whose own entry has already expired.
  */
 class LockLifecycleTests : StringSpec() {
   private val base = "/locks/${javaClass.simpleName}"
@@ -244,6 +246,30 @@ class LockLifecycleTests : StringSpec() {
           withClue("one failed revoke left the entry for its 30 s TTL") {
             leasedUnder(etcd, "$path/holders").shouldBeEmpty()
           }
+        }
+        etcd.deleteChildren(path)
+      }
+    }
+
+    "a read-write lock doesn't admit an acquisition whose entry expired before its scan" {
+      connectToEtcd(urls) { etcd ->
+        val path = "$base/expired-entry"
+        etcd.deleteChildren(path)
+        val client = HookedClient(etcd)
+        // The acquisition reads its entry's revision, then scans for conflicts. Before the
+        // scan, its entry's lease expires (revoked out-of-band), unnoticed by the lock yet.
+        client.beforeGet.store {
+          client.beforeGet.store {
+            val lease = etcd.getResponse("$path/", getOption { isPrefix(true) }).kvs.first().lease
+            etcd.leaseClient.revoke(lease).get()
+          }
+        }
+        DistributedReadWriteLock(client, path).use { lock ->
+          lock.writeLock.lock()
+          withClue("admitted with no entry in line, so another writer could hold the lock too") {
+            etcd.getChildrenKeys(path) shouldHaveSize 1
+          }
+          lock.writeLock.unlock()
         }
         etcd.deleteChildren(path)
       }
