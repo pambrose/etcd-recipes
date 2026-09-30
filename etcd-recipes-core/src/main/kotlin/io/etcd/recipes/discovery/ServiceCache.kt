@@ -52,7 +52,9 @@ class ServiceCache
   // Plain var: all reads/writes are inside @Synchronized methods on this instance.
   private var watcher: Watch.Watcher? = null
   private val servicePath = namesPath.appendToPath(serviceName)
-  private val serviceMap: ConcurrentMap<String, String> = newConcurrentMap()
+
+  // Decoded once, on arrival; an entry that doesn't decode is reported and left out.
+  private val serviceMap: ConcurrentMap<String, ServiceInstance> = newConcurrentMap()
   private val listeners: MutableList<ServiceCacheListener> = CopyOnWriteArrayList()
   private val recoveryListeners: MutableList<WatchRecoveryListener> = CopyOnWriteArrayList()
 
@@ -96,13 +98,18 @@ class ServiceCache
           val stripped = k.substring(trailingNamesPath.length)
           when (event.eventType) {
             WatchEvent.EventType.PUT -> {
-              val isAdd = !serviceMap.containsKey(stripped)
-              serviceMap[stripped] = v
-              notifyListeners(WatchEvent.EventType.PUT, isAdd, stripped, v)
+              val instance = decodeInstanceOrNull(k, v) { recordException(it) }
+              if (instance == null) {
+                // No longer a usable instance: whatever the key held is gone, as on a delete
+                removeInstance(stripped)
+              } else {
+                val isAdd = serviceMap.put(stripped, instance) == null
+                notifyListeners(WatchEvent.EventType.PUT, isAdd, stripped, instance)
+              }
             }
 
             WatchEvent.EventType.DELETE -> {
-              notifyListeners(WatchEvent.EventType.DELETE, false, stripped, serviceMap.remove(stripped))
+              removeInstance(stripped)
             }
 
             WatchEvent.EventType.UNRECOGNIZED -> {
@@ -122,18 +129,23 @@ class ServiceCache
     return this
   }
 
-  // Tells every listener about one change. [json] is the instance's new value, or its
-  // previous value on a DELETE.
+  // Drops the instance at [instanceKey], telling listeners only if they were told it existed.
+  private fun removeInstance(instanceKey: String) {
+    serviceMap.remove(instanceKey)?.let { notifyListeners(WatchEvent.EventType.DELETE, false, instanceKey, it) }
+  }
+
+  // Tells every listener about one change. [instance] is the new value, or the previous
+  // value on a DELETE.
   @Suppress("TooGenericExceptionCaught")
   private fun notifyListeners(
     type: WatchEvent.EventType,
     isAdd: Boolean,
-    name: String,
-    json: String?,
+    instanceKey: String,
+    instance: ServiceInstance?,
   ) {
     listeners.forEach { listener ->
       try {
-        listener.cacheChanged(type, isAdd, name, json?.let { ServiceInstance.toObject(it) })
+        listener.cacheChanged(type, isAdd, instanceKey, instance)
       } catch (e: Throwable) {
         logger.error(e) { "Exception in cacheChanged()" }
         recordException(e)
@@ -155,17 +167,21 @@ class ServiceCache
       withSortField(GetOption.SortTarget.KEY)
     }
     val resp = client.getResponse(trailingServicePath, getOption, resilience.rpc)
-    val fresh =
-      resp.kvs.associate { kv -> kv.key.asString.substring(trailingNamesPath.length) to kv.value.asString }
+    val fresh = LinkedHashMap<String, ServiceInstance>()
+    resp.kvs.forEach { kv ->
+      val key = kv.key.asString
+      decodeInstanceOrNull(key, kv.value.asString) { recordException(it) }
+        ?.let { fresh[key.substring(trailingNamesPath.length)] = it }
+    }
     val removed = serviceMap.filterKeys { it !in fresh }
-    val changed = fresh.filter { (name, json) -> serviceMap[name] != json }
+    val changed = fresh.filter { (instanceKey, instance) -> serviceMap[instanceKey] != instance }
     val added = changed.keys.filterNot { it in serviceMap }.toSet()
     serviceMap.keys.retainAll(fresh.keys)
     serviceMap.putAll(fresh)
     resilience.metrics.recordCacheSync(servicePath, start.elapsedNow(), serviceMap.size)
     if (emitEvents) {
-      removed.forEach { (name, json) -> notifyListeners(WatchEvent.EventType.DELETE, false, name, json) }
-      changed.forEach { (name, json) -> notifyListeners(WatchEvent.EventType.PUT, name in added, name, json) }
+      removed.forEach { (key, instance) -> notifyListeners(WatchEvent.EventType.DELETE, false, key, instance) }
+      changed.forEach { (key, instance) -> notifyListeners(WatchEvent.EventType.PUT, key in added, key, instance) }
     }
     return resp.header.revision + 1
   }
@@ -192,7 +208,7 @@ class ServiceCache
   val instances: List<ServiceInstance>
     get() {
       checkCloseNotCalled()
-      return serviceMap.values.map { ServiceInstance.toObject(it) }
+      return serviceMap.values.toList()
     }
 
   fun addListenerForChanges(listener: ServiceCacheListener) {
@@ -219,7 +235,8 @@ class ServiceCache
 
   @Synchronized
   override fun doClose() {
-    checkStartCalled()
+    // No checkStartCalled(): an un-started cache closes as a no-op, as a ServiceProvider does
+    if (!startCalled.load()) return
 
     watcher?.close()
     watcher = null

@@ -100,9 +100,10 @@ class ThreadedServiceDiscoveryTests : StringSpec() {
                 }
 
                 withServiceDiscovery(client, path) {
+                    // Every thread registers the same serviceCount names
                     val size = queryForNames().size
                     logger.info { "Retrieved all names: $size" }
-                    size shouldBe threadCount * serviceCount
+                    size shouldBe serviceCount
                 }
 
                 // Delete services

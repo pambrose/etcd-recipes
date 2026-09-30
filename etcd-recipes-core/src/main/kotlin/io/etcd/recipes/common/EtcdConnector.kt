@@ -42,6 +42,8 @@ open class EtcdConnector(
   protected val closeCalled = AtomicBoolean(false)
   protected val exceptionList: Lazy<MutableList<Throwable>> = lazy { synchronizedList([]) }
 
+  internal val isClosed: Boolean get() = closeCalled.load()
+
   protected fun checkCloseNotCalled() {
     if (closeCalled.load()) throw EtcdRecipeRuntimeException("close() already called")
   }

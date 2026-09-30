@@ -183,7 +183,7 @@ fun discoveryFlow(
     scope.launch {
       cache.eventsAsFlow().collect { event ->
         val verb = if (event.isAdd) "joined" else "left"
-        logger.info { "${event.serviceInstance?.id} $verb ${event.serviceName}" }
+        logger.info { "${event.serviceInstance?.id} $verb ${event.instanceKey}" }
       }
     }
     cache.start()

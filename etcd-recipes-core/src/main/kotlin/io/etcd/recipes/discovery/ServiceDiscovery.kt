@@ -18,6 +18,7 @@
 
 package io.etcd.recipes.discovery
 
+import com.pambrose.common.util.ensureSuffix
 import io.etcd.jetcd.Client
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
@@ -25,8 +26,8 @@ import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.appendToPath
 import io.etcd.recipes.common.asString
+import io.etcd.recipes.common.getChildren
 import io.etcd.recipes.common.getChildrenKeys
-import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getValue
 import io.etcd.recipes.discovery.ServiceDiscovery.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -62,6 +63,9 @@ constructor(
   private val serviceCacheList: MutableList<ServiceCache> = CopyOnWriteArrayList()
   private val serviceProviderList: MutableList<ServiceProvider> = CopyOnWriteArrayList()
 
+  // How many caches and providers this façade still tracks (tests).
+  internal val trackedCount: Int get() = serviceCacheList.size + serviceProviderList.size
+
   init {
     require(servicePath.isNotEmpty()) { "Service base path cannot be empty" }
   }
@@ -87,6 +91,8 @@ constructor(
   fun serviceCache(name: String): ServiceCache {
     checkCloseNotCalled()
     val cache = ServiceCache(client, namesPath, name, resilienceConfig)
+    // Forget the ones already closed, so a façade that hands out many doesn't keep them all
+    serviceCacheList.removeIf { it.isClosed }
     serviceCacheList += cache
     return cache
   }
@@ -106,6 +112,7 @@ constructor(
     checkCloseNotCalled()
     val provider =
       ServiceProvider(client, namesPath, serviceName, strategy, errorThreshold, downPeriod, resilienceConfig)
+    serviceProviderList.removeIf { it.isClosed }
     serviceProviderList += provider
     return provider
   }
@@ -119,17 +126,24 @@ constructor(
     receiver: ServiceProvider.() -> T,
   ): T = serviceProvider(serviceName, strategy, errorThreshold, downPeriod).use { it.receiver() }
 
+  /** The names of the services with at least one registered instance, each once, in key order. */
   @Synchronized
   fun queryForNames(): List<String> {
     checkCloseNotCalled()
-    return client.getChildrenKeys(namesPath, rpc = resilience.rpc)
+    val trailingNamesPath = namesPath.ensureSuffix("/")
+    // Instance keys are <namesPath>/<serviceName>/<id>
+    return client
+      .getChildrenKeys(namesPath, rpc = resilience.rpc)
+      .map { it.removePrefix(trailingNamesPath).substringBefore('/') }
+      .distinct()
   }
 
+  /** The instances registered under [name]; an entry that doesn't decode is skipped and recorded. */
   @Synchronized
   fun queryForInstances(name: String): List<ServiceInstance> {
     checkCloseNotCalled()
-    return client.getChildrenValues(namesPath.appendToPath(name), rpc = resilience.rpc).map {
-      ServiceInstance.toObject(it.asString)
+    return client.getChildren(namesPath.appendToPath(name), rpc = resilience.rpc).mapNotNull { (key, value) ->
+      decodeInstanceOrNull(key, value.asString) { recordException(it) }
     }
   }
 

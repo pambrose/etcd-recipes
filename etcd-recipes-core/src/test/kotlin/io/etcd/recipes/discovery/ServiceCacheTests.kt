@@ -63,11 +63,11 @@ class ServiceCacheTests : StringSpec() {
               override fun cacheChanged(
                 eventType: EventType,
                 isAdd: Boolean,
-                serviceName: String,
+                instanceKey: String,
                 serviceInstance: ServiceInstance?,
               ) {
                 captureException(holder) {
-                  serviceName.split("/").first() shouldBe name
+                  instanceKey.split("/").first() shouldBe name
 
                   if (eventType == EventType.PUT) {
                     if (isAdd) registerCounter.incrementAndFetch() else updateCounter.incrementAndFetch()

@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (discovery robustness)
+
+- One malformed or newer-schema instance entry no longer breaks discovery for a whole
+  service. Before, a non-JSON value under `names/<svc>/` (or JSON with a field this version
+  didn't know) made `ServiceCache.instances`, `queryForInstances`, and every
+  `ServiceProvider.getInstance()` throw. Now the entry is skipped, logged, and recorded in
+  `exceptions`, and unknown fields are ignored. The cache decodes each entry once, on
+  arrival, instead of on every read and once per listener. An entry it held that is
+  overwritten with something unreadable is dropped, and listeners get a `DELETE`.
+- `ServiceProvider.noteError` counts errors within a `downPeriod` window from the first.
+  Before, the count never reset, so an instance with one sporadic failure a day was ejected
+  every third day. The provider also forgets instances that are no longer registered or
+  whose window has lapsed. Before, every instance that ever had an error kept an entry until
+  `close()`. Ejection updates are atomic per instance, so a cleanup can't drop an ejection
+  another thread has just made.
+- `ServiceDiscovery` no longer keeps every cache and provider it ever handed out; closed
+  ones are dropped.
+- `ServiceCache.close()` on a cache that was never started is a no-op, as it is for
+  `ServiceProvider`. Before, it threw `EtcdRecipeRuntimeException`.
+- A `PathChildrenCache`'s own start worker is a daemon thread, so an unclosed primed cache
+  no longer keeps the JVM from exiting.
+
+### Changed (discovery naming)
+
+- **Behavior change:** `ServiceDiscovery.queryForNames()` (and `awaitQueryForNames()`)
+  returns each service name once, in key order. Before, it returned the full etcd key of
+  every instance (`…/names/worker/AbC1234`), one per instance.
+- `ServiceCacheListener.cacheChanged`'s third parameter is renamed `serviceName` →
+  `instanceKey`, since it holds `<serviceName>/<id>`. `ServiceCacheEvent.serviceName` is
+  likewise now `instanceKey`; `serviceName` remains as a deprecated alias.
+
 ### Fixed (coroutine flows and parity)
 
 - A watch abandoned for good no longer leaves its flow suspended forever. `watchAsFlow`
