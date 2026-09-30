@@ -18,13 +18,11 @@
 
 package io.etcd.recipes.examples.cache
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.putValue
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Demonstrates watch recovery: run this, then kill and restart the local etcd
@@ -44,7 +42,7 @@ fun main() {
 
       repeat(120) { i ->
         client.putValue("$cachePath/tick", "value-$i")
-        sleep(2.seconds)
+        Thread.sleep(2_000)
         logger.info { "Cache now: ${cache.currentDataAsMap.mapValues { it.value.asString }}" }
       }
     }

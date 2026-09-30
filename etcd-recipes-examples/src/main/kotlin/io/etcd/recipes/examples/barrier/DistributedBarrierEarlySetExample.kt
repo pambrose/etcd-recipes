@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.examples.barrier
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.barrier.withDistributedBarrier
 import io.etcd.recipes.common.connectToEtcd
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -54,15 +53,15 @@ fun main() {
 
   thread {
     goLatch.await()
-    sleep(5.seconds)
+    Thread.sleep(5_000)
     connectToEtcd(urls) { client ->
       withDistributedBarrier(client, barrierPath) {
         logger.info { "Setting Barrier" }
         setBarrier()
-        sleep(6.seconds)
+        Thread.sleep(6_000)
         logger.info { "Removing Barrier" }
         removeBarrier()
-        sleep(3.seconds)
+        Thread.sleep(3_000)
       }
     }
   }

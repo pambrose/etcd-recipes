@@ -18,14 +18,12 @@
 
 package io.etcd.recipes.examples.cache
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.cache.NodeCache
 import io.etcd.recipes.common.StringCodec
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteKey
 import io.etcd.recipes.common.putValue
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Keep a single config key hot with a [NodeCache]: `current` tracks the live value and a
@@ -46,11 +44,11 @@ fun main() {
       logger.info { "Initial value: ${cache.current}" }
 
       client.putValue(key, "world")
-      sleep(500.milliseconds)
+      Thread.sleep(500)
       logger.info { "After update: ${cache.current}" }
 
       client.deleteKey(key)
-      sleep(500.milliseconds)
+      Thread.sleep(500)
       logger.info { "After delete: ${cache.current}" }
     }
   }

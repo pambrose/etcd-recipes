@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.examples.basics
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteKey
@@ -29,7 +28,6 @@ import io.etcd.recipes.common.putValue
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.common.withWatcher
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val logger = KotlinLogging.logger {}
@@ -55,7 +53,7 @@ fun main() {
         logger.info { getChildren(path) }
         logger.info { getChildCount(path) }
 
-        sleep(5.seconds)
+        Thread.sleep(5_000)
 
         // Add children
         putValue("$path/election/a", "a")
@@ -75,7 +73,7 @@ fun main() {
         logger.info { getChildren("$path/waiting").asString }
         logger.info { getChildCount("$path/waiting") }
 
-        sleep(5.seconds)
+        Thread.sleep(5_000)
 
         // Delete root
         deleteKey(path)
@@ -92,7 +90,7 @@ fun main() {
           println(getChildren(path).asString)
           println(getChildCount(path))
 
-          sleep(5.seconds)
+          Thread.sleep(5_000)
         }
       }
     }

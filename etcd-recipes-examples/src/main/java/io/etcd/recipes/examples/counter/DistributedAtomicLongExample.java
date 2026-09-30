@@ -17,7 +17,6 @@
 package io.etcd.recipes.examples.counter;
 
 
-import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.recipes.counter.DistributedAtomicLong;
 
@@ -31,7 +30,7 @@ import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 public class DistributedAtomicLongExample {
 
   public static void main(String[] args) throws InterruptedException {
-    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    List<String> urls = List.of("http://localhost:2379");
     String path = "/counter/counterdemo";
     int threadCount = 10;
     int repeatCount = 25;

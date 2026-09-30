@@ -18,12 +18,10 @@
 
 package io.etcd.recipes.examples.discovery
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.discovery.ServiceInstance
 import io.etcd.recipes.discovery.withServiceDiscovery
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Duration.Companion.seconds
 
 @Suppress("TooGenericExceptionCaught")
 fun main() {
@@ -44,7 +42,7 @@ fun main() {
       logger.info {"Retrieved values: ${queryForInstances(service.name)}"}
       logger.info {"Retrieved names: ${queryForNames()}"}
 
-      sleep(2.seconds)
+      Thread.sleep(2_000)
       logger.info {"Updating"}
       payload.intval = -888
       service.jsonPayload = payload.toJson()
@@ -53,10 +51,10 @@ fun main() {
       logger.info {"Retrieved values: ${queryForInstances(service.name)}"}
       logger.info {"Retrieved names: ${queryForNames()}"}
 
-      sleep(2.seconds)
+      Thread.sleep(2_000)
       logger.info {"Unregistering"}
       unregisterService(service)
-      sleep(3.seconds)
+      Thread.sleep(3_000)
 
       try {
         logger.info {"Retrieved value: ${queryForInstance(service.name, service.id)}"}
@@ -64,7 +62,7 @@ fun main() {
         println("Exception: $e")
       }
 
-      sleep(2.seconds)
+      Thread.sleep(2_000)
     }
   }
 }

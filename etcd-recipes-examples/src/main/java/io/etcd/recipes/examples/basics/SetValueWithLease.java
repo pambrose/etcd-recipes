@@ -16,7 +16,6 @@
 
 package io.etcd.recipes.examples.basics;
 
-import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.Lease;
 import io.etcd.jetcd.lease.LeaseGrantResponse;
@@ -27,8 +26,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.BuilderUtils.putOption;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static io.etcd.recipes.common.KVUtils.getValue;
@@ -37,7 +36,7 @@ import static io.etcd.recipes.common.KVUtils.putValue;
 public class SetValueWithLease {
 
   public static void main(String[] args) throws InterruptedException {
-    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    List<String> urls = List.of("http://localhost:2379");
     String path = "/foo";
     String keyval = "foobar";
     ExecutorService executor = Executors.newCachedThreadPool();
@@ -64,8 +63,10 @@ public class SetValueWithLease {
         for (int i = 0; i < 12; i++) {
           String kval = getValue(client, path, "unset");
           System.out.printf("Key %s = %s after %sms%n", path, kval, System.currentTimeMillis() - start);
-          sleepSecs(1);
+          TimeUnit.SECONDS.sleep(1);
         }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       }
     });
 

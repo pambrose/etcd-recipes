@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.examples.queue
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.getChildCount
@@ -26,7 +25,6 @@ import io.etcd.recipes.queue.withDistributedPriorityQueue
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
-import kotlin.time.Duration.Companion.seconds
 
 fun main() {
   val logger = KotlinLogging.logger {}
@@ -63,7 +61,7 @@ fun main() {
       }
     }
 
-    sleep(2.seconds)
+    Thread.sleep(2_000)
 
     latch.await()
 

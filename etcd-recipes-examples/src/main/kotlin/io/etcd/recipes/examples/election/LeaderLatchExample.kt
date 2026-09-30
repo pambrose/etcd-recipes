@@ -18,13 +18,12 @@
 
 package io.etcd.recipes.examples.election
 
-import com.pambrose.common.concurrent.thread
-import com.pambrose.common.util.random
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.election.LeaderLatch
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
+import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -40,17 +39,21 @@ fun main() {
   val done = CountDownLatch(count)
 
   repeat(count) {
-    thread(done) {
-      connectToEtcd(urls) { client ->
-        LeaderLatch(client, electionPath, clientId = "Node$it").use { latch ->
-          latch.start()
-          latch.await() // block until this node holds leadership
-          val heldFor = 3.random().seconds
-          logger.info { "${latch.clientId} acquired leadership, holding for $heldFor" }
-          sleep(heldFor)
-          logger.info { "${latch.clientId} releasing leadership" }
-          // leaving use{} closes the latch → releases candidacy → a successor leads
+    thread {
+      try {
+        connectToEtcd(urls) { client ->
+          LeaderLatch(client, electionPath, clientId = "Node$it").use { latch ->
+            latch.start()
+            latch.await() // block until this node holds leadership
+            val heldFor = Random.nextInt(3).seconds
+            logger.info { "${latch.clientId} acquired leadership, holding for $heldFor" }
+            Thread.sleep(heldFor.inWholeMilliseconds)
+            logger.info { "${latch.clientId} releasing leadership" }
+            // leaving use{} closes the latch → releases candidacy → a successor leads
+          }
         }
+      } finally {
+        done.countDown()
       }
     }
   }

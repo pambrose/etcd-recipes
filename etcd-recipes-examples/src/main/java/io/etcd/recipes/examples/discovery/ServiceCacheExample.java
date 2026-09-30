@@ -24,14 +24,14 @@ import io.etcd.recipes.discovery.ServiceDiscovery;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static io.etcd.recipes.examples.discovery.ServiceDiscoveryExample.urls;
 
 public class ServiceCacheExample {
 
-  public static void main(String[] args) throws EtcdRecipeException {
+  public static void main(String[] args) throws EtcdRecipeException, InterruptedException {
     ExecutorService executor = Executors.newSingleThreadExecutor();
     CountDownLatch latch = new CountDownLatch(1);
 
@@ -61,7 +61,7 @@ public class ServiceCacheExample {
 
     ServiceDiscoveryExample.serviceExample(false);
     latch.countDown();
-    sleepSecs(1);
+    TimeUnit.SECONDS.sleep(1);
     executor.shutdown();
   }
 }

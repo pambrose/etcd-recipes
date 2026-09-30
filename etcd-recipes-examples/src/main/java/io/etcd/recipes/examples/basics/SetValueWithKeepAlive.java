@@ -16,7 +16,6 @@
 
 package io.etcd.recipes.examples.basics;
 
-import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import kotlin.Unit;
 
@@ -24,8 +23,8 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.ClientUtils.connectToEtcd;
 import static io.etcd.recipes.common.KeepAliveUtils.putValueWithKeepAlive;
 import static io.etcd.recipes.common.WatchUtils.getKeyAsString;
@@ -34,7 +33,7 @@ import static io.etcd.recipes.common.WatchUtils.watcherWithLatch;
 public class SetValueWithKeepAlive {
 
   public static void main(String[] args) throws InterruptedException {
-    List<String> urls = Lists.newArrayList("http://localhost:2379");
+    List<String> urls = List.of("http://localhost:2379");
     String path = "/foo";
     String keyval = "foobar";
     ExecutorService executor = Executors.newCachedThreadPool();
@@ -64,12 +63,18 @@ public class SetValueWithKeepAlive {
         putValueWithKeepAlive(client, path, keyval, 2,
           () -> {
             System.out.println("Starting sleep");
-            sleepSecs(5);
+            try {
+              TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
             System.out.println("Finished sleep");
             return Unit.INSTANCE;
           });
         System.out.println("Keep-alive is now terminated");
-        sleepSecs(5);
+        TimeUnit.SECONDS.sleep(5);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       } finally {
         System.out.println("Releasing latch");
         latch.countDown();

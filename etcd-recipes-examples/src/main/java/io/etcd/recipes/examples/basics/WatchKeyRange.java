@@ -16,7 +16,6 @@
 
 package io.etcd.recipes.examples.basics;
 
-import com.google.common.collect.Lists;
 import io.etcd.jetcd.Client;
 import io.etcd.jetcd.Watch.Watcher;
 import io.etcd.jetcd.options.WatchOption;
@@ -25,8 +24,8 @@ import io.etcd.recipes.common.KVUtils;
 import kotlin.Unit;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
-import static com.pambrose.common.util.MiscJavaFuncs.sleepSecs;
 import static io.etcd.recipes.common.BuilderUtils.watchOption;
 import static io.etcd.recipes.common.ChildrenUtils.getChildCount;
 import static io.etcd.recipes.common.ChildrenUtils.getChildren;
@@ -38,8 +37,8 @@ import static io.etcd.recipes.common.WatchUtils.watcher;
 
 public class WatchKeyRange {
 
-  public static void main(String[] args) {
-    List<String> urls = Lists.newArrayList("http://localhost:2379");
+  public static void main(String[] args) throws InterruptedException {
+    List<String> urls = List.of("http://localhost:2379");
     String path = "/watchkeyrange";
 
     //ByteSequence pathBS = getAsByteSequence(path);
@@ -66,7 +65,7 @@ public class WatchKeyRange {
       System.out.println(getAsString(getChildren(client, path)));
       System.out.println(getChildCount(client, path));
 
-      sleepSecs(5);
+      TimeUnit.SECONDS.sleep(5);
 
       // Add children
       putValue(client, path + "/election/a", "a");
@@ -86,7 +85,7 @@ public class WatchKeyRange {
       System.out.println(getAsString(getChildren(client, path + "/waiting")));
       System.out.println(getChildCount(client, path + "/waiting"));
 
-      sleepSecs(5);
+      TimeUnit.SECONDS.sleep(5);
 
       // Delete root
       KVUtils.deleteKey(client, path);
@@ -101,7 +100,7 @@ public class WatchKeyRange {
       System.out.println(getAsString(getChildren(client, path)));
       System.out.println(getChildCount(client, path));
 
-      sleepSecs(5);
+      TimeUnit.SECONDS.sleep(5);
     }
   }
 }

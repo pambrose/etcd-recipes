@@ -18,14 +18,12 @@
 
 package io.etcd.recipes.examples.cache
 
-import com.pambrose.common.util.sleep
 import io.etcd.recipes.cache.TypedPathChildrenCache
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.jsonCodec
 import io.etcd.recipes.common.putValue
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Watch a prefix of typed values with a [TypedPathChildrenCache]: `currentData` yields decoded
@@ -47,7 +45,7 @@ fun main() {
       logger.info { "Initial: ${cache.currentData}" }
 
       client.putValue("$path/w2", Worker("beta", 7), codec)
-      sleep(500.milliseconds)
+      Thread.sleep(500)
       logger.info { "Now: ${cache.currentData}" }
     }
   }
