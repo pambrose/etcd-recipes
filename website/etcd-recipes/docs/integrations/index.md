@@ -87,7 +87,8 @@ data class EtcdTlsConfig(
 ```
 
 Pass it to `connectToEtcd(config)`. In `EtcdTlsConfig`, `caCertPath` sets the trust manager
-(server verification) and `clientCertPath` + `clientKeyPath` together enable mutual TLS.
+(server verification) and `clientCertPath` + `clientKeyPath` together enable mutual TLS;
+setting only one of them is refused.
 
 !!! warning "These are `java.time.Duration`, not `kotlin.time.Duration`"
 

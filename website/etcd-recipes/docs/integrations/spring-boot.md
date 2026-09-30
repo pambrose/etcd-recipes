@@ -57,6 +57,10 @@ land in the same place.
 | `etcd.recipes.tls.client-cert-path` | `String?` | `null` |
 | `etcd.recipes.tls.client-key-path` | `String?` | `null` |
 
+`client-cert-path` and `client-key-path` enable mutual TLS together: setting only one fails
+startup rather than connecting without a client certificate. The bound `EtcdProperties`
+never shows the password in its `toString()`.
+
 === "application.yml"
 
     ```yaml

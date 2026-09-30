@@ -126,7 +126,7 @@
 - [x] [#66](#issue-66) A terminal watch failure never completes the watch and leadership flows
 - [x] [#67](#issue-67) The suspend RPC engine never records `EtcdMetrics.recordRpc`
 - [x] [#68](#issue-68) Every published artifact forces `logback-classic`, guava, and common-utils onto consumers
-- [ ] [#69](#issue-69) The Ktor plugin closes its client on `ApplicationStopping`, before user teardown runs
+- [x] [#69](#issue-69) The Ktor plugin closes its client on `ApplicationStopping`, before user teardown runs
 - [x] [#70](#issue-70) RPC-backed Micrometer gauges can stall the metrics scrape during an outage
 - [x] [#71](#issue-71) A deadlocked test can hang CI for 45 min without identifying the test
 
@@ -137,7 +137,7 @@
 - [x] [#75](#issue-75) The `EtcdConnector` exception list grows without bound
 - [x] [#76](#issue-76) The compaction fallback resumes one revision too late
 - [ ] [#77](#issue-77) `Duration`-typed APIs hidden from Java (`EtcdRecipes.distributedPriorityQueue`, `LeaderLatch` `closeJoinTimeout`)
-- [ ] [#78](#issue-78) Passwords appear in `toString()`, and half-configured mTLS is silently ignored
+- [x] [#78](#issue-78) Passwords appear in `toString()`, and half-configured mTLS is silently ignored
 - [ ] [#79](#issue-79) Gaps in background logging context (MDC)
 - [x] [#80](#issue-80) `DistributedAtomicLong` resilience gaps (no close check, uncapped backoff, undocumented ambiguous commits)
 - [x] [#81](#issue-81) Read-write lock and semaphore releases rely on a single, un-retried revoke
@@ -157,8 +157,8 @@
 - [x] [#95](#issue-95) `eventsAsFlow().onStart { }` doesn't guarantee the cache listener is registered
 - [x] [#96](#issue-96) The docs claim every blocking call has a suspending twin, but several don't
 - [x] [#97](#issue-97) `withLock(timeout)`'s "null means not acquired" is false for a nullable `T`
-- [ ] [#98](#issue-98) Micrometer gauge binders can report the wrong recipe, and the documented example binds to recipes it then closes
-- [ ] [#99](#issue-99) `EtcdProperties` binding depends on a transitive `kotlin-reflect`, and the starter's tests don't check binding
+- [x] [#98](#issue-98) Micrometer gauge binders can report the wrong recipe, and the documented example binds to recipes it then closes
+- [x] [#99](#issue-99) `EtcdProperties` binding depends on a transitive `kotlin-reflect`, and the starter's tests don't check binding
 - [x] [#100](#issue-100) `TransientKeyValueTest` counts every key under `/keyvalue`, which other test classes write to in parallel
 - [ ] [#101](#issue-101) Some regression tests can't fail for the bug they target
 - [x] [#102](#issue-102) The minimum Kotlin version for consumers (2.3+) is undocumented

@@ -30,7 +30,10 @@ import io.micrometer.core.instrument.Tags
  * Live-state gauges. Unlike the push [io.etcd.recipes.common.EtcdMetrics] SPI, a gauge polls its
  * source on every metrics scrape — so bind one to a specific recipe instance you already hold.
  * Micrometer keeps only a weak reference to the recipe, so a bound gauge does not keep it alive.
- * Binding several instances of the same gauge to one registry needs distinguishing [tags].
+ * Binding several instances of the same gauge to one registry needs distinguishing [tags]:
+ * Micrometer hands back the existing gauge for a repeated name and tags, still bound to the
+ * first instance. Each binder returns its gauge; `registry.remove(gauge)` when the recipe closes,
+ * or the gauge reads NaN once the recipe is collected and blocks a fresh binding for a new one.
  */
 
 /**
@@ -46,17 +49,31 @@ fun MeterRegistry.bindQueueDepth(
   rpc: RpcResilience = RpcResilience.PROBE,
 ): Gauge = Gauge.builder("etcd.queue.depth", queue) { it.size(rpc).toDouble() }.tags(tags).register(this)
 
-/** A gauge of [cache]'s live entry count (an in-memory read; no RPC). */
+/**
+ * A gauge of [cache]'s live entry count (an in-memory read; no RPC), tagged
+ * `recipe=PathChildrenCache` so it can't collide with [bindServiceCacheSize]'s.
+ */
 fun MeterRegistry.bindCacheSize(
   cache: PathChildrenCache,
   tags: Tags = Tags.empty(),
-): Gauge = Gauge.builder("etcd.cache.entries", cache) { it.currentData.size.toDouble() }.tags(tags).register(this)
+): Gauge =
+  Gauge.builder("etcd.cache.entries", cache) { it.currentData.size.toDouble() }
+    .tags(Tags.of(RECIPE_TAG, "PathChildrenCache").and(tags))
+    .register(this)
 
-/** A gauge of [cache]'s live instance count (an in-memory read; no RPC). */
+/**
+ * A gauge of [cache]'s live instance count (an in-memory read; no RPC), tagged
+ * `recipe=ServiceCache` so it can't collide with [bindCacheSize]'s.
+ */
 fun MeterRegistry.bindServiceCacheSize(
   cache: ServiceCache,
   tags: Tags = Tags.empty(),
-): Gauge = Gauge.builder("etcd.cache.entries", cache) { it.instances.size.toDouble() }.tags(tags).register(this)
+): Gauge =
+  Gauge.builder("etcd.cache.entries", cache) { it.instances.size.toDouble() }
+    .tags(Tags.of(RECIPE_TAG, "ServiceCache").and(tags))
+    .register(this)
+
+private const val RECIPE_TAG = "recipe"
 
 /**
  * A gauge of [semaphore]'s available permits. NOTE: [DistributedSemaphore.availablePermits] issues

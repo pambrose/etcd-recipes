@@ -23,7 +23,7 @@ import io.etcd.recipes.common.EtcdConnectionConfig
 import io.etcd.recipes.common.EtcdRecipes
 import io.etcd.recipes.common.connectToEtcd
 import io.ktor.server.application.Application
-import io.ktor.server.application.ApplicationStopping
+import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.hooks.MonitoringEvent
 import io.ktor.util.AttributeKey
@@ -52,7 +52,8 @@ private val EtcdClientKey = AttributeKey<Client>("EtcdRecipesClient")
 /**
  * A Ktor plugin that connects to etcd for the application's lifetime. Install it to get an
  * [Application.etcdClient] (and [Application.etcdRecipes] factory); a plugin-owned client is closed
- * automatically on `ApplicationStopping`.
+ * automatically on `ApplicationStopped`, so the app's own `ApplicationStopping` teardown (closing
+ * its recipes, which revokes their leases) can still use it.
  */
 val EtcdPlugin =
   createApplicationPlugin("Etcd", ::EtcdPluginConfig) {
@@ -61,8 +62,10 @@ val EtcdPlugin =
     application.attributes.put(EtcdClientKey, client)
 
     // Only close what the plugin created; an injected client stays the caller's responsibility.
+    // ApplicationStopped, not ApplicationStopping: handlers run in registration order, so closing
+    // on ApplicationStopping would pull the client from under every teardown registered later.
     if (supplied == null)
-      on(MonitoringEvent(ApplicationStopping)) { app -> app.attributes[EtcdClientKey].close() }
+      on(MonitoringEvent(ApplicationStopped)) { app -> app.attributes[EtcdClientKey].close() }
   }
 
 /** The etcd [Client] installed by [EtcdPlugin]. */

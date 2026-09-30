@@ -50,7 +50,7 @@ This is the one rule to get right, and it is decided entirely by which fields yo
 !!! warning "Set connection fields and the plugin owns the client. Inject one and it doesn't."
 
     **Supply `endpoints` (etc.)** — the plugin builds the client, and closes it on
-    `ApplicationStopping`. You do nothing.
+    `ApplicationStopped`, after every `ApplicationStopping` handler has run. You do nothing.
 
     **Supply `client`** — the plugin installs it and *never* closes it, because it did not
     create it. Closing it is your job, and if you forget, the connection outlives the
@@ -101,4 +101,6 @@ val Application.etcdRecipes: EtcdRecipes
     The recipes it builds are not owned by the plugin either. As everywhere else,
     `start()`/`close()` is yours: scope short-lived recipes to the request or the unit of
     work, and hold long-lived ones (a cache, a `LeaderLatch`) yourself, closing them on
-    `ApplicationStopping` alongside the plugin's own teardown.
+    `ApplicationStopping`. The plugin closes its own client later, on `ApplicationStopped`,
+    so that teardown can still reach etcd: a registration, leadership, or lock closed then
+    revokes its lease, instead of lingering until its TTL.

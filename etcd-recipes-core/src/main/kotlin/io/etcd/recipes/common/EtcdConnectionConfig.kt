@@ -20,13 +20,21 @@ import java.time.Duration
 
 /**
  * TLS material for [EtcdConnectionConfig]. All paths are files on disk. [caCertPath] sets the trust
- * manager (server verification); [clientCertPath] + [clientKeyPath] together enable mutual TLS.
+ * manager (server verification); [clientCertPath] + [clientKeyPath] together enable mutual TLS,
+ * so setting only one of them is refused rather than silently connecting without a client
+ * certificate.
  */
 data class EtcdTlsConfig(
   val caCertPath: String? = null,
   val clientCertPath: String? = null,
   val clientKeyPath: String? = null,
-)
+) {
+  init {
+    require((clientCertPath == null) == (clientKeyPath == null)) {
+      "Mutual TLS needs both clientCertPath and clientKeyPath, or neither"
+    }
+  }
+}
 
 /**
  * A declarative etcd connection, mapped onto the jetcd client builder by
@@ -43,4 +51,13 @@ data class EtcdConnectionConfig(
   val connectTimeout: Duration = Duration.ofSeconds(5),
   val retryMaxDuration: Duration = Duration.ofSeconds(30),
   val tls: EtcdTlsConfig? = null,
-)
+) {
+  // The password never shows: a logged or printed config must not leak the credential
+  override fun toString(): String =
+    "EtcdConnectionConfig(endpoints=$endpoints, user=$user, password=${password?.let { REDACTED }}, " +
+      "namespace=$namespace, connectTimeout=$connectTimeout, retryMaxDuration=$retryMaxDuration, tls=$tls)"
+
+  internal companion object {
+    const val REDACTED = "****"
+  }
+}

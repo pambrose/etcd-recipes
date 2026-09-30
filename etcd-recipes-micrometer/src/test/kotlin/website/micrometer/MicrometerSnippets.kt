@@ -68,18 +68,22 @@ fun bindGauges(
   registry: MeterRegistry,
 ) {
   // --8<-- [start:gauges]
-  // Gauges are pull-based: bind one to an instance you already hold and it polls that
-  // instance on every scrape. Micrometer keeps only a weak reference, so binding a gauge
-  // does not keep the recipe alive.
-  DistributedQueue(client, "/queues/orders").use { queue ->
-    registry.bindQueueDepth(queue, Tags.of("queue", "orders"))
-  }
+  // Gauges are pull-based: bind one to an instance you hold for as long as you want the
+  // metric, and it polls that instance on every scrape. Micrometer keeps only a weak
+  // reference, so binding a gauge does not keep the recipe alive.
+  val queue = DistributedQueue(client, "/queues/orders")
+  val depth = registry.bindQueueDepth(queue, Tags.of("queue", "orders"))
 
-  LeaderLatch(client, "/election/orders").use { latch ->
-    latch.start()
-    // 1.0 while this instance is the leader, 0.0 otherwise. An in-memory read; no RPC.
-    registry.bindLeadership(latch, Tags.of("election", "orders"))
-  }
+  val latch = LeaderLatch(client, "/election/orders").start()
+  // 1.0 while this instance is the leader, 0.0 otherwise. An in-memory read; no RPC.
+  val leader = registry.bindLeadership(latch, Tags.of("election", "orders"))
+
+  // ... later, at shutdown: remove each gauge with its recipe. One left behind reads NaN,
+  // and a later binding under the same name and tags would get it back, still stale.
+  registry.remove(depth)
+  queue.close()
+  registry.remove(leader)
+  latch.close()
   // --8<-- [end:gauges]
 }
 
@@ -90,8 +94,11 @@ fun bindPollingGauge(
   // --8<-- [start:polling-gauge]
   // Mind the ones that cost an RPC. availablePermits() (like AbstractQueue.size) issues a
   // range-count against etcd, so this gauge hits the cluster on EVERY scrape.
-  DistributedSemaphore(client, "/semaphores/pool", 5).use { semaphore ->
-    registry.bindAvailablePermits(semaphore, Tags.of("pool", "workers"))
-  }
+  val semaphore = DistributedSemaphore(client, "/semaphores/pool", 5)
+  val permits = registry.bindAvailablePermits(semaphore, Tags.of("pool", "workers"))
+
+  // ... and, as with any gauge, remove it when the recipe closes
+  registry.remove(permits)
+  semaphore.close()
   // --8<-- [end:polling-gauge]
 }

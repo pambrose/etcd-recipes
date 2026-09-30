@@ -25,7 +25,10 @@ import java.time.Duration
 
 /**
  * Binds `etcd.recipes.*` properties (relaxed binding, so `etcd.recipes.connect-timeout` etc.) and
- * maps them to an [EtcdConnectionConfig]. Constructor-bound and immutable.
+ * maps them to an [EtcdConnectionConfig]. Constructor-bound and immutable. With every parameter
+ * defaulted, Kotlin also emits a no-arg constructor, so Spring finds the bind constructor through
+ * kotlin-reflect, which the starter depends on directly. (`@ConstructorBinding` can't help:
+ * Kotlin copies it onto that no-arg constructor too, and Spring rejects it there.)
  */
 @ConfigurationProperties("etcd.recipes")
 data class EtcdProperties(
@@ -49,6 +52,12 @@ data class EtcdProperties(
     val clientCertPath: String? = null,
     val clientKeyPath: String? = null,
   )
+
+  // The password never shows: bound properties that get logged must not leak the credential
+  override fun toString(): String =
+    "EtcdProperties(endpoints=$endpoints, user=$user, password=${password?.let { "****" }}, " +
+      "namespace=$namespace, connectTimeout=$connectTimeout, retryMaxDuration=$retryMaxDuration, " +
+      "tls=$tls, health=$health)"
 
   fun toConnectionConfig(): EtcdConnectionConfig =
     EtcdConnectionConfig(

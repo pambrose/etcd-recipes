@@ -84,7 +84,10 @@ changes. It is the cleanest way to share one etcd cluster between environments o
 
 `EtcdTlsConfig(caCertPath, clientCertPath, clientKeyPath)` — all three are optional:
 supply just `caCertPath` to verify the server against a private CA, or all three for
-mutual TLS. Username/password auth is orthogonal and set via `user`/`password`.
+mutual TLS. `clientCertPath` and `clientKeyPath` go together: setting only one throws
+`IllegalArgumentException` rather than silently connecting without a client certificate.
+Username/password auth is orthogonal and set via `user`/`password`; `toString()` never
+shows the password.
 
 !!! warning "Don't put the password in source"
 
