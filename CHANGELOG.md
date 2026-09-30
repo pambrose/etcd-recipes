@@ -76,9 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "active leader" key in etcd for its duration and reports whether it found the key taken;
   before, the test checked only that every candidate took and released leadership.
 - CI: `ci.yml` runs with `permissions: contents: read`, and its actions move to the Node 24
-  generation (`checkout@v7`, `setup-java@v6`, `setup-gradle@v5`, `codecov-action@v7`,
-  `upload-artifact@v7`). `setup-gradle` stays on v5 on purpose: v6 puts caching under
-  separate Terms of Use.
+  generation (`checkout@v7`, `setup-java@v6`, `setup-gradle@v6`, `codecov-action@v7`,
+  `upload-artifact@v7`). `setup-gradle` v6's caching is a proprietary component under
+  Gradle's Terms of Use.
 - The documentation site deploys only after CI passes on a master push (a `workflow_run`
   trigger building the commit CI verified). Before, every push to master deployed, even
   when the snippets it embeds no longer compiled.
