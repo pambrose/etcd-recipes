@@ -11,14 +11,15 @@ exceptions, and implements `Closeable`. Everything it gives you:
 
 | Member | Purpose |
 | --- | --- |
-| `exceptions: List<Throwable>` | Failures captured on background threads |
+| `exceptions: List<Throwable>` | Failures captured on background threads (the most recent 100) |
+| `droppedExceptionCount: Long` | How many older failures `exceptions` let go |
 | `hasExceptions: Boolean` | Cheap check — does not allocate the list |
 | `clearExceptions()` | Drain after handling |
 | `addBackgroundExceptionListener(l)` | Be told instead of polling |
 | `connectionState: ConnectionState` | `CONNECTED` / `SUSPENDED` / `RECONNECTED` / `LOST` |
 | `addConnectionStateListener(l)` | React to connectivity changes |
 | `isHealthy(): Boolean` | Passive — no round trip |
-| `ping(): Boolean` | Active — count-only GET |
+| `ping(): Boolean` / `ping(rpc)` | Active — one count-only GET, bounded at 2 seconds by default |
 | `close()` | Idempotent |
 
 The typed decorators (`TypedDistributedQueue<T>`, `TypedPathChildrenCache<T>`,
@@ -81,10 +82,10 @@ There are 18 of these, plus `withLock`/`withPermit` on the lock types and
     `withXxx` — construct them and use `use { }`.
 
     And several `withXxx` overloads omit the `resilience` parameter their constructor
-    accepts (`withPathChildrenCache`, `withDistributedQueue`, `withDistributedBarrier*`,
-    `withLeaderSelector`, `withServiceDiscovery`, `withDistributedAtomicLong`,
-    `withTransientKeyValue`). Construct the recipe directly if you need custom
-    [resilience](../resilience/index.md) with one of those.
+    accepts (`withPathChildrenCache`, `withDistributedQueue`,
+    `withDistributedPriorityQueue`, `withDistributedBarrier*`, `withLeaderSelector`,
+    `withServiceDiscovery`, `withTransientKeyValue`). Construct the recipe directly if you
+    need custom [resilience](../resilience/index.md) with one of those.
 
 ## How failures reach you
 
@@ -117,6 +118,11 @@ listener can serve every recipe in the process. Recipes also push that identity 
 SLF4J **MDC** on their background threads, so it can go into your log pattern
 automatically. See [Observability](../observability.md).
 
+Background-exception, connection-state, and lock- or permit-lost listeners run on the
+recipe's own **notifier thread**, one at a time and in the order things happened — never
+on jetcd's threads. A listener may block or make an RPC; it delays only that recipe's
+later notifications.
+
 ### Exception types
 
 The library raises its own types rather than leaking jetcd's:
@@ -124,7 +130,14 @@ The library raises its own types rather than leaking jetcd's:
 | Type | Kind | Meaning |
 | --- | --- | --- |
 | `EtcdRecipeException` | checked | An operation legitimately failed — e.g. no service instance is available |
-| `EtcdRecipeRuntimeException` | unchecked | Misuse or an unrecoverable state — e.g. a read→write lock upgrade |
+| `EtcdRecipeRuntimeException` | unchecked | Misuse, an unrecoverable state (e.g. a read→write lock upgrade), or a failed RPC |
+
+Both take an optional cause, and the library fills it in: an RPC that fails reaches you as
+an `EtcdRecipeRuntimeException` whose cause is the original failure (the gRPC status, the
+timeout, or the interrupt). `EtcdRecipeRuntimeException` is `open`, and a few failures
+have their own subtype — `SemaphorePermitMismatchException`, the coroutine layer's
+`HoldLostException`, and `EstablishDeclinedException` from `selfHealingKeepAlive` — so
+catching the base type still catches them.
 
 ### Losing what you hold
 

@@ -7,31 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed (read-write lock, found by its TLA+ spec)
+## [0.13.0] - 2026-09-30
 
-- A downgraded read's fencing token no longer fences out the writer queued behind it. It
-  was the read entry's own, newer revision, so the writer admitted after the downgrade got a
-  smaller token than one already issued, and a resource keeping the largest token refused a
-  legitimate writer. A hold's token is now its rank: a downgrade's is the write hold's.
-- An acquisition whose entry's lease had just expired (not yet noticed) is no longer
-  admitted. The conflict scan never checked for the attempt's own entry, so such a client
-  could be admitted with no place in line, alongside a writer admitted after the expiry. It
-  now starts over at the tail, as the semaphore already did.
+A reliability release. Every issue from a full review of the library
+([docs/CODE_REVIEW_2026-09-28.md](docs/CODE_REVIEW_2026-09-28.md)) is fixed, the recipes'
+distributed protocols are model-checked with TLA+ (`specs/`), and their in-memory
+concurrent state with Lincheck. [RELEASE_NOTES.md](RELEASE_NOTES.md) has the highlights.
 
-### Fixed (work queue claims, found by its TLA+ spec)
+### Upgrading from 0.12.0
 
-- A claim whose transaction got no answer is no longer reconciled into another thread's
-  claim. Threads sharing one `DistributedWorkQueue` share its clientId and lease, and
-  `reconcileClaim` recognized its own claim by exactly those, so a thread could be handed
-  the item another thread had just claimed: both processed it under one claim, and the
-  second `ack()` returned false for a claim that was never lost. Each claim marker's value
-  is now `<clientId>:<nonce>`, unique to its attempt, and the item's guards and the
-  reconciliation compare against it.
-- A claim whose response was lost and whose re-read failed too no longer holds its item
-  until the consumer restarts or its lease lapses (possibly never, under a healthy lease).
-  The consumer remembers it, per claim attempt (so another thread's unresolved attempt on
-  the same item can't displace it), and its sweeper releases it if it committed, giving the
-  item back to the queue with that delivery undone, as `unclaim()` does.
+Most fixes need nothing from you. These change what you depend on, what you see, or how
+several processes must be deployed together; details are in the sections below.
+
+**Build and dependencies**
+
+- `etcd-recipes-core` no longer brings a logging backend. The published POMs depend on the
+  SLF4J API alone, so add one (Logback, Log4j 2, …) if your application relied on the
+  `logback-classic` it used to pull in. jetcd and kotlinx-serialization are now
+  compile-scope dependencies, as the public API needs.
+
+**Deploy all members together**
+
+- A counted barrier's waiting keys moved under `<path>/waiting/<round>/`. The two layouts
+  don't count each other's waiters, so every `DistributedBarrierWithCount` and
+  `DistributedDoubleBarrier` member meeting at one path must run the same version.
+- A read-write lock downgrade carries its rank in the entry value; avoid downgrading while
+  a mixed-version fleet shares a lock. A `clientId` starting with `rank:` is rejected.
+
+**Behavior changes**
+
+- The lock recipes (`DistributedMutex`, `DistributedReadWriteLock`, `DistributedSemaphore`)
+  default to a 10-second lease, up from 2. A crashed holder's lock takes up to 10 seconds
+  to free; pass `leaseTtlSecs` to choose.
+- Plain writes (`putValue`, `deleteKey`, `deleteChildren`, `compact`, and their suspending
+  twins) make one attempt instead of being retried, and every RPC failure surfaces as
+  `EtcdRecipeRuntimeException` with the original failure as its cause (a non-retriable one
+  used to escape as a raw `ExecutionException`).
+- Listener callbacks (background-exception, connection-state, lock- and permit-lost) run
+  on a per-recipe notifier thread, in order, never on jetcd's event loop or the reporting
+  thread. A `LOST` from a stream that's gone for good sticks until the recipe restarts.
+- `exceptions` keeps the most recent 100 failures (`droppedExceptionCount` counts the rest).
+- `ping()` makes a single attempt bounded at 2 seconds (`RpcResilience.PROBE`), and a
+  definite refusal from etcd counts as reachable.
+- `ServiceDiscovery.queryForNames()` returns each service name once, instead of every
+  instance's full key.
+- `EtcdTlsConfig` refuses a client certificate without its key, or the reverse
+  (`IllegalArgumentException`, which fails a Spring app's startup).
+- The Ktor plugin closes the client it owns on `ApplicationStopped`, after your
+  `ApplicationStopping` teardown.
+- Micrometer's `etcd.cache.entries` gauges carry a `recipe` tag.
+
+**Source changes**
+
+- `EtcdLock` gained `fencingToken`; an implementation outside this library must add it.
+- The bounded suspending `withLock(timeout) { … }` requires a non-null result type
+  (`T : Any`).
+- `ServiceCacheListener.cacheChanged`'s third parameter is `instanceKey`, and
+  `ServiceCacheEvent.serviceName` is deprecated in favor of `instanceKey` (both hold
+  `<serviceName>/<id>`).
+
+### Added (fencing tokens)
+
+- `EtcdLock.fencingToken` (on `DistributedMutex` and both of `DistributedReadWriteLock`'s
+  views) and `DistributedSemaphore.fencingToken`: a number etcd assigned to the calling
+  thread's hold, larger than any earlier conflicting holder's, or -1 when it holds nothing.
+  A downstream resource that keeps the largest token it has seen and refuses smaller ones
+  turns away a holder that lost the lock (a pause past its lease) but hasn't noticed yet.
+  A lock notices a loss only on the client, after etcd has already granted the lock to
+  the next waiter. The mutex's token is its grant revision; the read-write lock's and the
+  semaphore's are their entries' create revisions.
+
+### Added (suspending twins)
+
+- Suspending twins for the blocking calls added after the coroutine layer:
+  - `LeaderLatch.awaitStart` / `awaitLeadership`
+  - `awaitStart` for `LeaderObserver`, `NodeCache`, and `TypedTransientKeyValue`
+  - `TypedPathChildrenCache.awaitStart` / `awaitStartComplete`
+  - the typed queues' `receive` / `awaitTryDequeue` / `awaitEnqueue`
+  - `ServiceProvider.awaitStart` / `awaitGetInstance` / `awaitGetAllInstances`
+  - the work queue's `awaitDeadLetters` / `awaitRequeueDeadLetter` /
+    `awaitPurgeDeadLetter`
+
+### Added (suspend holders and lock loss)
+
+- On a lock or semaphore built with `interruptOnLockLoss` / `interruptOnPermitLoss`, losing
+  the hold now cancels the suspending `withLock` / `withPermit` body. The call then throws
+  the new `HoldLostException` (an `EtcdRecipeRuntimeException`). For a semaphore, only the
+  holder whose permit was lost is affected. Before, the option interrupted an idle
+  confined thread (locks) or an unrelated pooled thread (semaphores), and the body never
+  learned of the loss.
+
+### Added (`DistributedAtomicLong`)
+
+- `withDistributedAtomicLong` takes a `resilience` parameter, like the constructor.
+- `DistributedAtomicLong`'s KDoc now states that an update that throws has an unknown
+  outcome (its transaction may have been applied), so blindly retrying it can count
+  twice.
 
 ### Added (TLA+ specifications)
 
@@ -40,19 +111,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `make tla` and in CI. Each models the code one RPC per action, with leases expiring
   between them, and was checked against the bugs it's meant to catch.
 
-### Fixed (`StickyStrategy` under concurrency)
-
-- Concurrent `StickyStrategy` selections agree on one instance. When several callers found
-  no usable choice at once, each picked an instance and the last to store its pick won, so a
-  caller could return an instance another had already replaced, and later callers flipped to
-  a stale choice. A pick now replaces only the choice its caller saw, so one made meanwhile
-  is kept.
-
 ### Added (tests)
 
 - Lincheck model-checking tests for in-memory concurrent state: the provider strategies,
   and `EtcdConnector`'s connection state and recorded exceptions. The strategy test found
   the `StickyStrategy` race above.
+
+### Changed (RPC engine: real jetcd failures, reads-only retries)
+
+- The retry check only recognized jetcd's `EtcdException`, but jetcd's KV, lease, and
+  lock calls fail with raw gRPC `StatusRuntimeException`s — so status-based retries never
+  fired; only attempt timeouts were retried. gRPC statuses (`UNAVAILABLE`, `INTERNAL`,
+  `DEADLINE_EXCEEDED`) now count.
+- **Only calls that are safe to repeat are retried**: reads, plus `unlock` and
+  `leaseGrant`, whose duplicates are harmless. Plain writes — `putValue`, `deleteKey`,
+  `deleteChildren`, `compact` (and their suspending twins) — now make one attempt bounded
+  by `operationTimeout`, like transactions: a write that failed or timed out may still
+  have been applied, and a retried attempt could land after a newer write and revert it.
+  Previously a timed-out write was retried.
+- **Every RPC failure now surfaces as `EtcdRecipeRuntimeException`** with the original
+  failure (gRPC status, timeout, or interrupt) as its cause. Non-retriable failures used
+  to escape as a raw checked `ExecutionException` — undeclared, and uncatchable as such
+  from Java.
+- Interrupts are handled consistently: one arriving during a retry backoff or while
+  awaiting a transaction now surfaces as `EtcdRecipeRuntimeException` with the thread's
+  interrupt flag restored (it used to escape as a raw `InterruptedException` with the
+  flag cleared), and `leaseRevoke` no longer clears the interrupt flag of an interrupted
+  caller.
+
+### Changed (lock lease TTL)
+
+- **Behavior change:** `DistributedMutex`, `DistributedReadWriteLock`, and
+  `DistributedSemaphore` default to a 10-second lease (`leaseTtlSecs`), up from 2 seconds.
+  A lapsed lease loses the lock, and at 2 seconds a GC pause or network blip of about 1.3
+  seconds could put two holders in the critical section until the first noticed. The
+  trade-off: a crashed holder's lock now takes up to 10 seconds to free. An explicit
+  `leaseTtlSecs` is unaffected, and the other recipes keep 2 seconds.
+
+### Changed (barriers: wire layout)
+
+- **Wire-layout change:** a counted barrier's waiters register under
+  `<path>/waiting/<round>/`, where the round is `/ready`'s create revision, instead of
+  directly under `<path>/waiting/`. The two layouts don't count each other's waiters, so
+  every member meeting at one path, including `DistributedDoubleBarrier` members, must run
+  the same version.
+
+### Changed (discovery naming)
+
+- **Behavior change:** `ServiceDiscovery.queryForNames()` (and `awaitQueryForNames()`)
+  returns each service name once, in key order. Before, it returned the full etcd key of
+  every instance (`…/names/worker/AbC1234`), one per instance.
+- `ServiceCacheListener.cacheChanged`'s third parameter is renamed `serviceName` →
+  `instanceKey`, since it holds `<serviceName>/<id>`. `ServiceCacheEvent.serviceName` is
+  likewise now `instanceKey`; `serviceName` remains as a deprecated alias.
+
+### Changed (coroutines)
+
+- **Source-incompatible:** the bounded suspending `withLock(timeout) { … }` now requires
+  its body to return a non-null type (`<T : Any>`), so a `null` result always means "not
+  acquired". Before, a body that returned `null` was indistinguishable from a timeout.
+  Wrap a nullable result if you need one.
 
 ### Changed (examples and docs)
 
@@ -68,50 +186,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `llms.txt` says which recipe areas have Java examples.
   - References to a nonexistent `./etcd.sh` / `make etcd` now name `etcd-start.sh` /
     `make etcd-start`.
-
-### Added (fencing tokens)
-
-- `EtcdLock.fencingToken` (on `DistributedMutex` and both of `DistributedReadWriteLock`'s
-  views) and `DistributedSemaphore.fencingToken`: a number etcd assigned to the calling
-  thread's hold, larger than any earlier conflicting holder's, or -1 when it holds nothing.
-  A downstream resource that keeps the largest token it has seen and refuses smaller ones
-  turns away a holder that lost the lock (a pause past its lease) but hasn't noticed yet.
-  A lock notices a loss only on the client, after etcd has already granted the lock to
-  the next waiter. The mutex's token is its grant revision; the read-write lock's and the
-  semaphore's are their entries' create revisions.
-
-### Changed (lock lease TTL)
-
-- **Behavior change:** `DistributedMutex`, `DistributedReadWriteLock`, and
-  `DistributedSemaphore` default to a 10-second lease (`leaseTtlSecs`), up from 2 seconds.
-  A lapsed lease loses the lock, and at 2 seconds a GC pause or network blip of about 1.3
-  seconds could put two holders in the critical section until the first noticed. The
-  trade-off: a crashed holder's lock now takes up to 10 seconds to free. An explicit
-  `leaseTtlSecs` is unaffected, and the other recipes keep 2 seconds.
-
-### Fixed (Java interop, logging context, and leftovers)
-
-- Java can construct a `DistributedPriorityQueue` and set `LeaderLatch`'s
-  `closeJoinTimeout`. A Kotlin `Duration` parameter hides a member from Java, and those were
-  the only forms. New `(long, TimeUnit)` overloads:
-  `DistributedPriorityQueue(client, path, wait, unit[, resilience])`,
-  `EtcdRecipes.distributedPriorityQueue(path, wait, unit)`, and a `LeaderLatch` constructor
-  ending in `closeJoinTimeout, unit`. `EtcdRecipes.distributedPriorityQueue(path)` is now
-  callable from Java too. A Java source file in the test source set references each of
-  them, so CI's compile catches a Java-hidden API.
-- Background logs are attributable. A watcher (`Client.watcher` / `withWatcher`) and a lease
-  healer (`selfHealingKeepAlive`) now run every callback, recovery attempt, and heal with the
-  MDC of the code that created them. Every recipe creates them under its
-  `etcd.recipe` identity, so the watch blocks and recovery handlers of the caches, service
-  cache, observer, barriers, queues, locks, registry, and `TransientKeyValue` now log with it.
-  So do the listeners they call. The work queue's sweeper runs under it too, and its thread
-  is named `workqueue-sweeper[<queue path>]`.
-- `DistributedReadWriteLock` no longer uses a fully qualified
-  `java.util.concurrent.atomic.AtomicReference`. A detekt `ForbiddenImport` rule now rejects
-  `java.util.concurrent.atomic` imports.
-- A counted-barrier wait that times out no longer makes a second, un-guarded delete of its
-  waiting key; an etcd error there used to turn the timeout (`false`) into a throw.
-- `LeaderSelector` uses the shared `ElectionPaths` key scheme instead of its own copy.
 
 ### Changed (tests and CI)
 
@@ -130,232 +204,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   trigger building the commit CI verified). Before, every push to master deployed, even
   when the snippets it embeds no longer compiled.
 
-### Fixed (integrations)
+### Changed (build)
 
-- Ktor: a plugin-owned client closes on `ApplicationStopped` instead of
-  `ApplicationStopping`. Ktor runs handlers in registration order, so every
-  `ApplicationStopping` handler registered after `install(EtcdPlugin)` (typically the app's
-  own teardown) used to get a closed client. Recipes closed there then couldn't revoke their
-  leases, so registrations and leader or lock keys lingered until their TTL.
-- `EtcdConnectionConfig` and the Spring starter's `EtcdProperties` no longer show the
-  password in `toString()`.
-- `EtcdTlsConfig` requires `clientCertPath` and `clientKeyPath` together. Before, setting
-  only one silently connected without a client certificate; now it throws
-  `IllegalArgumentException` (and fails a Spring app's startup).
-- Micrometer: `bindCacheSize` and `bindServiceCacheSize` tag `etcd.cache.entries` with
-  `recipe=PathChildrenCache` / `recipe=ServiceCache`. Before, binding one of each to a
-  registry returned the first gauge for the second, which reported the first recipe's
-  value. The docs now say to `registry.remove(gauge)` when a recipe closes, and the gauge
-  examples no longer bind to recipes they immediately close.
-- The Spring starter depends on `kotlin-reflect` directly. Spring binds the all-defaults
-  `EtcdProperties` through it, and it used to arrive only by way of another library; had
-  that changed, `etcd.recipes.*` would have silently stopped binding. The starter's tests
-  now check the bound values and the Actuator-absent case.
+- Built with Kotlin 2.4.20 (from 2.4.10) and Gradle 9.8.0, on a JDK 17 toolchain. jetcd is
+  0.8.7 (from 0.8.6). The Ktor plugin targets Ktor 3.6.x (from 3.5.x), and the other
+  satellites track Spring Boot 4.1.1, Micrometer 1.17.1, and Jackson 2.22.3.
 
-### Fixed (barriers)
+### Fixed (packaging: dependency scopes)
 
-- `DistributedBarrierWithCount` releases nobody until the round's release is committed.
-  Before, the member that saw the count reached removed its own waiting key and left
-  first, then deleted `/ready` in a single, un-retried transaction. If that delete failed
-  during an etcd blip, the tripper had already gone (or threw), and every other waiter saw
-  `/ready` still standing and parked until its timeout, forever for `waitOnBarrier()`. Now
-  `/ready` is deleted first, guarded on the round and retried on a transient failure. A
-  delete that still can't be committed is recorded in `exceptions`, and the member stays
-  parked with the rest. A failed read on the watch thread is recorded too, instead of only
-  logged.
-- `DistributedBarrierWithCount` counts one round at a time. Before, every key under
-  `waiting/` counted, so a member that looped straight back into `waitOnBarrier()` (or
-  arrived just after a trip) could trip the next round alone on keys the last round hadn't
-  cleaned up yet. `waiterCount` likewise counts only the round in progress.
-- `DistributedBarrier.setBarrier()` after `removeBarrier()` on the same instance sets the
-  barrier again. Before, the removal flag was permanent, so the second `setBarrier()`
-  returned `false` (read as "another client holds it") and left no barrier. The flag is now
-  per `setBarrier()`, and is set before the healer closes, so a heal racing a removal can't
-  re-arm the barrier. A new `setBarrier()` also retires the previous one's healer instead of
-  leaking it.
+- The published `etcd-recipes-core` POM declared jetcd and kotlinx-serialization at
+  `runtime` scope although both appear in the public API (every recipe takes a jetcd
+  `Client`; `EtcdCodec` exposes `Json`/`KSerializer`), so a project that added only
+  `etcd-recipes-core`, as the README says, failed to compile. Both are now `api`
+  (`compile` scope in the POM), alongside kotlinx-coroutines.
+- Every published artifact forced `logback-classic` onto consumers — clashing with
+  Log4j 2 and other SLF4J backends (a Spring Boot app on `spring-boot-starter-log4j2`
+  could fail to start) — and each satellite also dragged in Guava and common-utils. The
+  libraries now depend on the SLF4J API alone; the satellites' POMs list only the core
+  artifact and their own framework.
+- Documented that Kotlin callers need Kotlin 2.3 or newer.
 
-### Changed (barriers: wire layout)
+### Fixed (lease grants and registration errors)
 
-- **Wire-layout change:** a counted barrier's waiters register under
-  `<path>/waiting/<round>/`, where the round is `/ready`'s create revision, instead of
-  directly under `<path>/waiting/`. The two layouts don't count each other's waiters, so
-  every member meeting at one path, including `DistributedDoubleBarrier` members, must run
-  the same version.
+- Self-healing leases (service registrations, barriers, election participation,
+  `TransientKeyValue`) are granted and revoked under the recipe's own RPC budget:
+  `selfHealingKeepAlive()` takes an `rpc` parameter. A registration against an unreachable
+  etcd used to sit through 5 × 30 s before reporting anything.
+- An establish hook that throws part-way no longer leaves its lease held until the TTL runs
+  out; the lease is revoked.
+- `ServiceRegistry` reports a lost CAS (the key already exists) separately from an
+  infrastructure failure, and both carry their cause. A declined establish throws the new
+  `EstablishDeclinedException`, and `EtcdRecipeException` takes an optional cause.
 
-### Fixed (discovery robustness)
+### Fixed (lease healing and registration lifecycle)
 
-- One malformed or newer-schema instance entry no longer breaks discovery for a whole
-  service. Before, a non-JSON value under `names/<svc>/` (or JSON with a field this version
-  didn't know) made `ServiceCache.instances`, `queryForInstances`, and every
-  `ServiceProvider.getInstance()` throw. Now the entry is skipped, logged, and recorded in
-  `exceptions`, and unknown fields are ignored. The cache decodes each entry once, on
-  arrival, instead of on every read and once per listener. An entry it held that is
-  overwritten with something unreadable is dropped, and listeners get a `DELETE`.
-- `ServiceProvider.noteError` counts errors within a `downPeriod` window from the first.
-  Before, the count never reset, so an instance with one sporadic failure a day was ejected
-  every third day. The provider also forgets instances that are no longer registered or
-  whose window has lapsed. Before, every instance that ever had an error kept an entry until
-  `close()`. Ejection updates are atomic per instance, so a cleanup can't drop an ejection
-  another thread has just made.
-- `ServiceDiscovery` no longer keeps every cache and provider it ever handed out; closed
-  ones are dropped.
-- `ServiceCache.close()` on a cache that was never started is a no-op, as it is for
-  `ServiceProvider`. Before, it threw `EtcdRecipeRuntimeException`.
-- A `PathChildrenCache`'s own start worker is a daemon thread, so an unclosed primed cache
-  no longer keeps the JVM from exiting.
+- A heal no longer re-grants a lease that is still alive in etcd. jetcd reports a lease
+  "gone" from its own client-side deadline; after an etcd leader change the new leader
+  extends every lease, so the lease and its keys can outlive that report. Re-granting
+  then made the establish CAS lose to the recipe's own key and the old lease lapsed, so a
+  `ServiceRegistry` instance, barrier, or election participant was permanently lost
+  after the cluster recovered. The healer now asks etcd first and, if the lease is alive,
+  resumes renewing it (`LeaseEvent.Restored` with the same old and new id).
+- A heal whose establish hook throws now revokes the lease it granted, as the initial
+  establish already did, instead of leaving a key bound to a lease nobody renews.
+- `ServiceRegistry.close()` releases every registration even when one instance's cleanup
+  delete fails (etcd unreachable at shutdown): it used to throw at the first failure and
+  leave the remaining instances renewing their leases inside a closed registry. The
+  cleanup delete now runs under the registry's RPC budget.
+- Re-registering an instance whose key had vanished no longer leaks the previous
+  registration's keep-alive and healer thread.
+- `DistributedBarrier.setBarrier`, `DistributedBarrierWithCount.waitOnBarrier`, and
+  `LeaderSelector` participation no longer report an infrastructure failure (a refused
+  or failed lease grant) as a lost CAS; it propagates with its cause.
+- `keepAlive(lease, onKeepAliveError)` now calls `onKeepAliveError` only when renewal
+  actually stopped (the stream completed, or etcd reported the lease not found). A
+  transient stream error — which jetcd restarts itself, with renewal continuing — is
+  logged at warn instead of reported as a lost lease.
 
-### Changed (discovery naming)
+### Fixed (RPC budgets and probes)
 
-- **Behavior change:** `ServiceDiscovery.queryForNames()` (and `awaitQueryForNames()`)
-  returns each service name once, in key order. Before, it returned the full etcd key of
-  every instance (`…/names/worker/AbC1234`), one per instance.
-- `ServiceCacheListener.cacheChanged`'s third parameter is renamed `serviceName` →
-  `instanceKey`, since it holds `<serviceName>/<id>`. `ServiceCacheEvent.serviceName` is
-  likewise now `instanceKey`; `serviceName` remains as a deprecated alias.
+- The recipe's `RpcResilience` (timeout, retries, and metrics) now reaches every RPC it
+  makes. Several calls fell back to the default (5 × 30 s, uninstrumented):
+  - `ServiceDiscovery.queryForNames` / `queryForInstances`, which did so while holding
+    the discovery monitor;
+  - the cache from `serviceCache(name)`, which now inherits the discovery's config;
+  - `ServiceProvider.getAllInstances`;
+  - `LeaderSelector`'s leadership lease revoke, which could delay `close()` for 30 s
+    during a partition.
 
-### Fixed (coroutine flows and parity)
-
-- A watch abandoned for good no longer leaves its flow suspended forever. `watchAsFlow`
-  completes after its `Recovery(Failed)` element, `watchEventsAsFlow` fails with
-  `EtcdRecipeRuntimeException`, and `leadershipAsFlow` completes after `WatchFailed`.
-- `leadershipAsFlow` takes an `rpc` parameter. A failed re-read after a recovery now ends
-  the flow with `WatchFailed` instead of being logged and leaving the flow silently stale.
-- The suspending RPC engine records `EtcdMetrics.recordRpc`, as the blocking one does
-  (cancellation counts as a failure). Coroutine users' `etcd.rpc` timers and retry
-  counters were always zero. A suspended single-attempt call that times out now carries
-  the `TimeoutException` as its cause.
-- Cache flows: the docs no longer suggest `onStart` as a sign that a flow is subscribed.
-  A flow registers its listener asynchronously, so the example now starts with
-  `BUILD_INITIAL_CACHE` and reads `currentData` instead of waiting for `INITIALIZED`.
-
-### Added (suspending twins)
-
-- Suspending twins for the blocking calls added after the coroutine layer:
-  - `LeaderLatch.awaitStart` / `awaitLeadership`
-  - `awaitStart` for `LeaderObserver`, `NodeCache`, and `TypedTransientKeyValue`
-  - `TypedPathChildrenCache.awaitStart` / `awaitStartComplete`
-  - the typed queues' `receive` / `awaitTryDequeue` / `awaitEnqueue`
-  - `ServiceProvider.awaitStart` / `awaitGetInstance` / `awaitGetAllInstances`
-  - the work queue's `awaitDeadLetters` / `awaitRequeueDeadLetter` /
-    `awaitPurgeDeadLetter`
-
-### Changed (coroutines)
-
-- **Source-incompatible:** the bounded suspending `withLock(timeout) { … }` now requires
-  its body to return a non-null type (`<T : Any>`), so a `null` result always means "not
-  acquired". Before, a body that returned `null` was indistinguishable from a timeout.
-  Wrap a nullable result if you need one.
-
-### Fixed (`TransientKeyValue` lifecycle)
-
-- `TransientKeyValue` no longer parks an executor thread for its whole life. `start()`
-  publishes the key synchronously under its self-healing lease, which renews on internal
-  threads. Instances sharing a single-thread or small executor used to hang in the
-  constructor or `start()`, since the second instance's task never ran; with a larger pool,
-  each instance silently held a thread. `userExecutor` is no longer used and remains for
-  compatibility.
-- A `start()` that fails can be retried. The retry used to rethrow the first attempt's
-  error (or, with the recipe's own executor, `RejectedExecutionException`) while a new
-  task published the key anyway, and `close()` then threw "start() not called", leaving the
-  key published for the life of the process. `close()` on an instance that never started
-  is now a no-op.
-
-### Fixed (queue ambiguity, ordering, and cost)
-
-- A work-queue claim whose transaction response was lost after it committed is now
-  reconciled. The consumer re-reads the claim marker and, if the claim is its own, returns
-  the item. It used to throw, leaving the claim stranded on the consumer's healthy lease,
-  where no sweep would reclaim it until the instance closed. The plain queues' docs now
-  say that a take that fails may still have consumed the item.
-- `DistributedQueue`'s take picks the lowest key among the entries at the head's revision,
-  so an `enqueueAll` batch keeps argument order whatever etcd's sort does with equal
-  revisions.
-- Head selection is cheaper. The priority queue (and every key-ordered first-child read)
-  no longer asks etcd to sort, so etcd can stop at the first key instead of reading the
-  whole prefix. `DistributedQueue` finds its head with a keys-only read.
-- The work queue's orphan sweep diffs one keys-only read of `claimed/` against one of
-  `claims/`, and fetches payloads only for orphans. It used to issue a transaction for
-  every claim in flight on every empty receive: with 50 idle consumers and 50 items in
-  flight, about 2,500 transactions per enqueue. A receive that finds the queue empty
-  sweeps at most once a second per instance.
-- Queue metrics now cover enqueues (all queues), `tryDequeue`, and the work queue's
-  `receive`, `ack`, and dead-lettering, as the `etcd.queue` docs described. Before, only
-  `dequeue` and `poll` were recorded.
-- The typed `putValue` / `getValue` extensions have `@JvmOverloads`, and the misleading
-  `TypedTransientKeyValue.start()` KDoc is corrected.
-
-### Fixed (lock lifecycle and semantics)
-
-- `close()` no longer races an acquisition in flight on `DistributedMutex`,
-  `DistributedReadWriteLock`, or `DistributedSemaphore`. It now aborts waits before
-  draining holds, and an acquisition re-checks `close()` after registering and after
-  winning. Before, one that was granting its lease when `close()` ran could still acquire
-  afterward, leaving a closed recipe holding the lock with a live keep-alive, or returning
-  `true` for a lock `close()` had already released.
-- `DistributedMutex` retries only failures that can heal: lease death, "no leader", and
-  retriable RPC statuses. Anything else, such as permission denied on the lock path, is
-  thrown as `EtcdRecipeRuntimeException`. `lock()` used to retry it forever (four lease
-  grants a second), and `tryLock` reported it as a timeout.
-- `DistributedSemaphore.release()` gives up a live permit the calling thread acquired,
-  else one it lost (returning `false`), and only then falls back to any permit. Before, a
-  thread whose permit was lost released another thread's live permit, admitting one more
-  holder than the semaphore allows. `withPermit` releases its own permit exactly.
-- `tryLock` / `tryAcquire` deadlines now bound the lease grant, reads, transactions, and
-  pauses of the attempt, not just the wait. The abort's revoke gets one short attempt.
-  During an etcd brownout a `tryLock(500.milliseconds)` returns `false` close to its
-  timeout instead of about two minutes later.
-- A read-write-lock or semaphore release retries its revoke, so one lost revoke no longer
-  leaves the entry blocking every successor until its lease TTL runs out.
-- `DistributedMutex.lock` / `tryLock` and `DistributedSemaphore.acquire` / `tryAcquire`
-  declare `InterruptedException` (`@Throws`), so Java can catch it.
-- A lock-loss event applies only to the hold it belongs to, and hold counts are read
-  safely across threads. A stale event could remove a newer hold of the same thread.
-
-### Fixed (`LeaderSelector` candidacy)
-
-- `LeaderSelector` now runs every election attempt and its term on one thread (the
-  selector's executor), and the leader-key watch only signals it. That fixes three
-  problems:
-  - `close()` now waits for a term won through the watch, as it already did for one won at
-    `start()`. That term used to run on the watch dispatcher, so `close()` returned after 5
-    s while the node still held the leader key and its keep-alive.
-  - A step-down can't start a second term while the first is still unwinding. A replayed
-    deletion used to start one concurrently on the dispatcher, invisible and unstoppable.
-  - An election attempt that fails rather than loses (a refused lease grant, a transaction
-    that timed out during an etcd blip) is retried, paced by the watch `RetryPolicy`, and
-    its lease is revoked. It used to be logged and dropped, and with the leader key already
-    gone no deletion would ever trigger another attempt, so the election could stay
-    leaderless.
-- `LeaderSelector.start()` can no longer hang. The watch and participation tasks run on
-  internal threads, so a user executor needs only one free thread (it hung with fewer than
-  three). A watch that can't be set up (a closed client, an unreachable etcd) makes
-  `start()` throw; it used to hang or, on a closed client, return a selector that never ran.
-  A `start()` rejected by a shut-down executor leaves the selector closable, and an
-  interrupted `start()` throws with the interrupt flag restored.
-- The leader-key watches of `LeaderSelector`, `LeaderObserver`, and `leadershipAsFlow` are
-  anchored just past the read that precedes them, so a hand-off during setup is no longer
-  missed. It could leave a candidate standing by forever, or an observer showing a stale
-  leader until the next hand-off. `leadershipAsFlow` also re-reads after a recovery only
-  when events could have been missed, like `LeaderObserver`.
-
-### Fixed (resilient watcher revisions)
-
-- A compaction whose resync fails is no longer forgotten. The next recovery attempt
-  resyncs again instead of resubscribing at the compacted revision and reporting
-  `Resubscribed` with nothing reconciled. A recovery whose new stream dies before
-  delivering anything keeps spending the same retry budget instead of restarting it, so a
-  bounded `WatchResilience` does reach `Failed`.
-- An un-anchored watch (no start revision) now resumes from the revision it was created
-  at, so writes committed while it was recovering are replayed rather than lost. An
-  anchored watch no longer jumps its resume point to the created notification's revision
-  before the replay of older events has finished. The watcher requests the created
-  notification internally and hides it from the watch block unless the caller asked for
-  it.
-- Without `resyncWith`, a compaction now resumes the watch at the compacted revision (the
-  oldest etcd still serves) rather than one past it, which skipped that revision's events.
-- Closing the `Client` while a watcher is open now ends its recovery with
-  `WatchRecoveryEvent.Failed` instead of retrying forever, silently, every few seconds.
-  Each failed recovery attempt is logged at debug.
+  `getChildrenValues`, `deleteKeys`, `putValuesWithKeepAlive`, and
+  `LeaderSelector.getParticipants` take a trailing `rpc` parameter.
+- `putValuesWithKeepAlive` / `putValueWithKeepAlive` now revoke their lease when the block
+  ends (returns or throws), so the keys go with the block instead of living up to a TTL
+  longer. The keys are written in one transaction, so a reader never sees half of a
+  multi-key registration.
+- `Client.ping()` and a recipe's `ping()` now make a single attempt bounded at 2 seconds
+  (the new `RpcResilience.PROBE`) instead of retrying for about 2.5 minutes during an
+  outage. A definite refusal from etcd (`PERMISSION_DENIED`, `NOT_FOUND`, …) counts as
+  reachable, so a prefix-scoped RBAC user no longer reads as permanently down. Recipes
+  gain `ping(rpc)`.
+- Spring Boot: the health indicator probes with `etcd.recipes.health.timeout` (default
+  2 s), and `management.health.etcd.enabled=false` now switches it off. Before, every
+  `/actuator/health` call could hang for minutes during an etcd outage.
+- Micrometer: `bindQueueDepth` / `bindAvailablePermits` read with `RpcResilience.PROBE`
+  (overridable through a new `rpc` argument), so during an outage they report `NaN`
+  promptly instead of holding the scrape past its timeout. `AbstractQueue.size(rpc)` and
+  `DistributedSemaphore.availablePermits(rpc)` are the new accessor overloads.
 
 ### Fixed (notifications and connection state)
 
@@ -390,100 +324,212 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   buffer). A bounded `backgroundExceptionsAsFlow(capacity)` drops the oldest failures
   instead of blocking the recipe's notifications.
 
-### Fixed (RPC budgets and probes)
+### Fixed (resilient watcher revisions)
 
-- The recipe's `RpcResilience` (timeout, retries, and metrics) now reaches every RPC it
-  makes. Several calls fell back to the default (5 × 30 s, uninstrumented):
-  - `ServiceDiscovery.queryForNames` / `queryForInstances`, which did so while holding
-    the discovery monitor;
-  - the cache from `serviceCache(name)`, which now inherits the discovery's config;
-  - `ServiceProvider.getAllInstances`;
-  - `LeaderSelector`'s leadership lease revoke, which could delay `close()` for 30 s
-    during a partition.
+- A compaction whose resync fails is no longer forgotten. The next recovery attempt
+  resyncs again instead of resubscribing at the compacted revision and reporting
+  `Resubscribed` with nothing reconciled. A recovery whose new stream dies before
+  delivering anything keeps spending the same retry budget instead of restarting it, so a
+  bounded `WatchResilience` does reach `Failed`.
+- An un-anchored watch (no start revision) now resumes from the revision it was created
+  at, so writes committed while it was recovering are replayed rather than lost. An
+  anchored watch no longer jumps its resume point to the created notification's revision
+  before the replay of older events has finished. The watcher requests the created
+  notification internally and hides it from the watch block unless the caller asked for
+  it.
+- Without `resyncWith`, a compaction now resumes the watch at the compacted revision (the
+  oldest etcd still serves) rather than one past it, which skipped that revision's events.
+- Closing the `Client` while a watcher is open now ends its recovery with
+  `WatchRecoveryEvent.Failed` instead of retrying forever, silently, every few seconds.
+  Each failed recovery attempt is logged at debug.
 
-  `getChildrenValues`, `deleteKeys`, `putValuesWithKeepAlive`, and
-  `LeaderSelector.getParticipants` take a trailing `rpc` parameter.
-- `putValuesWithKeepAlive` / `putValueWithKeepAlive` now revoke their lease when the block
-  ends (returns or throws), so the keys go with the block instead of living up to a TTL
-  longer. The keys are written in one transaction, so a reader never sees half of a
-  multi-key registration.
-- `Client.ping()` and a recipe's `ping()` now make a single attempt bounded at 2 seconds
-  (the new `RpcResilience.PROBE`) instead of retrying for about 2.5 minutes during an
-  outage. A definite refusal from etcd (`PERMISSION_DENIED`, `NOT_FOUND`, …) counts as
-  reachable, so a prefix-scoped RBAC user no longer reads as permanently down. Recipes
-  gain `ping(rpc)`.
-- Spring Boot: the health indicator probes with `etcd.recipes.health.timeout` (default
-  2 s), and `management.health.etcd.enabled=false` now switches it off. Before, every
-  `/actuator/health` call could hang for minutes during an etcd outage.
-- Micrometer: `bindQueueDepth` / `bindAvailablePermits` read with `RpcResilience.PROBE`
-  (overridable through a new `rpc` argument), so during an outage they report `NaN`
-  promptly instead of holding the scrape past its timeout. `AbstractQueue.size(rpc)` and
-  `DistributedSemaphore.availablePermits(rpc)` are the new accessor overloads.
+### Fixed (Java interop, logging context, and leftovers)
 
-### Fixed (coroutine cancellation safety)
+- Java can construct a `DistributedPriorityQueue` and set `LeaderLatch`'s
+  `closeJoinTimeout`. A Kotlin `Duration` parameter hides a member from Java, and those were
+  the only forms. New `(long, TimeUnit)` overloads:
+  `DistributedPriorityQueue(client, path, wait, unit[, resilience])`,
+  `EtcdRecipes.distributedPriorityQueue(path, wait, unit)`, and a `LeaderLatch` constructor
+  ending in `closeJoinTimeout, unit`. `EtcdRecipes.distributedPriorityQueue(path)` is now
+  callable from Java too. A Java source file in the test source set references each of
+  them, so CI's compile catches a Java-hidden API.
+- Background logs are attributable. A watcher (`Client.watcher` / `withWatcher`) and a lease
+  healer (`selfHealingKeepAlive`) now run every callback, recovery attempt, and heal with the
+  MDC of the code that created them. Every recipe creates them under its
+  `etcd.recipe` identity, so the watch blocks and recovery handlers of the caches, service
+  cache, observer, barriers, queues, locks, registry, and `TransientKeyValue` now log with it.
+  So do the listeners they call. The work queue's sweeper runs under it too, and its thread
+  is named `workqueue-sweeper[<queue path>]`.
+- `DistributedReadWriteLock` no longer uses a fully qualified
+  `java.util.concurrent.atomic.AtomicReference`. A detekt `ForbiddenImport` rule now rejects
+  `java.util.concurrent.atomic` imports.
+- A counted-barrier wait that times out no longer makes a second, un-guarded delete of its
+  waiting key; an etcd error there used to turn the timeout (`false`) into a throw.
+- `LeaderSelector` uses the shared `ElectionPaths` key scheme instead of its own copy.
 
-- A coroutine cancelled just as its blocking call *succeeded* no longer leaks what the
-  call got. `withContext`, which `runInterruptible` is built on, discards a result that
-  arrives after its caller was cancelled. That leaked:
-  - a `withLock` hold, which deadlocked every contender until `close()`, since the
-    releasing thread was gone;
-  - a `withPermit` / `awaitAcquire` / `awaitTryAcquire` permit;
-  - a `receive()` item from `DistributedQueue` / `DistributedPriorityQueue`, deleted and
-    dropped;
-  - an `awaitReceive()` claim, stranded until the instance closed.
+### Fixed (lock lifecycle and semantics)
 
-  Each is now given back before the cancellation propagates. A lock or permit is
-  released. A queue item is put back under its original key: a priority queue keeps its
-  place, and a FIFO queue, ordered by commit revision, gets it at the tail. A work item
-  returns to the queue without spending a delivery attempt.
-- A blocking call cancelled mid-flight now always surfaces as `CancellationException`, with
-  the original failure as its cause. Before, an interrupt re-wrapped in the checked
-  `EtcdRecipeException` (`awaitRegisterService`) or replaced by an exception with no
-  cause (a barrier's "Failed to set waitingPath") escaped as that error. The bridge now
-  classifies by the caller's job state as well as by the cause chain.
-- `interruptOnPermitLoss` no longer interrupts a shared `Dispatchers.IO` worker. The
-  suspending semaphore acquires now run on their own short-lived thread, so the permit's
-  recorded holder is never a pooled thread running someone else's coroutine.
+- `close()` no longer races an acquisition in flight on `DistributedMutex`,
+  `DistributedReadWriteLock`, or `DistributedSemaphore`. It now aborts waits before
+  draining holds, and an acquisition re-checks `close()` after registering and after
+  winning. Before, one that was granting its lease when `close()` ran could still acquire
+  afterward, leaving a closed recipe holding the lock with a live keep-alive, or returning
+  `true` for a lock `close()` had already released.
+- `DistributedMutex` retries only failures that can heal: lease death, "no leader", and
+  retriable RPC statuses. Anything else, such as permission denied on the lock path, is
+  thrown as `EtcdRecipeRuntimeException`. `lock()` used to retry it forever (four lease
+  grants a second), and `tryLock` reported it as a timeout.
+- `DistributedSemaphore.release()` gives up a live permit the calling thread acquired,
+  else one it lost (returning `false`), and only then falls back to any permit. Before, a
+  thread whose permit was lost released another thread's live permit, admitting one more
+  holder than the semaphore allows. `withPermit` releases its own permit exactly.
+- `tryLock` / `tryAcquire` deadlines now bound the lease grant, reads, transactions, and
+  pauses of the attempt, not just the wait. The abort's revoke gets one short attempt.
+  During an etcd brownout a `tryLock(500.milliseconds)` returns `false` close to its
+  timeout instead of about two minutes later.
+- A read-write-lock or semaphore release retries its revoke, so one lost revoke no longer
+  leaves the entry blocking every successor until its lease TTL runs out.
+- `DistributedMutex.lock` / `tryLock` and `DistributedSemaphore.acquire` / `tryAcquire`
+  declare `InterruptedException` (`@Throws`), so Java can catch it.
+- A lock-loss event applies only to the hold it belongs to, and hold counts are read
+  safely across threads. A stale event could remove a newer hold of the same thread.
 
-### Added (suspend holders and lock loss)
+### Fixed (read-write lock: downgrade, sibling paths, clientId)
 
-- On a lock or semaphore built with `interruptOnLockLoss` / `interruptOnPermitLoss`, losing
-  the hold now cancels the suspending `withLock` / `withPermit` body. The call then throws
-  the new `HoldLostException` (an `EtcdRecipeRuntimeException`). For a semaphore, only the
-  holder whose permit was lost is affected. Before, the option interrupted an idle
-  confined thread (locks) or an unrelated pooled thread (semaphores), and the body never
-  learned of the loss.
+- A write→read downgrade deadlocked when another process's writer had queued behind
+  the write hold: the new read entry waited on that writer, which waited on the write
+  hold the downgrading thread could not release. A downgraded read entry now keeps the
+  write entry's place in line (it carries the write's rank in its value), so it is
+  admitted at once and the queued writer keeps waiting until the downgraded read is
+  released too. A downgrade from a write entry that has already vanished server-side
+  retries as an ordinary read instead of taking a place it no longer holds. Clients
+  from earlier versions do not honor the carried rank, so avoid downgrading while a
+  mixed-version fleet shares a lock. Because the rank rides in the entry value, a
+  `clientId` starting with `rank:` is now rejected.
+- The conflict scan read the lock path without a trailing `/`, so a lock also counted
+  the entries of any sibling lock whose path shared its string prefix (`/order-1` vs
+  `/order-10`) — false contention, and a self-deadlock for a thread holding one while
+  taking the other. It now reads only the lock's own entries.
+- Entries were classified by their last path segment, so a writer whose `clientId`
+  contained `/` was invisible to readers, letting a reader and a writer hold at once
+  (and misreporting `isLocked`). Entries are now classified by their name under the
+  lock path.
 
-### Fixed (cache event path)
+### Fixed (read-write lock, found by its TLA+ spec)
 
-- A primed `PathChildrenCache` start (`BUILD_INITIAL_CACHE` / `POST_INITIALIZED_EVENT`)
-  that can't load its snapshot now fails instead of reporting a healthy, empty cache that
-  would never update. `start()` (with the default wait) and `waitOnStartComplete()` throw
-  `EtcdRecipeRuntimeException` carrying the cause, `connectionState` moves to `LOST`, and
-  no `INITIALIZED` fires. Before, the failure was only recorded: no watch was ever
-  created, `isHealthy()` stayed true, and `POST_INITIALIZED_EVENT` listeners received an
-  empty snapshot and concluded the prefix was empty.
-- `INITIALIZED` now fires before the watch starts, so it precedes every child event. Every
-  listener receives the same immutable snapshot. Before, events the anchored watch
-  replayed could arrive before `INITIALIZED`, and each listener got its own later copy of
-  the map, so a listener doing `state = initialData` could revert to a stale value for
-  good.
-- An `INITIALIZED` listener that calls `rebuild()`, `clear()`, or `close()` no longer
-  deadlocks `start()`, which used to hold the cache monitor while waiting for the
-  listener.
-- A compaction resync now tells listeners what changed during the gap. `PathChildrenCache`
-  fires `CHILD_REMOVED` / `CHILD_ADDED` / `CHILD_UPDATED`, `ServiceCache` fires
-  `DELETE` / `PUT`, and `NodeCache` fires `CREATED` / `UPDATED` / `DELETED`, and so do
-  their `eventsAsFlow` flows. Before, the maps converged silently, and state derived from
-  events stayed wrong indefinitely.
-- `PathChildrenCache.rebuild()` no longer permanently undoes a concurrent watch event. A
-  snapshot older than an event the watch has already applied is re-read rather than
-  applied. Before, a child deleted while the rebuild's snapshot was in flight was put
-  back and stayed in `currentData` forever.
-- `TypedPathChildrenCache` delivers each event to every typed listener even when one
-  throws, as the untyped cache does. A snapshot child that can't be decoded is left out
-  of `INITIALIZED` instead of suppressing it for everyone. Failures still reach
-  `untyped.exceptions`.
+- A downgraded read's fencing token no longer fences out the writer queued behind it. It
+  was the read entry's own, newer revision, so the writer admitted after the downgrade got a
+  smaller token than one already issued, and a resource keeping the largest token refused a
+  legitimate writer. A hold's token is now its rank: a downgrade's is the write hold's.
+- An acquisition whose entry's lease had just expired (not yet noticed) is no longer
+  admitted. The conflict scan never checked for the attempt's own entry, so such a client
+  could be admitted with no place in line, alongside a writer admitted after the expiry. It
+  now starts over at the tail, as the semaphore already did.
+
+### Fixed (`LeaderSelector` candidacy)
+
+- `LeaderSelector` now runs every election attempt and its term on one thread (the
+  selector's executor), and the leader-key watch only signals it. That fixes three
+  problems:
+  - `close()` now waits for a term won through the watch, as it already did for one won at
+    `start()`. That term used to run on the watch dispatcher, so `close()` returned after 5
+    s while the node still held the leader key and its keep-alive.
+  - A step-down can't start a second term while the first is still unwinding. A replayed
+    deletion used to start one concurrently on the dispatcher, invisible and unstoppable.
+  - An election attempt that fails rather than loses (a refused lease grant, a transaction
+    that timed out during an etcd blip) is retried, paced by the watch `RetryPolicy`, and
+    its lease is revoked. It used to be logged and dropped, and with the leader key already
+    gone no deletion would ever trigger another attempt, so the election could stay
+    leaderless.
+- `LeaderSelector.start()` can no longer hang. The watch and participation tasks run on
+  internal threads, so a user executor needs only one free thread (it hung with fewer than
+  three). A watch that can't be set up (a closed client, an unreachable etcd) makes
+  `start()` throw; it used to hang or, on a closed client, return a selector that never ran.
+  A `start()` rejected by a shut-down executor leaves the selector closable, and an
+  interrupted `start()` throws with the interrupt flag restored.
+- The leader-key watches of `LeaderSelector`, `LeaderObserver`, and `leadershipAsFlow` are
+  anchored just past the read that precedes them, so a hand-off during setup is no longer
+  missed. It could leave a candidate standing by forever, or an observer showing a stale
+  leader until the next hand-off. `leadershipAsFlow` also re-reads after a recovery only
+  when events could have been missed, like `LeaderObserver`.
+
+### Fixed (election lifecycle)
+
+- `LeaderSelector.waitOnLeadershipComplete(timeout)` now honors its timeout. It first
+  waited, untimed, for the start worker to finish, which only happens when the candidacy
+  ends — so a standby's timed wait blocked until it won and finished a term, or was
+  closed. The coroutine `awaitLeadershipComplete(timeout)` inherited the same bug.
+- `LeaderSelector.close()` called from inside `takeLeadership` no longer deadlocks.
+  `close()` waited for the start worker, which was the calling thread when this node
+  won at `start()`.
+- A `LeaderSelector` closed without ever winning (or whose start worker failed) can be
+  started again; `start()` used to throw "Previous call to start() not complete". A
+  restart also resets `connectionState`, so it no longer reports the previous candidacy's
+  `LOST`.
+- `close()` on a `LeaderSelector` that was never started no longer throws "start() not
+  called", matching `LeaderLatch` and `LeaderObserver`. A `withLeaderSelector { }` block
+  that never started it used to throw out of `use`.
+- `LeaderObserver` no longer replays `takeLeadership` for the current leader after every
+  watch recovery, only when events could have been missed (a resync, or a resubscribe
+  that could not resume at a known revision). A failure re-reading the leader there now
+  reaches `LeaderListener.onError` and `exceptions` instead of being swallowed.
+- `DistributedDoubleBarrier` now passes its `clientId` to its enter and leave barriers;
+  it was accepted but never used.
+
+### Fixed (barriers: close() cancels in-flight waits)
+
+- `DistributedBarrierWithCount.close()` now cancels an in-flight `waitOnBarrier` cleanly
+  (it returns `false`) wherever the waiter has got to. Previously a `close()` that
+  landed before the waiter parked either made `waitOnBarrier` throw — a cause-less
+  `EtcdRecipeException("Failed to set waitingPath")` during the ready CAS or lease
+  grant, or `EtcdRecipeRuntimeException("close() already called")` from its internal
+  reads — or went unseen, leaving the waiter parked until its timeout. `close()` also
+  cancels every concurrent waiter on the instance, not only the most recent one, and a
+  genuine waiting-key CAS failure now carries its cause.
+- `DistributedBarrier.close()` now releases a thread parked in `waitOnBarrier` (it
+  returns `false`) instead of leaving it to its timeout, and a `close()` during the
+  waiter's watch setup no longer makes it throw `close() already called`.
+
+### Fixed (barrier rounds and removal)
+
+- `DistributedBarrierWithCount` releases nobody until the round's release is committed.
+  Before, the member that saw the count reached removed its own waiting key and left
+  first, then deleted `/ready` in a single, un-retried transaction. If that delete failed
+  during an etcd blip, the tripper had already gone (or threw), and every other waiter saw
+  `/ready` still standing and parked until its timeout, forever for `waitOnBarrier()`. Now
+  `/ready` is deleted first, guarded on the round and retried on a transient failure. A
+  delete that still can't be committed is recorded in `exceptions`, and the member stays
+  parked with the rest. A failed read on the watch thread is recorded too, instead of only
+  logged.
+- `DistributedBarrierWithCount` counts one round at a time. Before, every key under
+  `waiting/` counted, so a member that looped straight back into `waitOnBarrier()` (or
+  arrived just after a trip) could trip the next round alone on keys the last round hadn't
+  cleaned up yet. `waiterCount` likewise counts only the round in progress.
+- `DistributedBarrier.setBarrier()` after `removeBarrier()` on the same instance sets the
+  barrier again. Before, the removal flag was permanent, so the second `setBarrier()`
+  returned `false` (read as "another client holds it") and left no barrier. The flag is now
+  per `setBarrier()`, and is set before the healer closes, so a heal racing a removal can't
+  re-arm the barrier. A new `setBarrier()` also retires the previous one's healer instead of
+  leaking it.
+
+### Fixed (queues: items stay in their queue and are never overwritten)
+
+- A consumer parked on an empty `DistributedQueue` or `DistributedPriorityQueue` could
+  take — delete and return — an item from a *different* queue whose path shares its
+  string prefix (a take on `/jobs` stealing from `/jobs2/…` or `/jobs-retry/…`). The
+  wait now watches only the queue's own children.
+- Queue item keys were the enqueue millisecond plus 3 random characters, written with
+  an unconditional put, so two enqueues in the same millisecond could silently
+  overwrite one another. Keys now carry a 16-character random suffix and are created
+  only if absent (retrying with a fresh key), in `enqueue`, `enqueueAll`, and the
+  work queue's delayed-item promotion.
+- Enqueue writes are no longer retried. A retried put whose first attempt had in fact
+  landed could re-create an item that a consumer had already taken; an ambiguous
+  failure now reaches the caller instead.
+- `DistributedWorkQueue.enqueue(value, delay)` rejects an infinite delay, which used to
+  overflow into a key that made every receive on the queue throw. A delayed key whose
+  ready time cannot be parsed is now moved to the dead-letter space (and recorded)
+  rather than breaking receives.
 
 ### Fixed (queue lifecycle and delivery)
 
@@ -517,6 +563,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   consumer instance. After a claim lapsed and the same instance received the item again,
   the earlier item's `ack()` used to return `true` and delete the new claim.
 
+### Fixed (queue ambiguity, ordering, and cost)
+
+- A work-queue claim whose transaction response was lost after it committed is now
+  reconciled. The consumer re-reads the claim marker and, if the claim is its own, returns
+  the item. It used to throw, leaving the claim stranded on the consumer's healthy lease,
+  where no sweep would reclaim it until the instance closed. The plain queues' docs now
+  say that a take that fails may still have consumed the item.
+- `DistributedQueue`'s take picks the lowest key among the entries at the head's revision,
+  so an `enqueueAll` batch keeps argument order whatever etcd's sort does with equal
+  revisions.
+- Head selection is cheaper. The priority queue (and every key-ordered first-child read)
+  no longer asks etcd to sort, so etcd can stop at the first key instead of reading the
+  whole prefix. `DistributedQueue` finds its head with a keys-only read.
+- The work queue's orphan sweep diffs one keys-only read of `claimed/` against one of
+  `claims/`, and fetches payloads only for orphans. It used to issue a transaction for
+  every claim in flight on every empty receive: with 50 idle consumers and 50 items in
+  flight, about 2,500 transactions per enqueue. A receive that finds the queue empty
+  sweeps at most once a second per instance.
+- Queue metrics now cover enqueues (all queues), `tryDequeue`, and the work queue's
+  `receive`, `ack`, and dead-lettering, as the `etcd.queue` docs described. Before, only
+  `dequeue` and `poll` were recorded.
+- The typed `putValue` / `getValue` extensions have `@JvmOverloads`, and the misleading
+  `TypedTransientKeyValue.start()` KDoc is corrected.
+
+### Fixed (work queue claims, found by its TLA+ spec)
+
+- A claim whose transaction got no answer is no longer reconciled into another thread's
+  claim. Threads sharing one `DistributedWorkQueue` share its clientId and lease, and
+  `reconcileClaim` recognized its own claim by exactly those, so a thread could be handed
+  the item another thread had just claimed: both processed it under one claim, and the
+  second `ack()` returned false for a claim that was never lost. Each claim marker's value
+  is now `<clientId>:<nonce>`, unique to its attempt, and the item's guards and the
+  reconciliation compare against it.
+- A claim whose response was lost and whose re-read failed too no longer holds its item
+  until the consumer restarts or its lease lapses (possibly never, under a healthy lease).
+  The consumer remembers it, per claim attempt (so another thread's unresolved attempt on
+  the same item can't displace it), and its sweeper releases it if it committed, giving the
+  item back to the queue with that delivery undone, as `unclaim()` does.
+
+### Fixed (cache event path)
+
+- A primed `PathChildrenCache` start (`BUILD_INITIAL_CACHE` / `POST_INITIALIZED_EVENT`)
+  that can't load its snapshot now fails instead of reporting a healthy, empty cache that
+  would never update. `start()` (with the default wait) and `waitOnStartComplete()` throw
+  `EtcdRecipeRuntimeException` carrying the cause, `connectionState` moves to `LOST`, and
+  no `INITIALIZED` fires. Before, the failure was only recorded: no watch was ever
+  created, `isHealthy()` stayed true, and `POST_INITIALIZED_EVENT` listeners received an
+  empty snapshot and concluded the prefix was empty.
+- `INITIALIZED` now fires before the watch starts, so it precedes every child event. Every
+  listener receives the same immutable snapshot. Before, events the anchored watch
+  replayed could arrive before `INITIALIZED`, and each listener got its own later copy of
+  the map, so a listener doing `state = initialData` could revert to a stale value for
+  good.
+- An `INITIALIZED` listener that calls `rebuild()`, `clear()`, or `close()` no longer
+  deadlocks `start()`, which used to hold the cache monitor while waiting for the
+  listener.
+- A compaction resync now tells listeners what changed during the gap. `PathChildrenCache`
+  fires `CHILD_REMOVED` / `CHILD_ADDED` / `CHILD_UPDATED`, `ServiceCache` fires
+  `DELETE` / `PUT`, and `NodeCache` fires `CREATED` / `UPDATED` / `DELETED`, and so do
+  their `eventsAsFlow` flows. Before, the maps converged silently, and state derived from
+  events stayed wrong indefinitely.
+- `PathChildrenCache.rebuild()` no longer permanently undoes a concurrent watch event. A
+  snapshot older than an event the watch has already applied is re-read rather than
+  applied. Before, a child deleted while the rebuild's snapshot was in flight was put
+  back and stayed in `currentData` forever.
+- `TypedPathChildrenCache` delivers each event to every typed listener even when one
+  throws, as the untyped cache does. A snapshot child that can't be decoded is left out
+  of `INITIALIZED` instead of suppressing it for everyone. Failures still reach
+  `untyped.exceptions`.
+
+### Fixed (discovery robustness)
+
+- One malformed or newer-schema instance entry no longer breaks discovery for a whole
+  service. Before, a non-JSON value under `names/<svc>/` (or JSON with a field this version
+  didn't know) made `ServiceCache.instances`, `queryForInstances`, and every
+  `ServiceProvider.getInstance()` throw. Now the entry is skipped, logged, and recorded in
+  `exceptions`, and unknown fields are ignored. The cache decodes each entry once, on
+  arrival, instead of on every read and once per listener. An entry it held that is
+  overwritten with something unreadable is dropped, and listeners get a `DELETE`.
+- `ServiceProvider.noteError` counts errors within a `downPeriod` window from the first.
+  Before, the count never reset, so an instance with one sporadic failure a day was ejected
+  every third day. The provider also forgets instances that are no longer registered or
+  whose window has lapsed. Before, every instance that ever had an error kept an entry until
+  `close()`. Ejection updates are atomic per instance, so a cleanup can't drop an ejection
+  another thread has just made.
+- `ServiceDiscovery` no longer keeps every cache and provider it ever handed out; closed
+  ones are dropped.
+- `ServiceCache.close()` on a cache that was never started is a no-op, as it is for
+  `ServiceProvider`. Before, it threw `EtcdRecipeRuntimeException`.
+- A `PathChildrenCache`'s own start worker is a daemon thread, so an unclosed primed cache
+  no longer keeps the JVM from exiting.
+
+### Fixed (`StickyStrategy` under concurrency)
+
+- Concurrent `StickyStrategy` selections agree on one instance. When several callers found
+  no usable choice at once, each picked an instance and the last to store its pick won, so a
+  caller could return an instance another had already replaced, and later callers flipped to
+  a stale choice. A pick now replaces only the choice its caller saw, so one made meanwhile
+  is kept.
+
 ### Fixed (`DistributedAtomicLong` recovery)
 
 - A failed first-use initialization no longer breaks the instance for good. A transient
@@ -531,150 +677,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loop's random backoff is capped at one second instead of widening without limit.
 - The create-if-absent transaction now runs under the recipe's RPC budget.
 
-### Added (`DistributedAtomicLong`)
+### Fixed (`TransientKeyValue` lifecycle)
 
-- `withDistributedAtomicLong` takes a `resilience` parameter, like the constructor.
-- `DistributedAtomicLong`'s KDoc now states that an update that throws has an unknown
-  outcome (its transaction may have been applied), so blindly retrying it can count
-  twice.
+- `TransientKeyValue` no longer parks an executor thread for its whole life. `start()`
+  publishes the key synchronously under its self-healing lease, which renews on internal
+  threads. Instances sharing a single-thread or small executor used to hang in the
+  constructor or `start()`, since the second instance's task never ran; with a larger pool,
+  each instance silently held a thread. `userExecutor` is no longer used and remains for
+  compatibility.
+- A `start()` that fails can be retried. The retry used to rethrow the first attempt's
+  error (or, with the recipe's own executor, `RejectedExecutionException`) while a new
+  task published the key anyway, and `close()` then threw "start() not called", leaving the
+  key published for the life of the process. `close()` on an instance that never started
+  is now a no-op.
 
-### Fixed (election lifecycle)
+### Fixed (coroutine cancellation safety)
 
-- `LeaderSelector.waitOnLeadershipComplete(timeout)` now honors its timeout. It first
-  waited, untimed, for the start worker to finish, which only happens when the candidacy
-  ends — so a standby's timed wait blocked until it won and finished a term, or was
-  closed. The coroutine `awaitLeadershipComplete(timeout)` inherited the same bug.
-- `LeaderSelector.close()` called from inside `takeLeadership` no longer deadlocks.
-  `close()` waited for the start worker, which was the calling thread when this node
-  won at `start()`.
-- A `LeaderSelector` closed without ever winning (or whose start worker failed) can be
-  started again; `start()` used to throw "Previous call to start() not complete". A
-  restart also resets `connectionState`, so it no longer reports the previous candidacy's
-  `LOST`.
-- `close()` on a `LeaderSelector` that was never started no longer throws "start() not
-  called", matching `LeaderLatch` and `LeaderObserver`. A `withLeaderSelector { }` block
-  that never started it used to throw out of `use`.
-- `LeaderObserver` no longer replays `takeLeadership` for the current leader after every
-  watch recovery, only when events could have been missed (a resync, or a resubscribe
-  that could not resume at a known revision). A failure re-reading the leader there now
-  reaches `LeaderListener.onError` and `exceptions` instead of being swallowed.
-- `DistributedDoubleBarrier` now passes its `clientId` to its enter and leave barriers;
-  it was accepted but never used.
+- A coroutine cancelled just as its blocking call *succeeded* no longer leaks what the
+  call got. `withContext`, which `runInterruptible` is built on, discards a result that
+  arrives after its caller was cancelled. That leaked:
+  - a `withLock` hold, which deadlocked every contender until `close()`, since the
+    releasing thread was gone;
+  - a `withPermit` / `awaitAcquire` / `awaitTryAcquire` permit;
+  - a `receive()` item from `DistributedQueue` / `DistributedPriorityQueue`, deleted and
+    dropped;
+  - an `awaitReceive()` claim, stranded until the instance closed.
 
-### Fixed (lease healing and registration lifecycle)
+  Each is now given back before the cancellation propagates. A lock or permit is
+  released. A queue item is put back under its original key: a priority queue keeps its
+  place, and a FIFO queue, ordered by commit revision, gets it at the tail. A work item
+  returns to the queue without spending a delivery attempt.
+- A blocking call cancelled mid-flight now always surfaces as `CancellationException`, with
+  the original failure as its cause. Before, an interrupt re-wrapped in the checked
+  `EtcdRecipeException` (`awaitRegisterService`) or replaced by an exception with no
+  cause (a barrier's "Failed to set waitingPath") escaped as that error. The bridge now
+  classifies by the caller's job state as well as by the cause chain.
+- `interruptOnPermitLoss` no longer interrupts a shared `Dispatchers.IO` worker. The
+  suspending semaphore acquires now run on their own short-lived thread, so the permit's
+  recorded holder is never a pooled thread running someone else's coroutine.
 
-- A heal no longer re-grants a lease that is still alive in etcd. jetcd reports a lease
-  "gone" from its own client-side deadline; after an etcd leader change the new leader
-  extends every lease, so the lease and its keys can outlive that report. Re-granting
-  then made the establish CAS lose to the recipe's own key and the old lease lapsed, so a
-  `ServiceRegistry` instance, barrier, or election participant was permanently lost
-  after the cluster recovered. The healer now asks etcd first and, if the lease is alive,
-  resumes renewing it (`LeaseEvent.Restored` with the same old and new id).
-- A heal whose establish hook throws now revokes the lease it granted, as the initial
-  establish already did, instead of leaving a key bound to a lease nobody renews.
-- `ServiceRegistry.close()` releases every registration even when one instance's cleanup
-  delete fails (etcd unreachable at shutdown): it used to throw at the first failure and
-  leave the remaining instances renewing their leases inside a closed registry. The
-  cleanup delete now runs under the registry's RPC budget.
-- Re-registering an instance whose key had vanished no longer leaks the previous
-  registration's keep-alive and healer thread.
-- `DistributedBarrier.setBarrier`, `DistributedBarrierWithCount.waitOnBarrier`, and
-  `LeaderSelector` participation no longer report an infrastructure failure (a refused
-  or failed lease grant) as a lost CAS; it propagates with its cause.
-- `keepAlive(lease, onKeepAliveError)` now calls `onKeepAliveError` only when renewal
-  actually stopped (the stream completed, or etcd reported the lease not found). A
-  transient stream error — which jetcd restarts itself, with renewal continuing — is
-  logged at warn instead of reported as a lost lease.
+### Fixed (coroutine flows and parity)
 
-### Changed (RPC engine: real jetcd failures, reads-only retries)
+- A watch abandoned for good no longer leaves its flow suspended forever. `watchAsFlow`
+  completes after its `Recovery(Failed)` element, `watchEventsAsFlow` fails with
+  `EtcdRecipeRuntimeException`, and `leadershipAsFlow` completes after `WatchFailed`.
+- `leadershipAsFlow` takes an `rpc` parameter. A failed re-read after a recovery now ends
+  the flow with `WatchFailed` instead of being logged and leaving the flow silently stale.
+- The suspending RPC engine records `EtcdMetrics.recordRpc`, as the blocking one does
+  (cancellation counts as a failure). Coroutine users' `etcd.rpc` timers and retry
+  counters were always zero. A suspended single-attempt call that times out now carries
+  the `TimeoutException` as its cause.
+- Cache flows: the docs no longer suggest `onStart` as a sign that a flow is subscribed.
+  A flow registers its listener asynchronously, so the example now starts with
+  `BUILD_INITIAL_CACHE` and reads `currentData` instead of waiting for `INITIALIZED`.
 
-- The retry check only recognized jetcd's `EtcdException`, but jetcd's KV, lease, and
-  lock calls fail with raw gRPC `StatusRuntimeException`s — so status-based retries never
-  fired; only attempt timeouts were retried. gRPC statuses (`UNAVAILABLE`, `INTERNAL`,
-  `DEADLINE_EXCEEDED`) now count.
-- **Only calls that are safe to repeat are retried**: reads, plus `unlock` and
-  `leaseGrant`, whose duplicates are harmless. Plain writes — `putValue`, `deleteKey`,
-  `deleteChildren`, `compact` (and their suspending twins) — now make one attempt bounded
-  by `operationTimeout`, like transactions: a write that failed or timed out may still
-  have been applied, and a retried attempt could land after a newer write and revert it.
-  Previously a timed-out write was retried.
-- **Every RPC failure now surfaces as `EtcdRecipeRuntimeException`** with the original
-  failure (gRPC status, timeout, or interrupt) as its cause. Non-retriable failures used
-  to escape as a raw checked `ExecutionException` — undeclared, and uncatchable as such
-  from Java.
-- Interrupts are handled consistently: one arriving during a retry backoff or while
-  awaiting a transaction now surfaces as `EtcdRecipeRuntimeException` with the thread's
-  interrupt flag restored (it used to escape as a raw `InterruptedException` with the
-  flag cleared), and `leaseRevoke` no longer clears the interrupt flag of an interrupted
-  caller.
+### Fixed (integrations)
 
-### Fixed (packaging: dependency scopes)
-
-- The published `etcd-recipes-core` POM declared jetcd and kotlinx-serialization at
-  `runtime` scope although both appear in the public API (every recipe takes a jetcd
-  `Client`; `EtcdCodec` exposes `Json`/`KSerializer`), so a project that added only
-  `etcd-recipes-core`, as the README says, failed to compile. Both are now `api`
-  (`compile` scope in the POM), alongside kotlinx-coroutines.
-- Every published artifact forced `logback-classic` onto consumers — clashing with
-  Log4j 2 and other SLF4J backends (a Spring Boot app on `spring-boot-starter-log4j2`
-  could fail to start) — and each satellite also dragged in Guava and common-utils. The
-  libraries now depend on the SLF4J API alone; the satellites' POMs list only the core
-  artifact and their own framework.
-- Documented that Kotlin callers need Kotlin 2.3 or newer.
-
-### Fixed (barriers: close() cancels in-flight waits)
-
-- `DistributedBarrierWithCount.close()` now cancels an in-flight `waitOnBarrier` cleanly
-  (it returns `false`) wherever the waiter has got to. Previously a `close()` that
-  landed before the waiter parked either made `waitOnBarrier` throw — a cause-less
-  `EtcdRecipeException("Failed to set waitingPath")` during the ready CAS or lease
-  grant, or `EtcdRecipeRuntimeException("close() already called")` from its internal
-  reads — or went unseen, leaving the waiter parked until its timeout. `close()` also
-  cancels every concurrent waiter on the instance, not only the most recent one, and a
-  genuine waiting-key CAS failure now carries its cause.
-- `DistributedBarrier.close()` now releases a thread parked in `waitOnBarrier` (it
-  returns `false`) instead of leaving it to its timeout, and a `close()` during the
-  waiter's watch setup no longer makes it throw `close() already called`.
-
-### Fixed (queues: items stay in their queue and are never overwritten)
-
-- A consumer parked on an empty `DistributedQueue` or `DistributedPriorityQueue` could
-  take — delete and return — an item from a *different* queue whose path shares its
-  string prefix (a take on `/jobs` stealing from `/jobs2/…` or `/jobs-retry/…`). The
-  wait now watches only the queue's own children.
-- Queue item keys were the enqueue millisecond plus 3 random characters, written with
-  an unconditional put, so two enqueues in the same millisecond could silently
-  overwrite one another. Keys now carry a 16-character random suffix and are created
-  only if absent (retrying with a fresh key), in `enqueue`, `enqueueAll`, and the
-  work queue's delayed-item promotion.
-- Enqueue writes are no longer retried. A retried put whose first attempt had in fact
-  landed could re-create an item that a consumer had already taken; an ambiguous
-  failure now reaches the caller instead.
-- `DistributedWorkQueue.enqueue(value, delay)` rejects an infinite delay, which used to
-  overflow into a key that made every receive on the queue throw. A delayed key whose
-  ready time cannot be parsed is now moved to the dead-letter space (and recorded)
-  rather than breaking receives.
-
-### Fixed (read-write lock: downgrade, sibling paths, clientId)
-
-- A write→read downgrade deadlocked when another process's writer had queued behind
-  the write hold: the new read entry waited on that writer, which waited on the write
-  hold the downgrading thread could not release. A downgraded read entry now keeps the
-  write entry's place in line (it carries the write's rank in its value), so it is
-  admitted at once and the queued writer keeps waiting until the downgraded read is
-  released too. A downgrade from a write entry that has already vanished server-side
-  retries as an ordinary read instead of taking a place it no longer holds. Clients
-  from earlier versions do not honor the carried rank, so avoid downgrading while a
-  mixed-version fleet shares a lock. Because the rank rides in the entry value, a
-  `clientId` starting with `rank:` is now rejected.
-- The conflict scan read the lock path without a trailing `/`, so a lock also counted
-  the entries of any sibling lock whose path shared its string prefix (`/order-1` vs
-  `/order-10`) — false contention, and a self-deadlock for a thread holding one while
-  taking the other. It now reads only the lock's own entries.
-- Entries were classified by their last path segment, so a writer whose `clientId`
-  contained `/` was invisible to readers, letting a reader and a writer hold at once
-  (and misreporting `isLocked`). Entries are now classified by their name under the
-  lock path.
+- Ktor: a plugin-owned client closes on `ApplicationStopped` instead of
+  `ApplicationStopping`. Ktor runs handlers in registration order, so every
+  `ApplicationStopping` handler registered after `install(EtcdPlugin)` (typically the app's
+  own teardown) used to get a closed client. Recipes closed there then couldn't revoke their
+  leases, so registrations and leader or lock keys lingered until their TTL.
+- `EtcdConnectionConfig` and the Spring starter's `EtcdProperties` no longer show the
+  password in `toString()`.
+- `EtcdTlsConfig` requires `clientCertPath` and `clientKeyPath` together. Before, setting
+  only one silently connected without a client certificate; now it throws
+  `IllegalArgumentException` (and fails a Spring app's startup).
+- Micrometer: `bindCacheSize` and `bindServiceCacheSize` tag `etcd.cache.entries` with
+  `recipe=PathChildrenCache` / `recipe=ServiceCache`. Before, binding one of each to a
+  registry returned the first gauge for the second, which reported the first recipe's
+  value. The docs now say to `registry.remove(gauge)` when a recipe closes, and the gauge
+  examples no longer bind to recipes they immediately close.
+- The Spring starter depends on `kotlin-reflect` directly. Spring binds the all-defaults
+  `EtcdProperties` through it, and it used to arrive only by way of another library; had
+  that changed, `etcd.recipes.*` would have silently stopped binding. The starter's tests
+  now check the bound values and the Actuator-absent case.
 
 ## [0.12.0] - 2026-07-26
 

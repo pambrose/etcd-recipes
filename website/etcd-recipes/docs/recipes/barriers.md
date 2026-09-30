@@ -37,9 +37,11 @@ One client arms the barrier, does whatever the others must not race, and removes
 
 `setBarrier()` returning `false` is not a failure — it means another client got there
 first and the barrier is already armed by somebody else. That distinction matters: the
-client that armed it is the one that should remove it. `removeBarrier()` returns `false`
-if this instance already removed it and hasn't set it again since. One instance can set,
-remove, and set the barrier again.
+client that armed it is the one that should remove it. A genuine failure, such as an
+unreachable etcd or a refused lease grant, throws `EtcdRecipeRuntimeException` with its
+cause rather than reading as `false`. `removeBarrier()` returns `false` if this instance
+already removed it and hasn't set it again since. One instance can set, remove, and set the
+barrier again.
 
 Everyone else waits:
 
@@ -77,7 +79,8 @@ than polling. The bounded overloads return `false` on timeout:
     `(long, TimeUnit)` one is the one to use from Java.
 
 A waiter holds no state between calls, so timing out and waiting again is free — that is
-exactly what a "wait, log progress, wait again" loop does.
+exactly what a "wait, log progress, wait again" loop does. `close()` releases a thread
+parked in `waitOnBarrier()`, which then returns `false`, as on a timeout.
 
 ### Waiting on a barrier nobody set
 
@@ -187,15 +190,16 @@ guarded on the round, so it is retried on a transient failure. If it can't be co
 the failure is recorded in `exceptions` and that member stays parked with the rest, rather
 than leaving a round that everyone else still sees standing.
 
-!!! warning "The key layout changed"
+!!! warning "The key layout changed in 0.13.0"
 
-    Before this version, waiters registered directly under `<path>/waiting/`. The two
-    layouts don't count each other's waiters, so every member meeting at one path must run
-    the same version.
+    Before 0.13.0, waiters registered directly under `<path>/waiting/`. The two layouts
+    don't count each other's waiters, so every member meeting at one path, including
+    `DistributedDoubleBarrier` members, must run 0.13.0 or later.
 
 `waitOnBarrier` throws `InterruptedException` and `EtcdRecipeException` — the latter when
 the waiter's own key cannot be established, which means somebody else is already using that
-exact token and this wait can never be counted.
+exact token and this wait can never be counted. Any other failure to set up the wait, such
+as an unreachable etcd, throws `EtcdRecipeRuntimeException` with its cause.
 
 === "Kotlin"
 

@@ -19,13 +19,13 @@ pays nothing.
 
 | Method | Called when |
 | --- | --- |
-| `recordRpc(opName, duration, attempts, failed)` | A blocking RPC completes. `attempts > 1` means it was retried. |
+| `recordRpc(opName, duration, attempts, failed)` | An RPC completes, blocking or suspending. `attempts > 1` means it was retried; a cancelled suspending call counts as failed. |
 | `incrementWatchRecovery(kind, key)` | A watcher transitions: `suspended` / `resubscribed` / `resynced` / `failed`. |
 | `incrementKeepAlive(kind, leaseId)` | A lease event: `renewal` / `suspended` / `expired` / `restored` / `failed`. |
 | `recordLockWait(path, duration, acquired)` | A lock or permit acquisition finishes, successfully or not. |
 | `recordLockHold(path, duration)` | A lock or permit is released, timed from grant. |
 | `incrementLeadershipTransition(path, becameLeader)` | Leadership is taken (`true`) or relinquished (`false`). |
-| `recordQueue(op, path, duration)` | A queue `enqueue` or `dequeue` completes. |
+| `recordQueue(op, path, duration)` | A queue operation completes: `enqueue` / `dequeue` (which covers `poll` and `tryDequeue`), or the work queue's `enqueue` / `receive` / `ack` / `dead-letter`. |
 | `recordCacheSync(path, duration, size)` | A cache snapshot loads, with the resulting entry count. |
 
 ```kotlin
@@ -132,7 +132,8 @@ of your recipes owns it — and the healer threads of every recipe in the proces
 that name.
 
 That covers watch callbacks and recovery handling (the `etcd-watch-dispatcher` threads),
-lease heals, and the listeners a recipe calls from them. A watcher or lease healer runs its
+lease heals, the listeners a recipe calls from them, and the listeners it notifies on its
+`etcd-recipe-notifier` thread. A watcher or lease healer runs its
 work with the MDC of the code that created it, so one you create yourself with
 `client.watcher(...)` or `client.selfHealingKeepAlive(...)` keeps whatever MDC you had set.
 The work queue's sweeper thread is named `workqueue-sweeper[<queue path>]`.
@@ -186,8 +187,9 @@ a weak reference, so a bound gauge does not keep the recipe alive.
     `bindQueueDepth` and `bindAvailablePermits` poll the server. A 10-second scrape
     interval across 200 instances is 20 range-counts per second against etcd purely for
     dashboards. Bind them where the number is worth the load, and mind the interval.
-    Each read is one attempt bounded at 2 seconds (`RpcResilience.PROBE`), so during an
-    outage they report `NaN` rather than stalling the scrape.
+    Each read is one attempt bounded at 2 seconds (`RpcResilience.PROBE`, overridable with
+    the binders' `rpc` argument), so during an outage they report `NaN` rather than
+    stalling the scrape.
 
 Binding several instances of the same gauge to one registry needs distinguishing `tags`
 — every binder takes them. Without them, Micrometer hands back the gauge already

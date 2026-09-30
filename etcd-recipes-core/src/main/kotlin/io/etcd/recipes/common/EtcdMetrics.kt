@@ -31,8 +31,9 @@ import kotlin.time.Duration
  * watch dispatcher, and lease-healer threads. `key`/`leaseId` are passed for context; a
  * backend should keep tag cardinality low (prefer the `kind`/outcome dimensions).
  *
- * Currently instruments the three connection funnels every recipe shares; recipe-level seams
- * (lock wait/hold, queue, election, cache) are added as they are instrumented.
+ * Instruments the three connection funnels every recipe shares (RPCs, watch recovery,
+ * keep-alives) and the recipe-level seams: lock wait and hold, queue operations, leadership
+ * transitions, and cache syncs.
  */
 interface EtcdMetrics {
   /**

@@ -60,7 +60,7 @@ fun healthEndpoint(client: Client) {
     // cheap enough to call on every scrape of a liveness endpoint.
     val live = mutex.isHealthy()
 
-    // Active: a bounded, count-only GET through the usual retry/timeout funnel.
+    // Active: one count-only GET, bounded at 2 seconds (RpcResilience.PROBE).
     // Costs a round trip, so save it for a readiness probe.
     val ready = mutex.ping()
 
@@ -72,9 +72,13 @@ fun healthEndpoint(client: Client) {
 fun clientPing(client: Client) {
   // --8<-- [start:client-ping]
   // The same probe without a recipe: useful for a readiness check that owns a
-  // Client but no recipe yet. A tight per-probe deadline keeps the endpoint honest.
-  val probe = RpcResilience(RetryPolicy.never, operationTimeout = 2.seconds)
-  logger.info { "etcd reachable: ${client.ping(probe)}" }
+  // Client but no recipe yet. It defaults to RpcResilience.PROBE: one attempt,
+  // bounded at 2 seconds.
+  logger.info { "etcd reachable: ${client.ping()}" }
+
+  // A probe with its own deadline, when 2 seconds is wrong for your endpoint.
+  val patient = RpcResilience(RetryPolicy.never, operationTimeout = 5.seconds)
+  logger.info { "etcd reachable within 5s: ${client.ping(patient)}" }
   // --8<-- [end:client-ping]
 }
 

@@ -102,7 +102,7 @@ Two questions that look the same and are not:
 | --- | --- | --- |
 | Cost | Free — no RPC | One round trip |
 | Answers | "Has anything gone irrecoverably wrong that I already know about?" | "Can I reach etcd right now?" |
-| Implementation | `connectionState != LOST && !closed` | Count-only GET through the RPC retry/timeout funnel |
+| Implementation | `connectionState != LOST && !closed` | One count-only GET, bounded at 2 seconds by default |
 | Fails how | Cannot fail | Returns `false` rather than throwing |
 
 ```kotlin
@@ -120,8 +120,11 @@ The distinction maps neatly onto Kubernetes-style probes:
   removes one pod from a load balancer; it does not kill anything.
 
 `ping()` writes nothing: it is a count-only GET against a fixed probe key that need not
-exist. It routes through the same retry and timeout funnel as every other RPC, so the
-recipe's `RpcResilience` decides how long it may take before returning `false`.
+exist. It makes a single attempt bounded at 2 seconds (`RpcResilience.PROBE`, reported to
+the recipe's metrics sink), so it answers promptly during the outage it exists to detect
+instead of retrying for minutes; `ping(rpc)` takes a different budget. A definite refusal
+from etcd, such as `PERMISSION_DENIED` for a user whose RBAC doesn't cover the probe key,
+still counts as reachable. Only failing to get an answer returns `false`.
 
 There is also a `Client`-level counterpart for code that holds a client but no recipe —
 a readiness endpoint wired up before any recipe is constructed, say:
@@ -130,12 +133,13 @@ a readiness endpoint wired up before any recipe is constructed, say:
 --8<-- "kotlin/website/resilience/ConnectionStateSnippets.kt:client-ping"
 ```
 
-!!! tip "Give the probe its own `RpcResilience`"
+!!! tip "A probe gets its own budget, not the recipe's"
 
     The 30-second default `operationTimeout` is right for a lock acquisition and wrong
     for a health endpoint. A probe that retries for half a minute is not reporting
-    health, it is hiding it. `RetryPolicy.never` with a 2-second deadline gives a fast,
-    honest answer.
+    health, it is hiding it. That is why both `ping()`s default to `RpcResilience.PROBE`
+    — `RetryPolicy.never` with a 2-second deadline — rather than the recipe's
+    `RpcResilience`. Pass a different one only when your probe's own timeout calls for it.
 
 ## As a `Flow`
 

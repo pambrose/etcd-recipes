@@ -61,9 +61,9 @@ than throwing — use `?: default` for a fallback.
 !!! note "Java sees these as `TypedKVUtils`"
 
     The file carries `@JvmName("TypedKVUtils")`, so from Java they are statics with the
-    client as the first argument. They have no `@JvmOverloads`, so Java callers must pass
-    the trailing `PutOption` / `RpcResilience` defaults explicitly. See
-    [Jackson](integrations/jackson.md) for a worked example.
+    client as the first argument. They are `@JvmOverloads`, so Java callers can leave off
+    the trailing `PutOption` / `RpcResilience`. See [Jackson](integrations/jackson.md) for a
+    worked example.
 
 ## Typed recipes
 

@@ -46,7 +46,8 @@ private val logger = KotlinLogging.logger {}
  * A keep-alive that survives lease expiry.
  *
  * jetcd auto-restarts the keep-alive stream after transient errors with observers
- * kept, so renewal resumes by itself; those surface as [LeaseEvent.Suspended] only.
+ * kept, so renewal resumes by itself; those surface as [LeaseEvent.Suspended], then
+ * [LeaseEvent.Restored] with the same old and new id once a renewal succeeds.
  * What jetcd reports as *gone* — `onCompleted` (renewal stopped past the TTL) or a
  * NOT_FOUND "requested lease not found" — triggers healing: re-grant the lease,
  * re-run the establish hook to re-create the owned keys, and re-register the

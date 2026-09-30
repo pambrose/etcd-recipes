@@ -47,10 +47,14 @@ talks to etcd fail differently and want different answers:
     ```
 
 Each of the three has its own `DEFAULT` and `DISABLED` constants, as does
-`ResilienceConfig` itself. `ResilienceConfig.DISABLED` is every sub-config disabled at
-once — the pre-0.12 behaviour, in which an RPC against an unreachable server parked
-forever, a fatally dead watcher was silently dropped, and an expired lease meant the
-recipe's keys were gone for good:
+`ResilienceConfig` itself. `RpcResilience` has a third, `PROBE`: one attempt bounded at 2
+seconds, which `ping()` and the RPC-backed Micrometer gauges use by default so a health
+probe answers quickly during the outage it exists to detect.
+
+`ResilienceConfig.DISABLED` is every sub-config disabled at once — the pre-0.12
+behaviour, in which an RPC against an unreachable server parked forever, a fatally dead
+watcher was silently dropped, and an expired lease meant the recipe's keys were gone for
+good:
 
 === "Kotlin"
 
@@ -176,6 +180,13 @@ single latency-sensitive read can be tighter than the recipe holding it:
     --8<-- "java/website/resilience/ResilienceSnippets.java:per-call-rpc"
     ```
 
+A recipe threads its own `resilience.rpc` through every RPC it makes: its reads and
+writes, the initial grant and the revokes of a self-healing lease (`selfHealingKeepAlive`
+takes the budget as its `rpc` parameter; a heal's re-grant uses `healOperationTimeout`),
+and `ServiceDiscovery`'s queries and the caches it hands out. So a recipe configured with
+a short `operationTimeout` reports an unreachable etcd on that timescale, rather than
+after the default budget's retries.
+
 ## Watch recovery
 
 jetcd already retries *transient* watch-stream errors itself, transparently and with
@@ -224,9 +235,9 @@ event list.
 | Event | Meaning |
 | --- | --- |
 | `Suspended(watchedKey, cause)` | The stream errored. Recovery may follow. |
-| `Resubscribed(watchedKey, resumeRevision)` | Back, resuming past the last event seen. No gap. |
+| `Resubscribed(watchedKey, resumeRevision)` | Back, resuming past the last event seen. No gap. Also follows a `Suspended` that jetcd recovered by itself. |
 | `Resynced(watchedKey, compactRevision, anchorRevision)` | Back, but events in `(compactRevision, anchorRevision)` are gone. |
-| `Failed(watchedKey, cause)` | The retry policy gave up. This watcher is dead. |
+| `Failed(watchedKey, cause)` | The retry policy gave up, or the `Client` was closed. This watcher is dead. |
 
 Recipes that own a watch expose these through their own recovery listener (for
 example `PathChildrenCache.addRecoveryListener`) and feed them into
@@ -240,12 +251,13 @@ the constructor they delegate to accepts it:
 | Scoped function | Takes `resilience`? |
 | --- | --- |
 | `withNodeCache`, `withLeaderLatch`, `withLeaderObserver` | Yes |
+| `withDistributedAtomicLong` | Yes |
 | The typed variants (`withTypedDistributedQueue`, …) | Yes |
 | `withPathChildrenCache` | No |
 | `withDistributedQueue`, `withDistributedPriorityQueue` | No |
 | `withDistributedBarrier`, `withDistributedBarrierWithCount` | No |
 | `withLeaderSelector`, `withServiceDiscovery` | No |
-| `withDistributedAtomicLong`, `withTransientKeyValue` | No |
+| `withTransientKeyValue` | No |
 
 This is an inconsistency, not a design statement. Where it bites, construct the recipe
 directly and use Kotlin's own `use { }` — you lose nothing but a few characters:

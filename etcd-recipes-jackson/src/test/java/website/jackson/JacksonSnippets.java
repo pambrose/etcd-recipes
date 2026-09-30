@@ -19,9 +19,7 @@ package website.jackson;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.etcd.jetcd.Client;
-import io.etcd.jetcd.options.PutOption;
 import io.etcd.recipes.common.EtcdCodec;
-import io.etcd.recipes.common.RpcResilience;
 import io.etcd.recipes.common.TypedKVUtils;
 import io.etcd.recipes.jackson.JacksonCodec;
 import io.etcd.recipes.queue.TypedDistributedQueue;
@@ -65,12 +63,11 @@ public class JacksonSnippets {
     EtcdCodec<Order> codec = new JacksonCodec<>(Order.class);
 
     // The typed KV helpers are Kotlin extension functions, so from Java they are statics on
-    // TypedKVUtils with the client as the first argument. They have no @JvmOverloads, so
-    // the trailing defaults must be passed explicitly.
-    TypedKVUtils.putValue(client, "/config/order", new Order("A-1", 3), codec,
-      PutOption.DEFAULT, RpcResilience.DEFAULT);
+    // TypedKVUtils with the client as the first argument. @JvmOverloads gives them short
+    // forms, so the trailing PutOption / RpcResilience can be left off.
+    TypedKVUtils.putValue(client, "/config/order", new Order("A-1", 3), codec);
 
-    Order order = TypedKVUtils.getValue(client, "/config/order", codec, RpcResilience.DEFAULT);
+    Order order = TypedKVUtils.getValue(client, "/config/order", codec);
     System.out.println("Read back " + order);
     // --8<-- [end:typed-kv]
   }

@@ -82,7 +82,7 @@ public class MutexSnippets {
            new DistributedMutex(
              client,
              "/locks/orders",
-             5L,                                  // leaseTtlSecs
+             10L,                                 // leaseTtlSecs (the lock default)
              io.etcd.recipes.common.ResilienceConfig.DEFAULT,
              "worker-1",                          // clientId
              true)) {                             // interruptOnLockLoss

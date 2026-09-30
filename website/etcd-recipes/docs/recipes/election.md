@@ -146,7 +146,8 @@ Calling `start()` while a previous term is still in flight throws
 `EtcdRecipeRuntimeException("Previous call to start() not complete")` rather than
 quietly running two overlapping terms from one instance. `close()` ends a candidacy
 whether or not it won, so a standby that was closed before its turn can be started
-again too.
+again too, and a restart resets `connectionState`. `close()` on a selector that was never
+started is a no-op.
 
 ### Who else is running?
 
@@ -210,7 +211,13 @@ owns the leadership; your ordinary code does.
 Internally the latch runs a worker thread that composes a fresh `LeaderSelector` per
 term — which is why latches and selectors can contest the same election path. When a
 term ends by step-down rather than by `close()`, the latch loops back and re-contests
-with a new selector.
+with a new selector. The latch reports that selector's health as its own: a
+participation lease that can't heal, or a leader watch that was abandoned, shows up in
+the latch's `connectionState` and `exceptions` as it happens.
+
+`close()` waits up to `closeJoinTimeout` (30 seconds by default) for the worker to finish
+before interrupting it. Java sets it through the constructor that ends in
+`(closeJoinTimeout, unit)`, since the `Duration` parameter is hidden from Java.
 
 ### Awaiting leadership
 
@@ -320,8 +327,9 @@ Hand-offs are reported to a `LeaderListener`:
     a `Flow` has no separate "read the snapshot" surface.)
 
 `LeaderListener.onError` defaults to a no-op and is invoked when one of your callbacks
-throws, or when the underlying watch is abandoned. The watch loop keeps running after a
-callback throws — it is your failure, not the observer's.
+throws, when the underlying watch is abandoned, or when re-reading the leader after a
+recovery fails (that last one is recorded on `exceptions` too). The watch loop keeps
+running after a callback throws — it is your failure, not the observer's.
 
 `withLeaderObserver` starts the observer and closes it on exit:
 
@@ -332,9 +340,10 @@ callback throws — it is your failure, not the observer's.
 !!! tip "Observers survive etcd restarts and compaction"
 
     The observer is backed by the resilient watcher, so a hand-off missed while the
-    stream was dead is recovered by re-reading the leader key after resubscribe or
-    resync — you get a late callback rather than a permanently stale `currentLeader`.
-    See [Resilience](../resilience/index.md).
+    stream was dead is recovered by re-reading the leader key after a recovery that could
+    have missed events (a resync, or a resubscribe that couldn't resume where it left off)
+    — you get a late callback rather than a permanently stale `currentLeader`. A recovery
+    that lost nothing replays nothing. See [Resilience](../resilience/index.md).
 
 ## Losing the lease
 
@@ -414,7 +423,7 @@ in place and quietly become a follower. Either way `hasLeadership` is the truth.
 
 `Client.leadershipAsFlow(electionPath)` observes an election as a `Flow` of
 `LeadershipEvent` — `Elected`, `Vacated`, `WatchFailed` — emitting the current leader
-first so a late collector is not blind:
+first so a late collector is not blind, and completing after a `WatchFailed`:
 
 ```kotlin
 --8<-- "kotlin/website/election/LeaderObserverSnippets.kt:flow"
@@ -424,8 +433,10 @@ This is an observer, not a candidate. To *run* for election from coroutine code,
 `LeaderSelector` and its suspending twins — `awaitStart()`, `awaitLeadershipComplete()`,
 and `awaitFinished()` — which release the thread instead of parking it. Note that
 `takeLeadership` itself is still a blocking callback invoked on the selector's executor:
-the coroutine surface covers waiting for a term, not the term. See
-[Coroutines](../coroutines/index.md) and [Flows](../coroutines/flows.md).
+the coroutine surface covers waiting for a term, not the term. `LeaderLatch` has
+`awaitStart()` and `awaitLeadership()` / `awaitLeadership(timeout)`, and `LeaderObserver`
+has `awaitStart()`. See [Coroutines](../coroutines/index.md) and
+[Flows](../coroutines/flows.md).
 
 ## Observability
 

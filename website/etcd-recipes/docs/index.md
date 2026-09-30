@@ -88,7 +88,7 @@ that is wired up, it is described in
 
     ```kotlin
     dependencies {
-      implementation("com.pambrose:etcd-recipes-core:0.12.0")
+      implementation("com.pambrose:etcd-recipes-core:0.13.0")
     }
     ```
 
@@ -96,7 +96,7 @@ that is wired up, it is described in
 
     ```groovy
     dependencies {
-      implementation 'com.pambrose:etcd-recipes-core:0.12.0'
+      implementation 'com.pambrose:etcd-recipes-core:0.13.0'
     }
     ```
 
@@ -106,7 +106,7 @@ that is wired up, it is described in
     <dependency>
       <groupId>com.pambrose</groupId>
       <artifactId>etcd-recipes-core</artifactId>
-      <version>0.12.0</version>
+      <version>0.13.0</version>
     </dependency>
     ```
 

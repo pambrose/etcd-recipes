@@ -29,6 +29,7 @@ JDK 17+ runtime. Compiler-wide opt-ins for `kotlin.time.ExperimentalTime`,
 - [CHANGELOG](CHANGELOG.md): version history
 - [CLAUDE.md](CLAUDE.md): contributor guide aimed at LLM tooling — module layout, architecture, build entry points
 - [RELEASE_NOTES](RELEASE_NOTES.md): release-by-release highlights
+- [specs/README.md](specs/README.md): TLA+ specifications of the barrier, read-write lock, and work queue protocols
 
 ## Recipes
 
@@ -38,15 +39,15 @@ JDK 17+ runtime. Compiler-wide opt-ins for `kotlin.time.ExperimentalTime`,
 - `io.etcd.recipes.discovery` — `ServiceDiscovery`, `ServiceCache`, `ServiceInstance`, `ServiceProvider` with pluggable `ProviderStrategy` (random / round-robin / sticky) and error-ejection
 - `io.etcd.recipes.election` — `LeaderSelector` (callback-scoped), `LeaderLatch` (holds leadership until `close()`), `LeaderObserver` (no candidacy), `Participant`
 - `io.etcd.recipes.keyvalue` — `TransientKeyValue` (lease-backed key/value), `TypedTransientKeyValue<T>`
-- `io.etcd.recipes.lock` — `DistributedMutex` (etcd's native lock service), `DistributedReadWriteLock` (fair shared/exclusive), `DistributedSemaphore` (counting)
+- `io.etcd.recipes.lock` — `DistributedMutex` (etcd's native lock service), `DistributedReadWriteLock` (fair shared/exclusive, write→read downgrade), `DistributedSemaphore` (counting); each hold carries a `fencingToken`, and the lock recipes default to a 10-second lease
 - `io.etcd.recipes.queue` — `DistributedQueue`, `DistributedPriorityQueue` (at-most-once, with `poll`/`tryDequeue`/`enqueueAll`), `DistributedWorkQueue` (at-least-once: claim/ack, visibility timeout, dead-lettering, delayed delivery)
 - `io.etcd.recipes.common` — Kotlin extensions over jetcd `Client`/`KV`/`Lease`/`Watch`/`Txn`; `EtcdCodec<T>` typed values; `ResilienceConfig`; `EtcdMetrics`
 - `io.etcd.recipes.coroutines` — suspending twins (`awaitPutValue`, `receive`, `withLock`, …) and `Flow` surfaces (`watchAsFlow`, `eventsAsFlow`, `leadershipAsFlow`, …)
 
 ## Cross-cutting
 
-- **Resilience** (on by default) — watchers auto-resubscribe after fatal stream deaths and re-anchor after compaction; leases self-heal and re-run the recipe's establish hook; blocking RPCs are bounded by an operation timeout and retry retriable statuses. Tuned per recipe via a trailing `ResilienceConfig`; `ResilienceConfig.DISABLED` restores pre-0.12 behavior. A lost *leadership* lease is deliberately never healed — the leader steps down.
-- **Observability** — `EtcdMetrics`, a dependency-free SPI installed with `ResilienceConfig.withMetrics(...)` (RPC, watch-recovery, keep-alive, lock wait/hold, leadership transitions, queue, cache sync); push/pull background-exception channels; `isHealthy()` / `ping()`; recipe identity in the SLF4J MDC under `etcd.recipe`.
+- **Resilience** (on by default) — watchers auto-resubscribe after fatal stream deaths and re-anchor after compaction; leases self-heal (checking first that etcd really dropped them) and re-run the recipe's establish hook; every blocking RPC is bounded by an operation timeout, calls safe to repeat (reads, `unlock`, lease grants) retry retriable gRPC statuses, plain writes and transactions make one attempt, and every failure surfaces as `EtcdRecipeRuntimeException` with its cause. Tuned per recipe via a trailing `ResilienceConfig`; `ResilienceConfig.DISABLED` restores pre-0.12 behavior. A lost *leadership* lease is deliberately never healed — the leader steps down.
+- **Observability** — `EtcdMetrics`, a dependency-free SPI installed with `ResilienceConfig.withMetrics(...)` (RPC, watch-recovery, keep-alive, lock wait/hold, leadership transitions, queue, cache sync); push/pull background-exception channels (the pull list keeps the latest 100); `connectionState`, where a `LOST` from a stream that's gone for good sticks until restart; `isHealthy()` / `ping()` (a single 2-second probe); recipe identity in the SLF4J MDC under `etcd.recipe`, on background work too. Listeners run on a per-recipe notifier thread, in order, never on jetcd's event loop.
 - **Typed values** — `EtcdCodec<T>` (`ByteSequenceCodec`, `StringCodec`, `jsonCodec<T>()`, or `JacksonCodec<T>`) types the KV extensions and every `Typed*` recipe, replacing hand-marshalled `ByteSequence`s.
 
 ## Modules
@@ -81,6 +82,10 @@ type-checked by `./gradlew compileTestKotlin compileTestJava`.
   container coordinating through a shared etcd container
 - Fault-injection tests (`io.etcd.recipes.fault`) pause / restart the etcd container to
   exercise watch recovery and lease healing; gated behind `-PuseTestcontainers`
+- Lincheck tests (`*LincheckTests.kt`) model-check in-memory concurrent state for
+  linearizability
+- `make tla` — TLC model-checks the TLA+ specs in `specs/` (the counted barrier's rounds,
+  the read-write lock's admission, the work queue's claims); CI runs them too
 
 ## Optional
 

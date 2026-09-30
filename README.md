@@ -146,7 +146,7 @@ etcd:
     namespace: /myapp/
 ```
 
-**Ktor 3.5.x** (`etcd-recipes-ktor`) — install the plugin; `application.etcdClient` and
+**Ktor 3.6.x** (`etcd-recipes-ktor`) — install the plugin; `application.etcdClient` and
 `application.etcdRecipes` become available, and a plugin-owned client closes on `ApplicationStopped`:
 
 ```kotlin
@@ -188,14 +188,17 @@ connectToEtcd(urls).use { client ->
 deaths recover automatically, and compaction resyncs surface in-band as
 `WatchFlowEvent.Recovery` so collectors with derived state can rebuild. The
 default unlimited buffer means a slow collector can never stall the watch
-dispatcher; cancelling the collector closes the watcher. Use
-`watchEventsAsFlow` for a flattened `Flow<WatchEvent>` when no derived state is
-kept.
+dispatcher; cancelling the collector closes the watcher. A watch abandoned for
+good ends the flow: `watchAsFlow` completes after its `Recovery(Failed)` element.
+Use `watchEventsAsFlow` for a flattened `Flow<WatchEvent>` when no derived state
+is kept; it fails with `EtcdRecipeRuntimeException` when its watch is abandoned.
 
 Every recipe's blocking entry points have suspending twins that run the
 blocking call on `Dispatchers.IO`, so a coroutine can wait on a queue, barrier,
 lock, or counter without dedicating a thread — and cancelling the coroutine
-aborts the wait, cleaning up any queued entry or lease:
+aborts the wait, cleaning up any queued entry or lease. A call cancelled just as it
+succeeded gives back what it got (a lock hold, a permit, a dequeued item, a claim)
+before the cancellation propagates:
 
 | Recipe | Blocking | Suspending |
 |---|---|---|
@@ -207,12 +210,16 @@ aborts the wait, cleaning up any queued entry or lease:
 | `DistributedSemaphore` | `acquire()` / `withPermit { }` | `awaitAcquire()` / `withPermit { }` |
 | `DistributedAtomicLong` | `increment()` / `add(n)` | `awaitIncrement()` / `awaitAdd(n)` |
 | `LeaderSelector` / `PathChildrenCache` | `start()` / `waitOn…()` | `awaitStart()` / `await…()` |
+| `LeaderLatch` | `start()` / `await()` | `awaitStart()` / `awaitLeadership()` |
+| `ServiceProvider` | `getInstance()` / `getAllInstances()` | `awaitGetInstance()` / `awaitGetAllInstances()` |
 
 The thread-owned locks (`DistributedMutex`, `DistributedReadWriteLock`) expose
 only the scoped `withLock { }` — ownership is pinned to the acquiring thread, so
 acquisition and release are confined to one thread per call while the body runs
 in your coroutine. The instance-held `DistributedSemaphore` also offers the
-split `awaitAcquire()` / `awaitRelease()`.
+split `awaitAcquire()` / `awaitRelease()`. On a lock or semaphore built to interrupt
+its holder on loss (`interruptOnLockLoss` / `interruptOnPermitLoss`), losing the hold
+cancels the `withLock` / `withPermit` body, and the call throws `HoldLostException`.
 
 Recipe event streams — previously callback listeners — are also exposed as
 `Flow`s. Collecting a flow registers the underlying listener; cancelling the
@@ -230,7 +237,7 @@ collector unregisters it, and collection never starts or closes the recipe:
 | Lock / permit loss | `EtcdLock.lockLostAsFlow()` / `DistributedSemaphore.permitLostAsFlow()` |
 
 `connectionStateAsFlow()` emits the current state first (conflated); the others
-are unbuffered by default, so the recipe's dispatcher is never stalled by a slow
+buffer without limit by default, so the recipe's dispatcher is never stalled by a slow
 collector. `leadershipAsFlow` is an observer of who holds leadership — to run for
 election, use `LeaderSelector` with the suspending `awaitStart()` /
 `awaitLeadershipComplete()`.
@@ -265,6 +272,14 @@ waiter and the dispossessed holder observes it **cooperatively**:
 state reports `LOST`, and `unlock()` returns false (interruption is opt-in via
 `interruptOnLockLoss`). The lock is deliberately never auto-reclaimed.
 
+Because a holder learns of a loss only after etcd has granted the lock to the next
+waiter, every hold carries a **fencing token** (`fencingToken`): a number etcd assigned
+to it, larger than any earlier conflicting holder's. Send it with each write to a
+resource that keeps the largest token it has seen and refuses smaller ones, and a
+holder that lost the lock but hasn't noticed can't act on it. The lock recipes default
+to a 10-second lease, so a pause of a few seconds doesn't lose the lock; `leaseTtlSecs`
+trades that against how long a crashed holder's lock takes to free.
+
 `DistributedReadWriteLock` adds shared/exclusive semantics with the same lock
 surface (`rw.readLock` / `rw.writeLock`, both `EtcdLock`s): readers share,
 writers exclude, and grants are **fair** — FIFO by arrival revision, so a queued
@@ -275,10 +290,10 @@ read→write upgrade throws (it would self-deadlock).
 semaphore (`acquire()` / `tryAcquire(timeout)` / `release()` /
 `withPermit { }`). The permit count is stored once at the semaphore path and
 validated by every instance, grants are FIFO, and capacity is never exceeded.
-Holds are instance-level, Java-`Semaphore`-style: any thread may release
-(releases are LIFO among the instance's holds), and a permit whose lease
-expires is lost cooperatively — a `PermitLostListener` fires and the matching
-`release()` returns false.
+Holds are instance-level, Java-`Semaphore`-style: any thread may release, and a
+release gives up a permit the calling thread acquired before any other thread's. A
+permit whose lease expires is lost cooperatively — a `PermitLostListener` fires and
+the acquiring thread's matching `release()` returns false.
 
 ## Load-balancing service provider
 
@@ -288,8 +303,9 @@ expires is lost cooperatively — a `PermitLostListener` fires and the matching
 affinity) — the basis for client-side load balancing. Call `start()` to back reads
 with a watch-updated `ServiceCache` (in-memory, current); without `start()` each read
 does a direct etcd lookup (the original behavior). Mark a failing instance with
-`noteError`: after an error threshold it is ejected from selection for a down window,
-then automatically becomes eligible again.
+`noteError`: after an error threshold within a down window it is ejected from selection
+for that window, then automatically becomes eligible again. A malformed or newer-schema
+instance entry is skipped (and recorded), never an outage for the whole service.
 
 ```kotlin
 import io.etcd.recipes.discovery.RoundRobinStrategy
@@ -342,7 +358,10 @@ is exhausted (`deadLetters()` / `requeueDeadLetter(id)` / `purgeDeadLetter(id)`)
 An item handed back with `requeue()` counts the same way: once it has been
 delivered `maxDeliveries` times, the next receive dead-letters it.
 A live consumer renews its lease, so processing may take longer than the
-visibility timeout — it bounds crash detection, not processing time.
+visibility timeout — it bounds crash detection, not processing time. A claim whose
+commit response is lost during an etcd blip is reconciled by re-reading its marker (or
+released by the consumer's sweeper if even that fails), so an item is neither lost nor
+held by a claim nobody knows about.
 
 Delivery can be deferred: `enqueue(value, delay)` keeps the item invisible until
 it matures, then it flows through the normal claim/ack lifecycle in ready-time
@@ -428,16 +447,23 @@ selector.addConnectionStateListener { new, prev ->
 ```
 
 `LOST` means a lease expired or recovery was abandoned — ownership may have been
-lost during the outage (a leader, for example, has already stepped down by then).
+lost during the outage (a leader, for example, has already stepped down by then). A
+`LOST` from a stream that's gone for good sticks until the recipe restarts, so a later
+`RECONNECTED` from another stream can't hide it. Listeners run on the recipe's own
+notifier thread, one at a time and in the order the changes happened, never on jetcd's
+event loop.
 
 ### RPC timeouts and retries
 
 Every blocking extension call (`putValue`, `getValue`, `deleteKey`, `leaseGrant`,
-...) used to block on an unbounded `future.get()` — against an unreachable cluster
-it parked forever. Each attempt is now bounded by a 30&nbsp;s operation timeout,
-and retriable failures (`UNAVAILABLE`, `INTERNAL`, `DEADLINE_EXCEEDED`, or a
-timeout) are retried under a bounded policy (4 attempts, 250&nbsp;ms apart) —
-configurable per call or per recipe via `ResilienceConfig.rpc`:
+...) is bounded by a 30&nbsp;s operation timeout per attempt. Calls that are safe to
+repeat — reads, plus `unlock` and `leaseGrant` — retry retriable failures
+(`UNAVAILABLE`, `INTERNAL`, `DEADLINE_EXCEEDED`, or a timeout) under a bounded policy
+(the first try plus up to 4 retries, 250&nbsp;ms apart). Plain writes (`putValue`, `deleteKey`,
+`deleteChildren`, `compact`) make one attempt: a write that failed or timed out may
+still have been applied, and a retry could land after a newer write. Every failure
+surfaces as `EtcdRecipeRuntimeException` with the original failure as its cause. The
+policy is configurable per call or per recipe via `ResilienceConfig.rpc`:
 
 ```kotlin
 // One-shot with a tight deadline for a latency-sensitive path:
@@ -450,7 +476,7 @@ recipes' own loops. The timeout still applies.
 
 `connectToEtcd` also applies recipe-tuned client defaults before your own builder
 settings (which win): a 5&nbsp;s `connectTimeout` and a 30&nbsp;s
-`retryMaxDuration` bound on jetcd's internal per-call retries. jetcd 0.8.6's own
+`retryMaxDuration` bound on jetcd's internal per-call retries. jetcd 0.8.7's own
 defaults already enable `waitForReady` and gRPC keepalive (30&nbsp;s /
 10&nbsp;s timeout).
 
@@ -474,10 +500,12 @@ val queue = DistributedQueue(client, "/queues/jobs", resilience = resilience)
 The optional `etcd-recipes-micrometer` module supplies that backend — `etcd.rpc`,
 `etcd.watch.recovery`, `etcd.keepalive`, `etcd.lock.wait` / `etcd.lock.hold`,
 `etcd.election.transitions`, `etcd.queue`, `etcd.cache.sync` — plus `EtcdGauges`
-binders (`bindQueueDepth`, `bindCacheSize`, `bindAvailablePermits`,
-`bindLeadership`) for current values the push SPI can't express. Keys, paths, and
-lease ids reach the sink as context but deliberately never become tags; two of the
-gauges poll etcd on every scrape, which is documented on the binders.
+binders (`bindQueueDepth`, `bindCacheSize`, `bindServiceCacheSize`,
+`bindAvailablePermits`, `bindLeadership`) for current values the push SPI can't
+express. Keys, paths, and lease ids reach the sink as context but deliberately never
+become tags; two of the gauges poll etcd on every scrape (a single 2-second attempt
+each), which is documented on the binders. Each binder returns its gauge: remove it
+with `registry.remove(gauge)` when its recipe closes.
 
 **Background exceptions.** A recipe can't throw at you from its own healer thread,
 so every background failure — keep-alive death, abandoned watcher, lost lock, a user
@@ -489,13 +517,16 @@ cache.addBackgroundExceptionListener { context, t ->
 }
 ```
 
-`exceptions` / `hasExceptions` / `clearExceptions()` remain as the pull side, and
-`backgroundExceptionsAsFlow()` is the coroutine form. An empty `exceptions` list
+`exceptions` / `hasExceptions` / `clearExceptions()` remain as the pull side
+(`exceptions` keeps the most recent 100; `droppedExceptionCount` counts the rest), and
+`backgroundExceptionsAsFlow()` is the coroutine form. Listeners run on the recipe's
+notifier thread, never on the thread that reported the failure. An empty `exceptions` list
 isn't the same as healthy — it means nothing failed since you last cleared it — so
 pair it with `connectionState` and `isHealthy()` (passive) or `ping()` (an active,
-bounded, non-mutating probe).
+non-mutating probe: a single attempt bounded at 2 seconds).
 
-**Logging context.** Recipe background threads run with the recipe's identity in the
+**Logging context.** Recipe background work — watch callbacks and recovery, lease
+heals, sweeps, and the listeners they call — runs with the recipe's identity in the
 SLF4J MDC under `etcd.recipe`, restoring any prior value. Add `%X{etcd.recipe}` to
 your pattern and a stray warning from a healer thread stops being anonymous — every
 recipe's healer threads otherwise share one thread name.
@@ -523,7 +554,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.pambrose:etcd-recipes-core:0.12.0")
+    implementation("com.pambrose:etcd-recipes-core:0.13.0")
 }
 ```
 
@@ -531,7 +562,7 @@ If you use a version catalog (`gradle/libs.versions.toml`):
 
 ```toml
 [versions]
-etcd-recipes-core = "0.12.0"
+etcd-recipes-core = "0.13.0"
 
 [libraries]
 etcd-recipes-core = { module = "com.pambrose:etcd-recipes-core", version.ref = "etcd-recipes-core" }
@@ -545,7 +576,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.pambrose:etcd-recipes-core:0.12.0'
+    implementation 'com.pambrose:etcd-recipes-core:0.13.0'
 }
 ```
 
@@ -556,7 +587,7 @@ dependencies {
     <dependency>
         <groupId>com.pambrose</groupId>
         <artifactId>etcd-recipes-core</artifactId>
-        <version>0.12.0</version>
+        <version>0.13.0</version>
     </dependency>
 </dependencies>
 ```
@@ -573,12 +604,12 @@ want it:
 | `com.pambrose:etcd-recipes-jackson` | `JacksonCodec<T>` — an `EtcdCodec` for projects using Jackson rather than kotlinx-serialization |
 | `com.pambrose:etcd-recipes-micrometer` | `MicrometerEtcdMetrics` (the `EtcdMetrics` backend) and the `EtcdGauges` binders |
 | `com.pambrose:etcd-recipes-spring-boot-starter` | Auto-configured `Client` / `EtcdRecipes` beans plus an optional Actuator health indicator (Spring Boot 4.1.x) |
-| `com.pambrose:etcd-recipes-ktor` | The Ktor `Application` plugin (Ktor 3.5.x) |
+| `com.pambrose:etcd-recipes-ktor` | The Ktor `Application` plugin (Ktor 3.6.x) |
 
 All four share the core's version:
 
 ```kotlin
-implementation("com.pambrose:etcd-recipes-micrometer:0.12.0")
+implementation("com.pambrose:etcd-recipes-micrometer:0.13.0")
 ```
 
 > **Upgrading from 0.11.0 or earlier:** the core coordinate changed from
@@ -611,13 +642,14 @@ make coverage           # Kover HTML + XML reports
 make kdocs              # Dokka HTML / Javadoc
 make versions           # gradle dependencyUpdates
 
+make tla                # model-check the TLA+ protocol specs in specs/
 make site               # serve the documentation site locally
 make docs-check         # compile the doc snippets + build the site strictly
 ```
 
-GitHub CI compiles and lints pull requests but does not run the test suite, which takes 30+
-minutes on a hosted runner. Run `make tests-tc` and confirm it passes before a PR merges;
-pushes to `master` still run the full suite.
+GitHub CI compiles and lints pull requests and runs the TLA+ models, but does not run the test
+suite, which takes 30+ minutes on a hosted runner. Run `make tests-tc` and confirm it passes
+before a PR merges; pushes to `master` still run the full suite.
 
 `make tests` and the examples expect a local etcd at `http://localhost:2379`. Start one with:
 
@@ -651,6 +683,16 @@ Two complementary variants of the distributed-coordination tests live in the rep
   container against a shared etcd container, exercising true cross-process coordination.
   Built from the `etcd-recipes-test-runners` submodule's shadow JAR. Gated by
   `-PuseTestcontainers`; run via `make tests-container`.
+
+Two more kinds of checks cover what those can't reach:
+
+- **Lincheck** (`*LincheckTests.kt`) model-checks the in-memory concurrent state (the
+  provider strategies, a connector's connection state and recorded exceptions) for
+  linearizability.
+- **TLA+ specs** (`specs/`) model the counted barrier's rounds, the read-write lock's
+  admission, and the work queue's claims as the code runs them, with leases expiring
+  between RPCs, and TLC checks every interleaving of small models. `make tla` runs them;
+  see [specs/README.md](specs/README.md).
 
 ## Contributing
 

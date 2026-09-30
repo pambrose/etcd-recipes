@@ -95,7 +95,7 @@ defaults is annotated `@JvmOverloads`. That generates one overload per trailing 
     parameter positionally, defaults included:
 
     ```java
-    new DistributedMutex(client, "/locks/orders", 5L, ResilienceConfig.DEFAULT, "worker-1", true);
+    new DistributedMutex(client, "/locks/orders", 10L, ResilienceConfig.DEFAULT, "worker-1", true);
     ```
 
     When a Java example here looks more verbose than its Kotlin twin, this is usually why.
@@ -111,6 +111,25 @@ mutex.tryLock(5, TimeUnit.SECONDS);
 semaphore.tryAcquire(2, TimeUnit.SECONDS);
 latch.await(30, TimeUnit.SECONDS);
 ```
+
+Two configuration durations have `(long, TimeUnit)` forms too: `DistributedPriorityQueue`'s
+`minimumWaitTime`, on its constructor and on
+`EtcdRecipes.distributedPriorityQueue(path, wait, unit)`, and `LeaderLatch`'s
+`closeJoinTimeout`, through the constructor that ends in `closeJoinTimeout, unit`.
+
+!!! warning "A few `Duration` parameters are still hidden from Java"
+
+    A Kotlin `Duration` parameter mangles the JVM name of the method or constructor that
+    takes it, which hides it from Java. These have no `TimeUnit` twin:
+
+    | Kotlin-only | What Java does instead |
+    | --- | --- |
+    | `leaseGrant(ttl)` | Grant through jetcd (`client.getLeaseClient().grant(secs)`); see [Leases](basics/lease.md) |
+    | `selfHealingKeepAlive(ttl, …)` | A recipe that heals its own lease, such as `TransientKeyValue` or `ServiceRegistry` |
+    | The `Duration` forms of `putValueWithKeepAlive` | The `ttlSecs: Long` overloads |
+    | `DistributedWorkQueue.enqueue(value, delay)` and `WorkQueueConfig`'s `sweepInterval` | Enqueue without a delay; keep the 30-second sweep |
+    | The `ServiceProvider` constructor, and `downPeriod` on `serviceProvider(…)` | `ServiceDiscovery.serviceProvider(name, strategy, errorThreshold)`, with the 30-second down period |
+    | Custom `RetryPolicy` delays, `operationTimeout`, `healOperationTimeout` | The built-in policies; see [Resilience](resilience/index.md#java-callers) |
 
 !!! note "Except `EtcdConnectionConfig`"
 

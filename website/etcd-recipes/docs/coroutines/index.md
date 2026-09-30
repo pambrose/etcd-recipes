@@ -201,8 +201,9 @@ and the lock-lost notification for you.
 
 !!! warning "`awaitLock` defaults to `RpcResilience.DISABLED`"
 
-    Every other suspending twin defaults to `RpcResilience.DEFAULT` — four attempts,
-    a 30-second per-attempt deadline. `awaitLock` is the one exception, and the
+    Every other suspending twin defaults to `RpcResilience.DEFAULT` — a 30-second
+    per-attempt deadline, and up to four retries for the calls that are safe to repeat
+    (writes and transactions make one attempt). `awaitLock` is the one exception, and the
     reason is that a lock call is *supposed* to take a long time: it waits
     server-side until the current holder releases. A 30-second operation timeout
     would abort perfectly healthy waits and turn ordinary contention into a stream of

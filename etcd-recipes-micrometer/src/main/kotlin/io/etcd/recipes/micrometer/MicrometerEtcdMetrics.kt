@@ -28,7 +28,7 @@ import kotlin.time.toJavaDuration
  * `ResilienceConfig.withMetrics(MicrometerEtcdMetrics(registry))`.
  *
  * Meters registered (all sharing whatever common tags [registry] carries):
- * - `etcd.rpc` — a [Timer] per blocking RPC, tagged `operation` (the op name without its key
+ * - `etcd.rpc` — a [Timer] per RPC, blocking or suspending, tagged `operation` (the op name without its key
  *   argument) and `outcome` (`success`/`failure`);
  * - `etcd.rpc.retries` — a counter of extra attempts beyond the first, tagged `operation`;
  * - `etcd.watch.recovery` — a counter of resilient-watcher transitions, tagged `kind`;

@@ -4,7 +4,7 @@
 shared, gracefully-closed etcd client. It targets **Spring Boot 4.1.x**.
 
 ```kotlin
-implementation("com.pambrose:etcd-recipes-spring-boot-starter:0.12.0")
+implementation("com.pambrose:etcd-recipes-spring-boot-starter:0.13.0")
 ```
 
 That is the entire installation. There is no `@EnableEtcd`, no annotation to add, and
@@ -56,6 +56,7 @@ land in the same place.
 | `etcd.recipes.tls.ca-cert-path` | `String?` | `null` |
 | `etcd.recipes.tls.client-cert-path` | `String?` | `null` |
 | `etcd.recipes.tls.client-key-path` | `String?` | `null` |
+| `etcd.recipes.health.timeout` | `Duration` | `2s` — see [Actuator health](#actuator-health) |
 
 `client-cert-path` and `client-key-path` enable mutual TLS together: setting only one fails
 startup rather than connecting without a client certificate. The bound `EtcdProperties`
