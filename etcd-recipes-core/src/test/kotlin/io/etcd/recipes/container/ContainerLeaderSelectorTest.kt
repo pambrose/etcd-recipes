@@ -24,13 +24,14 @@ import io.etcd.recipes.common.awaitResults
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.payload
 import io.etcd.recipes.runners.ElectionParticipantPayload
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration.Companion.seconds
 
 class ContainerLeaderSelectorTest :
   StringSpec({
-    "every candidate container takes and relinquishes leadership exactly once" {
+    "every candidate container takes and relinquishes leadership exactly once, one at a time" {
       assumeContainerMode()
 
       val count = 5
@@ -58,6 +59,9 @@ class ContainerLeaderSelectorTest :
             val payload = result.payload<ElectionParticipantPayload>()
             payload.tookLeadership shouldBe true
             payload.relinquished shouldBe true
+            withClue("${payload.clientId}'s term began while another leader's was still running") {
+              payload.overlapped shouldBe false
+            }
           }
         }
       }
