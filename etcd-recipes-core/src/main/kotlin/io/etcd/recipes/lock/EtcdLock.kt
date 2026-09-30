@@ -60,10 +60,25 @@ interface EtcdLock {
   /** The calling thread's reentrant hold count (0 when it is not the owner). */
   val holdCount: Int
 
+  /**
+   * The calling thread's fencing token: a number etcd assigned to its hold, larger than any
+   * earlier conflicting holder's; -1 when it holds nothing. Hand it to a downstream resource
+   * that keeps the largest token it has seen and rejects smaller ones: a holder that lost the
+   * lock (a pause past its lease) but hasn't noticed yet can then no longer act on it.
+   */
+  val fencingToken: Long
+
   fun addLockLostListener(listener: LockLostListener)
 
   fun removeLockLostListener(listener: LockLostListener)
 }
+
+/**
+ * The lock recipes' default lease TTL. Longer than other recipes' 2 seconds: a holder whose
+ * lease lapses loses the lock, so a GC pause or network blip of a couple of seconds must not
+ * cost it. The trade-off is that a crashed holder's lock takes up to this long to free.
+ */
+internal const val DEFAULT_LOCK_TTL_SECS = 10L
 
 /**
  * Whether this lock interrupts its holder when a hold is lost (`interruptOnLockLoss`).

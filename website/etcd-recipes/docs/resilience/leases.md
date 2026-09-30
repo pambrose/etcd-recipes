@@ -233,8 +233,9 @@ is authoritative on its own.
 
     Retry pacing decides how fast you come back. The lease TTL decides whether you go
     away at all. The 2-second default (`leaseTtlSecs` on most recipes) is responsive but
-    treats a 3-second GC pause as death. If your workload has long pauses or a flaky
-    network, raise the TTL before you touch the retry policy.
+    treats a 3-second GC pause as death. The lock recipes default to 10 seconds for that
+    reason (see [the lease TTL](../recipes/locks.md#the-lease-ttl)). If your workload has
+    long pauses or a flaky network, raise the TTL before you touch the retry policy.
 
 ## Where to go next
 

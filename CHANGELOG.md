@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (fencing tokens)
+
+- `EtcdLock.fencingToken` (on `DistributedMutex` and both of `DistributedReadWriteLock`'s
+  views) and `DistributedSemaphore.fencingToken`: a number etcd assigned to the calling
+  thread's hold, larger than any earlier conflicting holder's, or -1 when it holds nothing.
+  A downstream resource that keeps the largest token it has seen and refuses smaller ones
+  turns away a holder that lost the lock (a pause past its lease) but hasn't noticed yet.
+  A lock notices a loss only on the client, after etcd has already granted the lock to
+  the next waiter. The mutex's token is its grant revision; the read-write lock's and the
+  semaphore's are their entries' create revisions.
+
+### Changed (lock lease TTL)
+
+- **Behavior change:** `DistributedMutex`, `DistributedReadWriteLock`, and
+  `DistributedSemaphore` default to a 10-second lease (`leaseTtlSecs`), up from 2 seconds.
+  A lapsed lease loses the lock, and at 2 seconds a GC pause or network blip of about 1.3
+  seconds could put two holders in the critical section until the first noticed. The
+  trade-off: a crashed holder's lock now takes up to 10 seconds to free. An explicit
+  `leaseTtlSecs` is unaffected, and the other recipes keep 2 seconds.
+
 ### Fixed (Java interop, logging context, and leftovers)
 
 - Java can construct a `DistributedPriorityQueue` and set `LeaderLatch`'s

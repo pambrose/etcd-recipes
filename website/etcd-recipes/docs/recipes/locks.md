@@ -133,6 +133,39 @@ It defaults to `false` because interrupting a thread that is midway through
 non-idempotent work is not automatically safer than letting it finish and fail its
 own commit. Choose deliberately.
 
+### Fencing tokens
+
+Neither listeners nor interrupts close the gap entirely: a holder learns of the loss on the
+client, after etcd has already granted the lock to the next waiter. For a resource where two
+writers must never both land, use the hold's `fencingToken`. It is a number etcd assigned to
+the hold, larger than any earlier conflicting holder's. A resource that keeps the largest
+token it has seen and refuses smaller ones then turns away a holder that lost the lock but
+hasn't noticed yet:
+
+=== "Kotlin"
+
+    ```kotlin
+    --8<-- "kotlin/website/locks/MutexSnippets.kt:fencing"
+    ```
+
+=== "Java"
+
+    ```java
+    --8<-- "java/website/locks/MutexSnippets.java:fencing"
+    ```
+
+`fencingToken` is -1 on a thread that holds nothing. The read-write lock's `readLock` and
+`writeLock` have one each, and a semaphore's is the token of the permit the calling thread's
+`release()` would give up.
+
+### The lease TTL
+
+The lock recipes default to a 10-second lease (`leaseTtlSecs`), where other recipes use 2
+seconds. A lapsed lease loses the lock, so the longer lease rides out a GC pause or network
+blip of a few seconds. The trade-off: when a holder's process dies, its lock is freed only
+when the lease runs out, up to 10 seconds later. Set `leaseTtlSecs` for your own balance, and
+use a fencing token where a lost hold must not write.
+
 ### Reentrancy
 
 Holds are per-thread and reentrant, tracked by `holdCount`:

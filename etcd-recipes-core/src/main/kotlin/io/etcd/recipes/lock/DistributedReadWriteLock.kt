@@ -71,7 +71,7 @@ class DistributedReadWriteLock
 constructor(
   client: Client,
   val lockPath: String,
-  val leaseTtlSecs: Long = DEFAULT_TTL_SECS,
+  val leaseTtlSecs: Long = DEFAULT_LOCK_TTL_SECS,
   resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
   val clientId: String = defaultClientId(DistributedReadWriteLock::class.simpleName!!),
   internal val interruptOnLockLoss: Boolean = false,
@@ -91,6 +91,8 @@ constructor(
     val rank: Long, // place in line: the entry's create revision, or an inherited one
     // The acquisition this hold came from: a loss is applied only to the hold it belongs to
     val attempt: Attempt,
+    // The entry's own create revision: later than every conflicting hold granted before it
+    val fencingToken: Long,
   ) {
     // Changed by the owner thread; read by a loss on jetcd's lease thread
     @Volatile
@@ -177,6 +179,8 @@ constructor(
       }
 
     override val holdCount: Int get() = holdsFor(side)[Thread.currentThread()]?.holdCount ?: 0
+
+    override val fencingToken: Long get() = holdsFor(side)[Thread.currentThread()]?.fencingToken ?: -1L
 
     override fun addLockLostListener(listener: LockLostListener) {
       listenersFor(side) += listener
@@ -320,7 +324,7 @@ constructor(
               // Admitted: publish the hold BEFORE claiming the phase (a fatal in
               // the win window must always find the hold — or the CAS failure
               // below rolls it back).
-              val data = EntryData(lease, entryKey, ownRank, attempt)
+              val data = EntryData(lease, entryKey, ownRank, attempt, ownCreateRevision)
               holdsFor(side)[me] = data
               if (attempt.phase.compareAndSet(Phase.WAITING, Phase.HOLDING)) {
                 if (closeCalled.load()) {
