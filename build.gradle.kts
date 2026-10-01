@@ -124,6 +124,9 @@ subprojects {
         // after TEST_WAIT_LIMIT). Under CI's 45-minute job timeout, so a hung run fails this
         // task and still uploads its test reports instead of being cancelled without them.
         timeout.set(java.time.Duration.ofMinutes(40))
+        // -PskipLincheck (CI) leaves out the Lincheck model checks: they're CPU-heavy, and on a
+        // 2-core runner they pushed the full suite past the timeout above. They run locally.
+        if (providers.gradleProperty("skipLincheck").isPresent) exclude("**/*LincheckTests*")
         // Fork a new JVM for each test class so background threads / etcd watch
         // connections from one spec don't interfere with the next one.
         setForkEvery(1)

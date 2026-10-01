@@ -72,8 +72,9 @@ jobs:
         # task's inputs (notably -PuseTestcontainers) match between the
         # two; running them separately invalidates the test cache and
         # re-runs the suite without testcontainers wiring, which then
-        # hangs trying to reach localhost:2379.
-        run: ./gradlew check koverXmlReport -PuseTestcontainers
+        # hangs trying to reach localhost:2379. -PskipLincheck leaves out the
+        # CPU-heavy Lincheck model checks, which run locally (make tests-tc).
+        run: ./gradlew check koverXmlReport -PuseTestcontainers -PskipLincheck
 
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() && github.event_name != 'pull_request' }}

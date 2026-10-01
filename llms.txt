@@ -83,7 +83,7 @@ type-checked by `./gradlew compileTestKotlin compileTestJava`.
 - Fault-injection tests (`io.etcd.recipes.fault`) pause / restart the etcd container to
   exercise watch recovery and lease healing; gated behind `-PuseTestcontainers`
 - Lincheck tests (`*LincheckTests.kt`) model-check in-memory concurrent state for
-  linearizability
+  linearizability; they run locally, and CI skips them (`-PskipLincheck`)
 - `make tla` — TLC model-checks the TLA+ specs in `specs/` (the counted barrier's rounds,
   the read-write lock's admission, the work queue's claims); CI runs them too
 

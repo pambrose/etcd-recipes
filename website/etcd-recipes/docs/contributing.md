@@ -56,7 +56,8 @@ default `./gradlew check` skips them.
 **Lincheck** (`*LincheckTests.kt`) — [Lincheck](https://github.com/JetBrains/lincheck)
 model-checks in-memory concurrent state for linearizability: the service provider
 strategies, and `EtcdConnector`'s connection state and recorded exceptions. They run with
-the rest of the suite and need no etcd. Reach for one when a change touches shared
+the rest of the suite locally and need no etcd. CI leaves them out (`-PskipLincheck`):
+they're CPU-heavy, and on a 2-core runner they pushed the suite past its timeout. Reach for one when a change touches shared
 in-memory state that several threads update at once.
 
 **TLA+ specs** (`specs/`) — the counted barrier's rounds, the read-write lock's admission,
@@ -192,8 +193,8 @@ is the reliable way to catch them; do not rely on the list of files staying accu
 - **TLA+ models** — `./specs/tlc.sh`, on every pull request and every push to `master`.
 - **Build & test** — `detekt`, then, on a pull request, only a compile of every main and
   test source set (the website's snippet sources included) plus `lintKotlin`. A push to
-  `master` runs the full suite instead: `check koverXmlReport -PuseTestcontainers`, with a
-  coverage upload.
+  `master` runs the full suite instead, less the Lincheck checks:
+  `check koverXmlReport -PuseTestcontainers -PskipLincheck`, with a coverage upload.
 
 !!! warning "Pull-request CI does not run the tests"
 
