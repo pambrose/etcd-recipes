@@ -688,7 +688,8 @@ Two more kinds of checks cover what those can't reach:
 
 - **Lincheck** (`*LincheckTests.kt`) model-checks the in-memory concurrent state (the
   provider strategies, a connector's connection state and recorded exceptions) for
-  linearizability.
+  linearizability. These run locally with the rest of the suite; CI leaves them out
+  (`-PskipLincheck`), since they're CPU-heavy on a 2-core runner.
 - **TLA+ specs** (`specs/`) model the counted barrier's rounds, the read-write lock's
   admission, and the work queue's claims as the code runs them, with leases expiring
   between RPCs, and TLC checks every interleaving of small models. `make tla` runs them;

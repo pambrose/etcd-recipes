@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (CI)
+
+- CI's full test run on master leaves out the Lincheck model checks (`-PskipLincheck`).
+  They're CPU-heavy, and on a 2-core runner they pushed the suite past its 40-minute
+  timeout. They still run locally with `make tests` and `make tests-tc`.
+
 ## [0.13.0] - 2026-09-30
 
 A reliability release. Every issue from a full review of the library
