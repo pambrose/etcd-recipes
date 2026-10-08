@@ -73,7 +73,7 @@ class SuspendQueueTests : StringSpec() {
         DistributedQueue(client, "$base/park").use { queue ->
           coroutineScope {
             val parked = launch { queue.receive() }
-            delay(1_000) // let it park on the empty queue
+            delay(1.seconds) // let it park on the empty queue
             parked.cancelAndJoin()
           }
           queue.awaitEnqueue("later")
@@ -127,7 +127,7 @@ class SuspendQueueTests : StringSpec() {
         DistributedWorkQueue(client, "$base/work-cancel").use { wq ->
           coroutineScope {
             val parked = launch { wq.awaitReceive() }
-            delay(1_000)
+            delay(1.seconds)
             parked.cancelAndJoin()
           }
           wq.awaitEnqueue("survivor")

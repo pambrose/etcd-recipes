@@ -271,6 +271,6 @@ class LeaderLatch
     companion object {
       private val logger = KotlinLogging.logger {}
 
-      fun defaultClientId(): String = EtcdConnector.defaultClientId(LeaderLatch::class.simpleName!!)
+      fun defaultClientId(): String = defaultClientId(LeaderLatch::class.simpleName!!)
     }
   }

@@ -1,0 +1,39 @@
+name: zizmor
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Least privilege: the job only reads the repo (the online audits read public action
+# repos with the same token).
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Static analysis of the workflows themselves (https://docs.zizmor.sh), the same check
+# as `make zizmor`. Two of its rules shape every workflow here: each action is pinned
+# to a commit SHA with its release in a trailing comment (unpinned-uses), and checkout
+# doesn't leave the git credential on disk (artipacked).
+jobs:
+  zizmor:
+    name: Audit workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          # Keep equal to ZIZMOR_VERSION in the Makefile, so `make zizmor` audits the same way
+          version: 1.30.1
+          # Fail on any finding, as `make zizmor` does, and annotate the PR diff,
+          # rather than upload SARIF to the Security tab (security-events: write)
+          advanced-security: false
+          annotations: true

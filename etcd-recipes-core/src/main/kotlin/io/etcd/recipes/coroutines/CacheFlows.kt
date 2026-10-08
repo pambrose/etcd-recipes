@@ -67,7 +67,7 @@ fun PathChildrenCache.recoveryEventsAsFlow(capacity: Int = Channel.UNLIMITED): F
  */
 fun <T> NodeCache<T>.eventsAsFlow(capacity: Int = Channel.UNLIMITED): Flow<NodeCacheEvent<T>> =
   callbackFlow {
-    val listener = NodeCacheListener<T> { event -> trySendBlocking(event) }
+    val listener = NodeCacheListener { event -> trySendBlocking(event) }
     addListener(listener)
     awaitClose { removeListener(listener) }
   }.buffer(capacity)
@@ -88,7 +88,7 @@ fun <T> TypedPathChildrenCache<T>.eventsAsFlow(
   capacity: Int = Channel.UNLIMITED,
 ): Flow<TypedPathChildrenCacheEvent<T>> =
   callbackFlow {
-    val listener = TypedPathChildrenCacheListener<T> { event -> trySendBlocking(event) }
+    val listener = TypedPathChildrenCacheListener { event -> trySendBlocking(event) }
     addListener(listener)
     awaitClose { removeListener(listener) }
   }.buffer(capacity)

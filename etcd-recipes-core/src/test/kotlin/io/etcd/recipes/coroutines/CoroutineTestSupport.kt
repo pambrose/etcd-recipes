@@ -20,6 +20,7 @@ package io.etcd.recipes.coroutines
 
 import kotlinx.coroutines.delay
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /** Suspending pollUntil: true as soon as [predicate] holds, false once [timeout] elapses. */
@@ -30,7 +31,7 @@ internal suspend fun untilTrue(
   val start = TimeSource.Monotonic.markNow()
   while (start.elapsedNow() < timeout) {
     if (predicate()) return true
-    delay(50)
+    delay(50.milliseconds)
   }
   return predicate()
 }

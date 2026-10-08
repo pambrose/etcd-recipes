@@ -319,6 +319,6 @@ constructor(
   companion object {
     private val logger = KotlinLogging.logger {}
 
-    internal fun defaultClientId() = EtcdConnector.defaultClientId(DistributedBarrier::class.simpleName!!)
+    internal fun defaultClientId() = defaultClientId(DistributedBarrier::class.simpleName!!)
   }
 }

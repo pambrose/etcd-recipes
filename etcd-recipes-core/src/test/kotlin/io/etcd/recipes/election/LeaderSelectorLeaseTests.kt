@@ -24,7 +24,6 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.mockk.mockk
 import io.mockk.verify
-import java.util.concurrent.Executor
 
 class LeaderSelectorLeaseTests : StringSpec() {
     init {
@@ -44,7 +43,7 @@ class LeaderSelectorLeaseTests : StringSpec() {
                     mockk<LeaderSelectorListener>(relaxed = true),
                     leaseTtlSecs = 1L,
                     // A direct executor avoids spinning up a real thread pool.
-                    userExecutor = Executor { it.run() },
+                    userExecutor = { it.run() },
                 )
 
             shouldThrow<EtcdRecipeException> { selector.advertiseParticipation() }

@@ -1,0 +1,2080 @@
+public final class io/etcd/recipes/barrier/DistributedBarrier : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/barrier/DistributedBarrier$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JZ)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JZLjava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JZLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JZLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBarrierPath ()Ljava/lang/String;
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getLeaseTtlSecs ()J
+	public final fun isBarrierSet ()Z
+	public final fun removeBarrier ()Z
+	public final fun setBarrier ()Z
+	public final fun waitOnBarrier ()Z
+	public final fun waitOnBarrier (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun waitOnBarrier-LRDsOJo (J)Z
+}
+
+public final class io/etcd/recipes/barrier/DistributedBarrier$Companion {
+}
+
+public final class io/etcd/recipes/barrier/DistributedBarrierKt {
+	public static final fun withDistributedBarrier (Lio/etcd/jetcd/Client;Ljava/lang/String;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withDistributedBarrier (Lio/etcd/jetcd/Client;Ljava/lang/String;JZLjava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withDistributedBarrier (Lio/etcd/jetcd/Client;Ljava/lang/String;JZLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withDistributedBarrier (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withDistributedBarrier$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JZLjava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/barrier/DistributedBarrierWithCount : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/barrier/DistributedBarrierWithCount$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;I)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;IJ)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLjava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBarrierPath ()Ljava/lang/String;
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getLeaseTtlSecs ()J
+	public final fun getMemberCount ()I
+	public final fun getWaiterCount ()J
+	public final fun waitOnBarrier ()Z
+	public final fun waitOnBarrier (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun waitOnBarrier-LRDsOJo (J)Z
+}
+
+public final class io/etcd/recipes/barrier/DistributedBarrierWithCount$Companion {
+}
+
+public final class io/etcd/recipes/barrier/DistributedBarrierWithCountKt {
+	public static final fun withDistributedBarrierWithCount (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLjava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withDistributedBarrierWithCount (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withDistributedBarrierWithCount (Lio/etcd/jetcd/Client;Ljava/lang/String;ILkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withDistributedBarrierWithCount$default (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLjava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/barrier/DistributedDoubleBarrier : java/io/Closeable {
+	public static final field Companion Lio/etcd/recipes/barrier/DistributedDoubleBarrier$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;I)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;ILjava/lang/String;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;ILjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close ()V
+	public final fun enter ()Z
+	public final fun enter (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun enter-LRDsOJo (J)Z
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getEnterWaiterCount ()J
+	public final fun getLeaveWaiterCount ()J
+	public final fun leave ()Z
+	public final fun leave (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun leave-LRDsOJo (J)Z
+}
+
+public final class io/etcd/recipes/barrier/DistributedDoubleBarrier$Companion {
+}
+
+public final class io/etcd/recipes/barrier/DistributedDoubleBarrierKt {
+	public static final fun withDistributedDoubleBarrier (Lio/etcd/jetcd/Client;Ljava/lang/String;ILjava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withDistributedDoubleBarrier (Lio/etcd/jetcd/Client;Ljava/lang/String;ILkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withDistributedDoubleBarrier$default (Lio/etcd/jetcd/Client;Ljava/lang/String;ILjava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/cache/ChildData {
+	public fun <init> (Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lio/etcd/jetcd/ByteSequence;
+	public final fun copy (Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;)Lio/etcd/recipes/cache/ChildData;
+	public static synthetic fun copy$default (Lio/etcd/recipes/cache/ChildData;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;ILjava/lang/Object;)Lio/etcd/recipes/cache/ChildData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getValue ()Lio/etcd/jetcd/ByteSequence;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/cache/NodeCache : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/cache/NodeCache$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addListener (Lio/etcd/recipes/cache/NodeCacheListener;)V
+	public final fun addRecoveryListener (Lio/etcd/recipes/common/WatchRecoveryListener;)V
+	public final fun clearListeners ()V
+	public final fun getCurrent ()Ljava/lang/Object;
+	public final fun getCurrentBytes ()Lio/etcd/jetcd/ByteSequence;
+	public final fun getKey ()Ljava/lang/String;
+	public final fun removeListener (Lio/etcd/recipes/cache/NodeCacheListener;)V
+	public final fun removeRecoveryListener (Lio/etcd/recipes/common/WatchRecoveryListener;)V
+	public final fun start ()Lio/etcd/recipes/cache/NodeCache;
+}
+
+public final class io/etcd/recipes/cache/NodeCache$Companion {
+}
+
+public final class io/etcd/recipes/cache/NodeCacheEvent {
+	public fun <init> (Lio/etcd/recipes/cache/NodeCacheEvent$Type;Ljava/lang/Object;)V
+	public final fun component1 ()Lio/etcd/recipes/cache/NodeCacheEvent$Type;
+	public final fun component2 ()Ljava/lang/Object;
+	public final fun copy (Lio/etcd/recipes/cache/NodeCacheEvent$Type;Ljava/lang/Object;)Lio/etcd/recipes/cache/NodeCacheEvent;
+	public static synthetic fun copy$default (Lio/etcd/recipes/cache/NodeCacheEvent;Lio/etcd/recipes/cache/NodeCacheEvent$Type;Ljava/lang/Object;ILjava/lang/Object;)Lio/etcd/recipes/cache/NodeCacheEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getType ()Lio/etcd/recipes/cache/NodeCacheEvent$Type;
+	public final fun getValue ()Ljava/lang/Object;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/cache/NodeCacheEvent$Type : java/lang/Enum {
+	public static final field CREATED Lio/etcd/recipes/cache/NodeCacheEvent$Type;
+	public static final field DELETED Lio/etcd/recipes/cache/NodeCacheEvent$Type;
+	public static final field UPDATED Lio/etcd/recipes/cache/NodeCacheEvent$Type;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/etcd/recipes/cache/NodeCacheEvent$Type;
+	public static fun values ()[Lio/etcd/recipes/cache/NodeCacheEvent$Type;
+}
+
+public final class io/etcd/recipes/cache/NodeCacheKt {
+	public static final fun withNodeCache (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withNodeCache (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withNodeCache$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/cache/NodeCacheListener {
+	public abstract fun nodeChanged (Lio/etcd/recipes/cache/NodeCacheEvent;)V
+}
+
+public final class io/etcd/recipes/cache/PathChildrenCache : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/cache/PathChildrenCache$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/util/concurrent/Executor;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/util/concurrent/Executor;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/util/concurrent/Executor;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addListener (Lio/etcd/recipes/cache/PathChildrenCacheListener;)V
+	public final fun addRecoveryListener (Lio/etcd/recipes/common/WatchRecoveryListener;)V
+	public final fun clear ()V
+	public final fun clearListeners ()V
+	public final fun getCachePath ()Ljava/lang/String;
+	public final fun getCurrentData ()Ljava/util/List;
+	public final fun getCurrentData (Ljava/lang/String;)Lio/etcd/jetcd/ByteSequence;
+	public final fun getCurrentDataAsMap ()Ljava/util/Map;
+	public final fun rebuild ()V
+	public final fun removeListener (Lio/etcd/recipes/cache/PathChildrenCacheListener;)V
+	public final fun removeRecoveryListener (Lio/etcd/recipes/common/WatchRecoveryListener;)V
+	public final fun start ()Lio/etcd/recipes/cache/PathChildrenCache;
+	public final fun start (Lio/etcd/recipes/cache/PathChildrenCache$StartMode;)Lio/etcd/recipes/cache/PathChildrenCache;
+	public final fun start (Lio/etcd/recipes/cache/PathChildrenCache$StartMode;Z)Lio/etcd/recipes/cache/PathChildrenCache;
+	public final fun start (Z)Lio/etcd/recipes/cache/PathChildrenCache;
+	public final fun start (ZZ)Lio/etcd/recipes/cache/PathChildrenCache;
+	public static synthetic fun start$default (Lio/etcd/recipes/cache/PathChildrenCache;Lio/etcd/recipes/cache/PathChildrenCache$StartMode;ZILjava/lang/Object;)Lio/etcd/recipes/cache/PathChildrenCache;
+	public static synthetic fun start$default (Lio/etcd/recipes/cache/PathChildrenCache;ZZILjava/lang/Object;)Lio/etcd/recipes/cache/PathChildrenCache;
+	public final fun waitOnStartComplete ()Z
+	public final fun waitOnStartComplete (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun waitOnStartComplete-LRDsOJo (J)Z
+}
+
+public final class io/etcd/recipes/cache/PathChildrenCache$Companion {
+}
+
+public final class io/etcd/recipes/cache/PathChildrenCache$StartMode : java/lang/Enum {
+	public static final field BUILD_INITIAL_CACHE Lio/etcd/recipes/cache/PathChildrenCache$StartMode;
+	public static final field NORMAL Lio/etcd/recipes/cache/PathChildrenCache$StartMode;
+	public static final field POST_INITIALIZED_EVENT Lio/etcd/recipes/cache/PathChildrenCache$StartMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/etcd/recipes/cache/PathChildrenCache$StartMode;
+	public static fun values ()[Lio/etcd/recipes/cache/PathChildrenCache$StartMode;
+}
+
+public final class io/etcd/recipes/cache/PathChildrenCacheEvent {
+	public fun <init> (Ljava/lang/String;Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;Lio/etcd/jetcd/ByteSequence;)V
+	public final fun getChildName ()Ljava/lang/String;
+	public final fun getData ()Lio/etcd/jetcd/ByteSequence;
+	public final fun getInitialData ()Ljava/util/List;
+	public final fun getType ()Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/cache/PathChildrenCacheEvent$Type : java/lang/Enum {
+	public static final field CHILD_ADDED Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;
+	public static final field CHILD_REMOVED Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;
+	public static final field CHILD_UPDATED Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;
+	public static final field INITIALIZED Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;
+	public static fun values ()[Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;
+}
+
+public final class io/etcd/recipes/cache/PathChildrenCacheKt {
+	public static final fun withPathChildrenCache (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/util/concurrent/Executor;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withPathChildrenCache (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withPathChildrenCache$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/util/concurrent/Executor;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/cache/PathChildrenCacheListener {
+	public abstract fun childEvent (Lio/etcd/recipes/cache/PathChildrenCacheEvent;)V
+}
+
+public final class io/etcd/recipes/cache/TypedChildData {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Object;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Object;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Object;)Lio/etcd/recipes/cache/TypedChildData;
+	public static synthetic fun copy$default (Lio/etcd/recipes/cache/TypedChildData;Ljava/lang/String;Ljava/lang/Object;ILjava/lang/Object;)Lio/etcd/recipes/cache/TypedChildData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getValue ()Ljava/lang/Object;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/cache/TypedPathChildrenCache : java/io/Closeable {
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Ljava/util/concurrent/Executor;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Ljava/util/concurrent/Executor;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Ljava/util/concurrent/Executor;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/etcd/recipes/cache/PathChildrenCache;Lio/etcd/recipes/common/EtcdCodec;)V
+	public final fun addListener (Lio/etcd/recipes/cache/TypedPathChildrenCacheListener;)V
+	public final fun addRecoveryListener (Lio/etcd/recipes/common/WatchRecoveryListener;)V
+	public final fun clear ()V
+	public final fun clearListeners ()V
+	public fun close ()V
+	public final fun getCurrentData ()Ljava/util/List;
+	public final fun getCurrentData (Ljava/lang/String;)Ljava/lang/Object;
+	public final fun getCurrentDataAsMap ()Ljava/util/Map;
+	public final fun getUntyped ()Lio/etcd/recipes/cache/PathChildrenCache;
+	public final fun rebuild ()V
+	public final fun removeListener (Lio/etcd/recipes/cache/TypedPathChildrenCacheListener;)V
+	public final fun removeRecoveryListener (Lio/etcd/recipes/common/WatchRecoveryListener;)V
+	public final fun start ()Lio/etcd/recipes/cache/TypedPathChildrenCache;
+	public final fun start (Lio/etcd/recipes/cache/PathChildrenCache$StartMode;)Lio/etcd/recipes/cache/TypedPathChildrenCache;
+	public final fun start (Lio/etcd/recipes/cache/PathChildrenCache$StartMode;Z)Lio/etcd/recipes/cache/TypedPathChildrenCache;
+	public final fun start (Z)Lio/etcd/recipes/cache/TypedPathChildrenCache;
+	public final fun start (ZZ)Lio/etcd/recipes/cache/TypedPathChildrenCache;
+	public static synthetic fun start$default (Lio/etcd/recipes/cache/TypedPathChildrenCache;Lio/etcd/recipes/cache/PathChildrenCache$StartMode;ZILjava/lang/Object;)Lio/etcd/recipes/cache/TypedPathChildrenCache;
+	public static synthetic fun start$default (Lio/etcd/recipes/cache/TypedPathChildrenCache;ZZILjava/lang/Object;)Lio/etcd/recipes/cache/TypedPathChildrenCache;
+	public final fun waitOnStartComplete ()Z
+	public final fun waitOnStartComplete (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun waitOnStartComplete-LRDsOJo (J)Z
+}
+
+public final class io/etcd/recipes/cache/TypedPathChildrenCacheEvent {
+	public fun <init> (Ljava/lang/String;Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;Ljava/lang/Object;)V
+	public final fun getChildName ()Ljava/lang/String;
+	public final fun getData ()Ljava/lang/Object;
+	public final fun getInitialData ()Ljava/util/List;
+	public final fun getType ()Lio/etcd/recipes/cache/PathChildrenCacheEvent$Type;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/cache/TypedPathChildrenCacheKt {
+	public static final fun withTypedPathChildrenCache (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Ljava/util/concurrent/Executor;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTypedPathChildrenCache (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Ljava/util/concurrent/Executor;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTypedPathChildrenCache (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withTypedPathChildrenCache$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Ljava/util/concurrent/Executor;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/cache/TypedPathChildrenCacheListener {
+	public abstract fun childEvent (Lio/etcd/recipes/cache/TypedPathChildrenCacheEvent;)V
+}
+
+public final class io/etcd/recipes/common/BackgroundException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Throwable;)Lio/etcd/recipes/common/BackgroundException;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/BackgroundException;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)Lio/etcd/recipes/common/BackgroundException;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContext ()Ljava/lang/String;
+	public final fun getThrowable ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/etcd/recipes/common/BackgroundExceptionListener {
+	public abstract fun onException (Ljava/lang/String;Ljava/lang/Throwable;)V
+}
+
+public final class io/etcd/recipes/common/BuilderUtils {
+	public static final fun compactOption (Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/options/CompactOption;
+	public static final fun deleteOption (Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/options/DeleteOption;
+	public static final fun etcdClient (Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/Client;
+	public static final fun getOption (Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/options/GetOption;
+	public static final fun leaseOption (Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/options/LeaseOption;
+	public static final fun putOption (Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/options/PutOption;
+	public static final fun watchOption (Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/options/WatchOption;
+}
+
+public final class io/etcd/recipes/common/ByteSequenceCodec : io/etcd/recipes/common/EtcdCodec {
+	public static final field INSTANCE Lio/etcd/recipes/common/ByteSequenceCodec;
+	public fun decode (Lio/etcd/jetcd/ByteSequence;)Lio/etcd/jetcd/ByteSequence;
+	public synthetic fun decode (Lio/etcd/jetcd/ByteSequence;)Ljava/lang/Object;
+	public fun encode (Lio/etcd/jetcd/ByteSequence;)Lio/etcd/jetcd/ByteSequence;
+	public synthetic fun encode (Ljava/lang/Object;)Lio/etcd/jetcd/ByteSequence;
+}
+
+public final class io/etcd/recipes/common/ByteSequenceUtils {
+	public static final fun getAsByteSequence (I)Lio/etcd/jetcd/ByteSequence;
+	public static final fun getAsByteSequence (J)Lio/etcd/jetcd/ByteSequence;
+	public static final fun getAsByteSequence (Ljava/lang/String;)Lio/etcd/jetcd/ByteSequence;
+	public static final fun getAsInt (Lio/etcd/jetcd/ByteSequence;)I
+	public static final fun getAsLong (Lio/etcd/jetcd/ByteSequence;)J
+	public static final fun getAsString (Lio/etcd/jetcd/ByteSequence;)Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/ChildrenUtils {
+	public static final fun deleteChildren (Lio/etcd/jetcd/Client;Ljava/lang/String;)Ljava/util/List;
+	public static final fun deleteChildren (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)Ljava/util/List;
+	public static synthetic fun deleteChildren$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun getChildCount (Lio/etcd/jetcd/Client;Ljava/lang/String;)J
+	public static final fun getChildCount (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)J
+	public static synthetic fun getChildCount$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)J
+	public static final fun getChildren (Lio/etcd/jetcd/Client;Ljava/lang/String;)Ljava/util/List;
+	public static final fun getChildren (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;)Ljava/util/List;
+	public static final fun getChildren (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;)Ljava/util/List;
+	public static final fun getChildren (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;Z)Ljava/util/List;
+	public static final fun getChildren (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;ZLio/etcd/recipes/common/RpcResilience;)Ljava/util/List;
+	public static synthetic fun getChildren$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;ZLio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun getChildrenKeys (Lio/etcd/jetcd/Client;Ljava/lang/String;)Ljava/util/List;
+	public static final fun getChildrenKeys (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;)Ljava/util/List;
+	public static final fun getChildrenKeys (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;)Ljava/util/List;
+	public static final fun getChildrenKeys (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;Lio/etcd/recipes/common/RpcResilience;)Ljava/util/List;
+	public static synthetic fun getChildrenKeys$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun getChildrenValues (Lio/etcd/jetcd/Client;Ljava/lang/String;)Ljava/util/List;
+	public static final fun getChildrenValues (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;)Ljava/util/List;
+	public static final fun getChildrenValues (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;)Ljava/util/List;
+	public static final fun getChildrenValues (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;Lio/etcd/recipes/common/RpcResilience;)Ljava/util/List;
+	public static synthetic fun getChildrenValues$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun getFirstChild (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;)Lio/etcd/jetcd/kv/GetResponse;
+	public static final fun getFirstChild (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/GetResponse;
+	public static synthetic fun getFirstChild$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/GetResponse;
+	public static final fun getLastChild (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;)Lio/etcd/jetcd/kv/GetResponse;
+	public static final fun getLastChild (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/GetResponse;
+	public static synthetic fun getLastChild$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/GetResponse;
+}
+
+public final class io/etcd/recipes/common/ClientUtils {
+	public static final fun connectToEtcd (Lio/etcd/recipes/common/EtcdConnectionConfig;)Lio/etcd/jetcd/Client;
+	public static final fun connectToEtcd (Lio/etcd/recipes/common/EtcdConnectionConfig;Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/Client;
+	public static final fun connectToEtcd (Lio/etcd/recipes/common/EtcdConnectionConfig;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun connectToEtcd (Lio/etcd/recipes/common/EtcdConnectionConfig;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun connectToEtcd (Ljava/util/List;)Lio/etcd/jetcd/Client;
+	public static final fun connectToEtcd (Ljava/util/List;Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/Client;
+	public static final fun connectToEtcd (Ljava/util/List;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun connectToEtcd (Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun connectToEtcd$default (Lio/etcd/recipes/common/EtcdConnectionConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/etcd/jetcd/Client;
+	public static synthetic fun connectToEtcd$default (Lio/etcd/recipes/common/EtcdConnectionConfig;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun connectToEtcd$default (Ljava/util/List;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/etcd/jetcd/Client;
+	public static synthetic fun connectToEtcd$default (Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun ping (Lio/etcd/jetcd/Client;)Z
+	public static final fun ping (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/RpcResilience;)Z
+	public static synthetic fun ping$default (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Z
+	public static final fun withRecipeDefaults (Lio/etcd/jetcd/ClientBuilder;)Lio/etcd/jetcd/ClientBuilder;
+}
+
+public final class io/etcd/recipes/common/ConnectionState : java/lang/Enum {
+	public static final field CONNECTED Lio/etcd/recipes/common/ConnectionState;
+	public static final field LOST Lio/etcd/recipes/common/ConnectionState;
+	public static final field RECONNECTED Lio/etcd/recipes/common/ConnectionState;
+	public static final field SUSPENDED Lio/etcd/recipes/common/ConnectionState;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/etcd/recipes/common/ConnectionState;
+	public static fun values ()[Lio/etcd/recipes/common/ConnectionState;
+}
+
+public abstract interface class io/etcd/recipes/common/ConnectionStateListener {
+	public abstract fun stateChanged (Lio/etcd/recipes/common/ConnectionState;Lio/etcd/recipes/common/ConnectionState;)V
+}
+
+public final class io/etcd/recipes/common/EstablishDeclinedException : io/etcd/recipes/common/EtcdRecipeRuntimeException {
+	public fun <init> (J)V
+	public final fun getLeaseId ()J
+}
+
+public abstract interface class io/etcd/recipes/common/EtcdCodec {
+	public abstract fun decode (Lio/etcd/jetcd/ByteSequence;)Ljava/lang/Object;
+	public abstract fun encode (Ljava/lang/Object;)Lio/etcd/jetcd/ByteSequence;
+}
+
+public final class io/etcd/recipes/common/EtcdConnectionConfig {
+	public fun <init> (Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Duration;Ljava/time/Duration;Lio/etcd/recipes/common/EtcdTlsConfig;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Duration;Ljava/time/Duration;Lio/etcd/recipes/common/EtcdTlsConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/time/Duration;
+	public final fun component6 ()Ljava/time/Duration;
+	public final fun component7 ()Lio/etcd/recipes/common/EtcdTlsConfig;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Duration;Ljava/time/Duration;Lio/etcd/recipes/common/EtcdTlsConfig;)Lio/etcd/recipes/common/EtcdConnectionConfig;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/EtcdConnectionConfig;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Duration;Ljava/time/Duration;Lio/etcd/recipes/common/EtcdTlsConfig;ILjava/lang/Object;)Lio/etcd/recipes/common/EtcdConnectionConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConnectTimeout ()Ljava/time/Duration;
+	public final fun getEndpoints ()Ljava/util/List;
+	public final fun getNamespace ()Ljava/lang/String;
+	public final fun getPassword ()Ljava/lang/String;
+	public final fun getRetryMaxDuration ()Ljava/time/Duration;
+	public final fun getTls ()Lio/etcd/recipes/common/EtcdTlsConfig;
+	public final fun getUser ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public class io/etcd/recipes/common/EtcdConnector : java/io/Closeable {
+	public static final field Companion Lio/etcd/recipes/common/EtcdConnector$Companion;
+	public static final field MAX_RECORDED_EXCEPTIONS I
+	public static final field RECIPE_MDC_KEY Ljava/lang/String;
+	public fun <init> (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addBackgroundExceptionListener (Lio/etcd/recipes/common/BackgroundExceptionListener;)V
+	public final fun addConnectionStateListener (Lio/etcd/recipes/common/ConnectionStateListener;)V
+	protected final fun checkCloseNotCalled ()V
+	protected final fun checkStartCalled ()V
+	public final fun clearExceptions ()V
+	public final fun close ()V
+	protected fun doClose ()V
+	protected final fun forwardHealthOf (Lio/etcd/recipes/common/EtcdConnector;)Lkotlin/jvm/functions/Function0;
+	protected final fun getClient ()Lio/etcd/jetcd/Client;
+	protected final fun getCloseCalled ()Ljava/util/concurrent/atomic/AtomicBoolean;
+	public final fun getConnectionState ()Lio/etcd/recipes/common/ConnectionState;
+	public final fun getDroppedExceptionCount ()J
+	protected fun getExceptionContext ()Ljava/lang/String;
+	protected final fun getExceptionList ()Lkotlin/Lazy;
+	public final fun getExceptions ()Ljava/util/List;
+	public final fun getHasExceptions ()Z
+	protected final fun getResilience ()Lio/etcd/recipes/common/ResilienceConfig;
+	protected final fun getStartCalled ()Ljava/util/concurrent/atomic/AtomicBoolean;
+	protected final fun getStartThreadComplete ()Lcom/pambrose/common/concurrent/BooleanMonitor;
+	public final fun isHealthy ()Z
+	protected final fun notifyAsync (Lkotlin/jvm/functions/Function0;)V
+	public final fun ping ()Z
+	public final fun ping (Lio/etcd/recipes/common/RpcResilience;)Z
+	protected final fun recordException (Ljava/lang/String;Ljava/lang/Throwable;)V
+	protected final fun recordException (Ljava/lang/Throwable;)V
+	public final fun removeBackgroundExceptionListener (Lio/etcd/recipes/common/BackgroundExceptionListener;)V
+	public final fun removeConnectionStateListener (Lio/etcd/recipes/common/ConnectionStateListener;)V
+	protected final fun reportConnectionLost ()V
+	protected final fun reportLeaseEvent (Lio/etcd/recipes/common/LeaseEvent;)V
+	protected final fun reportRecoveryEvent (Lio/etcd/recipes/common/WatchRecoveryEvent;)V
+	protected final fun resetConnectionState ()V
+	protected final fun withRecipeLoggingContext (Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/common/EtcdConnector$Companion {
+}
+
+public abstract interface class io/etcd/recipes/common/EtcdMetrics {
+	public static final field Companion Lio/etcd/recipes/common/EtcdMetrics$Companion;
+	public fun incrementKeepAlive (Ljava/lang/String;J)V
+	public fun incrementLeadershipTransition (Ljava/lang/String;Z)V
+	public fun incrementWatchRecovery (Ljava/lang/String;Ljava/lang/String;)V
+	public fun recordCacheSync-8Mi8wO0 (Ljava/lang/String;JI)V
+	public fun recordLockHold-HG0u8IE (Ljava/lang/String;J)V
+	public fun recordLockWait-8Mi8wO0 (Ljava/lang/String;JZ)V
+	public fun recordQueue-SxA4cEA (Ljava/lang/String;Ljava/lang/String;J)V
+	public fun recordRpc-dWUq8MI (Ljava/lang/String;JIZ)V
+}
+
+public final class io/etcd/recipes/common/EtcdMetrics$Companion {
+	public final fun getNoOp ()Lio/etcd/recipes/common/EtcdMetrics;
+}
+
+public final class io/etcd/recipes/common/EtcdMetrics$DefaultImpls {
+	public static fun incrementKeepAlive (Lio/etcd/recipes/common/EtcdMetrics;Ljava/lang/String;J)V
+	public static fun incrementLeadershipTransition (Lio/etcd/recipes/common/EtcdMetrics;Ljava/lang/String;Z)V
+	public static fun incrementWatchRecovery (Lio/etcd/recipes/common/EtcdMetrics;Ljava/lang/String;Ljava/lang/String;)V
+	public static fun recordCacheSync-8Mi8wO0 (Lio/etcd/recipes/common/EtcdMetrics;Ljava/lang/String;JI)V
+	public static fun recordLockHold-HG0u8IE (Lio/etcd/recipes/common/EtcdMetrics;Ljava/lang/String;J)V
+	public static fun recordLockWait-8Mi8wO0 (Lio/etcd/recipes/common/EtcdMetrics;Ljava/lang/String;JZ)V
+	public static fun recordQueue-SxA4cEA (Lio/etcd/recipes/common/EtcdMetrics;Ljava/lang/String;Ljava/lang/String;J)V
+	public static fun recordRpc-dWUq8MI (Lio/etcd/recipes/common/EtcdMetrics;Ljava/lang/String;JIZ)V
+}
+
+public final class io/etcd/recipes/common/EtcdRecipeException : java/lang/Exception {
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public class io/etcd/recipes/common/EtcdRecipeRuntimeException : java/lang/RuntimeException {
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/etcd/recipes/common/EtcdRecipes {
+	public fun <init> (Lio/etcd/jetcd/Client;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun distributedAtomicLong (Ljava/lang/String;)Lio/etcd/recipes/counter/DistributedAtomicLong;
+	public final fun distributedPriorityQueue (Ljava/lang/String;)Lio/etcd/recipes/queue/DistributedPriorityQueue;
+	public final fun distributedPriorityQueue (Ljava/lang/String;JLjava/util/concurrent/TimeUnit;)Lio/etcd/recipes/queue/DistributedPriorityQueue;
+	public final fun distributedPriorityQueue-HG0u8IE (Ljava/lang/String;J)Lio/etcd/recipes/queue/DistributedPriorityQueue;
+	public static synthetic fun distributedPriorityQueue-HG0u8IE$default (Lio/etcd/recipes/common/EtcdRecipes;Ljava/lang/String;JILjava/lang/Object;)Lio/etcd/recipes/queue/DistributedPriorityQueue;
+	public final fun distributedQueue (Ljava/lang/String;)Lio/etcd/recipes/queue/DistributedQueue;
+	public final fun leaderLatch (Ljava/lang/String;)Lio/etcd/recipes/election/LeaderLatch;
+	public final fun mutex (Ljava/lang/String;)Lio/etcd/recipes/lock/DistributedMutex;
+	public final fun nodeCache (Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;)Lio/etcd/recipes/cache/NodeCache;
+	public final fun pathChildrenCache (Ljava/lang/String;)Lio/etcd/recipes/cache/PathChildrenCache;
+	public final fun readWriteLock (Ljava/lang/String;)Lio/etcd/recipes/lock/DistributedReadWriteLock;
+	public final fun semaphore (Ljava/lang/String;I)Lio/etcd/recipes/lock/DistributedSemaphore;
+	public final fun serviceDiscovery (Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceDiscovery;
+}
+
+public final class io/etcd/recipes/common/EtcdTlsConfig {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/etcd/recipes/common/EtcdTlsConfig;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/EtcdTlsConfig;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/etcd/recipes/common/EtcdTlsConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCaCertPath ()Ljava/lang/String;
+	public final fun getClientCertPath ()Ljava/lang/String;
+	public final fun getClientKeyPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/KVUtils {
+	public static final fun compact (Lio/etcd/jetcd/Client;J)Lio/etcd/jetcd/kv/CompactResponse;
+	public static final fun compact (Lio/etcd/jetcd/Client;JLio/etcd/jetcd/options/CompactOption;)Lio/etcd/jetcd/kv/CompactResponse;
+	public static final fun compact (Lio/etcd/jetcd/Client;JLio/etcd/jetcd/options/CompactOption;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/CompactResponse;
+	public static synthetic fun compact$default (Lio/etcd/jetcd/Client;JLio/etcd/jetcd/options/CompactOption;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/CompactResponse;
+	public static final fun deleteKey (Lio/etcd/jetcd/Client;Ljava/lang/String;)Lio/etcd/jetcd/kv/DeleteResponse;
+	public static final fun deleteKey (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/DeleteResponse;
+	public static synthetic fun deleteKey$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/DeleteResponse;
+	public static final fun deleteKeys (Lio/etcd/jetcd/Client;[Ljava/lang/String;)V
+	public static final fun deleteKeys (Lio/etcd/jetcd/Client;[Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)V
+	public static synthetic fun deleteKeys$default (Lio/etcd/jetcd/Client;[Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)V
+	public static final fun getKeyValuePairs (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/GetOption;)Ljava/util/List;
+	public static final fun getKeyValuePairs (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;)Ljava/util/List;
+	public static final fun getKeyValuePairs (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;)Ljava/util/List;
+	public static final fun getKeyValuePairs (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;)Ljava/util/List;
+	public static synthetic fun getKeyValuePairs$default (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Ljava/util/List;
+	public static synthetic fun getKeyValuePairs$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Ljava/util/List;
+	public static final fun getResponse (Lio/etcd/jetcd/Client;Ljava/lang/String;)Lio/etcd/jetcd/kv/GetResponse;
+	public static final fun getResponse (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;)Lio/etcd/jetcd/kv/GetResponse;
+	public static final fun getResponse (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/GetResponse;
+	public static synthetic fun getResponse$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/GetResponse;
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;)Lio/etcd/jetcd/ByteSequence;
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;I)I
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;ILio/etcd/recipes/common/RpcResilience;)I
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;J)J
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/RpcResilience;)J
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/ByteSequence;
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)Ljava/lang/String;
+	public static synthetic fun getValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;ILio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)I
+	public static synthetic fun getValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)J
+	public static synthetic fun getValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/ByteSequence;
+	public static synthetic fun getValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Ljava/lang/String;
+	public static final fun isKeyNotPresent (Lio/etcd/jetcd/Client;Ljava/lang/String;)Z
+	public static final fun isKeyNotPresent (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)Z
+	public static synthetic fun isKeyNotPresent$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Z
+	public static final fun isKeyPresent (Lio/etcd/jetcd/Client;Ljava/lang/String;)Z
+	public static final fun isKeyPresent (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)Z
+	public static synthetic fun isKeyPresent$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Z
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;I)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;ILio/etcd/jetcd/options/PutOption;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;ILio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;J)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/jetcd/options/PutOption;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/PutOption;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/jetcd/options/PutOption;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/PutResponse;
+	public static synthetic fun putValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;ILio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/PutResponse;
+	public static synthetic fun putValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/PutResponse;
+	public static synthetic fun putValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/PutResponse;
+	public static synthetic fun putValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/PutResponse;
+}
+
+public final class io/etcd/recipes/common/KeepAliveUtils {
+	public static final fun putValueWithKeepAlive (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLkotlin/jvm/functions/Function0;)V
+	public static final fun putValueWithKeepAlive (Lio/etcd/jetcd/Client;Ljava/lang/String;JJLkotlin/jvm/functions/Function0;)V
+	public static final fun putValueWithKeepAlive (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;JLkotlin/jvm/functions/Function0;)V
+	public static final fun putValueWithKeepAlive (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JLkotlin/jvm/functions/Function0;)V
+	public static final fun putValueWithKeepAliveDur (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLkotlin/jvm/functions/Function0;)V
+	public static final fun putValueWithKeepAliveDur (Lio/etcd/jetcd/Client;Ljava/lang/String;JJLkotlin/jvm/functions/Function0;)V
+	public static final fun putValueWithKeepAliveDur (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;JLkotlin/jvm/functions/Function0;)V
+	public static final fun putValueWithKeepAliveDur (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JLkotlin/jvm/functions/Function0;)V
+	public static final fun putValuesWithKeepAlive (Lio/etcd/jetcd/Client;Ljava/util/Collection;JLkotlin/jvm/functions/Function0;)V
+	public static final fun putValuesWithKeepAlive (Lio/etcd/jetcd/Client;Ljava/util/Collection;JLkotlin/jvm/functions/Function1;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function0;)V
+	public static final fun putValuesWithKeepAlive (Lio/etcd/jetcd/Client;Ljava/util/Collection;JLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)V
+	public static synthetic fun putValuesWithKeepAlive$default (Lio/etcd/jetcd/Client;Ljava/util/Collection;JLkotlin/jvm/functions/Function1;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
+	public static final fun putValuesWithKeepAlive-1Y68eR8 (Lio/etcd/jetcd/Client;Ljava/util/Collection;JLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)V
+	public static final fun putValuesWithKeepAlive-WPi__2c (Lio/etcd/jetcd/Client;Ljava/util/Collection;JLkotlin/jvm/functions/Function1;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function0;)V
+	public static synthetic fun putValuesWithKeepAlive-WPi__2c$default (Lio/etcd/jetcd/Client;Ljava/util/Collection;JLkotlin/jvm/functions/Function1;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
+	public static final fun putValuesWithKeepAlive-exY8QGI (Lio/etcd/jetcd/Client;Ljava/util/Collection;JLkotlin/jvm/functions/Function0;)V
+}
+
+public final class io/etcd/recipes/common/KeyValueUtils {
+	public static final fun getAsInt (Lio/etcd/jetcd/KeyValue;)Lkotlin/Pair;
+	public static final fun getAsLong (Lio/etcd/jetcd/KeyValue;)Lkotlin/Pair;
+	public static final fun getAsPair (Lio/etcd/jetcd/KeyValue;)Lkotlin/Pair;
+	public static final fun getAsString (Lio/etcd/jetcd/KeyValue;)Lkotlin/Pair;
+}
+
+public final class io/etcd/recipes/common/KotlinxJsonCodec : io/etcd/recipes/common/EtcdCodec {
+	public fun <init> (Lkotlinx/serialization/KSerializer;Lkotlinx/serialization/json/Json;)V
+	public synthetic fun <init> (Lkotlinx/serialization/KSerializer;Lkotlinx/serialization/json/Json;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun decode (Lio/etcd/jetcd/ByteSequence;)Ljava/lang/Object;
+	public fun encode (Ljava/lang/Object;)Lio/etcd/jetcd/ByteSequence;
+}
+
+public abstract interface class io/etcd/recipes/common/LeaseEvent {
+}
+
+public final class io/etcd/recipes/common/LeaseEvent$Expired : io/etcd/recipes/common/LeaseEvent {
+	public fun <init> (JLjava/lang/Throwable;)V
+	public final fun component1 ()J
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (JLjava/lang/Throwable;)Lio/etcd/recipes/common/LeaseEvent$Expired;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/LeaseEvent$Expired;JLjava/lang/Throwable;ILjava/lang/Object;)Lio/etcd/recipes/common/LeaseEvent$Expired;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ljava/lang/Throwable;
+	public final fun getLeaseId ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/LeaseEvent$Failed : io/etcd/recipes/common/LeaseEvent {
+	public fun <init> (JLjava/lang/Throwable;)V
+	public final fun component1 ()J
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (JLjava/lang/Throwable;)Lio/etcd/recipes/common/LeaseEvent$Failed;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/LeaseEvent$Failed;JLjava/lang/Throwable;ILjava/lang/Object;)Lio/etcd/recipes/common/LeaseEvent$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ljava/lang/Throwable;
+	public final fun getLeaseId ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/LeaseEvent$Restored : io/etcd/recipes/common/LeaseEvent {
+	public fun <init> (JJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun copy (JJ)Lio/etcd/recipes/common/LeaseEvent$Restored;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/LeaseEvent$Restored;JJILjava/lang/Object;)Lio/etcd/recipes/common/LeaseEvent$Restored;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNewLeaseId ()J
+	public final fun getOldLeaseId ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/LeaseEvent$Suspended : io/etcd/recipes/common/LeaseEvent {
+	public fun <init> (JLjava/lang/Throwable;)V
+	public final fun component1 ()J
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (JLjava/lang/Throwable;)Lio/etcd/recipes/common/LeaseEvent$Suspended;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/LeaseEvent$Suspended;JLjava/lang/Throwable;ILjava/lang/Object;)Lio/etcd/recipes/common/LeaseEvent$Suspended;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ljava/lang/Throwable;
+	public final fun getLeaseId ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/etcd/recipes/common/LeaseListener {
+	public abstract fun onLeaseEvent (Lio/etcd/recipes/common/LeaseEvent;)V
+}
+
+public final class io/etcd/recipes/common/LeaseResilience {
+	public static final field Companion Lio/etcd/recipes/common/LeaseResilience$Companion;
+	public static final field DEFAULT Lio/etcd/recipes/common/LeaseResilience;
+	public static final field DISABLED Lio/etcd/recipes/common/LeaseResilience;
+	public fun <init> ()V
+	public fun <init> (Lio/etcd/recipes/common/RetryPolicy;)V
+	public synthetic fun <init> (Lio/etcd/recipes/common/RetryPolicy;JLio/etcd/recipes/common/EtcdMetrics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/etcd/recipes/common/RetryPolicy;JLio/etcd/recipes/common/EtcdMetrics;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/etcd/recipes/common/RetryPolicy;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getHealOperationTimeout-UwyO8pc ()J
+	public final fun getMetrics ()Lio/etcd/recipes/common/EtcdMetrics;
+	public final fun getRetryPolicy ()Lio/etcd/recipes/common/RetryPolicy;
+	public final fun withMetrics (Lio/etcd/recipes/common/EtcdMetrics;)Lio/etcd/recipes/common/LeaseResilience;
+}
+
+public final class io/etcd/recipes/common/LeaseResilience$Companion {
+}
+
+public final class io/etcd/recipes/common/LeaseUtils {
+	public static final fun keepAlive (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;)Lio/etcd/jetcd/support/CloseableClient;
+	public static final fun keepAlive (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/support/CloseableClient;
+	public static synthetic fun keepAlive$default (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/etcd/jetcd/support/CloseableClient;
+	public static final fun keepAliveWith (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;
+	public static synthetic fun keepAliveWith$default (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun leaseGrant-8Mi8wO0 (Lio/etcd/jetcd/Client;JLio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/lease/LeaseGrantResponse;
+	public static synthetic fun leaseGrant-8Mi8wO0$default (Lio/etcd/jetcd/Client;JLio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/lease/LeaseGrantResponse;
+	public static final fun leaseGrant-HG0u8IE (Lio/etcd/jetcd/Client;J)Lio/etcd/jetcd/lease/LeaseGrantResponse;
+	public static final fun leaseRevoke (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;)V
+	public static final fun leaseRevoke (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;Lio/etcd/recipes/common/RpcResilience;)V
+	public static synthetic fun leaseRevoke$default (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)V
+}
+
+public final class io/etcd/recipes/common/LockUtils {
+	public static final fun lock (Lio/etcd/jetcd/Client;Ljava/lang/String;J)Lio/etcd/jetcd/lock/LockResponse;
+	public static final fun lock (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/lock/LockResponse;
+	public static synthetic fun lock$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/lock/LockResponse;
+	public static final fun unlock (Lio/etcd/jetcd/Client;Ljava/lang/String;)Lio/etcd/jetcd/lock/UnlockResponse;
+	public static final fun unlock (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/lock/UnlockResponse;
+	public static synthetic fun unlock$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/lock/UnlockResponse;
+}
+
+public final class io/etcd/recipes/common/PairUtils {
+	public static final fun getAsInt (Ljava/util/List;)Ljava/util/List;
+	public static final fun getAsInt (Lkotlin/Pair;)Lkotlin/Pair;
+	public static final fun getAsLong (Ljava/util/List;)Ljava/util/List;
+	public static final fun getAsLong (Lkotlin/Pair;)Lkotlin/Pair;
+	public static final fun getAsString (Ljava/util/List;)Ljava/util/List;
+	public static final fun getAsString (Lkotlin/Pair;)Lkotlin/Pair;
+	public static final fun getKeys (Ljava/util/List;)Ljava/util/List;
+	public static final fun getValues (Ljava/util/List;)Ljava/util/List;
+}
+
+public final class io/etcd/recipes/common/PathUtils {
+	public static final fun appendToPath (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static final fun appendToPath (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static synthetic fun appendToPath$default (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/ResilienceConfig {
+	public static final field Companion Lio/etcd/recipes/common/ResilienceConfig$Companion;
+	public static final field DEFAULT Lio/etcd/recipes/common/ResilienceConfig;
+	public static final field DISABLED Lio/etcd/recipes/common/ResilienceConfig;
+	public fun <init> ()V
+	public fun <init> (Lio/etcd/recipes/common/WatchResilience;Lio/etcd/recipes/common/LeaseResilience;Lio/etcd/recipes/common/RpcResilience;)V
+	public synthetic fun <init> (Lio/etcd/recipes/common/WatchResilience;Lio/etcd/recipes/common/LeaseResilience;Lio/etcd/recipes/common/RpcResilience;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/etcd/recipes/common/WatchResilience;
+	public final fun component2 ()Lio/etcd/recipes/common/LeaseResilience;
+	public final fun component3 ()Lio/etcd/recipes/common/RpcResilience;
+	public final fun copy (Lio/etcd/recipes/common/WatchResilience;Lio/etcd/recipes/common/LeaseResilience;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/recipes/common/ResilienceConfig;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/ResilienceConfig;Lio/etcd/recipes/common/WatchResilience;Lio/etcd/recipes/common/LeaseResilience;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/recipes/common/ResilienceConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLease ()Lio/etcd/recipes/common/LeaseResilience;
+	public final fun getMetrics ()Lio/etcd/recipes/common/EtcdMetrics;
+	public final fun getRpc ()Lio/etcd/recipes/common/RpcResilience;
+	public final fun getWatch ()Lio/etcd/recipes/common/WatchResilience;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public final fun withMetrics (Lio/etcd/recipes/common/EtcdMetrics;)Lio/etcd/recipes/common/ResilienceConfig;
+}
+
+public final class io/etcd/recipes/common/ResilienceConfig$Companion {
+}
+
+public abstract interface class io/etcd/recipes/common/RetryPolicy {
+	public static final field Companion Lio/etcd/recipes/common/RetryPolicy$Companion;
+	public static final field forever Lio/etcd/recipes/common/RetryPolicy;
+	public static final field never Lio/etcd/recipes/common/RetryPolicy;
+	public static fun bounded (I)Lio/etcd/recipes/common/RetryPolicy;
+	public static fun bounded-HG0u8IE (IJ)Lio/etcd/recipes/common/RetryPolicy;
+	public static fun exponentialBackoff ()Lio/etcd/recipes/common/RetryPolicy;
+	public static fun exponentialBackoff-4JGKpqs (JJDDIJ)Lio/etcd/recipes/common/RetryPolicy;
+	public static fun exponentialBackoff-LRDsOJo (J)Lio/etcd/recipes/common/RetryPolicy;
+	public static fun exponentialBackoff-NqJ4yvY (JJD)Lio/etcd/recipes/common/RetryPolicy;
+	public static fun exponentialBackoff-O4J4VbY (JJDD)Lio/etcd/recipes/common/RetryPolicy;
+	public static fun exponentialBackoff-QTBD994 (JJ)Lio/etcd/recipes/common/RetryPolicy;
+	public static fun exponentialBackoff-ePrTys8 (JJDDI)Lio/etcd/recipes/common/RetryPolicy;
+	public abstract fun nextDelay-dkRoYf4 (IJ)Lkotlin/time/Duration;
+}
+
+public final class io/etcd/recipes/common/RetryPolicy$Companion {
+	public final fun bounded (I)Lio/etcd/recipes/common/RetryPolicy;
+	public final fun bounded-HG0u8IE (IJ)Lio/etcd/recipes/common/RetryPolicy;
+	public static synthetic fun bounded-HG0u8IE$default (Lio/etcd/recipes/common/RetryPolicy$Companion;IJILjava/lang/Object;)Lio/etcd/recipes/common/RetryPolicy;
+	public final fun exponentialBackoff ()Lio/etcd/recipes/common/RetryPolicy;
+	public final fun exponentialBackoff-4JGKpqs (JJDDIJ)Lio/etcd/recipes/common/RetryPolicy;
+	public static synthetic fun exponentialBackoff-4JGKpqs$default (Lio/etcd/recipes/common/RetryPolicy$Companion;JJDDIJILjava/lang/Object;)Lio/etcd/recipes/common/RetryPolicy;
+	public final fun exponentialBackoff-LRDsOJo (J)Lio/etcd/recipes/common/RetryPolicy;
+	public final fun exponentialBackoff-NqJ4yvY (JJD)Lio/etcd/recipes/common/RetryPolicy;
+	public final fun exponentialBackoff-O4J4VbY (JJDD)Lio/etcd/recipes/common/RetryPolicy;
+	public final fun exponentialBackoff-QTBD994 (JJ)Lio/etcd/recipes/common/RetryPolicy;
+	public final fun exponentialBackoff-ePrTys8 (JJDDI)Lio/etcd/recipes/common/RetryPolicy;
+}
+
+public final class io/etcd/recipes/common/RpcResilience {
+	public static final field Companion Lio/etcd/recipes/common/RpcResilience$Companion;
+	public static final field DEFAULT Lio/etcd/recipes/common/RpcResilience;
+	public static final field DISABLED Lio/etcd/recipes/common/RpcResilience;
+	public static final field PROBE Lio/etcd/recipes/common/RpcResilience;
+	public fun <init> ()V
+	public fun <init> (Lio/etcd/recipes/common/RetryPolicy;)V
+	public synthetic fun <init> (Lio/etcd/recipes/common/RetryPolicy;JLio/etcd/recipes/common/EtcdMetrics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/etcd/recipes/common/RetryPolicy;JLio/etcd/recipes/common/EtcdMetrics;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/etcd/recipes/common/RetryPolicy;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getMetrics ()Lio/etcd/recipes/common/EtcdMetrics;
+	public final fun getOperationTimeout-UwyO8pc ()J
+	public final fun getRetryPolicy ()Lio/etcd/recipes/common/RetryPolicy;
+	public final fun withMetrics (Lio/etcd/recipes/common/EtcdMetrics;)Lio/etcd/recipes/common/RpcResilience;
+}
+
+public final class io/etcd/recipes/common/RpcResilience$Companion {
+}
+
+public final class io/etcd/recipes/common/SelfHealingKeepAlive : java/io/Closeable {
+	public fun close ()V
+	public final fun getCurrentLeaseId ()J
+	public final fun isHealthy ()Z
+}
+
+public final class io/etcd/recipes/common/SelfHealingKeepAliveKt {
+	public static final fun selfHealingKeepAlive-NcHsxvU (Lio/etcd/jetcd/Client;JLio/etcd/recipes/common/LeaseResilience;Lio/etcd/recipes/common/LeaseListener;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function1;)Lio/etcd/recipes/common/SelfHealingKeepAlive;
+	public static synthetic fun selfHealingKeepAlive-NcHsxvU$default (Lio/etcd/jetcd/Client;JLio/etcd/recipes/common/LeaseResilience;Lio/etcd/recipes/common/LeaseListener;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/etcd/recipes/common/SelfHealingKeepAlive;
+}
+
+public final class io/etcd/recipes/common/StringCodec : io/etcd/recipes/common/EtcdCodec {
+	public static final field INSTANCE Lio/etcd/recipes/common/StringCodec;
+	public synthetic fun decode (Lio/etcd/jetcd/ByteSequence;)Ljava/lang/Object;
+	public fun decode (Lio/etcd/jetcd/ByteSequence;)Ljava/lang/String;
+	public synthetic fun encode (Ljava/lang/Object;)Lio/etcd/jetcd/ByteSequence;
+	public fun encode (Ljava/lang/String;)Lio/etcd/jetcd/ByteSequence;
+}
+
+public final class io/etcd/recipes/common/TxnUtils {
+	public static final fun deleteOp (Lio/etcd/jetcd/ByteSequence;)Lio/etcd/jetcd/op/Op$DeleteOp;
+	public static final fun deleteOp (Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/DeleteOption;)Lio/etcd/jetcd/op/Op$DeleteOp;
+	public static final fun deleteOp (Ljava/lang/String;)Lio/etcd/jetcd/op/Op$DeleteOp;
+	public static final fun deleteOp (Ljava/lang/String;Lio/etcd/jetcd/options/DeleteOption;)Lio/etcd/jetcd/op/Op$DeleteOp;
+	public static synthetic fun deleteOp$default (Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/DeleteOption;ILjava/lang/Object;)Lio/etcd/jetcd/op/Op$DeleteOp;
+	public static synthetic fun deleteOp$default (Ljava/lang/String;Lio/etcd/jetcd/options/DeleteOption;ILjava/lang/Object;)Lio/etcd/jetcd/op/Op$DeleteOp;
+	public static final fun equalTo (ILio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun equalTo (JLio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun equalTo (Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun equalTo (Ljava/lang/String;Lio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun getDoesExist (Ljava/lang/String;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun getDoesNotExist (Ljava/lang/String;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun greaterThan (ILio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun greaterThan (JLio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun greaterThan (Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun greaterThan (Ljava/lang/String;Lio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun lessThan (ILio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun lessThan (JLio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun lessThan (Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun lessThan (Ljava/lang/String;Lio/etcd/jetcd/op/CmpTarget;)Lio/etcd/jetcd/op/Cmp;
+	public static final fun setTo (Ljava/lang/String;I)Lio/etcd/jetcd/op/Op$PutOp;
+	public static final fun setTo (Ljava/lang/String;ILio/etcd/jetcd/options/PutOption;)Lio/etcd/jetcd/op/Op$PutOp;
+	public static final fun setTo (Ljava/lang/String;J)Lio/etcd/jetcd/op/Op$PutOp;
+	public static final fun setTo (Ljava/lang/String;JLio/etcd/jetcd/options/PutOption;)Lio/etcd/jetcd/op/Op$PutOp;
+	public static final fun setTo (Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;)Lio/etcd/jetcd/op/Op$PutOp;
+	public static final fun setTo (Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/PutOption;)Lio/etcd/jetcd/op/Op$PutOp;
+	public static final fun setTo (Ljava/lang/String;Ljava/lang/String;)Lio/etcd/jetcd/op/Op$PutOp;
+	public static final fun setTo (Ljava/lang/String;Ljava/lang/String;Lio/etcd/jetcd/options/PutOption;)Lio/etcd/jetcd/op/Op$PutOp;
+	public static final fun transaction (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/kv/TxnResponse;
+	public static final fun transaction (Lio/etcd/jetcd/Client;Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/kv/TxnResponse;
+	public static synthetic fun transaction$default (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/etcd/jetcd/kv/TxnResponse;
+}
+
+public final class io/etcd/recipes/common/TypedKVUtils {
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;)Ljava/lang/Object;
+	public static final fun getValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/RpcResilience;)Ljava/lang/Object;
+	public static synthetic fun getValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/jetcd/options/PutOption;)Lio/etcd/jetcd/kv/PutResponse;
+	public static final fun putValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;)Lio/etcd/jetcd/kv/PutResponse;
+	public static synthetic fun putValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/etcd/jetcd/kv/PutResponse;
+}
+
+public abstract interface class io/etcd/recipes/common/WatchRecoveryEvent {
+	public abstract fun getWatchedKey ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/WatchRecoveryEvent$Failed : io/etcd/recipes/common/WatchRecoveryEvent {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Throwable;)Lio/etcd/recipes/common/WatchRecoveryEvent$Failed;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/WatchRecoveryEvent$Failed;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)Lio/etcd/recipes/common/WatchRecoveryEvent$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ljava/lang/Throwable;
+	public fun getWatchedKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/WatchRecoveryEvent$Resubscribed : io/etcd/recipes/common/WatchRecoveryEvent {
+	public fun <init> (Ljava/lang/String;J)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()J
+	public final fun copy (Ljava/lang/String;J)Lio/etcd/recipes/common/WatchRecoveryEvent$Resubscribed;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/WatchRecoveryEvent$Resubscribed;Ljava/lang/String;JILjava/lang/Object;)Lio/etcd/recipes/common/WatchRecoveryEvent$Resubscribed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getResumeRevision ()J
+	public fun getWatchedKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/WatchRecoveryEvent$Resynced : io/etcd/recipes/common/WatchRecoveryEvent {
+	public fun <init> (Ljava/lang/String;JJ)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun copy (Ljava/lang/String;JJ)Lio/etcd/recipes/common/WatchRecoveryEvent$Resynced;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/WatchRecoveryEvent$Resynced;Ljava/lang/String;JJILjava/lang/Object;)Lio/etcd/recipes/common/WatchRecoveryEvent$Resynced;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAnchorRevision ()J
+	public final fun getCompactRevision ()J
+	public fun getWatchedKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/common/WatchRecoveryEvent$Suspended : io/etcd/recipes/common/WatchRecoveryEvent {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Throwable;)Lio/etcd/recipes/common/WatchRecoveryEvent$Suspended;
+	public static synthetic fun copy$default (Lio/etcd/recipes/common/WatchRecoveryEvent$Suspended;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)Lio/etcd/recipes/common/WatchRecoveryEvent$Suspended;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ljava/lang/Throwable;
+	public fun getWatchedKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/etcd/recipes/common/WatchRecoveryListener {
+	public abstract fun onRecoveryEvent (Lio/etcd/recipes/common/WatchRecoveryEvent;)V
+}
+
+public final class io/etcd/recipes/common/WatchResilience {
+	public static final field Companion Lio/etcd/recipes/common/WatchResilience$Companion;
+	public static final field DEFAULT Lio/etcd/recipes/common/WatchResilience;
+	public static final field DISABLED Lio/etcd/recipes/common/WatchResilience;
+	public fun <init> ()V
+	public fun <init> (Lio/etcd/recipes/common/RetryPolicy;)V
+	public fun <init> (Lio/etcd/recipes/common/RetryPolicy;Z)V
+	public fun <init> (Lio/etcd/recipes/common/RetryPolicy;ZLio/etcd/recipes/common/EtcdMetrics;)V
+	public synthetic fun <init> (Lio/etcd/recipes/common/RetryPolicy;ZLio/etcd/recipes/common/EtcdMetrics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getMetrics ()Lio/etcd/recipes/common/EtcdMetrics;
+	public final fun getProgressNotify ()Z
+	public final fun getRetryPolicy ()Lio/etcd/recipes/common/RetryPolicy;
+	public final fun withMetrics (Lio/etcd/recipes/common/EtcdMetrics;)Lio/etcd/recipes/common/WatchResilience;
+}
+
+public final class io/etcd/recipes/common/WatchResilience$Companion {
+}
+
+public final class io/etcd/recipes/common/WatchUtils {
+	public static final fun getKeyAsInt (Lio/etcd/jetcd/watch/WatchEvent;)I
+	public static final fun getKeyAsLong (Lio/etcd/jetcd/watch/WatchEvent;)J
+	public static final fun getKeyAsString (Lio/etcd/jetcd/watch/WatchEvent;)Ljava/lang/String;
+	public static final fun getValueAsInt (Lio/etcd/jetcd/watch/WatchEvent;)I
+	public static final fun getValueAsLong (Lio/etcd/jetcd/watch/WatchEvent;)J
+	public static final fun getValueAsString (Lio/etcd/jetcd/watch/WatchEvent;)Ljava/lang/String;
+	public static final fun watcher (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lio/etcd/recipes/common/WatchResilience;Lio/etcd/recipes/common/WatchRecoveryListener;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/Watch$Watcher;
+	public static final fun watcher (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/Watch$Watcher;
+	public static final fun watcher (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/etcd/jetcd/Watch$Watcher;
+	public static synthetic fun watcher$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lio/etcd/recipes/common/WatchResilience;Lio/etcd/recipes/common/WatchRecoveryListener;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/etcd/jetcd/Watch$Watcher;
+	public static synthetic fun watcher$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/etcd/jetcd/Watch$Watcher;
+	public static final fun watcherWithLatch (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/util/concurrent/CountDownLatch;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public static final fun watcherWithLatch (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/util/concurrent/CountDownLatch;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/etcd/jetcd/options/WatchOption;)V
+	public static synthetic fun watcherWithLatch$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/util/concurrent/CountDownLatch;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lio/etcd/jetcd/options/WatchOption;ILjava/lang/Object;)V
+	public static final fun withWatcher (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lio/etcd/recipes/common/WatchResilience;Lio/etcd/recipes/common/WatchRecoveryListener;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withWatcher (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withWatcher (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withWatcher$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lio/etcd/recipes/common/WatchResilience;Lio/etcd/recipes/common/WatchRecoveryListener;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun withWatcher$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/BarrierSuspendKt {
+	public static final fun await (Lio/etcd/recipes/barrier/DistributedBarrier;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun await (Lio/etcd/recipes/barrier/DistributedBarrierWithCount;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun await-8Mi8wO0 (Lio/etcd/recipes/barrier/DistributedBarrier;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun await-8Mi8wO0 (Lio/etcd/recipes/barrier/DistributedBarrierWithCount;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnter (Lio/etcd/recipes/barrier/DistributedDoubleBarrier;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnter-8Mi8wO0 (Lio/etcd/recipes/barrier/DistributedDoubleBarrier;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitLeave (Lio/etcd/recipes/barrier/DistributedDoubleBarrier;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitLeave-8Mi8wO0 (Lio/etcd/recipes/barrier/DistributedDoubleBarrier;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitRemoveBarrier (Lio/etcd/recipes/barrier/DistributedBarrier;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitSetBarrier (Lio/etcd/recipes/barrier/DistributedBarrier;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/CacheFlowsKt {
+	public static final fun eventsAsFlow (Lio/etcd/recipes/cache/NodeCache;I)Lkotlinx/coroutines/flow/Flow;
+	public static final fun eventsAsFlow (Lio/etcd/recipes/cache/PathChildrenCache;I)Lkotlinx/coroutines/flow/Flow;
+	public static final fun eventsAsFlow (Lio/etcd/recipes/cache/TypedPathChildrenCache;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun eventsAsFlow$default (Lio/etcd/recipes/cache/NodeCache;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun eventsAsFlow$default (Lio/etcd/recipes/cache/PathChildrenCache;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun eventsAsFlow$default (Lio/etcd/recipes/cache/TypedPathChildrenCache;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public static final fun recoveryEventsAsFlow (Lio/etcd/recipes/cache/NodeCache;I)Lkotlinx/coroutines/flow/Flow;
+	public static final fun recoveryEventsAsFlow (Lio/etcd/recipes/cache/PathChildrenCache;I)Lkotlinx/coroutines/flow/Flow;
+	public static final fun recoveryEventsAsFlow (Lio/etcd/recipes/cache/TypedPathChildrenCache;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun recoveryEventsAsFlow$default (Lio/etcd/recipes/cache/NodeCache;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun recoveryEventsAsFlow$default (Lio/etcd/recipes/cache/PathChildrenCache;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun recoveryEventsAsFlow$default (Lio/etcd/recipes/cache/TypedPathChildrenCache;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/etcd/recipes/coroutines/ChildrenSuspendKt {
+	public static final fun awaitDeleteChildren (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitDeleteChildren$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitGetChildCount (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitGetChildCount$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitGetChildren (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;ZLio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitGetChildren$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;ZLio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitGetChildrenKeys (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitGetChildrenKeys$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitGetChildrenValues (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitGetChildrenValues$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/jetcd/options/GetOption$SortOrder;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitGetFirstChild (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitGetFirstChild$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitGetLastChild (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitGetLastChild$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/ConnectionFlowsKt {
+	public static final fun connectionStateAsFlow (Lio/etcd/recipes/common/EtcdConnector;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/etcd/recipes/coroutines/CounterSuspendKt {
+	public static final fun awaitAdd (Lio/etcd/recipes/counter/DistributedAtomicLong;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitDecrement (Lio/etcd/recipes/counter/DistributedAtomicLong;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitGet (Lio/etcd/recipes/counter/DistributedAtomicLong;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitIncrement (Lio/etcd/recipes/counter/DistributedAtomicLong;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitSubtract (Lio/etcd/recipes/counter/DistributedAtomicLong;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/DiscoveryFlowsKt {
+	public static final fun eventsAsFlow (Lio/etcd/recipes/discovery/ServiceCache;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun eventsAsFlow$default (Lio/etcd/recipes/discovery/ServiceCache;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public static final fun recoveryEventsAsFlow (Lio/etcd/recipes/discovery/ServiceCache;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun recoveryEventsAsFlow$default (Lio/etcd/recipes/discovery/ServiceCache;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/etcd/recipes/coroutines/DiscoverySuspendKt {
+	public static final fun awaitGetAllInstances (Lio/etcd/recipes/discovery/ServiceProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitGetInstance (Lio/etcd/recipes/discovery/ServiceProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitQueryForInstance (Lio/etcd/recipes/discovery/ServiceDiscovery;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitQueryForInstances (Lio/etcd/recipes/discovery/ServiceDiscovery;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitQueryForNames (Lio/etcd/recipes/discovery/ServiceDiscovery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitRegisterService (Lio/etcd/recipes/discovery/ServiceDiscovery;Lio/etcd/recipes/discovery/ServiceInstance;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/discovery/ServiceCache;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/discovery/ServiceProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitUnregisterService (Lio/etcd/recipes/discovery/ServiceDiscovery;Lio/etcd/recipes/discovery/ServiceInstance;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitUpdateService (Lio/etcd/recipes/discovery/ServiceDiscovery;Lio/etcd/recipes/discovery/ServiceInstance;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/ElectionFlowsKt {
+	public static final fun leadershipAsFlow (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/WatchResilience;ILio/etcd/recipes/common/RpcResilience;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun leadershipAsFlow$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/WatchResilience;ILio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/etcd/recipes/coroutines/ExceptionFlowsKt {
+	public static final fun backgroundExceptionsAsFlow (Lio/etcd/recipes/common/EtcdConnector;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun backgroundExceptionsAsFlow$default (Lio/etcd/recipes/common/EtcdConnector;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/etcd/recipes/coroutines/HoldLostException : io/etcd/recipes/common/EtcdRecipeRuntimeException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/etcd/recipes/coroutines/KVSuspendKt {
+	public static final fun awaitCompact (Lio/etcd/jetcd/Client;JLio/etcd/jetcd/options/CompactOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitCompact$default (Lio/etcd/jetcd/Client;JLio/etcd/jetcd/options/CompactOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitDeleteKey (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitDeleteKey$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitDeleteKeys (Lio/etcd/jetcd/Client;[Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitGetKeyValuePairs (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitGetKeyValuePairs$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitGetResponse (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitGetResponse$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitGetValue (Lio/etcd/jetcd/Client;Ljava/lang/String;ILio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitGetValue (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitGetValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitGetValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitGetValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;ILio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun awaitGetValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun awaitGetValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun awaitGetValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitIsKeyNotPresent (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitIsKeyNotPresent$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitIsKeyPresent (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitIsKeyPresent$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitPutValue (Lio/etcd/jetcd/Client;Ljava/lang/String;ILio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitPutValue (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitPutValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitPutValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitPutValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;ILio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun awaitPutValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun awaitPutValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun awaitPutValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/jetcd/options/PutOption;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/coroutines/LeadershipEvent {
+}
+
+public final class io/etcd/recipes/coroutines/LeadershipEvent$Elected : io/etcd/recipes/coroutines/LeadershipEvent {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lio/etcd/recipes/coroutines/LeadershipEvent$Elected;
+	public static synthetic fun copy$default (Lio/etcd/recipes/coroutines/LeadershipEvent$Elected;Ljava/lang/String;ILjava/lang/Object;)Lio/etcd/recipes/coroutines/LeadershipEvent$Elected;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeaderName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/coroutines/LeadershipEvent$Vacated : io/etcd/recipes/coroutines/LeadershipEvent {
+	public static final field INSTANCE Lio/etcd/recipes/coroutines/LeadershipEvent$Vacated;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/coroutines/LeadershipEvent$WatchFailed : io/etcd/recipes/coroutines/LeadershipEvent {
+	public fun <init> (Ljava/lang/Throwable;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lio/etcd/recipes/coroutines/LeadershipEvent$WatchFailed;
+	public static synthetic fun copy$default (Lio/etcd/recipes/coroutines/LeadershipEvent$WatchFailed;Ljava/lang/Throwable;ILjava/lang/Object;)Lio/etcd/recipes/coroutines/LeadershipEvent$WatchFailed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/coroutines/LeaseFlowsKt {
+	public static final fun leaseEventsAsFlow (Lio/etcd/recipes/discovery/ServiceRegistry;I)Lkotlinx/coroutines/flow/Flow;
+	public static final fun leaseEventsAsFlow (Lio/etcd/recipes/keyvalue/TransientKeyValue;I)Lkotlinx/coroutines/flow/Flow;
+	public static final fun leaseEventsAsFlow (Lio/etcd/recipes/queue/DistributedWorkQueue;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun leaseEventsAsFlow$default (Lio/etcd/recipes/discovery/ServiceRegistry;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun leaseEventsAsFlow$default (Lio/etcd/recipes/keyvalue/TransientKeyValue;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun leaseEventsAsFlow$default (Lio/etcd/recipes/queue/DistributedWorkQueue;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/etcd/recipes/coroutines/LeaseSuspendKt {
+	public static final fun awaitLeaseGrant-dWUq8MI (Lio/etcd/jetcd/Client;JLio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitLeaseGrant-dWUq8MI$default (Lio/etcd/jetcd/Client;JLio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitLeaseRevoke (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitLeaseRevoke$default (Lio/etcd/jetcd/Client;Lio/etcd/jetcd/lease/LeaseGrantResponse;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/LifecycleSuspendKt {
+	public static final fun awaitFinished (Lio/etcd/recipes/election/LeaderSelector;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitFinished-8Mi8wO0 (Lio/etcd/recipes/election/LeaderSelector;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitLeadership (Lio/etcd/recipes/election/LeaderLatch;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitLeadership-8Mi8wO0 (Lio/etcd/recipes/election/LeaderLatch;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitLeadershipComplete (Lio/etcd/recipes/election/LeaderSelector;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitLeadershipComplete-8Mi8wO0 (Lio/etcd/recipes/election/LeaderSelector;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/cache/NodeCache;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/cache/PathChildrenCache;Lio/etcd/recipes/cache/PathChildrenCache$StartMode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/cache/PathChildrenCache;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/cache/TypedPathChildrenCache;Lio/etcd/recipes/cache/PathChildrenCache$StartMode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/cache/TypedPathChildrenCache;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/counter/DistributedAtomicLong;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/election/LeaderLatch;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/election/LeaderObserver;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/election/LeaderSelector;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/keyvalue/TransientKeyValue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStart (Lio/etcd/recipes/keyvalue/TypedTransientKeyValue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitStart$default (Lio/etcd/recipes/cache/PathChildrenCache;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun awaitStart$default (Lio/etcd/recipes/cache/TypedPathChildrenCache;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitStartComplete (Lio/etcd/recipes/cache/PathChildrenCache;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStartComplete (Lio/etcd/recipes/cache/TypedPathChildrenCache;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStartComplete-8Mi8wO0 (Lio/etcd/recipes/cache/PathChildrenCache;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitStartComplete-8Mi8wO0 (Lio/etcd/recipes/cache/TypedPathChildrenCache;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/LockFlowsKt {
+	public static final fun lockLostAsFlow (Lio/etcd/recipes/lock/EtcdLock;)Lkotlinx/coroutines/flow/Flow;
+	public static final fun permitLostAsFlow (Lio/etcd/recipes/lock/DistributedSemaphore;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/etcd/recipes/coroutines/LockLostEvent {
+	public fun <init> (Ljava/lang/Throwable;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lio/etcd/recipes/coroutines/LockLostEvent;
+	public static synthetic fun copy$default (Lio/etcd/recipes/coroutines/LockLostEvent;Ljava/lang/Throwable;ILjava/lang/Object;)Lio/etcd/recipes/coroutines/LockLostEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/coroutines/LockRecipesSuspendKt {
+	public static final fun awaitAcquire (Lio/etcd/recipes/lock/DistributedSemaphore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitAvailablePermits (Lio/etcd/recipes/lock/DistributedSemaphore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitRelease (Lio/etcd/recipes/lock/DistributedSemaphore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitTryAcquire-8Mi8wO0 (Lio/etcd/recipes/lock/DistributedSemaphore;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun withLock (Lio/etcd/recipes/lock/EtcdLock;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun withLock-dWUq8MI (Lio/etcd/recipes/lock/EtcdLock;JLkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun withPermit (Lio/etcd/recipes/lock/DistributedSemaphore;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/LockSuspendKt {
+	public static final fun awaitLock (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitLock$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun awaitUnlock (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitUnlock$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/PermitLostEvent {
+	public fun <init> (Ljava/lang/Throwable;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lio/etcd/recipes/coroutines/PermitLostEvent;
+	public static synthetic fun copy$default (Lio/etcd/recipes/coroutines/PermitLostEvent;Ljava/lang/Throwable;ILjava/lang/Object;)Lio/etcd/recipes/coroutines/PermitLostEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/coroutines/QueueSuspendKt {
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedPriorityQueue;IILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedPriorityQueue;JILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedPriorityQueue;Lio/etcd/jetcd/ByteSequence;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedPriorityQueue;Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedQueue;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedQueue;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedQueue;Lio/etcd/jetcd/ByteSequence;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedQueue;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/TypedDistributedPriorityQueue;Ljava/lang/Object;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/TypedDistributedQueue;Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue-DZ5xr6s (Lio/etcd/recipes/queue/DistributedPriorityQueue;ISLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue-DZ5xr6s (Lio/etcd/recipes/queue/DistributedPriorityQueue;JSLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue-DZ5xr6s (Lio/etcd/recipes/queue/DistributedPriorityQueue;Lio/etcd/jetcd/ByteSequence;SLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue-DZ5xr6s (Lio/etcd/recipes/queue/DistributedPriorityQueue;Ljava/lang/String;SLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue-DZ5xr6s (Lio/etcd/recipes/queue/TypedDistributedPriorityQueue;Ljava/lang/Object;SLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueueAll (Lio/etcd/recipes/queue/DistributedQueue;Ljava/util/Collection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueueAll (Lio/etcd/recipes/queue/TypedDistributedQueue;Ljava/util/Collection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitTryDequeue (Lio/etcd/recipes/queue/AbstractQueue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitTryDequeue (Lio/etcd/recipes/queue/TypedDistributedPriorityQueue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitTryDequeue (Lio/etcd/recipes/queue/TypedDistributedQueue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun receive (Lio/etcd/recipes/queue/AbstractQueue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun receive (Lio/etcd/recipes/queue/TypedDistributedPriorityQueue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun receive (Lio/etcd/recipes/queue/TypedDistributedQueue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun receive-8Mi8wO0 (Lio/etcd/recipes/queue/AbstractQueue;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun receive-8Mi8wO0 (Lio/etcd/recipes/queue/TypedDistributedPriorityQueue;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun receive-8Mi8wO0 (Lio/etcd/recipes/queue/TypedDistributedQueue;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/coroutines/ServiceCacheEvent {
+	public fun <init> (Lio/etcd/jetcd/watch/WatchEvent$EventType;ZLjava/lang/String;Lio/etcd/recipes/discovery/ServiceInstance;)V
+	public final fun component1 ()Lio/etcd/jetcd/watch/WatchEvent$EventType;
+	public final fun component2 ()Z
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Lio/etcd/recipes/discovery/ServiceInstance;
+	public final fun copy (Lio/etcd/jetcd/watch/WatchEvent$EventType;ZLjava/lang/String;Lio/etcd/recipes/discovery/ServiceInstance;)Lio/etcd/recipes/coroutines/ServiceCacheEvent;
+	public static synthetic fun copy$default (Lio/etcd/recipes/coroutines/ServiceCacheEvent;Lio/etcd/jetcd/watch/WatchEvent$EventType;ZLjava/lang/String;Lio/etcd/recipes/discovery/ServiceInstance;ILjava/lang/Object;)Lio/etcd/recipes/coroutines/ServiceCacheEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEventType ()Lio/etcd/jetcd/watch/WatchEvent$EventType;
+	public final fun getInstanceKey ()Ljava/lang/String;
+	public final fun getServiceInstance ()Lio/etcd/recipes/discovery/ServiceInstance;
+	public final fun getServiceName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isAdd ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/coroutines/TxnSuspendKt {
+	public static final fun awaitTransaction (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun awaitTransaction$default (Lio/etcd/jetcd/Client;Lio/etcd/recipes/common/RpcResilience;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/coroutines/WatchFlowEvent {
+}
+
+public final class io/etcd/recipes/coroutines/WatchFlowEvent$Recovery : io/etcd/recipes/coroutines/WatchFlowEvent {
+	public fun <init> (Lio/etcd/recipes/common/WatchRecoveryEvent;)V
+	public final fun component1 ()Lio/etcd/recipes/common/WatchRecoveryEvent;
+	public final fun copy (Lio/etcd/recipes/common/WatchRecoveryEvent;)Lio/etcd/recipes/coroutines/WatchFlowEvent$Recovery;
+	public static synthetic fun copy$default (Lio/etcd/recipes/coroutines/WatchFlowEvent$Recovery;Lio/etcd/recipes/common/WatchRecoveryEvent;ILjava/lang/Object;)Lio/etcd/recipes/coroutines/WatchFlowEvent$Recovery;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEvent ()Lio/etcd/recipes/common/WatchRecoveryEvent;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/coroutines/WatchFlowEvent$Response : io/etcd/recipes/coroutines/WatchFlowEvent {
+	public fun <init> (Lio/etcd/jetcd/watch/WatchResponse;)V
+	public final fun component1 ()Lio/etcd/jetcd/watch/WatchResponse;
+	public final fun copy (Lio/etcd/jetcd/watch/WatchResponse;)Lio/etcd/recipes/coroutines/WatchFlowEvent$Response;
+	public static synthetic fun copy$default (Lio/etcd/recipes/coroutines/WatchFlowEvent$Response;Lio/etcd/jetcd/watch/WatchResponse;ILjava/lang/Object;)Lio/etcd/recipes/coroutines/WatchFlowEvent$Response;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getResponse ()Lio/etcd/jetcd/watch/WatchResponse;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/coroutines/WatchFlowEventKt {
+	public static final fun watchAsFlow (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lio/etcd/recipes/common/WatchResilience;Lkotlin/jvm/functions/Function0;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun watchAsFlow$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lio/etcd/recipes/common/WatchResilience;Lkotlin/jvm/functions/Function0;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public static final fun watchEventsAsFlow (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lio/etcd/recipes/common/WatchResilience;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun watchEventsAsFlow$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/WatchOption;Lio/etcd/recipes/common/WatchResilience;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/etcd/recipes/coroutines/WorkQueueSuspendKt {
+	public static final fun awaitAck (Lio/etcd/recipes/queue/DistributedWorkQueue$WorkItem;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitDeadLetters (Lio/etcd/recipes/queue/DistributedWorkQueue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedWorkQueue;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedWorkQueue;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedWorkQueue;Lio/etcd/jetcd/ByteSequence;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue (Lio/etcd/recipes/queue/DistributedWorkQueue;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue-exY8QGI (Lio/etcd/recipes/queue/DistributedWorkQueue;Lio/etcd/jetcd/ByteSequence;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueue-exY8QGI (Lio/etcd/recipes/queue/DistributedWorkQueue;Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitEnqueueAll (Lio/etcd/recipes/queue/DistributedWorkQueue;Ljava/util/Collection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitPurgeDeadLetter (Lio/etcd/recipes/queue/DistributedWorkQueue;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitReceive (Lio/etcd/recipes/queue/DistributedWorkQueue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitReceive-8Mi8wO0 (Lio/etcd/recipes/queue/DistributedWorkQueue;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitRequeue (Lio/etcd/recipes/queue/DistributedWorkQueue$WorkItem;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitRequeueDeadLetter (Lio/etcd/recipes/queue/DistributedWorkQueue;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun awaitTryReceive (Lio/etcd/recipes/queue/DistributedWorkQueue;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/counter/DistributedAtomicLong : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/counter/DistributedAtomicLong$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun add (J)J
+	public final fun decrement ()J
+	public static final fun delete (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public final fun get ()J
+	public final fun getCounterPath ()Ljava/lang/String;
+	public final fun increment ()J
+	public final fun start ()Lio/etcd/recipes/counter/DistributedAtomicLong;
+	public final fun subtract (J)J
+}
+
+public final class io/etcd/recipes/counter/DistributedAtomicLong$Companion {
+	public final fun delete (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+}
+
+public final class io/etcd/recipes/counter/DistributedAtomicLongKt {
+	public static final fun withDistributedAtomicLong (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withDistributedAtomicLong (Lio/etcd/jetcd/Client;Ljava/lang/String;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withDistributedAtomicLong (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withDistributedAtomicLong$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/discovery/ProviderStrategy {
+	public abstract fun select (Ljava/util/List;)Lio/etcd/recipes/discovery/ServiceInstance;
+}
+
+public final class io/etcd/recipes/discovery/RandomStrategy : io/etcd/recipes/discovery/ProviderStrategy {
+	public static final field INSTANCE Lio/etcd/recipes/discovery/RandomStrategy;
+	public fun select (Ljava/util/List;)Lio/etcd/recipes/discovery/ServiceInstance;
+}
+
+public final class io/etcd/recipes/discovery/RoundRobinStrategy : io/etcd/recipes/discovery/ProviderStrategy {
+	public fun <init> ()V
+	public fun select (Ljava/util/List;)Lio/etcd/recipes/discovery/ServiceInstance;
+}
+
+public final class io/etcd/recipes/discovery/ServiceCache : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/discovery/ServiceCache$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addListenerForChanges (Lio/etcd/recipes/discovery/ServiceCacheListener;)V
+	public final fun addRecoveryListener (Lio/etcd/recipes/common/WatchRecoveryListener;)V
+	public final fun getInstances ()Ljava/util/List;
+	public final fun getNamesPath ()Ljava/lang/String;
+	public final fun getServiceName ()Ljava/lang/String;
+	public final fun removeListenerForChanges (Lio/etcd/recipes/discovery/ServiceCacheListener;)V
+	public final fun removeRecoveryListener (Lio/etcd/recipes/common/WatchRecoveryListener;)V
+	public final fun start ()Lio/etcd/recipes/discovery/ServiceCache;
+}
+
+public final class io/etcd/recipes/discovery/ServiceCache$Companion {
+}
+
+public abstract interface class io/etcd/recipes/discovery/ServiceCacheListener {
+	public abstract fun cacheChanged (Lio/etcd/jetcd/watch/WatchEvent$EventType;ZLjava/lang/String;Lio/etcd/recipes/discovery/ServiceInstance;)V
+}
+
+public final class io/etcd/recipes/discovery/ServiceDiscovery : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/discovery/ServiceDiscovery$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getLeaseTtlSecs ()J
+	public final fun getServicePath ()Ljava/lang/String;
+	public final fun queryForInstance (Ljava/lang/String;Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceInstance;
+	public final fun queryForInstances (Ljava/lang/String;)Ljava/util/List;
+	public final fun queryForNames ()Ljava/util/List;
+	public final fun registerService (Lio/etcd/recipes/discovery/ServiceInstance;)V
+	public final fun serviceCache (Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceCache;
+	public final fun serviceProvider (Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceProvider;
+	public final fun serviceProvider (Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;)Lio/etcd/recipes/discovery/ServiceProvider;
+	public final fun serviceProvider (Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;I)Lio/etcd/recipes/discovery/ServiceProvider;
+	public final fun serviceProvider-Wn2Vu4Y (Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;IJ)Lio/etcd/recipes/discovery/ServiceProvider;
+	public static synthetic fun serviceProvider-Wn2Vu4Y$default (Lio/etcd/recipes/discovery/ServiceDiscovery;Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;IJILjava/lang/Object;)Lio/etcd/recipes/discovery/ServiceProvider;
+	public final fun unregisterService (Lio/etcd/recipes/discovery/ServiceInstance;)V
+	public final fun updateService (Lio/etcd/recipes/discovery/ServiceInstance;)V
+	public final fun withServiceCache (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun withServiceProvider (Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;ILkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun withServiceProvider (Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun withServiceProvider (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun withServiceProvider-zkXUZaI (Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;IJLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withServiceProvider-zkXUZaI$default (Lio/etcd/recipes/discovery/ServiceDiscovery;Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;IJLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/discovery/ServiceDiscovery$Companion {
+}
+
+public final class io/etcd/recipes/discovery/ServiceDiscoveryKt {
+	public static final fun withServiceDiscovery (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withServiceDiscovery (Lio/etcd/jetcd/Client;Ljava/lang/String;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withServiceDiscovery (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withServiceDiscovery$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/discovery/ServiceInstance {
+	public static final field Companion Lio/etcd/recipes/discovery/ServiceInstance$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIJLio/etcd/recipes/discovery/ServiceType;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIJLio/etcd/recipes/discovery/ServiceType;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()J
+	public final fun component7 ()Lio/etcd/recipes/discovery/ServiceType;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun component9 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIJLio/etcd/recipes/discovery/ServiceType;Ljava/lang/String;Z)Lio/etcd/recipes/discovery/ServiceInstance;
+	public static synthetic fun copy$default (Lio/etcd/recipes/discovery/ServiceInstance;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIJLio/etcd/recipes/discovery/ServiceType;Ljava/lang/String;ZILjava/lang/Object;)Lio/etcd/recipes/discovery/ServiceInstance;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAddress ()Ljava/lang/String;
+	public final fun getEnabled ()Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getJsonPayload ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPort ()I
+	public final fun getRegistrationTimeUTC ()J
+	public final fun getServiceType ()Lio/etcd/recipes/discovery/ServiceType;
+	public final fun getSslPort ()I
+	public final fun getUri ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static final fun newBuilder (Ljava/lang/String;Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceInstance$Companion$ServiceInstanceBuilder;
+	public final fun setAddress (Ljava/lang/String;)V
+	public final fun setEnabled (Z)V
+	public final fun setJsonPayload (Ljava/lang/String;)V
+	public final fun setPort (I)V
+	public final fun setRegistrationTimeUTC (J)V
+	public final fun setServiceType (Lio/etcd/recipes/discovery/ServiceType;)V
+	public final fun setSslPort (I)V
+	public final fun setUri (Ljava/lang/String;)V
+	public final fun toJson ()Ljava/lang/String;
+	public static final fun toObject (Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceInstance;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class io/etcd/recipes/discovery/ServiceInstance$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lio/etcd/recipes/discovery/ServiceInstance$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lio/etcd/recipes/discovery/ServiceInstance;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lio/etcd/recipes/discovery/ServiceInstance;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class io/etcd/recipes/discovery/ServiceInstance$Companion {
+	public final fun newBuilder (Ljava/lang/String;Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceInstance$Companion$ServiceInstanceBuilder;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public final fun toObject (Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceInstance;
+}
+
+public final class io/etcd/recipes/discovery/ServiceInstance$Companion$ServiceInstanceBuilder {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun build ()Lio/etcd/recipes/discovery/ServiceInstance;
+	public final fun getAddress ()Ljava/lang/String;
+	public final fun getEnabled ()Z
+	public final fun getJsonPayload ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPort ()I
+	public final fun getRegistrationTimeUTC ()J
+	public final fun getServiceType ()Lio/etcd/recipes/discovery/ServiceType;
+	public final fun getSslPort ()I
+	public final fun getUri ()Ljava/lang/String;
+	public final fun setAddress (Ljava/lang/String;)V
+	public final fun setEnabled (Z)V
+	public final fun setPort (I)V
+	public final fun setRegistrationTimeUTC (J)V
+	public final fun setServiceType (Lio/etcd/recipes/discovery/ServiceType;)V
+	public final fun setSslPort (I)V
+	public final fun setUri (Ljava/lang/String;)V
+}
+
+public final class io/etcd/recipes/discovery/ServiceInstanceKt {
+	public static final fun serviceInstance (Ljava/lang/String;Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceInstance;
+	public static final fun serviceInstance (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/etcd/recipes/discovery/ServiceInstance;
+	public static synthetic fun serviceInstance$default (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/etcd/recipes/discovery/ServiceInstance;
+}
+
+public final class io/etcd/recipes/discovery/ServiceProvider : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/discovery/ServiceProvider$Companion;
+	public static final field DEFAULT_ERROR_THRESHOLD I
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;IJLio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lio/etcd/recipes/discovery/ProviderStrategy;IJLio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAllInstances ()Ljava/util/List;
+	public final fun getInstance ()Lio/etcd/recipes/discovery/ServiceInstance;
+	public final fun getServiceName ()Ljava/lang/String;
+	public final fun noteError (Lio/etcd/recipes/discovery/ServiceInstance;)V
+	public final fun start ()Lio/etcd/recipes/discovery/ServiceProvider;
+}
+
+public final class io/etcd/recipes/discovery/ServiceProvider$Companion {
+	public final fun getDEFAULT_DOWN_PERIOD-UwyO8pc ()J
+}
+
+public final class io/etcd/recipes/discovery/ServiceRegistry : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/discovery/ServiceRegistry$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addLeaseListener (Lio/etcd/recipes/common/LeaseListener;)V
+	public final fun getLeaseTtlSecs ()J
+	public final fun getServicePath ()Ljava/lang/String;
+	public final fun registerService (Lio/etcd/recipes/discovery/ServiceInstance;)V
+	public final fun removeLeaseListener (Lio/etcd/recipes/common/LeaseListener;)V
+	public final fun unregisterService (Lio/etcd/recipes/discovery/ServiceInstance;)V
+	public final fun updateService (Lio/etcd/recipes/discovery/ServiceInstance;)V
+}
+
+public final class io/etcd/recipes/discovery/ServiceRegistry$Companion {
+}
+
+public final class io/etcd/recipes/discovery/ServiceType : java/lang/Enum {
+	public static final field DYNAMIC Lio/etcd/recipes/discovery/ServiceType;
+	public static final field DYNAMIC_SEQUENTIAL Lio/etcd/recipes/discovery/ServiceType;
+	public static final field PERMANENT Lio/etcd/recipes/discovery/ServiceType;
+	public static final field STATIC Lio/etcd/recipes/discovery/ServiceType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isDynamic ()Z
+	public static fun valueOf (Ljava/lang/String;)Lio/etcd/recipes/discovery/ServiceType;
+	public static fun values ()[Lio/etcd/recipes/discovery/ServiceType;
+}
+
+public final class io/etcd/recipes/discovery/StickyStrategy : io/etcd/recipes/discovery/ProviderStrategy {
+	public fun <init> ()V
+	public fun <init> (Lio/etcd/recipes/discovery/ProviderStrategy;)V
+	public synthetic fun <init> (Lio/etcd/recipes/discovery/ProviderStrategy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun select (Ljava/util/List;)Lio/etcd/recipes/discovery/ServiceInstance;
+}
+
+public final class io/etcd/recipes/discovery/TypedServiceInstances {
+	public static final fun payload (Lio/etcd/recipes/discovery/ServiceInstance;Lio/etcd/recipes/common/EtcdCodec;)Ljava/lang/Object;
+	public static final fun serviceInstance (Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;)Lio/etcd/recipes/discovery/ServiceInstance;
+	public static final fun serviceInstance (Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;Lkotlin/jvm/functions/Function1;)Lio/etcd/recipes/discovery/ServiceInstance;
+	public static synthetic fun serviceInstance$default (Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/etcd/recipes/discovery/ServiceInstance;
+	public static final fun setPayload (Lio/etcd/recipes/discovery/ServiceInstance;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;)V
+}
+
+public final class io/etcd/recipes/election/LeaderLatch : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/election/LeaderLatch$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;Z)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ZJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ZJLjava/util/concurrent/TimeUnit;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ZJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addListener (Lio/etcd/recipes/election/LeaderLatchListener;)V
+	public final fun await ()V
+	public final fun await (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun await-LRDsOJo (J)Z
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getElectionPath ()Ljava/lang/String;
+	public final fun getHasLeadership ()Z
+	public final fun getLeaseTtlSecs ()J
+	public final fun removeListener (Lio/etcd/recipes/election/LeaderLatchListener;)V
+	public final fun start ()Lio/etcd/recipes/election/LeaderLatch;
+}
+
+public final class io/etcd/recipes/election/LeaderLatch$Companion {
+	public final fun defaultClientId ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/election/LeaderLatchKt {
+	public static final fun withLeaderLatch (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderLatch (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderLatch (Lio/etcd/jetcd/Client;Ljava/lang/String;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderLatch (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withLeaderLatch$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/election/LeaderLatchListener {
+	public fun isLeader ()V
+	public fun notLeader ()V
+}
+
+public final class io/etcd/recipes/election/LeaderLatchListener$DefaultImpls {
+	public static fun isLeader (Lio/etcd/recipes/election/LeaderLatchListener;)V
+	public static fun notLeader (Lio/etcd/recipes/election/LeaderLatchListener;)V
+}
+
+public abstract interface class io/etcd/recipes/election/LeaderListener {
+	public fun onError (Ljava/lang/Throwable;)V
+	public abstract fun relinquishLeadership ()V
+	public abstract fun takeLeadership (Ljava/lang/String;)V
+}
+
+public final class io/etcd/recipes/election/LeaderListener$DefaultImpls {
+	public static fun onError (Lio/etcd/recipes/election/LeaderListener;Ljava/lang/Throwable;)V
+}
+
+public final class io/etcd/recipes/election/LeaderObserver : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/election/LeaderObserver$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addListener (Lio/etcd/recipes/election/LeaderListener;)V
+	public final fun getCurrentLeader ()Ljava/lang/String;
+	public final fun getElectionPath ()Ljava/lang/String;
+	public final fun removeListener (Lio/etcd/recipes/election/LeaderListener;)V
+	public final fun start ()Lio/etcd/recipes/election/LeaderObserver;
+}
+
+public final class io/etcd/recipes/election/LeaderObserver$Companion {
+}
+
+public final class io/etcd/recipes/election/LeaderObserverKt {
+	public static final fun withLeaderObserver (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderObserver (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withLeaderObserver$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/election/LeaderSelector : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/election/LeaderSelector$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;JLjava/util/concurrent/Executor;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;JLjava/util/concurrent/Executor;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;JLjava/util/concurrent/Executor;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;JLjava/util/concurrent/Executor;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;Z)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;JLjava/util/concurrent/Executor;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;JLjava/util/concurrent/ExecutorService;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;JLjava/util/concurrent/ExecutorService;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;JLjava/util/concurrent/ExecutorService;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;JLjava/util/concurrent/ExecutorService;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;Z)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;JLjava/util/concurrent/ExecutorService;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getElectionPath ()Ljava/lang/String;
+	public final fun getLeaseTtlSecs ()J
+	public static final fun getParticipants (Lio/etcd/jetcd/Client;Ljava/lang/String;)Ljava/util/List;
+	public static final fun getParticipants (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)Ljava/util/List;
+	public final fun isFinished ()Z
+	public final fun isLeader ()Z
+	public static final fun reportLeader (Ljava/util/List;Ljava/lang/String;Lio/etcd/recipes/election/LeaderListener;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CountDownLatch;
+	public final fun start ()Lio/etcd/recipes/election/LeaderSelector;
+	public final fun waitOnLeadershipComplete ()Z
+	public final fun waitOnLeadershipComplete (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun waitOnLeadershipComplete-LRDsOJo (J)Z
+	public final fun waitUntilFinished ()Z
+	public final fun waitUntilFinished (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun waitUntilFinished-LRDsOJo (J)Z
+}
+
+public final class io/etcd/recipes/election/LeaderSelector$Companion {
+	public final fun getParticipants (Lio/etcd/jetcd/Client;Ljava/lang/String;)Ljava/util/List;
+	public final fun getParticipants (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;)Ljava/util/List;
+	public static synthetic fun getParticipants$default (Lio/etcd/recipes/election/LeaderSelector$Companion;Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Ljava/util/List;
+	public final fun reportLeader (Ljava/util/List;Ljava/lang/String;Lio/etcd/recipes/election/LeaderListener;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CountDownLatch;
+}
+
+public final class io/etcd/recipes/election/LeaderSelectorKt {
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;JLjava/util/concurrent/Executor;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;JLjava/util/concurrent/Executor;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;JLjava/util/concurrent/ExecutorService;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;JLjava/util/concurrent/ExecutorService;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withLeaderSelector (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withLeaderSelector$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/election/LeaderSelectorListener;JLjava/util/concurrent/Executor;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun withLeaderSelector$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;JLjava/util/concurrent/ExecutorService;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/election/LeaderSelectorListener {
+	public abstract fun relinquishLeadership (Lio/etcd/recipes/election/LeaderSelector;)V
+	public abstract fun takeLeadership (Lio/etcd/recipes/election/LeaderSelector;)V
+}
+
+public class io/etcd/recipes/election/LeaderSelectorListenerAdapter : io/etcd/recipes/election/LeaderSelectorListener {
+	public fun <init> ()V
+	public fun relinquishLeadership (Lio/etcd/recipes/election/LeaderSelector;)V
+	public fun takeLeadership (Lio/etcd/recipes/election/LeaderSelector;)V
+}
+
+public final class io/etcd/recipes/election/Participant {
+	public fun <init> (Ljava/lang/String;Z)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun copy (Ljava/lang/String;Z)Lio/etcd/recipes/election/Participant;
+	public static synthetic fun copy$default (Lio/etcd/recipes/election/Participant;Ljava/lang/String;ZILjava/lang/Object;)Lio/etcd/recipes/election/Participant;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClientId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isLeader ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/keyvalue/TransientKeyValue : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/keyvalue/TransientKeyValue$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JZ)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JZLjava/util/concurrent/Executor;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JZLjava/util/concurrent/Executor;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JZLjava/util/concurrent/Executor;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JZLjava/util/concurrent/Executor;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addLeaseListener (Lio/etcd/recipes/common/LeaseListener;)V
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getKeyPath ()Ljava/lang/String;
+	public final fun getKeyValue ()Ljava/lang/String;
+	public final fun getLeaseTtlSecs ()J
+	public final fun removeLeaseListener (Lio/etcd/recipes/common/LeaseListener;)V
+	public final fun start ()Lio/etcd/recipes/keyvalue/TransientKeyValue;
+}
+
+public final class io/etcd/recipes/keyvalue/TransientKeyValue$Companion {
+}
+
+public final class io/etcd/recipes/keyvalue/TransientKeyValueKt {
+	public static final fun withTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JZLjava/util/concurrent/Executor;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JZLjava/util/concurrent/Executor;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JZLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withTransientKeyValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/String;JZLjava/util/concurrent/Executor;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/keyvalue/TypedTransientKeyValue : java/io/Closeable {
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZ)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZLjava/util/concurrent/Executor;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZLjava/util/concurrent/Executor;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZLjava/util/concurrent/Executor;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZLjava/util/concurrent/Executor;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addLeaseListener (Lio/etcd/recipes/common/LeaseListener;)V
+	public fun close ()V
+	public final fun getUntyped ()Lio/etcd/recipes/keyvalue/TransientKeyValue;
+	public final fun removeLeaseListener (Lio/etcd/recipes/common/LeaseListener;)V
+	public final fun start ()Lio/etcd/recipes/keyvalue/TypedTransientKeyValue;
+}
+
+public final class io/etcd/recipes/keyvalue/TypedTransientKeyValueKt {
+	public static final fun withTypedTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTypedTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZLjava/util/concurrent/Executor;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTypedTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZLjava/util/concurrent/Executor;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTypedTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZLjava/util/concurrent/Executor;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTypedTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTypedTransientKeyValue (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withTypedTransientKeyValue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Ljava/lang/Object;Lio/etcd/recipes/common/EtcdCodec;JZLjava/util/concurrent/Executor;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/lock/DistributedMutex : io/etcd/recipes/common/EtcdConnector, io/etcd/recipes/lock/EtcdLock {
+	public static final field Companion Lio/etcd/recipes/lock/DistributedMutex$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun addLockLostListener (Lio/etcd/recipes/lock/LockLostListener;)V
+	public final fun getClientId ()Ljava/lang/String;
+	public fun getFencingToken ()J
+	public fun getHoldCount ()I
+	public final fun getLeaseTtlSecs ()J
+	public final fun getLockPath ()Ljava/lang/String;
+	public fun isHeldByCurrentThread ()Z
+	public fun isLocked ()Z
+	public fun lock ()V
+	public fun removeLockLostListener (Lio/etcd/recipes/lock/LockLostListener;)V
+	public fun tryLock (JLjava/util/concurrent/TimeUnit;)Z
+	public fun tryLock-LRDsOJo (J)Z
+	public fun unlock ()Z
+}
+
+public final class io/etcd/recipes/lock/DistributedMutex$Companion {
+}
+
+public final class io/etcd/recipes/lock/DistributedReadWriteLock : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/lock/DistributedReadWriteLock$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;J)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getLeaseTtlSecs ()J
+	public final fun getLockPath ()Ljava/lang/String;
+	public final fun getReadLock ()Lio/etcd/recipes/lock/EtcdLock;
+	public final fun getWriteLock ()Lio/etcd/recipes/lock/EtcdLock;
+}
+
+public final class io/etcd/recipes/lock/DistributedReadWriteLock$Companion {
+}
+
+public final class io/etcd/recipes/lock/DistributedSemaphore : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/lock/DistributedSemaphore$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;I)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;IJ)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLio/etcd/recipes/common/ResilienceConfig;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;IJLio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun acquire ()V
+	public final fun addPermitLostListener (Lio/etcd/recipes/lock/PermitLostListener;)V
+	public final fun availablePermits ()I
+	public final fun availablePermits (Lio/etcd/recipes/common/RpcResilience;)I
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getFencingToken ()J
+	public final fun getLeaseTtlSecs ()J
+	public final fun getPermits ()I
+	public final fun getSemaphorePath ()Ljava/lang/String;
+	public final fun release ()Z
+	public final fun removePermitLostListener (Lio/etcd/recipes/lock/PermitLostListener;)V
+	public final fun tryAcquire (JLjava/util/concurrent/TimeUnit;)Z
+	public final fun tryAcquire-LRDsOJo (J)Z
+}
+
+public final class io/etcd/recipes/lock/DistributedSemaphore$Companion {
+}
+
+public final class io/etcd/recipes/lock/DistributedSemaphoreKt {
+	public static final fun withPermit (Lio/etcd/recipes/lock/DistributedSemaphore;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/lock/EtcdLock {
+	public abstract fun addLockLostListener (Lio/etcd/recipes/lock/LockLostListener;)V
+	public abstract fun getFencingToken ()J
+	public abstract fun getHoldCount ()I
+	public abstract fun isHeldByCurrentThread ()Z
+	public abstract fun isLocked ()Z
+	public abstract fun lock ()V
+	public abstract fun removeLockLostListener (Lio/etcd/recipes/lock/LockLostListener;)V
+	public abstract fun tryLock (JLjava/util/concurrent/TimeUnit;)Z
+	public abstract fun tryLock-LRDsOJo (J)Z
+	public abstract fun unlock ()Z
+}
+
+public final class io/etcd/recipes/lock/EtcdLockKt {
+	public static final fun withLock (Lio/etcd/recipes/lock/EtcdLock;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;
+}
+
+public abstract interface class io/etcd/recipes/lock/LockLostListener {
+	public abstract fun onLockLost (Ljava/lang/Throwable;)V
+}
+
+public abstract interface class io/etcd/recipes/lock/PermitLostListener {
+	public abstract fun onPermitLost (Ljava/lang/Throwable;)V
+}
+
+public final class io/etcd/recipes/lock/SemaphorePermitMismatchException : io/etcd/recipes/common/EtcdRecipeRuntimeException {
+	public fun <init> (Ljava/lang/String;II)V
+	public final fun getCanonicalPermits ()I
+	public final fun getRequestedPermits ()I
+	public final fun getSemaphorePath ()Ljava/lang/String;
+}
+
+public abstract class io/etcd/recipes/queue/AbstractQueue : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/queue/AbstractQueue$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/jetcd/options/GetOption$SortTarget;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun dequeue ()Lio/etcd/jetcd/ByteSequence;
+	protected fun doClose ()V
+	protected fun getExceptionContext ()Ljava/lang/String;
+	public final fun getQueuePath ()Ljava/lang/String;
+	public final fun getSize ()I
+	public final fun getTarget ()Lio/etcd/jetcd/options/GetOption$SortTarget;
+	public final fun poll (JLjava/util/concurrent/TimeUnit;)Lio/etcd/jetcd/ByteSequence;
+	public final fun poll-LRDsOJo (J)Lio/etcd/jetcd/ByteSequence;
+	public final fun size (Lio/etcd/recipes/common/RpcResilience;)I
+	public final fun tryDequeue ()Lio/etcd/jetcd/ByteSequence;
+}
+
+public final class io/etcd/recipes/queue/AbstractQueue$Companion {
+}
+
+public final class io/etcd/recipes/queue/DistributedPriorityQueue : io/etcd/recipes/queue/AbstractQueue {
+	public static final field Companion Lio/etcd/recipes/queue/DistributedPriorityQueue$Companion;
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/util/concurrent/TimeUnit;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/util/concurrent/TimeUnit;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;JLjava/util/concurrent/TimeUnit;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun enqueue (II)V
+	public final fun enqueue (JI)V
+	public final fun enqueue (Lio/etcd/jetcd/ByteSequence;I)V
+	public final fun enqueue (Ljava/lang/String;I)V
+	public final fun enqueue-i8woANY (IS)V
+	public final fun enqueue-i8woANY (JS)V
+	public final fun enqueue-i8woANY (Lio/etcd/jetcd/ByteSequence;S)V
+	public final fun enqueue-i8woANY (Ljava/lang/String;S)V
+	public final fun getMinimumWaitTime-UwyO8pc ()J
+}
+
+public final class io/etcd/recipes/queue/DistributedPriorityQueue$Companion {
+}
+
+public final class io/etcd/recipes/queue/DistributedPriorityQueueKt {
+	public static final fun withDistributedPriorityQueue-exY8QGI (Lio/etcd/jetcd/Client;Ljava/lang/String;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withDistributedPriorityQueue-exY8QGI$default (Lio/etcd/jetcd/Client;Ljava/lang/String;JLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/queue/DistributedQueue : io/etcd/recipes/queue/AbstractQueue {
+	public static final field Companion Lio/etcd/recipes/queue/DistributedQueue$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun enqueue (I)V
+	public final fun enqueue (J)V
+	public final fun enqueue (Lio/etcd/jetcd/ByteSequence;)V
+	public final fun enqueue (Ljava/lang/String;)V
+	public final fun enqueueAll (Ljava/util/Collection;)V
+}
+
+public final class io/etcd/recipes/queue/DistributedQueue$Companion {
+}
+
+public final class io/etcd/recipes/queue/DistributedQueueKt {
+	public static final fun withDistributedQueue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/queue/DistributedWorkQueue : io/etcd/recipes/common/EtcdConnector {
+	public static final field Companion Lio/etcd/recipes/queue/DistributedWorkQueue$Companion;
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/queue/WorkQueueConfig;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/queue/WorkQueueConfig;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/queue/WorkQueueConfig;Lio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/queue/WorkQueueConfig;Lio/etcd/recipes/common/ResilienceConfig;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addLeaseListener (Lio/etcd/recipes/common/LeaseListener;)V
+	public final fun deadLetters ()Ljava/util/List;
+	public final fun enqueue (I)V
+	public final fun enqueue (J)V
+	public final fun enqueue (Lio/etcd/jetcd/ByteSequence;)V
+	public final fun enqueue (Ljava/lang/String;)V
+	public final fun enqueue-HG0u8IE (Lio/etcd/jetcd/ByteSequence;J)V
+	public final fun enqueue-HG0u8IE (Ljava/lang/String;J)V
+	public final fun enqueueAll (Ljava/util/Collection;)V
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getConfig ()Lio/etcd/recipes/queue/WorkQueueConfig;
+	public final fun getQueuePath ()Ljava/lang/String;
+	public final fun purgeDeadLetter (Ljava/lang/String;)Z
+	public final fun receive ()Lio/etcd/recipes/queue/DistributedWorkQueue$WorkItem;
+	public final fun receive (JLjava/util/concurrent/TimeUnit;)Lio/etcd/recipes/queue/DistributedWorkQueue$WorkItem;
+	public final fun receive-LRDsOJo (J)Lio/etcd/recipes/queue/DistributedWorkQueue$WorkItem;
+	public final fun removeLeaseListener (Lio/etcd/recipes/common/LeaseListener;)V
+	public final fun requeueDeadLetter (Ljava/lang/String;)Z
+	public final fun tryReceive ()Lio/etcd/recipes/queue/DistributedWorkQueue$WorkItem;
+}
+
+public final class io/etcd/recipes/queue/DistributedWorkQueue$Companion {
+}
+
+public final class io/etcd/recipes/queue/DistributedWorkQueue$DeadLetter {
+	public fun <init> (Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;I)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lio/etcd/jetcd/ByteSequence;
+	public final fun component3 ()I
+	public final fun copy (Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;I)Lio/etcd/recipes/queue/DistributedWorkQueue$DeadLetter;
+	public static synthetic fun copy$default (Lio/etcd/recipes/queue/DistributedWorkQueue$DeadLetter;Ljava/lang/String;Lio/etcd/jetcd/ByteSequence;IILjava/lang/Object;)Lio/etcd/recipes/queue/DistributedWorkQueue$DeadLetter;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttempts ()I
+	public final fun getId ()Ljava/lang/String;
+	public final fun getValue ()Lio/etcd/jetcd/ByteSequence;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/queue/DistributedWorkQueue$WorkItem {
+	public final fun ack ()Z
+	public final fun getAttempt ()I
+	public final fun getId ()Ljava/lang/String;
+	public final fun getValue ()Lio/etcd/jetcd/ByteSequence;
+	public final fun requeue ()Z
+}
+
+public final class io/etcd/recipes/queue/TypedDistributedPriorityQueue : java/io/Closeable {
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;JLio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;JLio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/etcd/recipes/queue/DistributedPriorityQueue;Lio/etcd/recipes/common/EtcdCodec;)V
+	public fun close ()V
+	public final fun dequeue ()Ljava/lang/Object;
+	public final fun enqueue (Ljava/lang/Object;I)V
+	public final fun enqueue-i8woANY (Ljava/lang/Object;S)V
+	public final fun getSize ()I
+	public final fun getUntyped ()Lio/etcd/recipes/queue/DistributedPriorityQueue;
+	public final fun poll (JLjava/util/concurrent/TimeUnit;)Ljava/lang/Object;
+	public final fun poll-LRDsOJo (J)Ljava/lang/Object;
+	public final fun tryDequeue ()Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/queue/TypedDistributedPriorityQueueKt {
+	public static final fun withTypedDistributedPriorityQueue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTypedDistributedPriorityQueue-gwCluXo (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;JLio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withTypedDistributedPriorityQueue-gwCluXo$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;JLio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun withTypedDistributedPriorityQueue-zkXUZaI (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;JLkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/queue/TypedDistributedQueue : java/io/Closeable {
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/ResilienceConfig;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/ResilienceConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/etcd/recipes/queue/DistributedQueue;Lio/etcd/recipes/common/EtcdCodec;)V
+	public fun close ()V
+	public final fun dequeue ()Ljava/lang/Object;
+	public final fun enqueue (Ljava/lang/Object;)V
+	public final fun enqueueAll (Ljava/util/Collection;)V
+	public final fun getSize ()I
+	public final fun getUntyped ()Lio/etcd/recipes/queue/DistributedQueue;
+	public final fun poll (JLjava/util/concurrent/TimeUnit;)Ljava/lang/Object;
+	public final fun poll-LRDsOJo (J)Ljava/lang/Object;
+	public final fun tryDequeue ()Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/queue/TypedDistributedQueueKt {
+	public static final fun withTypedDistributedQueue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static final fun withTypedDistributedQueue (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public static synthetic fun withTypedDistributedQueue$default (Lio/etcd/jetcd/Client;Ljava/lang/String;Lio/etcd/recipes/common/EtcdCodec;Lio/etcd/recipes/common/ResilienceConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/etcd/recipes/queue/WorkQueueConfig {
+	public fun <init> ()V
+	public fun <init> (J)V
+	public fun <init> (JI)V
+	public synthetic fun <init> (JIJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JIJLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getMaxDeliveries ()I
+	public final fun getSweepInterval-UwyO8pc ()J
+	public final fun getVisibilityTimeoutSecs ()J
+}
+
+public final class io/etcd/recipes/util/LeaderReporterKt {
+	public static final fun main ()V
+	public static synthetic fun main ([Ljava/lang/String;)V
+}
+
+public final class io/etcd/recipes/util/ShowKeysKt {
+	public static final fun main ()V
+	public static synthetic fun main ([Ljava/lang/String;)V
+}
+

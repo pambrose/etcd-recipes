@@ -24,7 +24,6 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 
 /**
  * The interruptible bridge converts a wrapped mid-RPC interrupt into cancellation.
@@ -35,36 +34,30 @@ import kotlinx.coroutines.runBlocking
 class BridgesTests : StringSpec() {
   init {
     "a directly wrapped interrupt becomes CancellationException" {
-      runBlocking {
-        val wrapped = EtcdRecipeRuntimeException("getResponse interrupted", InterruptedException())
-        shouldThrow<CancellationException> {
-          interruptibleOn(Dispatchers.IO) { throw wrapped }
-        }
+      val wrapped = EtcdRecipeRuntimeException("getResponse interrupted", InterruptedException())
+      shouldThrow<CancellationException> {
+        interruptibleOn(Dispatchers.IO) { throw wrapped }
       }
     }
 
     "a doubly wrapped interrupt becomes CancellationException" {
-      runBlocking {
-        val doubleWrapped =
-          EtcdRecipeRuntimeException(
-            "getResponse interrupted",
-            EtcdRecipeRuntimeException("getResponse interrupted", InterruptedException()),
-          )
-        shouldThrow<CancellationException> {
-          interruptibleOn(Dispatchers.IO) { throw doubleWrapped }
-        }
+      val doubleWrapped =
+        EtcdRecipeRuntimeException(
+          "getResponse interrupted",
+          EtcdRecipeRuntimeException("getResponse interrupted", InterruptedException()),
+        )
+      shouldThrow<CancellationException> {
+        interruptibleOn(Dispatchers.IO) { throw doubleWrapped }
       }
     }
 
     "an EtcdRecipeRuntimeException with no interrupt in the chain propagates unchanged" {
-      runBlocking {
-        val real = EtcdRecipeRuntimeException("real failure", IllegalStateException("boom"))
-        val thrown =
-          shouldThrow<EtcdRecipeRuntimeException> {
-            interruptibleOn(Dispatchers.IO) { throw real }
-          }
-        thrown.message shouldBe "real failure"
-      }
+      val real = EtcdRecipeRuntimeException("real failure", IllegalStateException("boom"))
+      val thrown =
+        shouldThrow<EtcdRecipeRuntimeException> {
+          interruptibleOn(Dispatchers.IO) { throw real }
+        }
+      thrown.message shouldBe "real failure"
     }
   }
 }

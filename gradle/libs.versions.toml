@@ -1,10 +1,10 @@
 [versions]
 # Build infrastructure
-gradle-wrapper = "9.8.0"
+gradle-wrapper = "9.8.1"
 jvm = "17"
 
 # Kotlin language and runtime
-kotlin = "2.4.20"
+kotlin = "2.4.21"
 coroutines = "1.11.0"
 serialization = "1.11.0"
 
@@ -12,10 +12,10 @@ serialization = "1.11.0"
 jetcd = "0.8.7"
 
 # Runtime libraries
-common-utils = "5.1.0"
-guava = "33.7.1-jre"
+common-utils = "5.1.1"
+guava = "33.7.2-jre"
 kotlin-logging = "8.0.4"
-logback = "1.6.4"
+logback = "1.6.5"
 
 # Optional integration bindings (each used by a single satellite module)
 jackson = "2.22.3"
@@ -31,7 +31,7 @@ mockk = "1.14.11"
 testcontainers = "2.0.5"
 
 # Build tooling plugins
-ben-manes-versions = "0.64.0"
+ben-manes-versions = "0.65.0"
 detekt = "2.0.0-alpha.6"
 dokka = "2.2.0"
 kotlinter = "5.7.0"

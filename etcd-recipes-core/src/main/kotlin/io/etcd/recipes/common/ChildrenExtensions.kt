@@ -23,7 +23,6 @@ import com.pambrose.common.util.ensureSuffix
 import io.etcd.jetcd.ByteSequence
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.kv.GetResponse
-import io.etcd.jetcd.options.DeleteOption
 import io.etcd.jetcd.options.GetOption
 import io.etcd.jetcd.options.GetOption.SortOrder
 

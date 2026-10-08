@@ -68,7 +68,7 @@ class LeaderLatchFaultTests : StringSpec() {
           },
         )
         latch.start()
-        try {
+        latch.use {
           latch.await(20.seconds) shouldBe true
 
           revokeLeaseOf(client, "$electionPath/LEADER")
@@ -85,8 +85,6 @@ class LeaderLatchFaultTests : StringSpec() {
           pollUntil(10.seconds) {
             events.count { it == "isLeader" } - events.count { it == "notLeader" } == 1
           } shouldBe true
-        } finally {
-          latch.close()
         }
       }
     }

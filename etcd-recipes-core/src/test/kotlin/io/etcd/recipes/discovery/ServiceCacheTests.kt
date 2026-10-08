@@ -27,7 +27,6 @@ import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.nonblockingThreads
 import io.etcd.recipes.common.pollUntil
 import io.etcd.recipes.common.urls
-import io.etcd.recipes.discovery.withServiceDiscovery
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -59,29 +58,22 @@ class ServiceCacheTests : StringSpec() {
             serviceName shouldBe name
             urls shouldBe urls
 
-            addListenerForChanges(object : ServiceCacheListener {
-              override fun cacheChanged(
-                eventType: EventType,
-                isAdd: Boolean,
-                instanceKey: String,
-                serviceInstance: ServiceInstance?,
-              ) {
-                captureException(holder) {
-                  instanceKey.split("/").first() shouldBe name
+            addListenerForChanges { eventType, isAdd, instanceKey, serviceInstance ->
+              captureException(holder) {
+                instanceKey.split("/").first() shouldBe name
 
-                  if (eventType == EventType.PUT) {
-                    if (isAdd) registerCounter.incrementAndFetch() else updateCounter.incrementAndFetch()
+                if (eventType == EventType.PUT) {
+                  if (isAdd) registerCounter.incrementAndFetch() else updateCounter.incrementAndFetch()
 
-                    serviceInstance?.name shouldBe name
-                  }
+                  serviceInstance?.name shouldBe name
+                }
 
-                  if (eventType == EventType.DELETE) {
-                    unregisterCounter.incrementAndFetch()
-                    serviceInstance?.name shouldBe name
-                  }
+                if (eventType == EventType.DELETE) {
+                  unregisterCounter.incrementAndFetch()
+                  serviceInstance?.name shouldBe name
                 }
               }
-            })
+            }
 
             addListenerForChanges { _, _, _, _ -> totalCounter.incrementAndFetch() }
 

@@ -32,6 +32,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.decrementAndFetch
 import kotlin.concurrent.atomics.incrementAndFetch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Coroutine-scoped mutual exclusion and concurrency limiting: [withLock] holds a
@@ -52,7 +53,7 @@ fun main() {
               mutex.withLock {
                 val n = counter.incrementAndFetch()
                 logger.info { "Worker $id holds the mutex (count=$n)" }
-                delay(100)
+                delay(100.milliseconds)
               }
             }
           }
@@ -67,7 +68,7 @@ fun main() {
               semaphore.withPermit {
                 val now = inFlight.incrementAndFetch()
                 logger.info { "Worker $id holds a permit ($now of 2 in flight)" }
-                delay(150)
+                delay(150.milliseconds)
                 inFlight.decrementAndFetch()
               }
             }

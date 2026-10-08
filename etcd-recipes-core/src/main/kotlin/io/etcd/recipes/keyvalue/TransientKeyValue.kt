@@ -31,10 +31,7 @@ import io.etcd.recipes.common.selfHealingKeepAlive
 import io.etcd.recipes.keyvalue.TransientKeyValue.Companion.defaultClientId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.seconds
 
 @JvmOverloads

@@ -18,10 +18,13 @@
 
 package io.etcd.recipes.design
 
+import io.etcd.jetcd.Client
 import io.etcd.jetcd.options.LeaseOption
 import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.recipes.barrier.DistributedBarrier
+import io.etcd.recipes.barrier.DistributedBarrierWithCount
+import io.etcd.recipes.barrier.DistributedDoubleBarrier
 import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.common.awaitOrFail
 import io.etcd.recipes.common.connectToEtcd
@@ -34,9 +37,13 @@ import io.etcd.recipes.common.urls
 import io.etcd.recipes.common.watcher
 import io.etcd.recipes.counter.DistributedAtomicLong
 import io.etcd.recipes.keyvalue.TransientKeyValue
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -281,15 +288,19 @@ class BugFixesTests : StringSpec() {
     }
 
     // ============================================================
-    // Fix #8: DistributedDoubleBarrier.close uses try/finally so the
-    // second barrier is always closed.
+    // Fix #8: DistributedDoubleBarrier.close closes the second barrier
+    // even when closing the first one throws.
     // ============================================================
     "fix #8: DistributedDoubleBarrier.close closes leaveBarrier even if enterBarrier.close throws" {
-      val src = readSource("src/main/kotlin/io/etcd/recipes/barrier/DistributedDoubleBarrier.kt")
-      // The fix introduces a try/finally around enterBarrier.close().
-      src.contains("try {") shouldBe true
-      src.contains("} finally {") shouldBe true
-      src.contains("leaveBarrier.close()") shouldBe true
+      // Constructing the barriers starts nothing, so swapping in mocks leaks nothing
+      val barrier = DistributedDoubleBarrier(mockk<Client>(relaxed = true), "/fix8", memberCount = 2)
+      val enter = mockk<DistributedBarrierWithCount> { every { close() } throws IllegalStateException("enter failed") }
+      val leave = mockk<DistributedBarrierWithCount>(relaxed = true)
+      barrier.replaceField("enterBarrier", enter)
+      barrier.replaceField("leaveBarrier", leave)
+
+      shouldThrow<IllegalStateException> { barrier.close() }.message shouldBe "enter failed"
+      verify(exactly = 1) { leave.close() }
     }
 
     // ============================================================
@@ -334,4 +345,13 @@ class BugFixesTests : StringSpec() {
 
   private fun readSource(relativePath: String): String =
     java.nio.file.Files.readString(java.nio.file.Path.of(relativePath))
+
+  // Sets a private field, to swap a recipe's internal parts for mocks
+  private fun Any.replaceField(
+    name: String,
+    value: Any,
+  ) = javaClass.getDeclaredField(name).run {
+    isAccessible = true
+    set(this@replaceField, value)
+  }
 }

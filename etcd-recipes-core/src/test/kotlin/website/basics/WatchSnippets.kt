@@ -57,7 +57,7 @@ fun scopedWatch(client: Client) {
   val seen = CountDownLatch(3)
   client.withWatcher(
     "/config/name",
-    block = { response -> response.events.forEach { seen.countDown() } },
+    block = { response -> response.events.forEach { _ -> seen.countDown() } },
   ) {
     seen.await()
   }

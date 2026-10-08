@@ -33,6 +33,7 @@ import io.etcd.recipes.common.urls
 import io.etcd.recipes.common.valueAsString
 import io.etcd.recipes.common.watchOption
 import io.etcd.recipes.coroutines.WatchFlowEvent
+import io.etcd.recipes.coroutines.untilTrue
 import io.etcd.recipes.coroutines.watchAsFlow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -44,9 +45,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 /**
  * Real faults through the Flow watch surface: recovery transitions arrive in-band
@@ -54,18 +53,6 @@ import kotlin.time.TimeSource
  */
 class WatchFlowFaultTests : StringSpec() {
   private val path = "/fault/${javaClass.simpleName}"
-
-  private suspend fun untilTrue(
-    timeout: Duration,
-    predicate: () -> Boolean,
-  ): Boolean {
-    val start = TimeSource.Monotonic.markNow()
-    while (start.elapsedNow() < timeout) {
-      if (predicate()) return true
-      delay(50)
-    }
-    return predicate()
-  }
 
   init {
     "a flow anchored at a compacted revision resyncs in-band and stays live" {
@@ -144,14 +131,14 @@ class WatchFlowFaultTests : StringSpec() {
               }
             }
           }
-          delay(1_000)
+          delay(1.seconds)
 
           client.putValue("$prefix/a", "before")
           untilTrue(10.seconds) { seen.contains("before") } shouldBe true
 
           EtcdTestContainer.pause()
           try {
-            delay(3_000)
+            delay(3.seconds)
           } finally {
             EtcdTestContainer.unpause()
           }

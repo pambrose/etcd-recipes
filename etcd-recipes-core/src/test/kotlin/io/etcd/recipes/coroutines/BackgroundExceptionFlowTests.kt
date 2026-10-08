@@ -32,6 +32,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -63,7 +64,7 @@ class BackgroundExceptionFlowTests : StringSpec() {
       val seen = CopyOnWriteArrayList<BackgroundException>()
       withScope { scope ->
         scope.launch { connector.backgroundExceptionsAsFlow().collect { seen += it } }
-        delay(500)
+        delay(500.milliseconds)
 
         val boom = RuntimeException("boom")
         connector.record(boom)
@@ -79,11 +80,11 @@ class BackgroundExceptionFlowTests : StringSpec() {
       val seen = CopyOnWriteArrayList<BackgroundException>()
       withScope { scope ->
         val job = scope.launch { connector.backgroundExceptionsAsFlow().collect { seen += it } }
-        delay(500)
+        delay(500.milliseconds)
         job.cancelAndJoin()
 
         connector.record(RuntimeException("after cancel"))
-        delay(500)
+        delay(500.milliseconds)
         seen.size shouldBe 0
       }
     }

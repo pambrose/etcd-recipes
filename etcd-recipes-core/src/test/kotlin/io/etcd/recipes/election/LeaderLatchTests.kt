@@ -44,7 +44,7 @@ class LeaderLatchTests : StringSpec() {
       connectToEtcd(urls) { client ->
         client.deleteChildren(path)
         val latch = LeaderLatch(client, "$path/lone", clientId = "solo").start()
-        try {
+        latch.use {
           latch.await(20.seconds) shouldBe true
           latch.hasLeadership shouldBe true
           // Participant advertisement is async, so poll rather than reading it point-in-time.
@@ -53,8 +53,6 @@ class LeaderLatchTests : StringSpec() {
               LeaderSelector.getParticipants(client, "$path/lone").single { it.isLeader }.clientId == "solo"
             }.getOrDefault(false)
           } shouldBe true
-        } finally {
-          latch.close()
         }
         latch.hasLeadership shouldBe false
         latch.hasExceptions shouldBe false
@@ -65,17 +63,13 @@ class LeaderLatchTests : StringSpec() {
       connectToEtcd(urls) { client ->
         client.deleteChildren(path)
         val holder = LeaderLatch(client, "$path/contended", clientId = "holder").start()
-        try {
+        holder.use {
           holder.await(20.seconds) shouldBe true
           val contender = LeaderLatch(client, "$path/contended", clientId = "contender").start()
-          try {
+          contender.use {
             contender.await(2.seconds) shouldBe false
             contender.hasLeadership shouldBe false
-          } finally {
-            contender.close()
           }
-        } finally {
-          holder.close()
         }
       }
     }
@@ -194,15 +188,13 @@ class LeaderLatchTests : StringSpec() {
         client.deleteChildren(path)
         val electionPath = "$path/never-led"
         val holder = LeaderLatch(client, electionPath, clientId = "holder").start()
-        try {
+        holder.use {
           holder.await(20.seconds) shouldBe true
           val waiter = LeaderLatch(client, electionPath, clientId = "waiter").start()
           waiter.hasLeadership shouldBe false
           waiter.close() // parked pre-leadership; must return promptly
           waiter.hasLeadership shouldBe false
           waiter.hasExceptions shouldBe false
-        } finally {
-          holder.close()
         }
       }
     }

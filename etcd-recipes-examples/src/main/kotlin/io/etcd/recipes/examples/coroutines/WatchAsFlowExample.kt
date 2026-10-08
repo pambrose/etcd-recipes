@@ -30,6 +30,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Consumes etcd watch events as a Flow: the collector sees puts and deletes in
@@ -61,11 +63,11 @@ fun main() {
             }
           }
         }
-      delay(500) // let the watch subscribe
+      delay(500.milliseconds) // let the watch subscribe
 
       repeat(5) { i -> client.awaitPutValue("$prefix/key$i", "value$i") }
       client.awaitDeleteChildren(prefix)
-      delay(1_000) // let the events arrive
+      delay(1.seconds) // let the events arrive
 
       collector.cancel() // closes the watcher
       logger.info { "Collector cancelled; done" }

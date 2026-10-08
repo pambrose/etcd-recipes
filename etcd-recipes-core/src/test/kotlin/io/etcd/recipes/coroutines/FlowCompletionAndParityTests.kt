@@ -48,14 +48,13 @@ import io.grpc.StatusRuntimeException
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
@@ -141,7 +140,7 @@ class FlowCompletionAndParityTests : StringSpec() {
   init {
     "watchAsFlow completes once its watch is abandoned" {
       val mocks = Mocks()
-      runBlocking {
+      coroutineScope {
         val events = async { mocks.client.watchAsFlow("/k", resilience = WatchResilience.DISABLED).toList() }
         mocks.awaitListener().die()
         val collected = withClue("the flow never completed") { withTimeout(10.seconds) { events.await() } }
@@ -151,7 +150,7 @@ class FlowCompletionAndParityTests : StringSpec() {
 
     "watchEventsAsFlow fails once its watch is abandoned" {
       val mocks = Mocks()
-      runBlocking {
+      coroutineScope {
         val events =
           async { runCatching { mocks.client.watchEventsAsFlow("/k", resilience = WatchResilience.DISABLED).toList() } }
         mocks.awaitListener().die()
@@ -162,7 +161,7 @@ class FlowCompletionAndParityTests : StringSpec() {
 
     "leadershipAsFlow completes after reporting that its watch was abandoned" {
       val mocks = Mocks()
-      runBlocking {
+      coroutineScope {
         val events =
           async { mocks.client.leadershipAsFlow("/election", resilience = WatchResilience.DISABLED).toList() }
         mocks.awaitListener().die()
@@ -174,7 +173,7 @@ class FlowCompletionAndParityTests : StringSpec() {
     "leadershipAsFlow ends with WatchFailed when its re-read after a resync fails" {
       val mocks = Mocks(okGets = 1) // the seed read works; the re-read after the resync doesn't
       val quick = WatchResilience(RetryPolicy.bounded(maxAttempts = 5, delay = 10.milliseconds))
-      runBlocking {
+      coroutineScope {
         val events = async { mocks.client.leadershipAsFlow("/election", resilience = quick).toList() }
         mocks.awaitListener().die(EtcdExceptionFactory.newCompactedException(5))
         val collected = withClue("the failed re-read was swallowed") { withTimeout(10.seconds) { events.await() } }
@@ -183,16 +182,14 @@ class FlowCompletionAndParityTests : StringSpec() {
     }
 
     "leadershipAsFlow and the suspend RPC engine run under a given RpcResilience, with metrics" {
-      connectToEtcd(urls) { client ->
+      connectToEtcd(urls).use { client ->
         val path = "$base/metrics"
         client.deleteChildren(path)
         val metrics = RecordingMetrics()
         val rpc = RpcResilience.DEFAULT.withMetrics(metrics)
-        runBlocking {
-          client.awaitPutValue("$path/k", "v", rpc = rpc)
-          client.awaitGetValue("$path/k", rpc = rpc)
-          client.leadershipAsFlow("$path/election", rpc = rpc).let { flow -> withTimeout(10.seconds) { flow.first() } }
-        }
+        client.awaitPutValue("$path/k", "v", rpc = rpc)
+        client.awaitGetValue("$path/k", rpc = rpc)
+        client.leadershipAsFlow("$path/election", rpc = rpc).let { flow -> withTimeout(10.seconds) { flow.first() } }
         withClue("recorded: ${metrics.rpcs}") {
           metrics.rpcs.any { it.startsWith("putValue") } shouldBe true
           metrics.rpcs.any { it.startsWith("getResponse") || it.startsWith("getValue") } shouldBe true
@@ -203,47 +200,43 @@ class FlowCompletionAndParityTests : StringSpec() {
     }
 
     "a suspended single-attempt call that times out keeps the timeout as its cause" {
-      runBlocking {
-        val failure =
-          shouldThrow<EtcdRecipeRuntimeException> {
-            suspendAwaitRpc(RpcResilience(RetryPolicy.never, 100.milliseconds), "txn", CompletableFuture<String>())
-          }
-        (failure.cause is TimeoutException) shouldBe true
-      }
+      val failure =
+        shouldThrow<EtcdRecipeRuntimeException> {
+          suspendAwaitRpc(RpcResilience(RetryPolicy.never, 100.milliseconds), "txn", CompletableFuture<String>())
+        }
+      (failure.cause is TimeoutException) shouldBe true
     }
 
     "the recipes added after the coroutine layer have suspending twins" {
-      connectToEtcd(urls) { client ->
+      connectToEtcd(urls).use { client ->
         val path = "$base/twins"
         client.deleteChildren(path)
-        runBlocking {
-          LeaderLatch(client, "$path/latch").use { latch ->
-            latch.awaitStart()
-            latch.awaitLeadership(10.seconds) shouldBe true
+        LeaderLatch(client, "$path/latch").use { latch ->
+          latch.awaitStart()
+          latch.awaitLeadership(10.seconds) shouldBe true
+        }
+        client.putValue("$path/node", "n")
+        NodeCache(client, "$path/node", StringCodec).use { cache ->
+          cache.awaitStart()
+          cache.current shouldBe "n"
+        }
+        ServiceDiscovery(client, "$path/discovery").use { sd ->
+          sd.registerService(ServiceInstance("svc", "{}"))
+          sd.serviceProvider("svc").use { provider ->
+            provider.awaitStart()
+            provider.awaitGetAllInstances().size shouldBe 1
+            provider.awaitGetInstance().name shouldBe "svc"
           }
-          client.putValue("$path/node", "n")
-          NodeCache(client, "$path/node", StringCodec).use { cache ->
-            cache.awaitStart()
-            cache.current shouldBe "n"
-          }
-          ServiceDiscovery(client, "$path/discovery").use { sd ->
-            sd.registerService(ServiceInstance("svc", "{}"))
-            sd.serviceProvider("svc").use { provider ->
-              provider.awaitStart()
-              provider.awaitGetAllInstances().size shouldBe 1
-              provider.awaitGetInstance().name shouldBe "svc"
-            }
-          }
-          TypedDistributedQueue(client, "$path/typed", StringCodec).use { queue ->
-            queue.awaitEnqueue("t")
-            queue.receive() shouldBe "t"
-          }
-          DistributedWorkQueue(client, "$path/work", WorkQueueConfig(maxDeliveries = 1)).use { queue ->
-            queue.enqueue("poison")
-            queue.awaitReceive().requeue() shouldBe true
-            queue.awaitTryReceive() shouldBe null // dead-lettered on the next receive
-            queue.awaitDeadLetters().map { it.id }.size shouldBe 1
-          }
+        }
+        TypedDistributedQueue(client, "$path/typed", StringCodec).use { queue ->
+          queue.awaitEnqueue("t")
+          queue.receive() shouldBe "t"
+        }
+        DistributedWorkQueue(client, "$path/work", WorkQueueConfig(maxDeliveries = 1)).use { queue ->
+          queue.enqueue("poison")
+          queue.awaitReceive().requeue() shouldBe true
+          queue.awaitTryReceive() shouldBe null // dead-lettered on the next receive
+          queue.awaitDeadLetters().map { it.id }.size shouldBe 1
         }
         client.deleteChildren(path)
       }

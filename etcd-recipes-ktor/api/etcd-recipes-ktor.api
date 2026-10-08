@@ -1,0 +1,20 @@
+public final class io/etcd/recipes/ktor/EtcdPluginConfig {
+	public fun <init> ()V
+	public final fun getClient ()Lio/etcd/jetcd/Client;
+	public final fun getEndpoints ()Ljava/util/List;
+	public final fun getNamespace ()Ljava/lang/String;
+	public final fun getPassword ()Ljava/lang/String;
+	public final fun getUser ()Ljava/lang/String;
+	public final fun setClient (Lio/etcd/jetcd/Client;)V
+	public final fun setEndpoints (Ljava/util/List;)V
+	public final fun setNamespace (Ljava/lang/String;)V
+	public final fun setPassword (Ljava/lang/String;)V
+	public final fun setUser (Ljava/lang/String;)V
+}
+
+public final class io/etcd/recipes/ktor/EtcdPluginKt {
+	public static final fun getEtcdClient (Lio/ktor/server/application/Application;)Lio/etcd/jetcd/Client;
+	public static final fun getEtcdPlugin ()Lio/ktor/server/application/ApplicationPlugin;
+	public static final fun getEtcdRecipes (Lio/ktor/server/application/Application;)Lio/etcd/recipes/common/EtcdRecipes;
+}
+

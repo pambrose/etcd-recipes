@@ -1,0 +1,76 @@
+public final class io/etcd/recipes/spring/EtcdAutoConfiguration {
+	public fun <init> ()V
+	public final fun etcdClient (Lio/etcd/recipes/spring/EtcdProperties;)Lio/etcd/jetcd/Client;
+	public final fun etcdRecipes (Lio/etcd/jetcd/Client;)Lio/etcd/recipes/common/EtcdRecipes;
+}
+
+public final class io/etcd/recipes/spring/EtcdAutoConfiguration$EtcdHealthConfiguration {
+	public fun <init> ()V
+	public final fun etcdHealthIndicator (Lio/etcd/jetcd/Client;Lio/etcd/recipes/spring/EtcdProperties;)Lorg/springframework/boot/health/contributor/HealthIndicator;
+}
+
+public final class io/etcd/recipes/spring/EtcdHealthIndicator : org/springframework/boot/health/contributor/HealthIndicator {
+	public fun <init> (Lio/etcd/jetcd/Client;)V
+	public fun <init> (Lio/etcd/jetcd/Client;Ljava/time/Duration;)V
+	public synthetic fun <init> (Lio/etcd/jetcd/Client;Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun health ()Lorg/springframework/boot/health/contributor/Health;
+}
+
+public final class io/etcd/recipes/spring/EtcdProperties {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Duration;Ljava/time/Duration;Lio/etcd/recipes/spring/EtcdProperties$Tls;Lio/etcd/recipes/spring/EtcdProperties$HealthProbe;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Duration;Ljava/time/Duration;Lio/etcd/recipes/spring/EtcdProperties$Tls;Lio/etcd/recipes/spring/EtcdProperties$HealthProbe;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/time/Duration;
+	public final fun component6 ()Ljava/time/Duration;
+	public final fun component7 ()Lio/etcd/recipes/spring/EtcdProperties$Tls;
+	public final fun component8 ()Lio/etcd/recipes/spring/EtcdProperties$HealthProbe;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Duration;Ljava/time/Duration;Lio/etcd/recipes/spring/EtcdProperties$Tls;Lio/etcd/recipes/spring/EtcdProperties$HealthProbe;)Lio/etcd/recipes/spring/EtcdProperties;
+	public static synthetic fun copy$default (Lio/etcd/recipes/spring/EtcdProperties;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/time/Duration;Ljava/time/Duration;Lio/etcd/recipes/spring/EtcdProperties$Tls;Lio/etcd/recipes/spring/EtcdProperties$HealthProbe;ILjava/lang/Object;)Lio/etcd/recipes/spring/EtcdProperties;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConnectTimeout ()Ljava/time/Duration;
+	public final fun getEndpoints ()Ljava/util/List;
+	public final fun getHealth ()Lio/etcd/recipes/spring/EtcdProperties$HealthProbe;
+	public final fun getNamespace ()Ljava/lang/String;
+	public final fun getPassword ()Ljava/lang/String;
+	public final fun getRetryMaxDuration ()Ljava/time/Duration;
+	public final fun getTls ()Lio/etcd/recipes/spring/EtcdProperties$Tls;
+	public final fun getUser ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun toConnectionConfig ()Lio/etcd/recipes/common/EtcdConnectionConfig;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/spring/EtcdProperties$HealthProbe {
+	public fun <init> ()V
+	public fun <init> (Ljava/time/Duration;)V
+	public synthetic fun <init> (Ljava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/time/Duration;
+	public final fun copy (Ljava/time/Duration;)Lio/etcd/recipes/spring/EtcdProperties$HealthProbe;
+	public static synthetic fun copy$default (Lio/etcd/recipes/spring/EtcdProperties$HealthProbe;Ljava/time/Duration;ILjava/lang/Object;)Lio/etcd/recipes/spring/EtcdProperties$HealthProbe;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTimeout ()Ljava/time/Duration;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/etcd/recipes/spring/EtcdProperties$Tls {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/etcd/recipes/spring/EtcdProperties$Tls;
+	public static synthetic fun copy$default (Lio/etcd/recipes/spring/EtcdProperties$Tls;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/etcd/recipes/spring/EtcdProperties$Tls;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCaCertPath ()Ljava/lang/String;
+	public final fun getClientCertPath ()Ljava/lang/String;
+	public final fun getClientKeyPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+

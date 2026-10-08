@@ -63,8 +63,7 @@ import kotlin.time.Duration
  * `withLock { }` — import one of the two explicitly.
  */
 suspend fun <T> EtcdLock.withLock(action: suspend () -> T): T {
-  val confined = confinedDispatcher("etcd-suspend-lock")
-  try {
+  confinedDispatcher("etcd-suspend-lock").use { confined ->
     interruptibleAcquire(confined, { lock() }, { unlock() })
     try {
       return holdingLock(confined, action)
@@ -72,8 +71,6 @@ suspend fun <T> EtcdLock.withLock(action: suspend () -> T): T {
       // NonCancellable: the release leg must run even when action() was cancelled
       withContext(NonCancellable) { runInterruptible(confined) { unlock() } }
     }
-  } finally {
-    confined.close()
   }
 }
 
@@ -87,16 +84,13 @@ suspend fun <T : Any> EtcdLock.withLock(
   timeout: Duration,
   action: suspend () -> T,
 ): T? {
-  val confined = confinedDispatcher("etcd-suspend-lock")
-  try {
+  confinedDispatcher("etcd-suspend-lock").use { confined ->
     if (!interruptibleAcquire(confined, { tryLock(timeout) }, { acquired -> if (acquired) unlock() })) return null
     try {
       return holdingLock(confined, action)
     } finally {
       withContext(NonCancellable) { runInterruptible(confined) { unlock() } }
     }
-  } finally {
-    confined.close()
   }
 }
 
@@ -176,14 +170,8 @@ suspend fun <T> DistributedSemaphore.withPermit(action: suspend () -> T): T {
 }
 
 // Runs [block] with a dedicated thread (see confinedDispatcher), closed afterward.
-private suspend fun <T> onOwnThread(block: suspend (kotlinx.coroutines.CoroutineDispatcher) -> T): T {
-  val thread = confinedDispatcher("etcd-suspend-semaphore")
-  try {
-    return block(thread)
-  } finally {
-    thread.close()
-  }
-}
+private suspend fun <T> onOwnThread(block: suspend (kotlinx.coroutines.CoroutineDispatcher) -> T): T =
+  confinedDispatcher("etcd-suspend-semaphore").use { thread -> block(thread) }
 
 // Runs [action], cancelling it when a loss reported through [register] turns out to be
 // this call's hold ([stillHeld] false). Then throws HoldLostException rather than the

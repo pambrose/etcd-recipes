@@ -16,6 +16,11 @@ indent_style = tab
 indent_size = 4
 
 [*.{kt,kts}]
+# Keep IntelliJ's optimize-imports from collapsing imports into `*` (detekt's WildcardImport
+# rejects them): no name count triggers a star import, and no package always gets one.
+ij_kotlin_name_count_to_use_star_import = 2147483647
+ij_kotlin_name_count_to_use_star_import_for_members = 2147483647
+ij_kotlin_packages_to_use_import_on_demand = unset
 ktlint_standard_no-wildcard-imports = disabled
 ktlint_standard_no-unused-imports = disabled
 ktlint_standard_multiline-if-else = disabled

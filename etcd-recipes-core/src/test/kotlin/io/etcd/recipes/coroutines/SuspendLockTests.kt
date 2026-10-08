@@ -43,6 +43,7 @@ import java.util.concurrent.Executors
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.decrementAndFetch
 import kotlin.concurrent.atomics.incrementAndFetch
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -90,7 +91,7 @@ class SuspendLockTests : StringSpec() {
                     val now = inCritical.incrementAndFetch()
                     maxInCritical.accumulateMax(now)
                     unguarded += 1
-                    delay(50)
+                    delay(50.milliseconds)
                     inCritical.decrementAndFetch()
                   }
                 }
@@ -202,7 +203,7 @@ class SuspendLockTests : StringSpec() {
                 rw.readLock.withLock {
                   val now = concurrent.incrementAndFetch()
                   maxConcurrent.accumulateMax(now)
-                  delay(500)
+                  delay(500.milliseconds)
                   concurrent.decrementAndFetch()
                 }
               }
@@ -234,7 +235,7 @@ class SuspendLockTests : StringSpec() {
         client.deleteChildren(base)
         DistributedSemaphore(client, "$base/sem-split", 1).use { sem ->
           sem.awaitAcquire()
-          delay(100) // resumption may land on a different IO thread — instance-held, so fine
+          delay(100.milliseconds) // resumption may land on a different IO thread — instance-held, so fine
           sem.awaitAvailablePermits() shouldBe 0
           sem.awaitRelease() shouldBe true
           sem.awaitAvailablePermits() shouldBe 1
@@ -256,7 +257,7 @@ class SuspendLockTests : StringSpec() {
                 sem.withPermit {
                   val now = inFlight.incrementAndFetch()
                   maxInFlight.accumulateMax(now)
-                  delay(200)
+                  delay(200.milliseconds)
                   inFlight.decrementAndFetch()
                 }
               }

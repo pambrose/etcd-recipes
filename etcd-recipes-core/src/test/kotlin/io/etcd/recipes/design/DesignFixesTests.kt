@@ -256,11 +256,9 @@ class DesignFixesTests : StringSpec() {
       val client = io.etcd.jetcd.Client.builder()
         .endpoints("http://127.0.0.1:1")
         .build()
-      try {
+      client.use {
         // No I/O performed; no exception expected.
         DistributedAtomicLong(client, "/counter/never-touched")
-      } finally {
-        client.close()
       }
     }
 

@@ -7,11 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (build)
+
+- Kotlin's ABI validation checks every published module's public API against a reference
+  dump checked in under `<module>/api/`. `check` and pull-request CI fail when the API
+  changes; after an intended change, `make api-dump` updates the dump to commit with it
+  (`make api-check` runs the check alone).
+
+### Changed (build)
+
+- Built with Kotlin 2.4.21 (from 2.4.20) and Gradle 9.8.1 (from 9.8.0).
+  `etcd-recipes-core` depends on Guava 33.7.2 (from 33.7.1) and common-utils 5.1.1 (from
+  5.1.0); the examples and tests use Logback 1.6.5 (from 1.6.4).
+
 ### Changed (CI)
 
 - CI's full test run on master leaves out the Lincheck model checks (`-PskipLincheck`).
   They're CPU-heavy, and on a 2-core runner they pushed the suite past its 40-minute
   timeout. They still run locally with `make tests` and `make tests-tc`.
+- A zizmor workflow audits the GitHub Actions workflows on every pull request and master
+  push; `make zizmor` runs the same zizmor release locally.
+- Every action in the workflows is pinned to a commit SHA, with its release in a trailing
+  comment, and checkouts no longer leave the git credential on disk
+  (`persist-credentials: false`). Dependabot proposes action updates weekly, once a
+  release is a week old.
 
 ## [0.13.0] - 2026-09-30
 

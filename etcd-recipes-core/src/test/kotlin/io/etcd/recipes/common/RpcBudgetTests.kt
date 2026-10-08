@@ -20,7 +20,6 @@ package io.etcd.recipes.common
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.KV
-import io.etcd.jetcd.kv.GetResponse
 import io.etcd.recipes.discovery.ServiceDiscovery
 import io.etcd.recipes.discovery.ServiceInstance
 import io.etcd.recipes.election.LeaderSelector
@@ -176,7 +175,7 @@ class RpcBudgetTests : StringSpec() {
     "ping counts a definite server reply as reachable" {
       val kv = mockk<KV>()
       every { kv.get(any(), any()) } returns
-        CompletableFuture.failedFuture<GetResponse>(StatusRuntimeException(Status.PERMISSION_DENIED))
+        CompletableFuture.failedFuture(StatusRuntimeException(Status.PERMISSION_DENIED))
       val client = mockk<Client> { every { kvClient } returns kv }
       withClue("an RBAC-scoped cluster reported unreachable") { client.ping() shouldBe true }
     }

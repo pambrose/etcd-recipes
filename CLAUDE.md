@@ -17,6 +17,8 @@ JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17
 - `make all-tests` — all three variants in sequence
 - `make etcd-start` / `make etcd-stop` — start / gracefully stop a local etcd
 - `make lint` — `./gradlew lintKotlin detekt`
+- `make zizmor` — audit the GitHub Actions workflows with [zizmor](https://docs.zizmor.sh), running the release pinned by `ZIZMOR_VERSION` through `uvx` (keep it equal to the `version:` input in `zizmor.yml`; borrows the `gh` CLI's token for the online audits). Workflows pin every action to a commit SHA with its release in a trailing comment (Dependabot bumps both weekly, per `.github/dependabot.yml`), and check out with `persist-credentials: false`
+- `make api-check` / `make api-dump` — check the published modules' public API against the reference dumps in `<module>/api/*.api` (Kotlin ABI validation; also part of `check` and PR CI) / rewrite the dumps after an intended API change, and commit them with it. An unintended diff here is a breaking change to a published artifact
 - `make tla` — model-check the TLA+ protocol specs in `specs/` with TLC (downloads a pinned TLC once; runs in CI)
 - `make coverage` — Kover HTML + XML reports + summary
 - `make kdocs` — Dokka HTML / Javadoc
@@ -26,7 +28,7 @@ JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17
 - `make refresh` — refresh dependencies
 - `make upgrade-wrapper` — bumps the Gradle wrapper
 
-GitHub CI does not run the test suite on pull requests — it only compiles every source set, lints, and runs the TLA+ models (the Testcontainers suite takes 30+ minutes on a hosted runner). Run `make tests-tc` locally and confirm it passes before a PR merges. Pushes to `master` still run the full suite and upload coverage.
+GitHub CI does not run the test suite on pull requests — it only compiles every source set, lints, checks the public API dumps, audits the workflows with zizmor, and runs the TLA+ models (the Testcontainers suite takes 30+ minutes on a hosted runner). Run `make tests-tc` locally and confirm it passes before a PR merges. Pushes to `master` still run the full suite and upload coverage.
 
 Run a single test class:
 ```

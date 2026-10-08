@@ -33,12 +33,12 @@ import io.kotest.matchers.string.shouldStartWith
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.time.Duration
@@ -58,13 +58,10 @@ import kotlin.time.Duration.Companion.seconds
  *   that a permit-loss interrupt would hit.
  */
 class CancellationSafetyTests : StringSpec() {
-  // Launches [block] lazily, handing it its own Job so a mock can cancel it, then waits.
-  private fun cancelledMidCall(block: suspend (Job) -> Unit) =
-    runBlocking {
-      val job = AtomicReference<Job?>(null)
-      val launched = launch(Dispatchers.Default, start = CoroutineStart.LAZY) { block(job.load()!!) }
-      job.store(launched)
-      launched.start()
+  // Launches [block], handing it its own Job so a mock can cancel it, then waits.
+  private suspend fun cancelledMidCall(block: suspend (Job) -> Unit) =
+    coroutineScope {
+      val launched = launch(Dispatchers.Default) { block(coroutineContext.job) }
       launched.join()
       launched.isCancelled shouldBe true
     }
@@ -141,15 +138,13 @@ class CancellationSafetyTests : StringSpec() {
     }
 
     "an interrupt re-wrapped in a checked EtcdRecipeException surfaces as cancellation" {
-      runBlocking {
-        shouldThrow<TimeoutCancellationException> {
-          withTimeout(200.milliseconds) {
-            interruptibleOn(Dispatchers.IO) {
-              try {
-                Thread.sleep(10_000)
-              } catch (e: InterruptedException) {
-                throw EtcdRecipeException("Service registration failed", EtcdRecipeRuntimeException("grant", e))
-              }
+      shouldThrow<TimeoutCancellationException> {
+        withTimeout(200.milliseconds) {
+          interruptibleOn(Dispatchers.IO) {
+            try {
+              Thread.sleep(10_000)
+            } catch (e: InterruptedException) {
+              throw EtcdRecipeException("Service registration failed", EtcdRecipeRuntimeException("grant", e))
             }
           }
         }
@@ -157,15 +152,13 @@ class CancellationSafetyTests : StringSpec() {
     }
 
     "an interrupt replaced by an exception with no cause surfaces as cancellation" {
-      runBlocking {
-        shouldThrow<TimeoutCancellationException> {
-          withTimeout(200.milliseconds) {
-            interruptibleOn(Dispatchers.IO) {
-              try {
-                Thread.sleep(10_000)
-              } catch (e: InterruptedException) {
-                throw EtcdRecipeRuntimeException("Failed to set waitingPath")
-              }
+      shouldThrow<TimeoutCancellationException> {
+        withTimeout(200.milliseconds) {
+          interruptibleOn(Dispatchers.IO) {
+            try {
+              Thread.sleep(10_000)
+            } catch (e: InterruptedException) {
+              throw EtcdRecipeRuntimeException("Failed to set waitingPath")
             }
           }
         }
@@ -173,20 +166,18 @@ class CancellationSafetyTests : StringSpec() {
     }
 
     "a genuine failure of a live caller still propagates unchanged" {
-      runBlocking {
-        val thrown =
-          shouldThrow<EtcdRecipeException> {
-            interruptibleOn(Dispatchers.IO) { throw EtcdRecipeException("real failure") }
-          }
-        thrown.message shouldBe "real failure"
-      }
+      val thrown =
+        shouldThrow<EtcdRecipeException> {
+          interruptibleOn(Dispatchers.IO) { throw EtcdRecipeException("real failure") }
+        }
+      thrown.message shouldBe "real failure"
     }
 
     "the semaphore's suspend acquire runs on a dedicated thread, not a shared IO worker" {
       val semaphore = mockk<DistributedSemaphore>(relaxed = true)
       val acquirer = AtomicReference<String?>(null)
       every { semaphore.acquire() } answers { acquirer.store(Thread.currentThread().name) }
-      runBlocking { semaphore.awaitAcquire() }
+      semaphore.awaitAcquire()
       withClue("acquired on ${acquirer.load()}") { acquirer.load()!! shouldStartWith "etcd-suspend-" }
     }
   }

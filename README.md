@@ -638,6 +638,9 @@ make tests-tc           # full test suite against an ephemeral Testcontainers et
 make tests-container    # multi-container variant: each participant in its own container
 make all-tests          # all three variants in sequence
 make lint               # kotlinter + detekt
+make zizmor             # audit the GitHub Actions workflows with zizmor
+make api-check          # check the published public API against the api/ dumps
+make api-dump           # update the api/ dumps after an intended API change
 make coverage           # Kover HTML + XML reports
 make kdocs              # Dokka HTML / Javadoc
 make versions           # gradle dependencyUpdates
@@ -647,8 +650,9 @@ make site               # serve the documentation site locally
 make docs-check         # compile the doc snippets + build the site strictly
 ```
 
-GitHub CI compiles and lints pull requests and runs the TLA+ models, but does not run the test
-suite, which takes 30+ minutes on a hosted runner. Run `make tests-tc` and confirm it passes
+GitHub CI compiles and lints pull requests, checks the public API against the `api/` dumps,
+audits the workflows with zizmor, and runs the TLA+ models, but does not run the test suite,
+which takes 30+ minutes on a hosted runner. Run `make tests-tc` and confirm it passes
 before a PR merges; pushes to `master` still run the full suite.
 
 `make tests` and the examples expect a local etcd at `http://localhost:2379`. Start one with:

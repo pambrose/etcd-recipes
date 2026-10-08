@@ -23,7 +23,6 @@ import com.pambrose.common.delegate.AtomicDelegates.nonNullableReference
 import io.etcd.jetcd.Client
 import io.etcd.recipes.common.EstablishDeclinedException
 import io.etcd.recipes.common.EtcdConnector
-import io.etcd.recipes.common.EtcdConnector.Companion.DEFAULT_TTL_SECS
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.LeaseEvent
