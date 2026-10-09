@@ -1,11 +1,15 @@
 .PHONY: default help tla clean clean-all stop etcd-start etcd-stop build tests tests-tc tests-container all-tests coverage kdocs \
         site clean-site check-site upgrade-site docs-check \
-        lint detekt detekt-baseline refresh versions publish-local publish-local-snapshot \
+        lint detekt detekt-baseline zizmor api-check api-dump refresh versions publish-local publish-local-snapshot \
         publish-snapshot publish-maven-central upgrade-wrapper \
         _check-gpg-env _require-version _require-gradle-version
 
 VERSION := $(shell sed -n 's/^version=\(.*\)/\1/p' gradle.properties)
 GRADLE_VERSION := $(shell sed -n 's/^gradle-wrapper = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+
+# The zizmor release `make zizmor` runs; keep it equal to the `version:` input in
+# .github/workflows/zizmor.yml so the local audit and CI's are the same.
+ZIZMOR_VERSION := 1.30.1
 
 # The uv project root: where pyproject.toml and uv.lock live. The check-site /
 # upgrade-site targets cd here so `uv lock` finds the project.
@@ -114,6 +118,22 @@ detekt: ## Run detekt static analysis
 
 detekt-baseline: ## (Re)generate detekt baseline files
 	./gradlew detektBaseline
+
+# Runs the pinned ZIZMOR_VERSION through uvx (uv already builds the docs site), so no
+# local install is needed. zizmor reads GH_TOKEN for its online audits (actions with
+# known advisories, impostor commits); borrow the gh CLI's token when it's logged in, or
+# run only the offline audits. GH_TOKEN is exported only when set: zizmor rejects an empty one.
+zizmor: ## Audit the GitHub Actions workflows with zizmor (the version CI runs)
+	@token="$${GH_TOKEN:-$$(gh auth token 2>/dev/null)}"; \
+	if [ -n "$$token" ]; then export GH_TOKEN="$$token"; else unset GH_TOKEN; echo "No GitHub token: running the offline audits only"; fi; \
+	uvx zizmor@$(ZIZMOR_VERSION) .
+
+api-check: ## Check the published modules' public API against their api/ reference dumps
+	./gradlew checkKotlinAbi
+
+# Run after an intended public-API change, and commit the updated api/*.api files with it
+api-dump: ## Update the api/ reference dumps to the current public API
+	./gradlew updateKotlinAbi
 
 refresh: ## Force-refresh Gradle dependencies
 	./gradlew --refresh-dependencies

@@ -79,7 +79,7 @@ class ThreadedServiceDiscoveryTests : StringSpec() {
                 contextMap.forEach { (_, context) ->
                     context.serviceMap.forEach { (_, service) ->
                         val payload = TestPayload.toObject(service.jsonPayload)
-                        payload.testval = payload.testval * -1
+                        payload.testval *= -1
                         service.jsonPayload = payload.toJson()
                         logger.info { "Updating service: $service" }
                         context.serviceDiscovery.updateService(service)
@@ -110,7 +110,7 @@ class ThreadedServiceDiscoveryTests : StringSpec() {
                 contextMap.forEach { (_, context) ->
                     context.serviceMap.forEach { (_, service) ->
                         val payload = TestPayload.toObject(service.jsonPayload)
-                        payload.testval = payload.testval * -1
+                        payload.testval *= -1
                         service.jsonPayload = payload.toJson()
                         logger.info { "Unregistering service: $service" }
                         context.serviceDiscovery.unregisterService(service)

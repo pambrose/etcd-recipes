@@ -46,7 +46,6 @@ import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.getChildrenValues
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.isKeyNotPresent
 import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.isLeaseNotFound
 import io.etcd.recipes.common.leaseGrant
@@ -524,11 +523,7 @@ constructor(
     // Run until closed; closing the healer revokes the participation lease promptly
     // (#7) so the participant key is evicted on relinquish instead of lingering
     // until TTL (which is what forces the pre-CAS wait loop above).
-    try {
-      terminateKeepAlive.waitUntilTrue()
-    } finally {
-      healer.close()
-    }
+    healer.use { terminateKeepAlive.waitUntilTrue() }
   }
 
   private fun onParticipationLeaseEvent(event: LeaseEvent) {
@@ -684,7 +679,7 @@ constructor(
     // How long a finishing candidacy waits for its watch and participation threads to end
     private const val HELPER_JOIN_MILLIS = 10_000L
 
-    internal fun defaultClientId() = EtcdConnector.defaultClientId(LeaderSelector::class.simpleName!!)
+    internal fun defaultClientId() = defaultClientId(LeaderSelector::class.simpleName!!)
 
     // The clientId of the election's current leader, or null when there is none
     private fun Client.currentLeaderId(

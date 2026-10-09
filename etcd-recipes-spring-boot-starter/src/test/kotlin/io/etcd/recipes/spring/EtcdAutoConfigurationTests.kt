@@ -34,7 +34,6 @@ import org.springframework.boot.test.context.FilteredClassLoader
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import java.io.File
 import java.time.Duration
-import java.util.function.Supplier
 
 /**
  * The auto-configuration wires a [Client] + [EtcdRecipes] from properties (jetcd's `build()` is
@@ -75,7 +74,7 @@ class EtcdAutoConfigurationTests : StringSpec() {
     "every etcd.recipes property binds" {
       runner
         // A supplied client: building one from these TLS paths would read files that don't exist
-        .withBean("myClient", Client::class.java, Supplier { mockk<Client>(relaxed = true) })
+        .withBean("myClient", Client::class.java, { mockk<Client>(relaxed = true) })
         .withPropertyValues(
           "etcd.recipes.endpoints=http://a:2379,http://b:2379",
           "etcd.recipes.user=root",
@@ -138,7 +137,7 @@ class EtcdAutoConfigurationTests : StringSpec() {
 
     "a user-supplied Client bean is not overridden" {
       runner
-        .withBean("myClient", Client::class.java, Supplier { mockk<Client>(relaxed = true) })
+        .withBean("myClient", Client::class.java, { mockk<Client>(relaxed = true) })
         .run { context ->
           context.getBeansOfType(Client::class.java).keys.toList() shouldContainExactly ["myClient"]
         }

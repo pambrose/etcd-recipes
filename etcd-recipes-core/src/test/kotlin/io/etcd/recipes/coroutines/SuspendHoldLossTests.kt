@@ -38,6 +38,7 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -205,7 +206,7 @@ class SuspendHoldLossTests : StringSpec() {
               holders.count { it.isCompleted } shouldBe 1
             }
             release.complete(Unit)
-            holders.map { it.await() }.count { it.getOrNull() == "finished" } shouldBe 1
+            holders.awaitAll().count { it.getOrNull() == "finished" } shouldBe 1
           }
         }
         client.deleteChildren(path)

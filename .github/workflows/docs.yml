@@ -4,7 +4,11 @@ on:
   # Deploy only what CI passed: a push to master runs CI (which compiles every snippet
   # source set and runs the full suite), and CI's success on that push runs this. A
   # site whose snippets no longer compile never deploys.
-  workflow_run:
+  # zizmor flags every workflow_run (dangerous-triggers): it runs with this repo's
+  # token even when a fork's PR fired the CI run. The build job's `if` admits only a
+  # CI run triggered by a push, and CI runs on pushes to master alone, so fork code
+  # never gets here.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [CI]
     types: [completed]
     branches: [master]
@@ -40,10 +44,11 @@ jobs:
         # `-f website/etcd-recipes/zensical.toml` silently finds no snippets.
         working-directory: website/etcd-recipes
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The commit CI verified, not whatever master has moved on to since
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
 
       # NOTE: deliberately no actions/configure-pages here. It exists to enable
       # Pages and to expose base_url/origin outputs for generators that need
@@ -53,10 +58,7 @@ jobs:
 
       # uv resolves zensical from website/uv.lock, so CI builds the docs with the
       # same pinned version as a local `make site`.
-      # Pinned to an exact tag on purpose: astral-sh/setup-uv publishes a floating
-      # major only up to v7 — the 8.x line has patch tags only, so `@v8` does not
-      # resolve. Bump this deliberately.
-      - uses: astral-sh/setup-uv@v8.3.2
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
 
@@ -65,7 +67,7 @@ jobs:
         # link) into build failures.
         run: uv run zensical build --clean --strict
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: website/etcd-recipes/site
 
@@ -83,5 +85,5 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/deploy-pages@v5
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
         id: deployment

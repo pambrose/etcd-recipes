@@ -14,6 +14,9 @@ make tests-tc   # full suite against an ephemeral Testcontainers etcd (needs Doc
 make all-tests  # local, Testcontainers and multi-container variants in sequence
 make tla        # model-check the TLA+ protocol specs in specs/ with TLC
 make lint       # ./gradlew lintKotlin detekt
+make zizmor     # audit the GitHub Actions workflows with zizmor
+make api-check  # check the published public API against the api/ dumps
+make api-dump   # update the api/ dumps after an intended API change
 make coverage   # Kover HTML + XML + summary
 make kdocs      # Dokka API docs
 ```

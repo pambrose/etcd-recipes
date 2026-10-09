@@ -1,0 +1,29 @@
+public final class io/etcd/recipes/micrometer/EtcdGaugesKt {
+	public static final fun bindAvailablePermits (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/lock/DistributedSemaphore;)Lio/micrometer/core/instrument/Gauge;
+	public static final fun bindAvailablePermits (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/lock/DistributedSemaphore;Lio/micrometer/core/instrument/Tags;)Lio/micrometer/core/instrument/Gauge;
+	public static final fun bindAvailablePermits (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/lock/DistributedSemaphore;Lio/micrometer/core/instrument/Tags;Lio/etcd/recipes/common/RpcResilience;)Lio/micrometer/core/instrument/Gauge;
+	public static synthetic fun bindAvailablePermits$default (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/lock/DistributedSemaphore;Lio/micrometer/core/instrument/Tags;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/micrometer/core/instrument/Gauge;
+	public static final fun bindCacheSize (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/cache/PathChildrenCache;Lio/micrometer/core/instrument/Tags;)Lio/micrometer/core/instrument/Gauge;
+	public static synthetic fun bindCacheSize$default (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/cache/PathChildrenCache;Lio/micrometer/core/instrument/Tags;ILjava/lang/Object;)Lio/micrometer/core/instrument/Gauge;
+	public static final fun bindLeadership (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/election/LeaderLatch;Lio/micrometer/core/instrument/Tags;)Lio/micrometer/core/instrument/Gauge;
+	public static synthetic fun bindLeadership$default (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/election/LeaderLatch;Lio/micrometer/core/instrument/Tags;ILjava/lang/Object;)Lio/micrometer/core/instrument/Gauge;
+	public static final fun bindQueueDepth (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/queue/AbstractQueue;)Lio/micrometer/core/instrument/Gauge;
+	public static final fun bindQueueDepth (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/queue/AbstractQueue;Lio/micrometer/core/instrument/Tags;)Lio/micrometer/core/instrument/Gauge;
+	public static final fun bindQueueDepth (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/queue/AbstractQueue;Lio/micrometer/core/instrument/Tags;Lio/etcd/recipes/common/RpcResilience;)Lio/micrometer/core/instrument/Gauge;
+	public static synthetic fun bindQueueDepth$default (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/queue/AbstractQueue;Lio/micrometer/core/instrument/Tags;Lio/etcd/recipes/common/RpcResilience;ILjava/lang/Object;)Lio/micrometer/core/instrument/Gauge;
+	public static final fun bindServiceCacheSize (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/discovery/ServiceCache;Lio/micrometer/core/instrument/Tags;)Lio/micrometer/core/instrument/Gauge;
+	public static synthetic fun bindServiceCacheSize$default (Lio/micrometer/core/instrument/MeterRegistry;Lio/etcd/recipes/discovery/ServiceCache;Lio/micrometer/core/instrument/Tags;ILjava/lang/Object;)Lio/micrometer/core/instrument/Gauge;
+}
+
+public final class io/etcd/recipes/micrometer/MicrometerEtcdMetrics : io/etcd/recipes/common/EtcdMetrics {
+	public fun <init> (Lio/micrometer/core/instrument/MeterRegistry;)V
+	public fun incrementKeepAlive (Ljava/lang/String;J)V
+	public fun incrementLeadershipTransition (Ljava/lang/String;Z)V
+	public fun incrementWatchRecovery (Ljava/lang/String;Ljava/lang/String;)V
+	public fun recordCacheSync-8Mi8wO0 (Ljava/lang/String;JI)V
+	public fun recordLockHold-HG0u8IE (Ljava/lang/String;J)V
+	public fun recordLockWait-8Mi8wO0 (Ljava/lang/String;JZ)V
+	public fun recordQueue-SxA4cEA (Ljava/lang/String;Ljava/lang/String;J)V
+	public fun recordRpc-dWUq8MI (Ljava/lang/String;JIZ)V
+}
+

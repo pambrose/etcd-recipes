@@ -84,13 +84,10 @@ constructor(
   fun leave(timeout: Duration): Boolean = leaveBarrier.waitOnBarrier(timeout)
 
   override fun close() {
-    // Without try/finally an exception from enterBarrier.close() would leak
-    // the second barrier (its watcher and dispatcher executor).
-    try {
-      enterBarrier.close()
-    } finally {
-      leaveBarrier.close()
-    }
+    // leaveBarrier is closed even when enterBarrier.close() throws, which would otherwise
+    // leak it (its watcher and dispatcher executor). If both throw, use() keeps the
+    // first failure and attaches the second as suppressed.
+    leaveBarrier.use { enterBarrier.close() }
   }
 
   companion object {

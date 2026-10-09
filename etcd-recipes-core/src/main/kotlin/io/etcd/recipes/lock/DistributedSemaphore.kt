@@ -43,9 +43,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -69,9 +67,9 @@ class SemaphorePermitMismatchException(
   val requestedPermits: Int,
   val canonicalPermits: Int,
 ) : EtcdRecipeRuntimeException(
-    "Semaphore at $semaphorePath already exists with $canonicalPermits permits; " +
-      "this instance requested $requestedPermits",
-  )
+  "Semaphore at $semaphorePath already exists with $canonicalPermits permits; " +
+    "this instance requested $requestedPermits",
+)
 
 /**
  * A distributed counting semaphore. The canonical permit count is CAS-created at
@@ -94,16 +92,16 @@ class SemaphorePermitMismatchException(
  * sound wakeup (a nearest-predecessor watch can miss multi-departure windows).
  */
 class DistributedSemaphore
-  @JvmOverloads
-  constructor(
-    client: Client,
-    val semaphorePath: String,
-    val permits: Int,
-    val leaseTtlSecs: Long = DEFAULT_LOCK_TTL_SECS,
-    resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
-    val clientId: String = defaultClientId(DistributedSemaphore::class.simpleName!!),
-    internal val interruptOnPermitLoss: Boolean = false,
-  ) : EtcdConnector(client, resilience) {
+@JvmOverloads
+constructor(
+  client: Client,
+  val semaphorePath: String,
+  val permits: Int,
+  val leaseTtlSecs: Long = DEFAULT_LOCK_TTL_SECS,
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+  val clientId: String = defaultClientId(DistributedSemaphore::class.simpleName!!),
+  internal val interruptOnPermitLoss: Boolean = false,
+) : EtcdConnector(client, resilience) {
   private enum class Phase { WAITING, HOLDING, DEAD }
 
   private class PermitData(
@@ -346,14 +344,7 @@ class DistributedSemaphore
                 // close() landed in the admission window: don't hand out a permit on a closed
                 // semaphore. If close() already drained this hold, undo the lost permit it recorded.
                 if (!holds.remove(data))
-                  lostPermits.computeIfPresent(me) { _, count ->
-                    if (count >
-                  1
-                    )
-                    count - 1
-                    else
-                    null
-                  }
+                  lostPermits.computeIfPresent(me) { _, count -> if (count > 1) count - 1 else null }
                 abortedByClose()
               }
               acquired = true

@@ -22,7 +22,6 @@ import io.etcd.jetcd.watch.WatchEvent
 import io.etcd.jetcd.watch.WatchResponse
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.WatchRecoveryEvent
-import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.WatchResilience
 import io.etcd.recipes.common.watcher
 import kotlinx.coroutines.channels.Channel
@@ -81,7 +80,7 @@ fun Client.watchAsFlow(
         option,
         resilience,
         recoveryListener =
-          WatchRecoveryListener { event ->
+          { event ->
             trySendBlocking(WatchFlowEvent.Recovery(event))
             // The watcher has stopped for good: complete the flow rather than leave it suspended
             if (event is WatchRecoveryEvent.Failed) channel.close()

@@ -24,7 +24,6 @@ import io.etcd.jetcd.KV
 import io.etcd.jetcd.Txn
 import io.etcd.jetcd.common.exception.ErrorCode
 import io.etcd.jetcd.common.exception.EtcdExceptionFactory
-import io.etcd.jetcd.kv.TxnResponse
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.StringSpec
@@ -121,7 +120,7 @@ class RpcRetryTests : StringSpec() {
           every { Then(*anyVararg()) } returns this
           every { commit() } answers {
             commits.incrementAndFetch()
-            CompletableFuture.failedFuture<TxnResponse>(unavailable())
+            CompletableFuture.failedFuture(unavailable())
           }
         }
       val client =

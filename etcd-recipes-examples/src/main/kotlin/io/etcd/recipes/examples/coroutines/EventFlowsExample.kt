@@ -29,6 +29,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Composes several event flows in one structured-concurrency scope: cache child
@@ -66,11 +68,11 @@ fun main() {
                 }
               }
             }
-          delay(500) // let the collectors subscribe
+          delay(500.milliseconds) // let the collectors subscribe
 
           client.putValue("$cachePath/config", "v1")
           client.putValue("$cachePath/config", "v2")
-          delay(1_000) // let the events arrive
+          delay(1.seconds) // let the events arrive
 
           collectors.cancel() // unsubscribes every flow
         }

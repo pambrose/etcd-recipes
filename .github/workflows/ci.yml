@@ -24,10 +24,12 @@ jobs:
     # About 80 s of model checking on 18 cores; a 2-core runner takes several minutes
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 17
@@ -45,10 +47,12 @@ jobs:
     # class), so give it real headroom rather than shaving the margin again.
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: 17
@@ -56,15 +60,16 @@ jobs:
       - name: Set up Gradle
         # v6's caching is a proprietary component under Gradle's Terms of Use
         # (https://gradle.com/legal/terms-of-use/), accepted by using it.
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       - name: Detekt
         run: ./gradlew detekt
 
-      - name: Compile + lint (pull requests)
-        # Every main and test source set, including the website's snippet sources
+      - name: Compile + lint + API check (pull requests)
+        # Every main and test source set, including the website's snippet sources, and
+        # the published modules' public API against their api/ reference dumps
         if: github.event_name == 'pull_request'
-        run: ./gradlew classes testClasses lintKotlin
+        run: ./gradlew classes testClasses lintKotlin checkKotlinAbi
 
       - name: Test + Kover XML (Testcontainers)
         if: github.event_name != 'pull_request'
@@ -78,7 +83,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() && github.event_name != 'pull_request' }}
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           # Use the library subproject's report directly. The root aggregate
           # at build/reports/kover/report.xml is empty because the root
@@ -96,7 +101,7 @@ jobs:
 
       - name: Upload test reports on failure or cancellation
         if: failure() || cancelled()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports
           path: |

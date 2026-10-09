@@ -89,7 +89,7 @@ class DistributedMutex
   // One in-flight acquisition: the phase machine resolves the race between the
   // keep-alive's fatal callback and the acquirer's win. Exactly one of
   // {retry-as-loser, lockLost} runs.
-  private inner class Attempt(
+  private class Attempt(
     val owner: Thread,
   ) {
     val phase = AtomicReference(Phase.WAITING)

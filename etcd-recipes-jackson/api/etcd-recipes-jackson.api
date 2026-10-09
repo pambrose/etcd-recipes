@@ -1,0 +1,11 @@
+public final class io/etcd/recipes/jackson/JacksonCodec : io/etcd/recipes/common/EtcdCodec {
+	public fun <init> (Lcom/fasterxml/jackson/core/type/TypeReference;)V
+	public fun <init> (Lcom/fasterxml/jackson/core/type/TypeReference;Lcom/fasterxml/jackson/databind/ObjectMapper;)V
+	public synthetic fun <init> (Lcom/fasterxml/jackson/core/type/TypeReference;Lcom/fasterxml/jackson/databind/ObjectMapper;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/Class;)V
+	public fun <init> (Ljava/lang/Class;Lcom/fasterxml/jackson/databind/ObjectMapper;)V
+	public synthetic fun <init> (Ljava/lang/Class;Lcom/fasterxml/jackson/databind/ObjectMapper;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun decode (Lio/etcd/jetcd/ByteSequence;)Ljava/lang/Object;
+	public fun encode (Ljava/lang/Object;)Lio/etcd/jetcd/ByteSequence;
+}
+

@@ -18,14 +18,12 @@ package io.etcd.recipes.election
 
 import io.etcd.jetcd.Client
 import io.etcd.jetcd.Watch
-import io.etcd.jetcd.options.WatchOption
 import io.etcd.jetcd.watch.WatchEvent.EventType.DELETE
 import io.etcd.jetcd.watch.WatchEvent.EventType.PUT
 import io.etcd.recipes.common.EtcdConnector
 import io.etcd.recipes.common.EtcdRecipeRuntimeException
 import io.etcd.recipes.common.ResilienceConfig
 import io.etcd.recipes.common.WatchRecoveryEvent
-import io.etcd.recipes.common.WatchRecoveryListener
 import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
@@ -56,146 +54,146 @@ fun <T> withLeaderObserver(
  * Listener callbacks fire on the watch dispatcher thread and must not block for long.
  */
 class LeaderObserver
-  @JvmOverloads
-  constructor(
-    client: Client,
-    val electionPath: String,
-    resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
-  ) : EtcdConnector(client, resilience) {
-    init {
-      require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
-    }
+@JvmOverloads
+constructor(
+  client: Client,
+  val electionPath: String,
+  resilience: ResilienceConfig = ResilienceConfig.DEFAULT,
+) : EtcdConnector(client, resilience) {
+  init {
+    require(electionPath.isNotEmpty()) { "Election path cannot be empty" }
+  }
 
-    override val exceptionContext get() = "LeaderObserver[$electionPath]"
+  override val exceptionContext get() = "LeaderObserver[$electionPath]"
 
-    private val leaderKey = ElectionPaths.leaderKey(electionPath)
-    private val listeners = CopyOnWriteArrayList<LeaderListener>()
-    private val currentLeaderRef = AtomicReference<String?>(null)
+  private val leaderKey = ElectionPaths.leaderKey(electionPath)
+  private val listeners = CopyOnWriteArrayList<LeaderListener>()
+  private val currentLeaderRef = AtomicReference<String?>(null)
 
-    @Volatile
-    private var watcher: Watch.Watcher? = null
+  @Volatile
+  private var watcher: Watch.Watcher? = null
 
-    /** The current leader's clientId, or null when the election is vacant. */
-    val currentLeader: String? get() = currentLeaderRef.load()
+  /** The current leader's clientId, or null when the election is vacant. */
+  val currentLeader: String? get() = currentLeaderRef.load()
 
-    fun addListener(listener: LeaderListener) {
-      listeners += listener
-    }
+  fun addListener(listener: LeaderListener) {
+    listeners += listener
+  }
 
-    fun removeListener(listener: LeaderListener) {
-      listeners -= listener
-    }
+  fun removeListener(listener: LeaderListener) {
+    listeners -= listener
+  }
 
-    @Synchronized
-    fun start(): LeaderObserver {
-      checkCloseNotCalled()
-      if (!startCalled.compareAndSet(false, true))
-        throw EtcdRecipeRuntimeException("start() already called")
-      // Seed the snapshot: a listener registered before start() reads currentLeader; only
-      // CHANGES (PUT/DELETE) fire callbacks, so no synthetic take/relinquish is emitted. The
-      // watch starts just past the seed read, so a hand-off during setup is still delivered.
-      val seed = client.getResponse(leaderKey, rpc = resilience.rpc)
-      currentLeaderRef.store(seed.kvs.firstOrNull()?.value?.asString?.let { ElectionPaths.stripLeaderClientId(it) })
-      watcher =
-        withRecipeLoggingContext {
-          client.watcher(
-            leaderKey,
-            watchOption { withRevision(seed.header.revision + 1) },
-            resilience.watch,
-            recoveryListener = WatchRecoveryListener { event -> onRecovery(event) },
-            resyncWith = null,
-          ) { response ->
-            response.events.forEach { event ->
-              when (event.eventType) {
-                PUT -> setLeader(ElectionPaths.stripLeaderClientId(event.keyValue.value.asString))
-                DELETE -> clearLeader()
-                else -> logger.error { "Unrecognized event on $leaderKey" }
-              }
+  @Synchronized
+  fun start(): LeaderObserver {
+    checkCloseNotCalled()
+    if (!startCalled.compareAndSet(false, true))
+      throw EtcdRecipeRuntimeException("start() already called")
+    // Seed the snapshot: a listener registered before start() reads currentLeader; only
+    // CHANGES (PUT/DELETE) fire callbacks, so no synthetic take/relinquish is emitted. The
+    // watch starts just past the seed read, so a hand-off during setup is still delivered.
+    val seed = client.getResponse(leaderKey, rpc = resilience.rpc)
+    currentLeaderRef.store(seed.kvs.firstOrNull()?.value?.asString?.let { ElectionPaths.stripLeaderClientId(it) })
+    watcher =
+      withRecipeLoggingContext {
+        client.watcher(
+          leaderKey,
+          watchOption { withRevision(seed.header.revision + 1) },
+          resilience.watch,
+          recoveryListener = { event -> onRecovery(event) },
+          resyncWith = null,
+        ) { response ->
+          response.events.forEach { event ->
+            when (event.eventType) {
+              PUT -> setLeader(ElectionPaths.stripLeaderClientId(event.keyValue.value.asString))
+              DELETE -> clearLeader()
+              else -> logger.error { "Unrecognized event on $leaderKey" }
             }
           }
         }
-      startThreadComplete.set(true)
-      return this
-    }
-
-    private fun readLeader(): String? =
-      client.getValue(leaderKey, resilience.rpc)?.asString?.let { ElectionPaths.stripLeaderClientId(it) }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun setLeader(name: String) {
-      currentLeaderRef.store(name)
-      listeners.forEach { listener ->
-        try {
-          listener.takeLeadership(name)
-        } catch (e: Throwable) {
-          logger.error(e) { "Exception in LeaderObserver takeLeadership" }
-          runCatching { listener.onError(e) }
-          recordException(e)
-        }
       }
-    }
+    startThreadComplete.set(true)
+    return this
+  }
 
-    @Suppress("TooGenericExceptionCaught")
-    private fun clearLeader() {
-      currentLeaderRef.store(null)
-      listeners.forEach { listener ->
-        try {
-          listener.relinquishLeadership()
-        } catch (e: Throwable) {
-          logger.error(e) { "Exception in LeaderObserver relinquishLeadership" }
-          runCatching { listener.onError(e) }
-          recordException(e)
-        }
+  private fun readLeader(): String? =
+    client.getValue(leaderKey, resilience.rpc)?.asString?.let { ElectionPaths.stripLeaderClientId(it) }
+
+  @Suppress("TooGenericExceptionCaught")
+  private fun setLeader(name: String) {
+    currentLeaderRef.store(name)
+    listeners.forEach { listener ->
+      try {
+        listener.takeLeadership(name)
+      } catch (e: Throwable) {
+        logger.error(e) { "Exception in LeaderObserver takeLeadership" }
+        runCatching { listener.onError(e) }
+        recordException(e)
       }
-    }
-
-    // A hand-off can be lost while the stream is fatally dead; re-read the leader key
-    // after recovery and replay the current state. Mirrors LeaderSelector.reportLeader's
-    // recovery listener: a Resubscribed that resumed at a known revision replays every
-    // missed event itself, so only a resync or a resume from "now" can hide a hand-off.
-    // internal (not private) so recovery handling can be unit-tested directly.
-    @Suppress("TooGenericExceptionCaught")
-    internal fun onRecovery(event: WatchRecoveryEvent) {
-      reportRecoveryEvent(event)
-      when (event) {
-        is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
-          val gapPossible = event !is WatchRecoveryEvent.Resubscribed || event.resumeRevision == 0L
-          if (gapPossible) {
-            val leader =
-              try {
-                readLeader()
-              } catch (e: Throwable) {
-                logger.error(e) { "Re-reading $leaderKey after watch recovery failed" }
-                recordException(e)
-                listeners.forEach { listener -> runCatching { listener.onError(e) } }
-                return
-              }
-            if (leader != null) setLeader(leader) else clearLeader()
-          }
-        }
-
-        is WatchRecoveryEvent.Failed -> {
-          listeners.forEach { listener ->
-            runCatching {
-              listener.onError(event.cause ?: EtcdRecipeRuntimeException("Leader watch on $electionPath abandoned"))
-            }
-          }
-        }
-
-        is WatchRecoveryEvent.Suspended -> {
-          Unit
-        }
-      }
-    }
-
-    @Synchronized
-    override fun doClose() {
-      watcher?.close()
-      watcher = null
-      listeners.clear()
-    }
-
-    companion object {
-      private val logger = KotlinLogging.logger {}
     }
   }
+
+  @Suppress("TooGenericExceptionCaught")
+  private fun clearLeader() {
+    currentLeaderRef.store(null)
+    listeners.forEach { listener ->
+      try {
+        listener.relinquishLeadership()
+      } catch (e: Throwable) {
+        logger.error(e) { "Exception in LeaderObserver relinquishLeadership" }
+        runCatching { listener.onError(e) }
+        recordException(e)
+      }
+    }
+  }
+
+  // A hand-off can be lost while the stream is fatally dead; re-read the leader key
+  // after recovery and replay the current state. Mirrors LeaderSelector.reportLeader's
+  // recovery listener: a Resubscribed that resumed at a known revision replays every
+  // missed event itself, so only a resync or a resume from "now" can hide a hand-off.
+  // internal (not private) so recovery handling can be unit-tested directly.
+  @Suppress("TooGenericExceptionCaught")
+  internal fun onRecovery(event: WatchRecoveryEvent) {
+    reportRecoveryEvent(event)
+    when (event) {
+      is WatchRecoveryEvent.Resubscribed, is WatchRecoveryEvent.Resynced -> {
+        val gapPossible = event !is WatchRecoveryEvent.Resubscribed || event.resumeRevision == 0L
+        if (gapPossible) {
+          val leader =
+            try {
+              readLeader()
+            } catch (e: Throwable) {
+              logger.error(e) { "Re-reading $leaderKey after watch recovery failed" }
+              recordException(e)
+              listeners.forEach { listener -> runCatching { listener.onError(e) } }
+              return
+            }
+          if (leader != null) setLeader(leader) else clearLeader()
+        }
+      }
+
+      is WatchRecoveryEvent.Failed -> {
+        listeners.forEach { listener ->
+          runCatching {
+            listener.onError(event.cause ?: EtcdRecipeRuntimeException("Leader watch on $electionPath abandoned"))
+          }
+        }
+      }
+
+      is WatchRecoveryEvent.Suspended -> {
+        Unit
+      }
+    }
+  }
+
+  @Synchronized
+  override fun doClose() {
+    watcher?.close()
+    watcher = null
+    listeners.clear()
+  }
+
+  companion object {
+    private val logger = KotlinLogging.logger {}
+  }
+}

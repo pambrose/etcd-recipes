@@ -48,7 +48,6 @@ import io.etcd.recipes.common.getKeyValuePairs
 import io.etcd.recipes.common.getOption
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.getValue
-import io.etcd.recipes.common.isKeyPresent
 import io.etcd.recipes.common.isLeaseNotFound
 import io.etcd.recipes.common.putOption
 import io.etcd.recipes.common.selfHealingKeepAlive
@@ -495,7 +494,7 @@ class DistributedWorkQueue
           null
         }
       val ours = marker != null && marker.value.asString == claimMarker && marker.lease == leaseId
-      return if (ours) WorkItem(id, value, attempt, marker!!.createRevision, claimMarker) else null
+      return if (ours) WorkItem(id, value, attempt, marker.createRevision, claimMarker) else null
     } finally {
       if (interrupted) Thread.currentThread().interrupt()
     }

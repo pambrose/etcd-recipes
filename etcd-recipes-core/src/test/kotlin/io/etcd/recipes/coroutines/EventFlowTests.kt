@@ -25,7 +25,6 @@ import io.etcd.recipes.cache.PathChildrenCache
 import io.etcd.recipes.cache.PathChildrenCacheEvent
 import io.etcd.recipes.cache.TypedPathChildrenCache
 import io.etcd.recipes.common.StringCodec
-import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.deleteKey
@@ -88,11 +87,11 @@ class EventFlowTests : StringSpec() {
             scope.launch {
               cache.eventsAsFlow().collect { e -> seen += e.type to e.childName }
             }
-            delay(1_000) // let the collector subscribe
+            delay(1.seconds) // let the collector subscribe
 
             client.putValue("$path/k", "v1")
             client.putValue("$path/k", "v2")
-            client.deleteChildren("$path")
+            client.deleteChildren(path)
 
             untilTrue(15.seconds) { seen.size == 3 } shouldBe true
             seen.map { it.first } shouldContainExactly
@@ -117,7 +116,7 @@ class EventFlowTests : StringSpec() {
 
           withScope { scope ->
             scope.launch { cache.eventsAsFlow().collect { e -> seen += e.type } }
-            delay(1_000) // let the collector subscribe
+            delay(1.seconds) // let the collector subscribe
 
             client.putValue(key, "v1")
             client.putValue(key, "v2")
@@ -148,7 +147,7 @@ class EventFlowTests : StringSpec() {
 
           withScope { scope ->
             scope.launch { cache.eventsAsFlow().collect { e -> seen += e.type to e.data } }
-            delay(1_000) // let the collector subscribe
+            delay(1.seconds) // let the collector subscribe
 
             client.putValue("$path/k", Payload("v1"), codec)
             client.putValue("$path/k", Payload("v2"), codec)
@@ -180,7 +179,7 @@ class EventFlowTests : StringSpec() {
 
           withScope { scope ->
             val job = scope.launch { cache.eventsAsFlow().collect { seen += it.childName } }
-            delay(1_000)
+            delay(1.seconds)
             client.putValue("$path/a", "1")
             untilTrue(15.seconds) { seen.size == 1 } shouldBe true
 
@@ -238,7 +237,7 @@ class EventFlowTests : StringSpec() {
             cache.start()
             withScope { scope ->
               scope.launch { cache.eventsAsFlow().collect { events += it } }
-              delay(1_000)
+              delay(1.seconds)
 
               val instance = ServiceInstance("TestService", "payload")
               sd.registerService(instance)

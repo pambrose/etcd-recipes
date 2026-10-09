@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -58,7 +59,7 @@ fun main() {
           // Producer feeds ten jobs, then lets the consumers drain and time out
           repeat(10) { n ->
             queue.awaitEnqueue("job-$n")
-            delay(100)
+            delay(100.milliseconds)
           }
         }
       }

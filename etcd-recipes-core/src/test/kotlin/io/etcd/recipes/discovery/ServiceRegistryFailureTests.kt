@@ -22,7 +22,6 @@ import io.etcd.jetcd.Client
 import io.etcd.jetcd.Lease
 import io.etcd.jetcd.common.exception.ErrorCode
 import io.etcd.jetcd.common.exception.EtcdExceptionFactory
-import io.etcd.jetcd.lease.LeaseGrantResponse
 import io.etcd.jetcd.lease.LeaseRevokeResponse
 import io.etcd.recipes.common.EtcdRecipeException
 import io.etcd.recipes.common.FailingLeaseMocks
@@ -63,7 +62,7 @@ class ServiceRegistryFailureTests : StringSpec() {
         init {
             every { lease.grant(any()) } answers {
                 if (pending)
-                    CompletableFuture<LeaseGrantResponse>()
+                    CompletableFuture()
                 else
                     CompletableFuture.failedFuture(
                         EtcdExceptionFactory.newEtcdException(ErrorCode.UNAVAILABLE, "etcdserver: no leader"),

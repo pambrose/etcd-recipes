@@ -1,0 +1,17 @@
+# Keeps the SHA-pinned actions in .github/workflows current: Dependabot rewrites both
+# the commit SHA and its trailing `# vX.Y.Z` comment. Gradle and website dependencies
+# are updated by hand (make versions, make check-site).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # One PR for the week's action bumps rather than one per action
+    groups:
+      github-actions:
+        patterns: ["*"]
+    # Let a release age a week before proposing it, which gives a compromised release
+    # time to be found and pulled
+    cooldown:
+      default-days: 7

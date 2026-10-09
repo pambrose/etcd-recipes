@@ -51,7 +51,7 @@ class SuspendBarrierTests : StringSpec() {
           barrier.awaitSetBarrier() shouldBe true
           coroutineScope {
             val waiter = async { barrier.await() }
-            delay(1_000)
+            delay(1.seconds)
             waiter.isCompleted shouldBe false
 
             barrier.awaitRemoveBarrier() shouldBe true

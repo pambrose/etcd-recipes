@@ -20,7 +20,6 @@ package io.etcd.recipes.coroutines
 
 import io.etcd.jetcd.Client
 import io.etcd.recipes.common.LeaseEvent
-import io.etcd.recipes.common.asString
 import io.etcd.recipes.common.connectToEtcd
 import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.getOption
@@ -85,7 +84,7 @@ class LossFlowTests : StringSpec() {
 
           withScope { scope ->
             scope.launch { mutex.lockLostAsFlow().collect { lost += it } }
-            delay(1_000)
+            delay(1.seconds)
 
             revokeLeaseUnder(client, path)
 
@@ -107,7 +106,7 @@ class LossFlowTests : StringSpec() {
           semaphore.acquire()
           withScope { scope ->
             scope.launch { semaphore.permitLostAsFlow().collect { lost += it } }
-            delay(1_000)
+            delay(1.seconds)
 
             revokeLeaseUnder(client, "$path/holders")
 
@@ -126,7 +125,7 @@ class LossFlowTests : StringSpec() {
         TransientKeyValue(client, path, "alive", leaseTtlSecs = 2).use { tkv ->
           withScope { scope ->
             scope.launch { tkv.leaseEventsAsFlow().collect { events += it } }
-            delay(1_000)
+            delay(1.seconds)
 
             // Revoke the key's lease; the self-healer surfaces the loss then re-registers
             val kv = client.getResponse(path).kvs.first()
@@ -150,12 +149,12 @@ class LossFlowTests : StringSpec() {
           semaphore.acquire()
           withScope { scope ->
             val job = scope.launch { semaphore.permitLostAsFlow().collect { lost += it } }
-            delay(1_000)
+            delay(1.seconds)
             job.cancelAndJoin()
 
             // After the collector is gone, a real loss must not reach the drained list
             revokeLeaseUnder(client, "$path/holders")
-            delay(3_000)
+            delay(3.seconds)
             lost.size shouldBe 0
           }
           semaphore.release() shouldBe false // the permit was lost out-of-band

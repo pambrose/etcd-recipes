@@ -38,7 +38,6 @@ import io.etcd.recipes.common.deleteOp
 import io.etcd.recipes.common.doesNotExist
 import io.etcd.recipes.common.equalTo
 import io.etcd.recipes.common.getChildCount
-import io.etcd.recipes.common.getFirstChild
 import io.etcd.recipes.common.getOption
 import io.etcd.recipes.common.getResponse
 import io.etcd.recipes.common.setTo

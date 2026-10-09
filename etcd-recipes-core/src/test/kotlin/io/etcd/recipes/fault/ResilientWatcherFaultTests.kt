@@ -18,7 +18,6 @@
 
 package io.etcd.recipes.fault
 
-import io.etcd.jetcd.options.WatchOption
 import io.etcd.recipes.common.EtcdTestContainer
 import io.etcd.recipes.common.WatchRecoveryEvent
 import io.etcd.recipes.common.WatchResilience

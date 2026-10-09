@@ -17,7 +17,6 @@
 package io.etcd.recipes.lock
 
 import io.etcd.recipes.common.ResilienceConfig
-import io.etcd.recipes.common.RetryPolicy
 import io.etcd.recipes.common.RpcResilience
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
@@ -39,7 +38,7 @@ internal fun RpcResilience.within(deadline: ComparableTimeMark?): RpcResilience 
   // ending a hair before the deadline it was sized to.
   val remaining = (-deadline.elapsedNow() + TIMEOUT_SLACK).coerceAtLeast(MIN_ATTEMPT)
   return RpcResilience(
-    RetryPolicy { attempt, elapsed -> base.nextDelay(attempt, elapsed)?.takeIf { it < -deadline.elapsedNow() } },
+    { attempt, elapsed -> base.nextDelay(attempt, elapsed)?.takeIf { it < -deadline.elapsedNow() } },
     operationTimeout = minOf(operationTimeout, remaining),
     metrics = metrics,
   )

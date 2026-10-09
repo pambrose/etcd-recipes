@@ -26,6 +26,7 @@ import io.etcd.recipes.common.deleteChildren
 import io.etcd.recipes.common.urls
 import io.etcd.recipes.coroutines.connectionStateAsFlow
 import io.etcd.recipes.coroutines.leaseEventsAsFlow
+import io.etcd.recipes.coroutines.untilTrue
 import io.etcd.recipes.keyvalue.TransientKeyValue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -37,9 +38,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 /**
  * Flow event surfaces under a real partition: a paused etcd drives the lease and
@@ -47,18 +46,6 @@ import kotlin.time.TimeSource
  */
 class EventFlowFaultTests : StringSpec() {
   private val path = "/fault/${javaClass.simpleName}"
-
-  private suspend fun untilTrue(
-    timeout: Duration,
-    predicate: () -> Boolean,
-  ): Boolean {
-    val start = TimeSource.Monotonic.markNow()
-    while (start.elapsedNow() < timeout) {
-      if (predicate()) return true
-      delay(50)
-    }
-    return predicate()
-  }
 
   init {
     "a partition drives the lease and connection-state flows through loss and recovery" {
@@ -73,11 +60,11 @@ class EventFlowFaultTests : StringSpec() {
           try {
             scope.launch { tkv.leaseEventsAsFlow().collect { leaseEvents += it } }
             scope.launch { tkv.connectionStateAsFlow().collect { states += it } }
-            delay(1_000)
+            delay(1.seconds)
 
             EtcdTestContainer.pause()
             try {
-              delay(7_000) // well past the 2s TTL
+              delay(7.seconds) // well past the 2s TTL
             } finally {
               EtcdTestContainer.unpause()
             }

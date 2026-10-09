@@ -4,6 +4,7 @@ import com.vanniktech.maven.publish.SourcesJar
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 // The shared prefix (repo name + satellite-module prefix). The core library module itself is
@@ -129,7 +130,7 @@ subprojects {
         if (providers.gradleProperty("skipLincheck").isPresent) exclude("**/*LincheckTests*")
         // Fork a new JVM for each test class so background threads / etcd watch
         // connections from one spec don't interfere with the next one.
-        setForkEvery(1)
+        forkEvery = 1
         // Run multiple test classes in parallel against the local etcd. Each
         // test namespaces its keys under its own path, so concurrent forks
         // do not collide. Cap at half the cores so etcd + coverage
@@ -227,6 +228,14 @@ fun Project.configurePublishing() {
     // Dokka is already applied via the root subprojects { ... } block;
     // only maven-publish is project-specific to the published module.
     apply(plugin = "com.vanniktech.maven.publish")
+
+    // A published module's public API is checked against its reference dump in api/, so a
+    // change to it (say, a public property an IDE cleanup turned into a plain parameter)
+    // fails until the dump is updated on purpose with `make api-dump`.
+    extensions.configure<KotlinJvmProjectExtension> {
+        @OptIn(ExperimentalAbiValidation::class)
+        abiValidation()
+    }
 
     extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
         configure(

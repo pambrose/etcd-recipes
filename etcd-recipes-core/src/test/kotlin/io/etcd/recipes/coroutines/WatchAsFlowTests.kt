@@ -38,9 +38,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 /**
  * Flow-based watch semantics: ordered delivery, flattening, cancellation closing the
@@ -48,18 +47,6 @@ import kotlin.time.TimeSource
  */
 class WatchAsFlowTests : StringSpec() {
   private val base = "/coroutines/${javaClass.simpleName}"
-
-  private suspend fun untilTrue(
-    timeout: Duration,
-    predicate: () -> Boolean,
-  ): Boolean {
-    val start = TimeSource.Monotonic.markNow()
-    while (start.elapsedNow() < timeout) {
-      if (predicate()) return true
-      delay(50)
-    }
-    return predicate()
-  }
 
   // Collectors run on their own scope: the kotest test context must stay free to
   // drive puts and assertions while collection is live. The settle delay lets the
@@ -71,7 +58,7 @@ class WatchAsFlowTests : StringSpec() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     try {
       val job = collect(scope)
-      delay(1_000)
+      delay(1.seconds)
       return body(job)
     } finally {
       scope.coroutineContext[Job]!!.cancelAndJoin()
@@ -148,7 +135,7 @@ class WatchAsFlowTests : StringSpec() {
           job.cancelAndJoin()
 
           client.putValue(key, "after")
-          delay(2_000) // grace: a live watcher would have delivered by now
+          delay(2.seconds) // grace: a live watcher would have delivered by now
           seen.toList() shouldContainExactly ["before"]
         }
       }
@@ -185,7 +172,7 @@ class WatchAsFlowTests : StringSpec() {
           collect = {
             launch {
               client.watchEventsAsFlow(prefix, watchOption { isPrefix(true) }).collect {
-                delay(50) // slower than the producer
+                delay(50.milliseconds) // slower than the producer
                 seen += it.valueAsString
               }
             }
