@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   comment, and checkouts no longer leave the git credential on disk
   (`persist-credentials: false`). Dependabot proposes action updates weekly, once a
   release is a week old.
+- A weekly cleanup workflow prunes the Actions run list: cancelled and skipped runs after
+  a week, and other runs once their logs expire at 90 days, keeping each workflow's newest
+  10 of those.
 
 ## [0.13.0] - 2026-09-30
 

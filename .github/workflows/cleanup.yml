@@ -1,0 +1,51 @@
+name: Cleanup
+
+on:
+  schedule:
+    # Mondays 04:17 UTC: off the top of the hour, when scheduled runs are most often delayed
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: List the runs that would be deleted, without deleting them
+        type: boolean
+        default: true
+
+# Least privilege: nothing at the workflow level; the job gets only actions: write.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+# Prunes the Actions run list. GitHub deletes a run's logs after 90 days (this repo's
+# retention setting, the maximum) but keeps the run itself in the list forever. Artifacts
+# expire on their own (ci.yml keeps test reports 7 days), and GitHub evicts caches itself.
+# Note that each step also deletes every run whose workflow no longer exists, whatever its
+# age (the action's "orphan runs"), so renaming or removing a workflow file drops its history.
+jobs:
+  cleanup:
+    name: Delete old workflow runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write # to delete workflow runs
+    steps:
+      - name: Delete cancelled and skipped runs older than a week
+        # A CI run superseded by a newer push, or a docs build skipped because CI didn't
+        # pass, records nothing worth keeping
+        uses: Mattraks/delete-workflow-runs@b3018382ca039b53d238908238bd35d1fb14f8ee # v2.1.0
+        with:
+          retain_days: 7
+          keep_minimum_runs: 0
+          delete_run_by_conclusion_pattern: cancelled,skipped
+          dry_run: ${{ inputs.dry_run || false }}
+
+      - name: Delete runs older than 90 days, keeping each workflow's newest 10 of those
+        # keep_minimum_runs counts only runs past retain_days, so a workflow that rarely
+        # runs still shows its last 10 runs however old they are
+        uses: Mattraks/delete-workflow-runs@b3018382ca039b53d238908238bd35d1fb14f8ee # v2.1.0
+        with:
+          retain_days: 90
+          keep_minimum_runs: 10
+          dry_run: ${{ inputs.dry_run || false }}
