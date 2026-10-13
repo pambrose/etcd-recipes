@@ -31,7 +31,7 @@ mockk = "1.14.11"
 testcontainers = "2.0.5"
 
 # Build tooling plugins
-ben-manes-versions = "0.65.0"
+ben-manes-versions = "0.66.0"
 detekt = "2.0.0-alpha.6"
 dokka = "2.2.0"
 kotlinter = "5.7.0"

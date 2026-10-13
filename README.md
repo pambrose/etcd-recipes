@@ -643,7 +643,8 @@ make api-check          # check the published public API against the api/ dumps
 make api-dump           # update the api/ dumps after an intended API change
 make coverage           # Kover HTML + XML reports
 make kdocs              # Dokka HTML / Javadoc
-make versions           # gradle dependencyUpdates
+make versions           # dependencies with newer versions available
+make versions-all       # full dependency report, up-to-date ones included
 
 make tla                # model-check the TLA+ protocol specs in specs/
 make site               # serve the documentation site locally
