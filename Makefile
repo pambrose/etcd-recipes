@@ -1,6 +1,6 @@
 .PHONY: default help tla clean clean-all stop etcd-start etcd-stop build tests tests-tc tests-container all-tests coverage kdocs \
         site clean-site check-site upgrade-site docs-check \
-        lint detekt detekt-baseline zizmor api-check api-dump refresh versions publish-local publish-local-snapshot \
+        lint detekt detekt-baseline zizmor api-check api-dump refresh versions versions-all publish-local publish-local-snapshot \
         publish-snapshot publish-maven-central upgrade-wrapper \
         _check-gpg-env _require-version _require-gradle-version
 
@@ -138,8 +138,14 @@ api-dump: ## Update the api/ reference dumps to the current public API
 refresh: ## Force-refresh Gradle dependencies
 	./gradlew --refresh-dependencies
 
-versions: ## Report dependencies with newer versions available
+# build.gradle.kts gives dependencyUpdates a formatter that lists only what is behind (and what
+# could not be checked); versions-all names the plugin's own plain report, which also lists
+# everything up to date.
+versions: ## List the dependencies with newer versions, and any that could not be checked
 	./gradlew dependencyUpdates --no-parallel
+
+versions-all: ## The plugin's full dependency report, up-to-date dependencies included
+	./gradlew dependencyUpdates --no-parallel --output-formatter=plain
 
 publish-local: _require-version ## Publish artifacts to ~/.m2/repository
 	./gradlew publishToMavenLocal

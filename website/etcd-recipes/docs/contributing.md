@@ -8,17 +8,19 @@ Licensed [Apache 2.0](https://github.com/pambrose/etcd-recipes/blob/master/Licen
 JDK 17 and the Gradle wrapper. `make help` lists every target.
 
 ```bash
-make build      # ./gradlew clean build -x test
-make tests      # full suite against a local etcd at localhost:2379
-make tests-tc   # full suite against an ephemeral Testcontainers etcd (needs Docker)
-make all-tests  # local, Testcontainers and multi-container variants in sequence
-make tla        # model-check the TLA+ protocol specs in specs/ with TLC
-make lint       # ./gradlew lintKotlin detekt
-make zizmor     # audit the GitHub Actions workflows with zizmor
-make api-check  # check the published public API against the api/ dumps
-make api-dump   # update the api/ dumps after an intended API change
-make coverage   # Kover HTML + XML + summary
-make kdocs      # Dokka API docs
+make build         # ./gradlew clean build -x test
+make tests         # full suite against a local etcd at localhost:2379
+make tests-tc      # full suite against an ephemeral Testcontainers etcd (needs Docker)
+make all-tests     # local, Testcontainers and multi-container variants in sequence
+make tla           # model-check the TLA+ protocol specs in specs/ with TLC
+make lint          # ./gradlew lintKotlin detekt
+make zizmor        # audit the GitHub Actions workflows with zizmor
+make api-check     # check the published public API against the api/ dumps
+make api-dump      # update the api/ dumps after an intended API change
+make coverage      # Kover HTML + XML + summary
+make kdocs         # Dokka API docs
+make versions      # dependencies with newer versions, and any that could not be checked
+make versions-all  # the full dependency report, up-to-date ones included
 ```
 
 `make tests` expects an etcd at `http://localhost:2379`:
@@ -195,15 +197,16 @@ is the reliable way to catch them; do not rely on the list of files staying accu
 
 - **TLA+ models** — `./specs/tlc.sh`, on every pull request and every push to `master`.
 - **Build & test** — `detekt`, then, on a pull request, only a compile of every main and
-  test source set (the website's snippet sources included) plus `lintKotlin`. A push to
-  `master` runs the full suite instead, less the Lincheck checks:
+  test source set (the website's snippet sources included), `lintKotlin`, and
+  `checkKotlinAbi` (the published API against the `api/` dumps). A push to `master` runs
+  the full suite instead, less the Lincheck checks:
   `check koverXmlReport -PuseTestcontainers -PskipLincheck`, with a coverage upload.
 
 !!! warning "Pull-request CI does not run the tests"
 
     The Testcontainers suite takes 30+ minutes on a hosted runner, so a pull request is
-    only compiled and linted. Run `make tests-tc` locally and see it pass before the PR
-    merges; the full run on `master` is a check after the fact, not a gate.
+    only compiled, linted, and API-checked. Run `make tests-tc` locally and see it pass
+    before the PR merges; the full run on `master` is a check after the fact, not a gate.
 
 !!! note "`check` and `koverXmlReport` must stay in one Gradle invocation"
 
@@ -214,3 +217,17 @@ is the reliable way to catch them; do not rely on the list of files staying accu
 `.github/workflows/docs.yml` builds the site on every PR. It deploys only after CI passes
 on a push to `master`, building the commit CI verified, so a site whose snippets no longer
 compile never goes out.
+
+`.github/workflows/zizmor.yml` audits the workflows with
+[zizmor](https://docs.zizmor.sh) on every pull request and push to `master`, and its
+**Audit workflows** job must pass before a PR can merge. `make zizmor` runs the same
+release locally. Every action is pinned to a commit SHA with its release in a trailing
+comment; Dependabot (`.github/dependabot.yml`) proposes the week's action updates in one
+PR, once a release is a week old. Gradle and website dependencies are updated by hand
+(`make versions`, `make check-site`).
+
+`.github/workflows/cleanup.yml` prunes the Actions run list every Monday: cancelled and
+skipped runs after a week, and other runs after 30 days, when GitHub deletes their logs,
+keeping each workflow's newest 10 of those. Started by hand, it defaults to a dry run that
+only lists what it would delete. Keep its 30 days equal to the repository's log retention
+(Settings > Actions > General).

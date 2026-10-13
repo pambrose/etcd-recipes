@@ -24,11 +24,11 @@ JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17
 - `make kdocs` — Dokka HTML / Javadoc
 - `make site` — serve the documentation site locally
 - `make docs-check` — compile the website code snippets, then build the site in strict mode (both halves of what CI checks: `ci.yml` compiles the snippets, `docs.yml` builds the site)
-- `make versions` — `./gradlew dependencyUpdates --no-parallel`
+- `make versions` — `./gradlew dependencyUpdates --no-parallel`, listing only the dependencies (and Gradle) with newer versions, plus any that could not be checked (the formatter is in `configureVersions()` in `build.gradle.kts`); `make versions-all` prints the plugin's full plain report, up-to-date dependencies included
 - `make refresh` — refresh dependencies
 - `make upgrade-wrapper` — bumps the Gradle wrapper
 
-GitHub CI does not run the test suite on pull requests — it only compiles every source set, lints, checks the public API dumps, audits the workflows with zizmor, and runs the TLA+ models (the Testcontainers suite takes 30+ minutes on a hosted runner). Run `make tests-tc` locally and confirm it passes before a PR merges. Pushes to `master` still run the full suite and upload coverage.
+GitHub CI does not run the test suite on pull requests — it only compiles every source set, lints, checks the public API dumps, audits the workflows with zizmor, and runs the TLA+ models (the Testcontainers suite takes 30+ minutes on a hosted runner). Run `make tests-tc` locally and confirm it passes before a PR merges. Pushes to `master` still run the full suite and upload coverage. `.github/workflows/cleanup.yml` prunes old workflow runs every Monday; its 30-day `retain_days` matches the repository's Actions log retention, a GitHub setting (Settings > Actions > General) that isn't in the repo, so change the two together.
 
 Run a single test class:
 ```

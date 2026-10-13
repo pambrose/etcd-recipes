@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Built with Kotlin 2.4.21 (from 2.4.20) and Gradle 9.8.1 (from 9.8.0).
   `etcd-recipes-core` depends on Guava 33.7.2 (from 33.7.1) and common-utils 5.1.1 (from
   5.1.0); the examples and tests use Logback 1.6.5 (from 1.6.4).
+- `make versions` lists only the dependencies with newer versions, plus any it could not
+  check; `make versions-all` prints the full report, up-to-date dependencies included. The
+  versions plugin is 0.66.0 (from 0.65.0), and the Gradle daemon's heap is 4 GB (from 2 GB).
 
 ### Changed (CI)
 
@@ -32,8 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`persist-credentials: false`). Dependabot proposes action updates weekly, once a
   release is a week old.
 - A weekly cleanup workflow prunes the Actions run list: cancelled and skipped runs after
-  a week, and other runs once their logs expire at 90 days, keeping each workflow's newest
-  10 of those.
+  a week, and other runs once their logs expire at 30 days (the repository's log retention,
+  lowered from 90), keeping each workflow's newest 10 of those. Each pass retries once after
+  a transient GitHub API error.
 
 ## [0.13.0] - 2026-09-30
 
