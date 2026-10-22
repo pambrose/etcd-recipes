@@ -16,9 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (build)
 
-- Built with Kotlin 2.4.21 (from 2.4.20) and Gradle 9.8.1 (from 9.8.0).
-  `etcd-recipes-core` depends on Guava 33.7.2 (from 33.7.1) and common-utils 5.1.1 (from
-  5.1.0); the examples and tests use Logback 1.6.5 (from 1.6.4).
+- Built with Kotlin 2.4.21 (from 2.4.20) and Gradle 9.8.2 (from 9.8.0).
+  `etcd-recipes-core` depends on Guava 33.7.2 (from 33.7.1), common-utils 5.1.1 (from
+  5.1.0), and kotlinx-serialization 1.12.0 (from 1.11.0). The satellites track Spring Boot
+  4.1.2 (from 4.1.1), Micrometer 1.17.2 (from 1.17.1), and Jackson 2.22.4 (from 2.22.3).
+  The examples and tests use Logback 1.6.5 (from 1.6.4) and Kotest 6.2.6 (from 6.2.5).
 - `make versions` lists only the dependencies with newer versions, plus any it could not
   check; `make versions-all` prints the full report, up-to-date dependencies included. The
   versions plugin is 0.66.0 (from 0.65.0), and the Gradle daemon's heap is 4 GB (from 2 GB).
