@@ -9,7 +9,7 @@ GRADLE_VERSION := $(shell sed -n 's/^gradle-wrapper = "\(.*\)"/\1/p' gradle/libs
 
 # The zizmor release `make zizmor` runs; keep it equal to the `version:` input in
 # .github/workflows/zizmor.yml so the local audit and CI's are the same.
-ZIZMOR_VERSION := 1.30.1
+ZIZMOR_VERSION := 1.31.1
 
 # The uv project root: where pyproject.toml and uv.lock live. The check-site /
 # upgrade-site targets cd here so `uv lock` finds the project.
