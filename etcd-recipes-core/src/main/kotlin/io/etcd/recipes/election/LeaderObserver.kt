@@ -181,7 +181,6 @@ constructor(
       }
 
       is WatchRecoveryEvent.Suspended -> {
-        Unit
       }
     }
   }
