@@ -99,7 +99,6 @@ fun Client.leadershipAsFlow(
             }
 
             else -> {
-              Unit
             }
           }
         }
@@ -148,7 +147,6 @@ private fun ProducerScope<LeadershipEvent>.leadershipRecovery(
       }
 
       is WatchRecoveryEvent.Suspended -> {
-        Unit
       }
     }
   }
