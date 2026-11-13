@@ -2,7 +2,7 @@
         site clean-site check-site upgrade-site docs-check \
         lint detekt detekt-baseline zizmor api-check api-dump refresh versions versions-all publish-local publish-local-snapshot \
         publish-snapshot publish-maven-central upgrade-wrapper \
-        _check-gpg-env _require-version _require-gradle-version
+        _check-gpg-env _check-maven-central-env _require-version _require-gradle-version
 
 VERSION := $(shell sed -n 's/^version=\(.*\)/\1/p' gradle.properties)
 GRADLE_VERSION := $(shell sed -n 's/^gradle-wrapper = "\(.*\)"/\1/p' gradle/libs.versions.toml)
@@ -26,6 +26,18 @@ GPG_ENV = \
 	ORG_GRADLE_PROJECT_signingInMemoryKey="$$(gpg --armor --export-secret-keys $$GPG_SIGNING_KEY_ID)" \
 	ORG_GRADLE_PROJECT_signingInMemoryKeyId="$$GPG_SIGNING_KEY_ID" \
 	ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="$$(security find-generic-password -a "gpg-signing" -s "gradle-signing-password" -w)"
+
+# Maven Central's credentials, a user token's name and password from central.sonatype.com, from the macOS keychain, as
+# the signing key's passphrase is: the maven-central-username and maven-central-password entries (account
+# maven-central), shared by every repository that publishes this way. They reach only the publishing commands, as the
+# vanniktech plugin's mavenCentralUsername and mavenCentralPassword, never ~/.gradle/gradle.properties, which every
+# Gradle build on the machine is given. Add them once with
+#   security add-generic-password -a maven-central -s maven-central-username -U -w
+#   security add-generic-password -a maven-central -s maven-central-password -U -w
+# each of which asks for the value, so it stays out of the shell's history.
+MAVEN_CENTRAL_ENV = \
+	ORG_GRADLE_PROJECT_mavenCentralUsername="$$(security find-generic-password -a "maven-central" -s "maven-central-username" -w)" \
+	ORG_GRADLE_PROJECT_mavenCentralPassword="$$(security find-generic-password -a "maven-central" -s "maven-central-password" -w)"
 
 default: help
 
@@ -153,11 +165,11 @@ publish-local: _require-version ## Publish artifacts to ~/.m2/repository
 publish-local-snapshot: _require-version ## Publish a -SNAPSHOT to ~/.m2/repository (uses VERSION= or gradle.properties)
 	./gradlew -PoverrideVersion=$(VERSION)-SNAPSHOT publishToMavenLocal
 
-publish-snapshot: _require-version _check-gpg-env ## Publish a -SNAPSHOT to Maven Central (requires VERSION= and GPG)
-	$(GPG_ENV) ./gradlew -PoverrideVersion=$(VERSION)-SNAPSHOT publishToMavenCentral
+publish-snapshot: _require-version _check-gpg-env _check-maven-central-env ## Publish a -SNAPSHOT to Maven Central (requires VERSION= and GPG)
+	$(GPG_ENV) $(MAVEN_CENTRAL_ENV) ./gradlew -PoverrideVersion=$(VERSION)-SNAPSHOT publishToMavenCentral
 
-publish-maven-central: _require-version _check-gpg-env ## Publish and release the current version to Maven Central
-	$(GPG_ENV) ./gradlew publishAndReleaseToMavenCentral
+publish-maven-central: _require-version _check-gpg-env _check-maven-central-env ## Publish and release the current version to Maven Central
+	$(GPG_ENV) $(MAVEN_CENTRAL_ENV) ./gradlew publishAndReleaseToMavenCentral
 
 # Gradle's documented upgrade procedure: the first run rewrites
 # gradle-wrapper.properties using the *old* wrapper jar; the second run
@@ -176,6 +188,15 @@ _check-gpg-env:
 	@if ! security find-generic-password -a "gpg-signing" -s "gradle-signing-password" -w >/dev/null 2>&1; then \
 		echo "Error: keychain entry 'gradle-signing-password' (account 'gpg-signing') not found" >&2; exit 1; \
 	fi
+
+# Fails, naming the keychain entry and never its value, when either of Maven Central's credentials is missing or empty
+_check-maven-central-env:
+	@for entry in maven-central-username maven-central-password; do \
+		if [ -z "$$(security find-generic-password -a 'maven-central' -s "$$entry" -w 2>/dev/null)" ]; then \
+			echo "ERROR: keychain entry '$$entry' (account 'maven-central') is missing or empty; add it with: security add-generic-password -a maven-central -s $$entry -U -w" >&2; \
+			exit 1; \
+		fi; \
+	done
 
 _require-version:
 	@[ -n "$(VERSION)" ] || { echo "ERROR: Could not determine project version from gradle.properties" >&2; exit 1; }

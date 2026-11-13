@@ -191,6 +191,29 @@ git grep -F '0.13.0'   # find every reference to the outgoing version
 
 is the reliable way to catch them; do not rely on the list of files staying accurate.
 
+`make publish-maven-central` then signs every module, publishes it, and releases it to
+Maven Central (`make publish-snapshot` publishes a `-SNAPSHOT` of the version instead).
+Both need `GPG_SIGNING_KEY_ID` naming a key in the local GPG keyring, and they read their
+secrets from the macOS keychain:
+
+| Keychain entry | Account | Holds |
+| --- | --- | --- |
+| `gradle-signing-password` | `gpg-signing` | The signing key's passphrase |
+| `maven-central-username` | `maven-central` | The name of a user token from [central.sonatype.com](https://central.sonatype.com) |
+| `maven-central-password` | `maven-central` | That token's password |
+
+The secrets reach only those two Gradle runs, as environment variables, never
+`~/.gradle/gradle.properties`, which every Gradle build on the machine reads. Add the
+token once; `-w` with no value prompts for it, which keeps it out of the shell's history:
+
+```bash
+security add-generic-password -a maven-central -s maven-central-username -U -w
+security add-generic-password -a maven-central -s maven-central-password -U -w
+```
+
+A missing or empty entry stops the target before Gradle starts, naming the entry but not
+its value.
+
 ## CI
 
 `.github/workflows/ci.yml` has two jobs:
