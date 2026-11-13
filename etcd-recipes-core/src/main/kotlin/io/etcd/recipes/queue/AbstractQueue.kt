@@ -266,11 +266,8 @@ abstract class AbstractQueue(
         // the outer loop re-reads. (Never fall back to the key the watcher saw — the
         // re-query is a linearizable read taken after the event, so a key it misses is
         // already gone.)
-        val head = readHead().entry
-        if (head == null) {
-          watchFailure.load()?.let { cause ->
-            throw EtcdRecipeRuntimeException("Queue watch on $queuePath failed while waiting for an item", cause)
-          }
+        val head = readHead().entry ?: watchFailure.load()?.let { cause ->
+          throw EtcdRecipeRuntimeException("Queue watch on $queuePath failed while waiting for an item", cause)
         }
         head
       }
