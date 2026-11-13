@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `make versions` lists only the dependencies with newer versions, plus any it could not
   check; `make versions-all` prints the full report, up-to-date dependencies included. The
   versions plugin is 0.66.0 (from 0.65.0), and the Gradle daemon's heap is 4 GB (from 2 GB).
+- `make publish-maven-central` and `make publish-snapshot` read the Maven Central
+  credentials (a Central Portal user token) from the macOS keychain, as they already read
+  the signing key's passphrase, and pass them to that Gradle run alone rather than leaving
+  them in `~/.gradle/gradle.properties`, where every Gradle build on the machine sees them.
+  Either target stops before Gradle starts when an entry is missing or empty. The
+  contributing page has the one-time setup.
 
 ### Changed (CI)
 

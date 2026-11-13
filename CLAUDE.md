@@ -25,6 +25,7 @@ JDK 17 toolchain (configured in `build.gradle.kts` via `kotlin { jvmToolchain(17
 - `make site` — serve the documentation site locally
 - `make docs-check` — compile the website code snippets, then build the site in strict mode (both halves of what CI checks: `ci.yml` compiles the snippets, `docs.yml` builds the site)
 - `make versions` — `./gradlew dependencyUpdates --no-parallel`, listing only the dependencies (and Gradle) with newer versions, plus any that could not be checked (the formatter is in `configureVersions()` in `build.gradle.kts`); `make versions-all` prints the plugin's full plain report, up-to-date dependencies included
+- `make publish-local` / `make publish-maven-central` / `make publish-snapshot` — publish to `~/.m2` / sign, publish, and release the current version to Maven Central / publish a `-SNAPSHOT` of it there. The Maven Central targets need `GPG_SIGNING_KEY_ID` and read every secret from the macOS keychain, passing it to that Gradle run alone (never `~/.gradle/gradle.properties`): the key's passphrase (`gradle-signing-password`, account `gpg-signing`) and a Central Portal user token (`maven-central-username` / `maven-central-password`, account `maven-central`). `_check-gpg-env` and `_check-maven-central-env` fail before Gradle starts when an entry is missing; the comment above `MAVEN_CENTRAL_ENV` has the `security add-generic-password` commands
 - `make refresh` — refresh dependencies
 - `make upgrade-wrapper` — bumps the Gradle wrapper
 
